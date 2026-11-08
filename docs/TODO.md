@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 10 · **Closed:** 7
+**Open:** 13 · **Closed:** 7
 
 ## decision (4)
 
@@ -27,12 +27,15 @@
 |---|---|---|---|
 | [TD-011](../tracker/todo/TD-011.md) | forms F13 report-slot mapping + F14 AI import assistant (SPEC-11 §2) not in Phase 1 tasks | T-0110 | planner |
 
-## later (2)
+## later (5)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
 | [TD-016](../tracker/todo/TD-016.md) | Backend tests: move TestClient transport from httpx to httpx2 (Starlette 1.x deprecation warning) | T-0001 | implementer |
 | [TD-017](../tracker/todo/TD-017.md) | Backend: add a dependency lock file (pinned versions) before T-0004 Dockerfile needs reproducible builds | T-0001 | reviewer |
+| [TD-018](../tracker/todo/TD-018.md) | Frontend: wire npm run gen:api (OpenAPI -> frontend/src/api/) once the backend exposes an OpenAPI schema | T-0002 | implementer |
+| [TD-019](../tracker/todo/TD-019.md) | Frontend: PWA manifest + service worker (app-shell caching) for offline-first field use | T-0002 | implementer |
+| [TD-020](../tracker/todo/TD-020.md) | Frontend: add ESLint (typescript-eslint, react-hooks) + lint gate in CLAUDE.md section 4 and CI | T-0002 | implementer |
 
 ## risk (1)
 
