@@ -1,46 +1,31 @@
 # KERP specification — index (single source of truth)
 
-Agents build **strictly** against the two documents below. They are the unified,
-consolidated output of the architectural review suite and supersede every legacy
-document (now in [`../archive-legacy-specs/`](../archive-legacy-specs/README.md),
-including the Inspection-ERP PR #23/#24 material that previously lived here).
+Agents build **strictly** against the documents below — the merged, consolidated spec.
+They supersede every legacy document (archived under
+[`../archive-legacy-specs/`](../archive-legacy-specs/README.md), reference only).
 
 ## Authoritative (build to these)
 
-| Document | Role |
-|---|---|
-| [KERP-MASTER-SPEC.md](KERP-MASTER-SPEC.md) | Single source of truth: database schemas (DDL), 3-tier topology, module contracts (`service.py`), state machines, the cross-module interaction matrix, domain-event bus payloads, and the automated MDR collation engine. |
-| [KERP-EDGE-SCREENS-AND-SPEC-UPDATE.md](KERP-EDGE-SCREENS-AND-SPEC-UPDATE.md) | Operational addendum: the three Tier-1 offline edge screens (Gate Delivery/OS&D, Look-Ahead Constraint Board, Daily Workface Log), the IndexedDB offline mutation outbox, the CEL rule engine (dual-runtime JS/Python), the equipment-calibration hard quality gates, the persona access matrix, project-scoped RLS, and the phase roadmap. |
+| Document | Role | Precedence |
+|---|---|---|
+| [KERP-CONSOLIDATION-AND-DIFF.md](KERP-CONSOLIDATION-AND-DIFF.md) | **Binding** scope culls, data-model overhauls, engine/infra, security, calibration, frontend, phasing — the merge of old + new | **1 (wins on conflict)** |
+| [KERP-MASTER-SPEC.md](KERP-MASTER-SPEC.md) | 12-domain architecture catalog, core DDL, module contracts, state machines, event bus, MDR engine | 2 |
+| [KERP-EDGE-SCREENS-AND-SPEC-UPDATE.md](KERP-EDGE-SCREENS-AND-SPEC-UPDATE.md) | 3 Tier-1 offline edge screens, IndexedDB/Dexie outbox, CEL engine, calibration gates, persona matrix, project-RLS | 2 |
+| [modules/](modules/) | Preserved KAEFER domain detail (quality/ITP/eligibility, welding/NDE, coatings/scaffolding, asset/ltree/JSONB, materials/heat, documents/MDR, commercial/claims) with the overhauls applied | 3 |
 
-### How the two relate
-`KERP-MASTER-SPEC.md` owns the data model, contracts and events.
-`KERP-EDGE-SCREENS-AND-SPEC-UPDATE.md` owns the field UI/UX, the offline sync outbox,
-CEL, and the calibration/quality gates (the "one-engine" decisions: TD-002). A task
-that touches edge screens, CEL/the unified field engine, offline sync, or calibration
-references **both**; everything else references the master spec. On disagreement, the
-master spec's data contracts win; raise a `spec-gap` TODO.
+**Precedence:** consolidation diff → master + edge specs → module detail → (archive, reference only).
+Disagreements found while building → `spec-gap` TODO.
 
-## Resolved architectural decisions now baked in
-- **TD-002 — One-Engine Architecture (adopted):** one dynamic schema/field registry, one
-  inspection-record lifecycle, one centralized `eligibility` verification service, shared
-  by forms, item types, ITP templates and inspection requests.
-- **CEL (Common Expression Language)** is the sandboxed, dual-runtime (JS client / Python
-  server) rule and dynamic-expression engine behind `run_checks`.
-- **Equipment calibration hard gates** block expired/invalid tools from executing field
-  inspections (Phase 1 backbone).
-- **Project-isolated tenancy:** PostgreSQL RLS keyed to `tenant_id` bound to each `project_id`.
-
-## Note on numbering
-The spec roadmap (§7.2 of the edge-screens addendum) is an illustrative sequence. Where its
-`T-xxxx` numbers collide with ids already in the tracker (e.g. the Phase-1 freeze gate it
-labels `T-0131`), the tracker keeps its existing ids and the gate/calibration tasks take the
-next free ids — see `docs/TASKS.md`.
+## What the merge changed (summary — full detail in the consolidation diff)
+- **Culled:** GL/accounting, HR/payroll, e-commerce/POS/CRM, `enterprise_workflows`, `module_builder`, 3D CAD/BIM viewers & `.dwg` parsers. Money is a read-only external mirror.
+- **One-engine (TD-002):** one field-type registry (`core/fields`), one inspection record (`oe_inspections_inspection`, kind inspection/itp/rfi), stateless `eligibility`, new `inspection_requests`.
+- **Overhauls:** ltree hierarchy; JSONB attributes (EAV deleted); **CEL** (not JSONLogic); **SAQ** (not ARQ); **FFD + rectpack** cutting; project-scoped RLS + 4 bypass tests; **RS256/EdDSA + JWKS**; hash-chain audit → pyHanko PAdES at turnover; calibration hard gate; 15 personas; 8-group IA; Dexie offline outbox.
 
 ## Reference only (do NOT build to these)
 Everything under [`../archive-legacy-specs/`](../archive-legacy-specs/README.md) — the
-pre-consolidation analysis, module notes, and port templates (incl. SPEC-11, MODULE-SPECS,
-ADR-001, the OpenBusinessERP analysis, and the PR #22 architecture suite). Kept for obscure
-calculation/field detail only.
+pre-consolidation OpenBusinessERP analysis, field-ops module specs (SPEC-08/09/10/11,
+MODULE-SPECS, ADR-001) and the PR #22 architecture suite. Kept for obscure calculation /
+field detail only, superseded wherever the four authoritative sources speak.
 
 ## Review reports
 The `00`–`09` review suite that produced this consolidation lives in
