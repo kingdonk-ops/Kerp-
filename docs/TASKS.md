@@ -21,7 +21,7 @@
 
 | | ID | Title | Module | Size | Depends on | PR |
 |---|---|---|---|---|---|---|
-| 🟦 | [T-0001](../tracker/tasks/T-0001.md) | Backend scaffold: FastAPI app factory, settings, /health | platform | S | — |  |
+| 🟪 | [T-0001](../tracker/tasks/T-0001.md) | Backend scaffold: FastAPI app factory, settings, /health | platform | S | — | #7 |
 | ▶ | [T-0002](../tracker/tasks/T-0002.md) | Frontend scaffold: Vite + React 18 + TS strict, Tailwind, TanStack Query, Dexie, router, i18n, Vitest | platform | S | — |  |
 | ⬜ | [T-0003](../tracker/tasks/T-0003.md) | Dev infra: docker-compose (PG16+PostGIS+ltree, Redis7, MinIO), Makefile, .env.example | platform | S | T-0001 |  |
 | ⬜ | [T-0004](../tracker/tasks/T-0004.md) | Backend Dockerfile (multi-stage, --only-binary) + CI image build to GHCR | platform | S | T-0001 |  |
