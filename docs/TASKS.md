@@ -3,12 +3,12 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 0/66 tasks done (0%) · **ready now:** 2 · **epics awaiting breakdown:** 40
+**Overall:** 0/67 tasks done (0%) · **ready now:** 2 · **epics awaiting breakdown:** 40
 
 | Phase | Tasks done | Progress |
 |---|---|---|
 | 0 · Platform foundations | 0/27 | `░░░░░░░░░░` 0% |
-| 1 · Asset & Quality backbone | 0/31 (+1 epics) | `░░░░░░░░░░` 0% |
+| 1 · Asset & Quality backbone | 0/32 (+1 epics) | `░░░░░░░░░░` 0% |
 | 2 · Welding quality | 0/8 | `░░░░░░░░░░` 0% |
 | 3 · Logistics | 0/0 (+7 epics) | `░░░░░░░░░░` 0% |
 | 4 · Execution | 0/0 (+10 epics) | `░░░░░░░░░░` 0% |
@@ -60,10 +60,13 @@
 | ⬜ | [T-0105](../tracker/tasks/T-0105.md) | P6 Primavera XML import variant | asset_management | S | T-0104 |  |
 | ⬜ | [T-0106](../tracker/tasks/T-0106.md) | P6 export: progress actuals file keyed on Activity ID (non-destructive re-import) | asset_management | M | T-0104 |  |
 | ⬜ | [T-0107](../tracker/tasks/T-0107.md) | Excel/CSV bulk import wizard + manual ingest | asset_management | M | T-0103 |  |
-| ⬜ | [T-0108](../tracker/tasks/T-0108.md) | Default configuration packs provisioned at project creation | asset_management | M | T-0102 |  |
+| ⬜ | [T-0108](../tracker/tasks/T-0108.md) | Default configuration packs provisioned at project creation | asset_management | M | T-0109 |  |
 | ⬜ | [T-0109](../tracker/tasks/T-0109.md) | item_types: versions, publish with migration preview (impact counts), migrate; starter packs unified with form seeds | asset_management | M | T-0102, T-0131 |  |
+| ⬜ | [T-0110](../tracker/tasks/T-0110.md) | forms engine core: shared field-type registry + sandboxed evaluator (Python, TS-parity fixtures) | forms | M | T-0016 |  |
+| ⬜ | [T-0131](../tracker/tasks/T-0131.md) | forms templates + revisions: kinds, draft→approved→retired, publish freezes schema (schema_hash + trigger), forms.publish lint | forms | M | T-0110 |  |
 | ⬜ | [T-0111](../tracker/tasks/T-0111.md) | Inspection record anchored at Asset/sub-Asset/RSW/Item + lifecycle | inspections | M | T-0103, T-0131 |  |
 | ⬜ | [T-0112](../tracker/tasks/T-0112.md) | Global inspections register: cross-level filters + batch PDF/Excel export (ARQ) | inspections | M | T-0111 |  |
+| ⬜ | [T-0132](../tracker/tasks/T-0132.md) | Frontend: TS evaluator package passing the shared evaluator fixtures (SPEC-11 §2 F8 parity) | frontend | M | T-0110, T-0002 |  |
 | ⬜ | [T-0113](../tracker/tasks/T-0113.md) | qms: ITP plans/templates + audit register | qms | M | T-0111 |  |
 | ⬜ | [T-0114](../tracker/tasks/T-0114.md) | construction_control: hold/witness gates + conformance criteria | construction_control | M | T-0113 |  |
 | ⬜ | [T-0115](../tracker/tasks/T-0115.md) | ncr: Non-Conformance Reports anchored to Asset/RSW/Item | ncr | S | T-0111 |  |
@@ -83,8 +86,6 @@
 | ⬜ | [T-0129](../tracker/tasks/T-0129.md) | Frontend: inspections register + raise/close flow with gate findings surfaced | frontend | M | T-0112, T-0124, T-0127 |  |
 | ⬜ | [T-0130](../tracker/tasks/T-0130.md) | Phase 1 exit journey: P6 → hierarchy → inspection gates → completion blocked by open NCR | e2e | S | T-0128, T-0129 |  |
 | 🧩 | [E-01-01](../tracker/tasks/E-01-01.md) | Request-for-Inspection module + ported AIP capabilities | inspection_requests | L | T-0111 |  |
-| ⬜ | [T-0110](../tracker/tasks/T-0110.md) | forms engine core: shared field-type registry + sandboxed evaluator (Python, TS-parity fixtures) | forms | M | T-0016 |  |
-| ⬜ | [T-0131](../tracker/tasks/T-0131.md) | forms templates + revisions: kinds, draft→approved→retired, publish freezes schema (schema_hash + trigger), forms.publish lint | forms | M | T-0110 |  |
 
 ## Phase 2 — Welding quality
 
