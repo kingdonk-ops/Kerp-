@@ -26,18 +26,36 @@ gh api -X PUT "$R/actions/permissions/workflow" -f default_workflow_permissions=
 echo "actions token: write"
 
 # 3. Variables used by the workflows.
-setvar() {
-  gh api -X POST "$R/actions/variables" -f name="$1" -f value="$2" >/dev/null 2>&1 \
-    || gh api -X PATCH "$R/actions/variables/$1" -f name="$1" -f value="$2" >/dev/null
-  echo "var $1=$2"
+# Create-if-missing only: re-runs never overwrite values you changed later.
+getvar() { gh api "$R/actions/variables/$1" -q .value 2>/dev/null || true; }
+setvar_default() {
+  local cur; cur="$(getvar "$1")"
+  if [ -z "$cur" ]; then
+    gh api -X POST "$R/actions/variables" -f name="$1" -f value="$2" >/dev/null
+    echo "var $1=$2 (created)"
+  else
+    echo "var $1=$cur (kept)"
+  fi
 }
-setvar KERP_PROMOTE_EVERY 5
-setvar KERP_ALLOWED_REVIEWERS "$(gh api user -q .login)"
+ME="$(gh api user -q .login)"
+setvar_default KERP_PROMOTE_EVERY 5
+# Allowed reviewers: merge the current login into any existing list.
+CUR="$(getvar KERP_ALLOWED_REVIEWERS)"
+if [ -z "$CUR" ]; then
+  setvar_default KERP_ALLOWED_REVIEWERS "$ME"
+elif ! tr ',' '\n' <<<"$CUR" | grep -qixF "$ME"; then
+  gh api -X PATCH "$R/actions/variables/KERP_ALLOWED_REVIEWERS" -f name=KERP_ALLOWED_REVIEWERS -f value="$CUR,$ME" >/dev/null
+  echo "var KERP_ALLOWED_REVIEWERS=$CUR,$ME (merged)"
+else
+  echo "var KERP_ALLOWED_REVIEWERS=$CUR (kept)"
+fi
 
 # 4. Rulesets (create or replace by name).
+# Required checks are pinned to the GitHub Actions app (integration_id 15368) so a
+# hand-posted commit status named ci-gate/review-gate cannot satisfy them.
 upsert_ruleset() {
   local name="$1" body="$2" id
-  id=$(gh api "$R/rulesets" -q ".[] | select(.name==\"$name\") | .id" || true)
+  id=$(gh api "$R/rulesets" -q "[.[] | select(.name==\"$name\") | .id][0] // empty" || true)
   if [ -n "$id" ]; then
     gh api -X PUT "$R/rulesets/$id" --input - <<<"$body" -q '"updated ruleset \(.name)"'
   else
@@ -59,7 +77,7 @@ upsert_ruleset "dev" '{
       "required_review_thread_resolution": false, "allowed_merge_methods": ["squash"]}},
     {"type": "required_status_checks", "parameters": {
       "strict_required_status_checks_policy": false,
-      "required_status_checks": [{"context": "ci-gate"}, {"context": "review-gate"}]}}
+      "required_status_checks": [{"context": "ci-gate", "integration_id": 15368}, {"context": "review-gate", "integration_id": 15368}]}}
   ]}'
 
 # main: only fast-forwards of CI-green commits (the promotion workflow). No PR rule, so the workflow can push.
@@ -72,7 +90,7 @@ upsert_ruleset "main" '{
     {"type": "non_fast_forward"},
     {"type": "required_status_checks", "parameters": {
       "strict_required_status_checks_policy": false,
-      "required_status_checks": [{"context": "ci-gate"}]}}
+      "required_status_checks": [{"context": "ci-gate", "integration_id": 15368}]}}
   ]}'
 
 # Release tags are immutable once created.
