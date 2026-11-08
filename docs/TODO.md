@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 8 · **Closed:** 7
+**Open:** 9 · **Closed:** 7
 
 ## decision (4)
 
@@ -26,6 +26,12 @@
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
 | [TD-011](../tracker/todo/TD-011.md) | forms F13 report-slot mapping + F14 AI import assistant (SPEC-11 §2) not in Phase 1 tasks | T-0110 | planner |
+
+## later (1)
+
+| ID | Title | Related tasks | Raised by |
+|---|---|---|---|
+| [TD-016](../tracker/todo/TD-016.md) | Backend tests: move TestClient transport from httpx to httpx2 (Starlette 1.x deprecation warning) | T-0001 | implementer |
 
 ## risk (1)
 
