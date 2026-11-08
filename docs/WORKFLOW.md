@@ -23,9 +23,10 @@
 | Branch | Rule |
 |---|---|
 | `dev` | PR required · required checks **`ci-gate`** and **`review-gate`** · no force-push · no deletion |
-| `main` | required check **`ci-gate`** on the pushed commit · no force-push · no deletion · written only by `promote.yml` (fast-forward of a CI-green dev commit) |
+| `main` | required check **`ci-gate`** (from GitHub Actions) on the pushed commit · no force-push · no deletion. Enforced: only fast-forwards to CI-green commits. Convention (CLAUDE.md): only `promote.yml` does it |
 
 - **`ci-gate`** (`.github/workflows/ci.yml`): tracker validation + boards fresh + pipeline tests, then backend / frontend / e2e jobs, each auto-enabled once that component exists.
+- Required checks are pinned to the GitHub Actions app, so a hand-posted commit status can't fake them.
 - **`review-gate`** (`.github/workflows/review-gate.yml` → `scripts/review_gate.py`): the latest `KERP-REVIEW:` marker from an allowed reviewer must be `APPROVED` with a `patch-id` equal to the PR's current code diff. Tracker-only commits (status, boards) don't invalidate it; any code change does.
 - **Promotion** (`.github/workflows/promote.yml`): threshold in repo variable `KERP_PROMOTE_EVERY` (default 5). Manual "Run workflow" promotes now. Tags `release-YYYYMMDD-HHMM-<sha>` with the list of merged PRs.
 
