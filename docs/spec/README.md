@@ -29,4 +29,7 @@ PR #22 (architecture suite of the as-built Inspection-ERP) is **not** part of th
 - `REVISED-PLAN-*.md` — superseded by FINAL-PLAN.
 
 ## Precedence when documents disagree
-DEVELOPMENT-PLAN + MODULE-SPECS → PROPOSAL-port-from-aip + MODULE-SPEC-11 (where they dedup/extend a module) → ADR-001 → MODULE-SPEC-08/09/10 → FINAL-PLAN → everything else. Disagreements found while building → `spec-gap` TODO.
+1. **For the modules SPEC-11 covers** — `forms`, `item_types` / `asset_management` schema & layout, `inspections`, `eligibility`, `inspection_requests`, `rfi` / `submittals` — **MODULE-SPEC-11 + PROPOSAL-port-from-aip override** MODULE-SPECS and MODULE-SPEC-08 (e.g. the thin `forms` and the standalone `oe_asset_layout` designer are superseded). PROPOSAL's own "Status: Proposal for review" header is superseded by TD-002 (adopted); the file is kept byte-identical to its source.
+2. **Everywhere else:** DEVELOPMENT-PLAN + MODULE-SPECS → ADR-001 → MODULE-SPEC-08/09/10 → FINAL-PLAN → everything else.
+
+Disagreements found while building → `spec-gap` TODO.
