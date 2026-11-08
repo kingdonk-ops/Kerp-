@@ -3,15 +3,15 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 0/67 tasks done (0%) · **ready now:** 2 · **epics awaiting breakdown:** 40
+**Overall:** 0/69 tasks done (0%) · **ready now:** 2 · **epics awaiting breakdown:** 40
 
 | Phase | Tasks done | Progress |
 |---|---|---|
 | 0 · Platform foundations | 0/27 | `░░░░░░░░░░` 0% |
-| 1 · Asset & Quality backbone | 0/32 (+1 epics) | `░░░░░░░░░░` 0% |
+| 1 · Asset & Quality backbone | 0/34 (+1 epics) | `░░░░░░░░░░` 0% |
 | 2 · Welding quality | 0/8 | `░░░░░░░░░░` 0% |
-| 3 · Logistics | 0/0 (+7 epics) | `░░░░░░░░░░` 0% |
-| 4 · Execution | 0/0 (+10 epics) | `░░░░░░░░░░` 0% |
+| 3 · Logistics | 0/0 (+6 epics) | `░░░░░░░░░░` 0% |
+| 4 · Execution | 0/0 (+11 epics) | `░░░░░░░░░░` 0% |
 | 5 · Documents, collaboration & AI | 0/0 (+10 epics) | `░░░░░░░░░░` 0% |
 | 6 · Defense, claims & controls | 0/0 (+7 epics) | `░░░░░░░░░░` 0% |
 | 6b · Work packaging (AWP) | 0/0 (+2 epics) | `░░░░░░░░░░` 0% |
@@ -79,6 +79,7 @@
 | ⬜ | [T-0122](../tracker/tasks/T-0122.md) | source_data: prerequisite-documents register | source_data | S | T-0101 |  |
 | ⬜ | [T-0123](../tracker/tasks/T-0123.md) | compliance / compliance_ai / compliance_docs DSL wired into run_checks | compliance | M | T-0016 |  |
 | ⬜ | [T-0124](../tracker/tasks/T-0124.md) | Rule sets: asset.status_change, inspection.close, rsw.complete, asset.p6_fields, schedule.p6_import/export | validation | M | T-0111, T-0114, T-0115, T-0104 |  |
+| ⬜ | [T-0134](../tracker/tasks/T-0134.md) | Equipment calibration register + OCR cert ingest + hard field gate (expired tool blocked) | equipment | M | T-0014, T-0015, T-0016, T-0111 |  |
 | ⬜ | [T-0125](../tracker/tasks/T-0125.md) | Offline sync core: idempotent sync ledger (client op id → result) + conflict replay | sync | M | T-0013 |  |
 | ⬜ | [T-0126](../tracker/tasks/T-0126.md) | Frontend: useOfflineSync tier-1 (IndexedDB queue) + offline indicator | frontend | M | T-0125, T-0024 |  |
 | ⬜ | [T-0127](../tracker/tasks/T-0127.md) | Frontend: asset tree + Asset-Details (attributes, items, inspections tab over descendants) | frontend | M | T-0101, T-0103, T-0024 |  |
@@ -86,6 +87,7 @@
 | ⬜ | [T-0129](../tracker/tasks/T-0129.md) | Frontend: inspections register + raise/close flow with gate findings surfaced | frontend | M | T-0112, T-0124, T-0127 |  |
 | ⬜ | [T-0130](../tracker/tasks/T-0130.md) | Phase 1 exit journey: P6 → hierarchy → inspection gates → completion blocked by open NCR | e2e | S | T-0128, T-0129 |  |
 | 🧩 | [E-01-01](../tracker/tasks/E-01-01.md) | Request-for-Inspection module + ported AIP capabilities | inspection_requests | L | T-0111 |  |
+| ⬜ | [T-0133](../tracker/tasks/T-0133.md) | Phase 1 backbone-freeze contract gate (schema immutability + CEL parity + seam hashes) | platform | M | T-0101, T-0103, T-0110, T-0111, T-0124, T-0130, T-0132, T-0134 |  |
 
 ## Phase 2 — Welding quality
 
@@ -105,12 +107,11 @@
 | | ID | Title | Module | Size | Depends on | PR |
 |---|---|---|---|---|---|---|
 | 🧩 | [E-03-01](../tracker/tasks/E-03-01.md) | contacts: party master + people/company directory (crm folded in) | contacts | L | T-0010 |  |
+| 🧩 | [E-03-05](../tracker/tasks/E-03-05.md) | procurement / supplier_catalogs / subcontractors (basic, external contract refs) | procurement | L | E-03-01 |  |
 | 🧩 | [E-03-02](../tracker/tasks/E-03-02.md) | site_logistics: deliveries, gate receipt, OS&D vs ERP-mirrored PO lines (+ Gate Delivery edge screen) | site_logistics | L | T-0101, T-0126 |  |
 | 🧩 | [E-03-03](../tracker/tasks/E-03-03.md) | site_inventory: append-only movements ledger | site_inventory | L | T-0101 |  |
 | 🧩 | [E-03-04](../tracker/tasks/E-03-04.md) | cutting: bar/sheet nesting, yield/waste, offcut reuse, cutting.confirm → inventory | cutting | L | E-03-03 |  |
-| 🧩 | [E-03-05](../tracker/tasks/E-03-05.md) | procurement / supplier_catalogs / subcontractors (basic, external contract refs) | procurement | L | E-03-01 |  |
-| 🧩 | [E-03-06](../tracker/tasks/E-03-06.md) | equipment & fleet register | equipment | L | T-0101 |  |
-| 🧩 | [E-03-07](../tracker/tasks/E-03-07.md) | resource_summary: demand rollup from tasks/look-ahead with required-by dates | resource_summary | L | E-04-04 |  |
+| 🧩 | [E-03-06](../tracker/tasks/E-03-06.md) | equipment & fleet register | equipment | L | T-0101, T-0134 |  |
 
 ## Phase 4 — Execution
 
@@ -126,6 +127,7 @@
 | 🧩 | [E-04-08](../tracker/tasks/E-04-08.md) | site_prep / site_supervision / commissioning / closeout / defects_liability / temporary_works | site_supervision | L | T-0124 |  |
 | 🧩 | [E-04-09](../tracker/tasks/E-04-09.md) | timeline / deadlines / prefab / resources | timeline | L | E-04-01 |  |
 | 🧩 | [E-04-10](../tracker/tasks/E-04-10.md) | safety + hse_advanced (+ safety KPI ingestion) | safety | L | T-0010 |  |
+| 🧩 | [E-04-11](../tracker/tasks/E-04-11.md) | resource_summary: demand rollup from tasks/look-ahead with required-by dates | resource_summary | L | E-04-04 |  |
 
 ## Phase 5 — Documents, collaboration & AI
 
@@ -152,7 +154,7 @@
 | 🧩 | [E-06-04](../tracker/tasks/E-06-04.md) | reporting / dashboard(s) / bi_dashboards (rollups in ARQ → summary tables) | reporting | L | E-06-03 |  |
 | 🧩 | [E-06-05](../tracker/tasks/E-06-05.md) | project_intelligence + risk | risk | L | E-06-04 |  |
 | 🧩 | [E-06-06](../tracker/tasks/E-06-06.md) | carbon / esg / service | carbon | L | T-0101 |  |
-| 🧩 | [E-06-07](../tracker/tasks/E-06-07.md) | cases (persona walkthroughs) / enterprise_workflows / approval_routes | cases | L | T-0016 |  |
+| 🧩 | [E-06-07](../tracker/tasks/E-06-07.md) | cases (persona walkthroughs) + approval_routes (enterprise_workflows retired) | cases | L | T-0016 |  |
 
 ## Phase 6b — Work packaging (AWP)
 

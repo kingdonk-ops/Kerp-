@@ -1,35 +1,47 @@
-# KERP specification — index
+# KERP specification — index (single source of truth)
 
-Everything in this folder came from `kingdonk-ops/Inspection-ERP`:
-
-| Source PR | What it delivered | Where it is here |
-|---|---|---|
-| **#23** (merged) — OpenBusinessERP architecture & per-module analysis | Field Operations Platform plan, module specs, ADR-001, MODULE-SPEC-08/09/10, final plan + the original analysis | `field-operations-platform/` (except the two PR #24 files below) · `openbusinesserp-analysis/` |
-| **#24** (merged) — port the strongest Project-AIP capabilities | One-engine dedup proposal, MODULE-SPEC-11, MODULE-SPECS §15 pointer | `field-operations-platform/PROPOSAL-port-from-aip.md` · `field-operations-platform/spec/MODULE-SPEC-11-inspection-requests.md` · `field-operations-platform/MODULE-SPECS.md` (§15) |
-
-PR #22 (architecture suite of the as-built Inspection-ERP) is **not** part of the spec; it is parked in `docs/archive/` for reference only.
+Agents build **strictly** against the two documents below. They are the unified,
+consolidated output of the architectural review suite and supersede every legacy
+document (now in [`../archive-legacy-specs/`](../archive-legacy-specs/README.md),
+including the Inspection-ERP PR #23/#24 material that previously lived here).
 
 ## Authoritative (build to these)
 
 | Document | Role |
 |---|---|
-| [field-operations-platform/DEVELOPMENT-PLAN.md](field-operations-platform/DEVELOPMENT-PLAN.md) | Scope, principles, boundaries, RBAC, verification engine, phases & exit criteria |
-| [field-operations-platform/MODULE-SPECS.md](field-operations-platform/MODULE-SPECS.md) | Per-module spec for every in-scope module (incl. §15 → SPEC-11) |
-| [field-operations-platform/ADR-001-runtime-and-storage-architecture.md](field-operations-platform/ADR-001-runtime-and-storage-architecture.md) | Runtime topology: Nginx, 3 Uvicorn, ARQ+Redis, Postgres16+PostGIS, presigned uploads |
-| [field-operations-platform/PROPOSAL-port-from-aip.md](field-operations-platform/PROPOSAL-port-from-aip.md) | **Adopted** (PR #24): one forms/item_types engine, single inspection record, `eligibility` service, `inspection_requests` |
-| [field-operations-platform/spec/MODULE-SPEC-11-inspection-requests.md](field-operations-platform/spec/MODULE-SPEC-11-inspection-requests.md) | `inspection_requests`, `forms`/`item_types`, `inspections` + `eligibility` + `rfi`/`submittals` extensions |
-| [field-operations-platform/spec/MODULE-SPEC-10-workpacks-awp.md](field-operations-platform/spec/MODULE-SPEC-10-workpacks-awp.md) | `workpacks`, `awp`, documents VFS |
-| [openbusinesserp-analysis/spec/MODULE-SPEC-08-new-modules.md](openbusinesserp-analysis/spec/MODULE-SPEC-08-new-modules.md) | `asset_management`, `wps`, `cutting` (+ P6 round-trip §2.5) |
-| [openbusinesserp-analysis/spec/MODULE-SPEC-09-reanchored-and-portal.md](openbusinesserp-analysis/spec/MODULE-SPEC-09-reanchored-and-portal.md) | Re-anchored schedule/progress/costmodel/variations + phased portal |
-| [openbusinesserp-analysis/FIELD-OPERATIONS-PLATFORM-FINAL-PLAN.md](openbusinesserp-analysis/FIELD-OPERATIONS-PLATFORM-FINAL-PLAN.md) | Module register (added/modified/kept/removed) + resolved decisions D3/D5/D7/D8 |
+| [KERP-MASTER-SPEC.md](KERP-MASTER-SPEC.md) | Single source of truth: database schemas (DDL), 3-tier topology, module contracts (`service.py`), state machines, the cross-module interaction matrix, domain-event bus payloads, and the automated MDR collation engine. |
+| [KERP-EDGE-SCREENS-AND-SPEC-UPDATE.md](KERP-EDGE-SCREENS-AND-SPEC-UPDATE.md) | Operational addendum: the three Tier-1 offline edge screens (Gate Delivery/OS&D, Look-Ahead Constraint Board, Daily Workface Log), the IndexedDB offline mutation outbox, the CEL rule engine (dual-runtime JS/Python), the equipment-calibration hard quality gates, the persona access matrix, project-scoped RLS, and the phase roadmap. |
 
-## Reference only (do not build to these directly)
+### How the two relate
+`KERP-MASTER-SPEC.md` owns the data model, contracts and events.
+`KERP-EDGE-SCREENS-AND-SPEC-UPDATE.md` owns the field UI/UX, the offline sync outbox,
+CEL, and the calibration/quality gates (the "one-engine" decisions: TD-002). A task
+that touches edge screens, CEL/the unified field engine, offline sync, or calibration
+references **both**; everything else references the master spec. On disagreement, the
+master spec's data contracts win; raise a `spec-gap` TODO.
 
-- `openbusinesserp-analysis/MASTER-REDEVELOPMENT-PLAN.md`, `openbusinesserp-*.md`, `spec/MODULE-SPEC-00…07b` — the original full-ERP analysis; many modules were **removed** in the field-ops pivot (FINAL-PLAN §1.4). Use only for entity/field detail on modules still in scope.
-- `REVISED-PLAN-*.md` — superseded by FINAL-PLAN.
+## Resolved architectural decisions now baked in
+- **TD-002 — One-Engine Architecture (adopted):** one dynamic schema/field registry, one
+  inspection-record lifecycle, one centralized `eligibility` verification service, shared
+  by forms, item types, ITP templates and inspection requests.
+- **CEL (Common Expression Language)** is the sandboxed, dual-runtime (JS client / Python
+  server) rule and dynamic-expression engine behind `run_checks`.
+- **Equipment calibration hard gates** block expired/invalid tools from executing field
+  inspections (Phase 1 backbone).
+- **Project-isolated tenancy:** PostgreSQL RLS keyed to `tenant_id` bound to each `project_id`.
 
-## Precedence when documents disagree
-1. **For the modules SPEC-11 covers** — `forms`, `item_types` / `asset_management` schema & layout, `inspections`, `eligibility`, `inspection_requests`, `rfi` / `submittals` — **MODULE-SPEC-11 + PROPOSAL-port-from-aip override** MODULE-SPECS and MODULE-SPEC-08 (e.g. the thin `forms` and the standalone `oe_asset_layout` designer are superseded). PROPOSAL's own "Status: Proposal for review" header is superseded by TD-002 (adopted); the file is kept byte-identical to its source.
-2. **Everywhere else:** DEVELOPMENT-PLAN + MODULE-SPECS → ADR-001 → MODULE-SPEC-08/09/10 → FINAL-PLAN → everything else.
+## Note on numbering
+The spec roadmap (§7.2 of the edge-screens addendum) is an illustrative sequence. Where its
+`T-xxxx` numbers collide with ids already in the tracker (e.g. the Phase-1 freeze gate it
+labels `T-0131`), the tracker keeps its existing ids and the gate/calibration tasks take the
+next free ids — see `docs/TASKS.md`.
 
-Disagreements found while building → `spec-gap` TODO.
+## Reference only (do NOT build to these)
+Everything under [`../archive-legacy-specs/`](../archive-legacy-specs/README.md) — the
+pre-consolidation analysis, module notes, and port templates (incl. SPEC-11, MODULE-SPECS,
+ADR-001, the OpenBusinessERP analysis, and the PR #22 architecture suite). Kept for obscure
+calculation/field detail only.
+
+## Review reports
+The `00`–`09` review suite that produced this consolidation lives in
+[`../reviews/`](../reviews/README.md) (reference, not a build target).
