@@ -27,7 +27,8 @@ echo "actions token: write"
 
 # 3. Variables used by the workflows.
 # Create-if-missing only: re-runs never overwrite values you changed later.
-getvar() { gh api "$R/actions/variables/$1" -q .value 2>/dev/null || true; }
+# Lists variables (never 404s); any API error aborts the script via set -e instead of being read as "missing".
+getvar() { gh api "$R/actions/variables?per_page=100" -q "[.variables[] | select(.name==\"$1\") | .value][0] // empty"; }
 setvar_default() {
   local cur; cur="$(getvar "$1")"
   if [ -z "$cur" ]; then
@@ -40,7 +41,7 @@ setvar_default() {
 ME="$(gh api user -q .login)"
 setvar_default KERP_PROMOTE_EVERY 5
 # Allowed reviewers: merge the current login into any existing list.
-CUR="$(getvar KERP_ALLOWED_REVIEWERS)"
+CUR="$(getvar KERP_ALLOWED_REVIEWERS | tr -d '[:space:]')"
 if [ -z "$CUR" ]; then
   setvar_default KERP_ALLOWED_REVIEWERS "$ME"
 elif ! tr ',' '\n' <<<"$CUR" | grep -qixF "$ME"; then
@@ -55,7 +56,7 @@ fi
 # hand-posted commit status named ci-gate/review-gate cannot satisfy them.
 upsert_ruleset() {
   local name="$1" body="$2" id
-  id=$(gh api "$R/rulesets" -q "[.[] | select(.name==\"$name\") | .id][0] // empty" || true)
+  id=$(gh api "$R/rulesets" -q "[.[] | select(.name==\"$name\") | .id][0] // empty")
   if [ -n "$id" ]; then
     gh api -X PUT "$R/rulesets/$id" --input - <<<"$body" -q '"updated ruleset \(.name)"'
   else
