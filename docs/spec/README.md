@@ -1,35 +1,32 @@
-# KERP specification — index
+# KERP specification — index (single source of truth)
 
-Everything in this folder came from `kingdonk-ops/Inspection-ERP`:
-
-| Source PR | What it delivered | Where it is here |
-|---|---|---|
-| **#23** (merged) — OpenBusinessERP architecture & per-module analysis | Field Operations Platform plan, module specs, ADR-001, MODULE-SPEC-08/09/10, final plan + the original analysis | `field-operations-platform/` (except the two PR #24 files below) · `openbusinesserp-analysis/` |
-| **#24** (merged) — port the strongest Project-AIP capabilities | One-engine dedup proposal, MODULE-SPEC-11, MODULE-SPECS §15 pointer | `field-operations-platform/PROPOSAL-port-from-aip.md` · `field-operations-platform/spec/MODULE-SPEC-11-inspection-requests.md` · `field-operations-platform/MODULE-SPECS.md` (§15) |
-
-PR #22 (architecture suite of the as-built Inspection-ERP) is **not** part of the spec; it is parked in `docs/archive/` for reference only.
+Agents build **strictly** against the documents below — the merged, consolidated spec.
+They supersede every legacy document (archived under
+[`../archive-legacy-specs/`](../archive-legacy-specs/README.md), reference only).
 
 ## Authoritative (build to these)
 
-| Document | Role |
-|---|---|
-| [field-operations-platform/DEVELOPMENT-PLAN.md](field-operations-platform/DEVELOPMENT-PLAN.md) | Scope, principles, boundaries, RBAC, verification engine, phases & exit criteria |
-| [field-operations-platform/MODULE-SPECS.md](field-operations-platform/MODULE-SPECS.md) | Per-module spec for every in-scope module (incl. §15 → SPEC-11) |
-| [field-operations-platform/ADR-001-runtime-and-storage-architecture.md](field-operations-platform/ADR-001-runtime-and-storage-architecture.md) | Runtime topology: Nginx, 3 Uvicorn, ARQ+Redis, Postgres16+PostGIS, presigned uploads |
-| [field-operations-platform/PROPOSAL-port-from-aip.md](field-operations-platform/PROPOSAL-port-from-aip.md) | **Adopted** (PR #24): one forms/item_types engine, single inspection record, `eligibility` service, `inspection_requests` |
-| [field-operations-platform/spec/MODULE-SPEC-11-inspection-requests.md](field-operations-platform/spec/MODULE-SPEC-11-inspection-requests.md) | `inspection_requests`, `forms`/`item_types`, `inspections` + `eligibility` + `rfi`/`submittals` extensions |
-| [field-operations-platform/spec/MODULE-SPEC-10-workpacks-awp.md](field-operations-platform/spec/MODULE-SPEC-10-workpacks-awp.md) | `workpacks`, `awp`, documents VFS |
-| [openbusinesserp-analysis/spec/MODULE-SPEC-08-new-modules.md](openbusinesserp-analysis/spec/MODULE-SPEC-08-new-modules.md) | `asset_management`, `wps`, `cutting` (+ P6 round-trip §2.5) |
-| [openbusinesserp-analysis/spec/MODULE-SPEC-09-reanchored-and-portal.md](openbusinesserp-analysis/spec/MODULE-SPEC-09-reanchored-and-portal.md) | Re-anchored schedule/progress/costmodel/variations + phased portal |
-| [openbusinesserp-analysis/FIELD-OPERATIONS-PLATFORM-FINAL-PLAN.md](openbusinesserp-analysis/FIELD-OPERATIONS-PLATFORM-FINAL-PLAN.md) | Module register (added/modified/kept/removed) + resolved decisions D3/D5/D7/D8 |
+| Document | Role | Precedence |
+|---|---|---|
+| [KERP-CONSOLIDATION-AND-DIFF.md](KERP-CONSOLIDATION-AND-DIFF.md) | **Binding** scope culls, data-model overhauls, engine/infra, security, calibration, frontend, phasing — the merge of old + new | **1 (wins on conflict)** |
+| [KERP-MASTER-SPEC.md](KERP-MASTER-SPEC.md) | 12-domain architecture catalog, core DDL, module contracts, state machines, event bus, MDR engine | 2 |
+| [KERP-EDGE-SCREENS-AND-SPEC-UPDATE.md](KERP-EDGE-SCREENS-AND-SPEC-UPDATE.md) | 3 Tier-1 offline edge screens, IndexedDB/Dexie outbox, CEL engine, calibration gates, persona matrix, project-RLS | 2 |
+| [modules/](modules/) | Preserved KAEFER domain detail (quality/ITP/eligibility, welding/NDE, coatings/scaffolding, asset/ltree/JSONB, materials/heat, documents/MDR, commercial/claims) with the overhauls applied | 3 |
 
-## Reference only (do not build to these directly)
-
-- `openbusinesserp-analysis/MASTER-REDEVELOPMENT-PLAN.md`, `openbusinesserp-*.md`, `spec/MODULE-SPEC-00…07b` — the original full-ERP analysis; many modules were **removed** in the field-ops pivot (FINAL-PLAN §1.4). Use only for entity/field detail on modules still in scope.
-- `REVISED-PLAN-*.md` — superseded by FINAL-PLAN.
-
-## Precedence when documents disagree
-1. **For the modules SPEC-11 covers** — `forms`, `item_types` / `asset_management` schema & layout, `inspections`, `eligibility`, `inspection_requests`, `rfi` / `submittals` — **MODULE-SPEC-11 + PROPOSAL-port-from-aip override** MODULE-SPECS and MODULE-SPEC-08 (e.g. the thin `forms` and the standalone `oe_asset_layout` designer are superseded). PROPOSAL's own "Status: Proposal for review" header is superseded by TD-002 (adopted); the file is kept byte-identical to its source.
-2. **Everywhere else:** DEVELOPMENT-PLAN + MODULE-SPECS → ADR-001 → MODULE-SPEC-08/09/10 → FINAL-PLAN → everything else.
-
+**Precedence:** consolidation diff → master + edge specs → module detail → (archive, reference only).
 Disagreements found while building → `spec-gap` TODO.
+
+## What the merge changed (summary — full detail in the consolidation diff)
+- **Culled:** GL/accounting, HR/payroll, e-commerce/POS/CRM, `enterprise_workflows`, `module_builder`, 3D CAD/BIM viewers & `.dwg` parsers. Money is a read-only external mirror.
+- **One-engine (TD-002):** one field-type registry (`core/fields`), one inspection record (`oe_inspections_inspection`, kind inspection/itp/rfi), stateless `eligibility`, new `inspection_requests`.
+- **Overhauls:** ltree hierarchy; JSONB attributes (EAV deleted); **CEL** (not JSONLogic); **SAQ** (not ARQ); **FFD + rectpack** cutting; project-scoped RLS + 4 bypass tests; **RS256/EdDSA + JWKS**; hash-chain audit → pyHanko PAdES at turnover; calibration hard gate; 15 personas; 8-group IA; Dexie offline outbox.
+
+## Reference only (do NOT build to these)
+Everything under [`../archive-legacy-specs/`](../archive-legacy-specs/README.md) — the
+pre-consolidation OpenBusinessERP analysis, field-ops module specs (SPEC-08/09/10/11,
+MODULE-SPECS, ADR-001) and the PR #22 architecture suite. Kept for obscure calculation /
+field detail only, superseded wherever the four authoritative sources speak.
+
+## Review reports
+The `00`–`09` review suite that produced this consolidation lives in
+[`../reviews/`](../reviews/README.md) (reference, not a build target).
