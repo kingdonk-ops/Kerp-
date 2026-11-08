@@ -34,15 +34,15 @@ contract before 3–6").
 
 1. **Offline sync core moved into Phase 1** (T-0125/T-0126) — spec §9 requires it be designed in from Phase 0/1, though its modules are listed under Phase 4. → TD-006.
 2. **`module_builder`** has no buildable spec → a spec-writing task (T-0027) instead of code. → TD-005.
-3. **Admin/User-Manager UI** added (T-0025) — architecture-suite Part 4 §7.2 records it as not built.
-4. **PROPOSAL-port-from-aip** is unresolved ("for review"). Tasks it reshapes (T-0102, T-0109, T-0110, E-01-01) are **blocked on TD-002** — the only blocking decision.
+3. **Admin/User-Manager UI** added (T-0025) — the RBAC matrix (§4) needs a UI to assign personas and scope; no module spec covers it.
+4. **PROPOSAL-port-from-aip + MODULE-SPEC-11 (PR #24) adopted** — one shared forms/item_types engine, single inspection record, `eligibility` service, new `inspection_requests` module (E-01-01). Shapes T-0102, T-0109, T-0110.
 
 ## Decisions (defaults applied unless you override — see `TODO.md`)
 
 | ID | Question | Default in use |
 |---|---|---|
 | TD-001 | Port Inspection-ERP core or rewrite | Port & adapt |
-| TD-002 | Adopt the AIP one-engine dedup proposal | **Blocking** — needs your call |
+| TD-002 | Adopt the AIP one-engine dedup proposal | **Adopted** (PR #24 is spec) — resolved |
 | TD-003 | SSO vs local auth | Local JWT behind an `AuthProvider` seam |
 | TD-004 | Hosting (Coolify/MinIO vs AWS) | S3-compatible storage; deploy target TBD before T-0004 publishes |
 | TD-007 | Multi-tenant plumbing in a single-company product | Keep tenant_id + RLS |

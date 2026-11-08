@@ -44,7 +44,7 @@
 | ⬜ | [T-0021](../tracker/tasks/T-0021.md) | onboarding: first-run provisioning (tenant, admin, default project) | onboarding | S | T-0010, T-0012 |  |
 | ⬜ | [T-0022](../tracker/tasks/T-0022.md) | Observability + security headers (request id, structured logs, CSP/HSTS) | platform | S | T-0001 |  |
 | ⬜ | [T-0023](../tracker/tasks/T-0023.md) | Lint rule: heavy libs (fitz, trimesh, cv2, pyarrow) must be lazily imported | platform | S | T-0001 |  |
-| ⬜ | [T-0024](../tracker/tasks/T-0024.md) | Frontend shell: auth flow, Datum design tokens, sidebar (4 pillars), top bar, generated API client | frontend | M | T-0002, T-0007 |  |
+| ⬜ | [T-0024](../tracker/tasks/T-0024.md) | Frontend shell: auth flow, design tokens, sidebar (4 pillars), top bar, generated API client | frontend | M | T-0002, T-0007 |  |
 | ⬜ | [T-0025](../tracker/tasks/T-0025.md) | Admin UI: user manager, roles/personas, project/site scope assignment | frontend | M | T-0024, T-0012 |  |
 | ⬜ | [T-0026](../tracker/tasks/T-0026.md) | Playwright setup + Phase 0 exit journey | e2e | S | T-0021, T-0024, T-0016 |  |
 | 🟥 | [T-0027](../tracker/tasks/T-0027.md) | module_builder: write a buildable spec (spec-gap) — no code *(blocked by TD-005)* | module_builder | S | T-0009 |  |
@@ -54,15 +54,15 @@
 | | ID | Title | Module | Size | Depends on | PR |
 |---|---|---|---|---|---|---|
 | ⬜ | [T-0101](../tracker/tasks/T-0101.md) | Asset hierarchy: oe_asset_node (Site→Area→Asset→sub-Asset*→RSW), tree API | asset_management | M | T-0010, T-0016 |  |
-| 🟥 | [T-0102](../tracker/tasks/T-0102.md) | Dynamic schema: categories/types/field defs/values (JSONB + versioned JSONSchema, GIN) *(blocked by TD-002)* | asset_management | M | T-0101 |  |
+| ⬜ | [T-0102](../tracker/tasks/T-0102.md) | Dynamic schema: categories/types/field defs/values (JSONB + versioned JSONSchema, GIN) | asset_management | M | T-0101 |  |
 | ⬜ | [T-0103](../tracker/tasks/T-0103.md) | Items (oe_asset_item): typed inspectable items on assets | asset_management | M | T-0102 |  |
 | ⬜ | [T-0104](../tracker/tasks/T-0104.md) | P6 .xer import: parser in ARQ → staging → hierarchy mapping (idempotent on Activity ID) | asset_management | M | T-0101, T-0014 |  |
 | ⬜ | [T-0105](../tracker/tasks/T-0105.md) | P6 Primavera XML import variant | asset_management | S | T-0104 |  |
 | ⬜ | [T-0106](../tracker/tasks/T-0106.md) | P6 export: progress actuals file keyed on Activity ID (non-destructive re-import) | asset_management | M | T-0104 |  |
 | ⬜ | [T-0107](../tracker/tasks/T-0107.md) | Excel/CSV bulk import wizard + manual ingest | asset_management | M | T-0103 |  |
 | ⬜ | [T-0108](../tracker/tasks/T-0108.md) | Default configuration packs provisioned at project creation | asset_management | M | T-0102 |  |
-| 🟥 | [T-0109](../tracker/tasks/T-0109.md) | Page/layout designer backend (oe_asset_layout) *(blocked by TD-002)* | asset_management | M | T-0102 |  |
-| 🟥 | [T-0110](../tracker/tasks/T-0110.md) | Form/template engine: field-type registry + sandboxed evaluator (templates by kind) *(blocked by TD-002)* | forms | M | T-0016 |  |
+| ⬜ | [T-0109](../tracker/tasks/T-0109.md) | Page/layout designer backend (oe_asset_layout) | asset_management | M | T-0102 |  |
+| ⬜ | [T-0110](../tracker/tasks/T-0110.md) | Form/template engine: field-type registry + sandboxed evaluator (templates by kind) | forms | M | T-0016 |  |
 | ⬜ | [T-0111](../tracker/tasks/T-0111.md) | Inspection record anchored at Asset/sub-Asset/RSW/Item + lifecycle | inspections | M | T-0103, T-0110 |  |
 | ⬜ | [T-0112](../tracker/tasks/T-0112.md) | Global inspections register: cross-level filters + batch PDF/Excel export (ARQ) | inspections | M | T-0111 |  |
 | ⬜ | [T-0113](../tracker/tasks/T-0113.md) | qms: ITP plans/templates + audit register | qms | M | T-0111 |  |
@@ -83,7 +83,7 @@
 | ⬜ | [T-0128](../tracker/tasks/T-0128.md) | Frontend: P6 import wizard UI (upload, map, unmatched rows, commit) | frontend | M | T-0104, T-0127 |  |
 | ⬜ | [T-0129](../tracker/tasks/T-0129.md) | Frontend: inspections register + raise/close flow with gate findings surfaced | frontend | M | T-0112, T-0124, T-0127 |  |
 | ⬜ | [T-0130](../tracker/tasks/T-0130.md) | Phase 1 exit journey: P6 → hierarchy → inspection gates → completion blocked by open NCR | e2e | S | T-0128, T-0129 |  |
-| 🧩 | [E-01-01](../tracker/tasks/E-01-01.md) | Request-for-Inspection module + ported AIP capabilities *(blocked by TD-002)* | inspection_requests | L | T-0111 |  |
+| 🧩 | [E-01-01](../tracker/tasks/E-01-01.md) | Request-for-Inspection module + ported AIP capabilities | inspection_requests | L | T-0111 |  |
 
 ## Phase 2 — Welding quality
 
