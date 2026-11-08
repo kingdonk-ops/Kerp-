@@ -1,0 +1,76 @@
+name: Promote dev → main
+
+# After CI passes on a push to dev, fast-forward main to that exact (CI-green)
+# commit once at least PROMOTE_EVERY PRs have merged into dev since the last
+# promotion. A manual run (workflow_dispatch) promotes immediately.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [dev]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  checks: read
+
+concurrency:
+  group: promote
+  cancel-in-progress: false
+
+env:
+  PROMOTE_EVERY: ${{ vars.KERP_PROMOTE_EVERY || '5' }}
+
+jobs:
+  promote:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Decide
+        id: d
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            SHA="${{ github.event.workflow_run.head_sha }}"
+          else
+            SHA="$(git rev-parse origin/dev)"
+            OK=$(gh api "repos/${{ github.repository }}/commits/$SHA/check-runs?check_name=ci-gate" \
+                 -q '[.check_runs[] | select(.conclusion=="success")] | length')
+            [ "$OK" -gt 0 ] || { echo "::error::ci-gate has not passed on dev@$SHA"; exit 1; }
+          fi
+          if ! git merge-base --is-ancestor origin/main "$SHA"; then
+            echo "::error::main is not an ancestor of dev@$SHA — main was written directly. Merge main into dev via PR, then re-run."
+            exit 1
+          fi
+          MERGES=$(git log --first-parent --format=%s "origin/main..$SHA" | grep -cE '\(#[0-9]+\)$' || true)
+          GO=false
+          [ "${{ github.event_name }}" = "workflow_dispatch" ] && GO=true
+          [ "$MERGES" -ge "$PROMOTE_EVERY" ] && GO=true
+          git log --first-parent --format='- %s' "origin/main..$SHA" > notes.md
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "merges=$MERGES" >> "$GITHUB_OUTPUT"
+          echo "go=$GO" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Promotion check"
+            echo "dev@\`${SHA:0:8}\` — **$MERGES** merged PR(s) since last promotion (threshold $PROMOTE_EVERY) → promote: **$GO**"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Fast-forward main and tag
+        if: steps.d.outputs.go == 'true'
+        run: |
+          set -euo pipefail
+          SHA="${{ steps.d.outputs.sha }}"
+          TAG="release-$(date -u +%Y%m%d-%H%M)-${SHA:0:7}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git push origin "$SHA:refs/heads/main"
+          printf 'Promoted dev → main (%s PRs)\n\n' "${{ steps.d.outputs.merges }}" | cat - notes.md > tagmsg.md
+          git tag -a "$TAG" "$SHA" -F tagmsg.md
+          git push origin "$TAG"
+          { echo "Promoted to **main**, tagged \`$TAG\`"; echo; cat notes.md; } >> "$GITHUB_STEP_SUMMARY"

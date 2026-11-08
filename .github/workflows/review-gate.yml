@@ -1,0 +1,37 @@
+name: Review gate
+
+# A PR into dev needs an independent-review approval marker that matches the
+# PR's current code (patch-id). See scripts/review_gate.py.
+on:
+  pull_request:
+    branches: [dev]
+    types: [opened, synchronize, reopened, ready_for_review]
+  pull_request_review:
+    types: [submitted, edited, dismissed]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: review-gate-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review-gate:
+    if: github.event.pull_request.base.ref == 'dev'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - name: Check approval
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          # Logins whose KERP-REVIEW markers count. Agents act as the repo owner.
+          ALLOWED_REVIEWERS: ${{ vars.KERP_ALLOWED_REVIEWERS || 'kingdonk-ops' }}
+        run: python scripts/review_gate.py

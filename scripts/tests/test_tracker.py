@@ -1,0 +1,169 @@
+"""Tests for scripts/tracker.py and scripts/review_gate.py (pure logic)."""
+from __future__ import annotations
+
+import importlib.util
+import subprocess
+import sys
+from pathlib import Path
+
+import pytest
+
+SCRIPTS = Path(__file__).resolve().parent.parent
+
+
+def _load(name: str):
+    spec = importlib.util.spec_from_file_location(name, SCRIPTS / f"{name}.py")
+    mod = importlib.util.module_from_spec(spec)
+    assert spec.loader
+    sys.modules[name] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
+tracker = _load("tracker")
+gate = _load("review_gate")
+
+
+def task(tmp: Path, id_: str, **meta) -> "tracker.Item":
+    base = {"id": id_, "title": f"Task {id_}", "phase": "0", "module": "core", "size": "S", "status": "todo"}
+    base.update(meta)
+    p = tmp / f"{id_}.md"
+    item = tracker.Item(p, base, "## Goal\n")
+    p.write_text(tracker.dump(item), encoding="utf-8")
+    return tracker.parse_text(p.read_text(encoding="utf-8"), p)
+
+
+def todo(tmp: Path, id_: str, **meta) -> "tracker.Item":
+    base = {"id": id_, "title": "x", "kind": "decision", "status": "open"}
+    base.update(meta)
+    p = tmp / f"{id_}.md"
+    p.write_text(tracker.dump(tracker.Item(p, base, "")), encoding="utf-8")
+    return tracker.parse_text(p.read_text(encoding="utf-8"), p)
+
+
+# ------------------------------------------------------------------ tracker
+def test_roundtrip_preserves_lists_and_colons(tmp_path):
+    t = task(tmp_path, "T-0001", title="API: health", depends_on=["T-0002", "T-0003"])
+    assert t.get("title") == "API: health"
+    assert t.deps() == ["T-0002", "T-0003"]
+
+
+def test_validate_catches_unknown_dep_cycle_and_bad_size(tmp_path):
+    a = task(tmp_path, "T-0001", depends_on=["T-0002"])
+    b = task(tmp_path, "T-0002", depends_on=["T-0001"])
+    c = task(tmp_path, "T-0003", depends_on=["T-9999"])
+    d = task(tmp_path, "T-0004", size="L")
+    errs = "\n".join(tracker.validate([a, b, c, d], []))
+    assert "cycle" in errs
+    assert "unknown id 'T-9999'" in errs
+    assert "size L is only for epics" in errs
+
+
+def test_done_requires_pr(tmp_path):
+    t = task(tmp_path, "T-0001", status="done")
+    assert any("requires a pr" in e for e in tracker.validate([t], []))
+    t2 = task(tmp_path, "T-0002", status="done", pr="7")
+    assert tracker.validate([t2], []) == []
+
+
+def test_ready_respects_deps_blockers_and_order(tmp_path):
+    a = task(tmp_path, "T-0001", status="done", pr="1")
+    b = task(tmp_path, "T-0002", depends_on=["T-0001"], order="2")
+    c = task(tmp_path, "T-0003", depends_on=["T-0002"])
+    d = task(tmp_path, "T-0004", order="1")
+    e = task(tmp_path, "T-0005", blocked_by=["TD-001"])
+    epic = task(tmp_path, "E-03-01", phase="3", size="L", status="needs-breakdown")
+    td = todo(tmp_path, "TD-001")
+    ids = [t.id for t in tracker.ready([a, b, c, d, e, epic], [td])]
+    assert ids == ["T-0004", "T-0002"]  # order field, then id; c waits on b; e blocked; epics never ready
+    td_closed = todo(tmp_path, "TD-001", status="resolved")
+    assert "T-0005" in [t.id for t in tracker.ready([a, b, c, d, e], [td_closed])]
+
+
+def test_render_is_deterministic_and_marks_ready(tmp_path):
+    a = task(tmp_path, "T-0001", status="done", pr="3")
+    b = task(tmp_path, "T-0002", depends_on=["T-0001"])
+    out1 = tracker.render_tasks([a, b], [])
+    out2 = tracker.render_tasks([b, a], [])
+    assert out1 == out2
+    assert "1/2 tasks done (50%)" in out1
+    assert "| ▶ | [T-0002]" in out1
+
+
+def test_render_todos_groups_by_kind(tmp_path):
+    t1 = todo(tmp_path, "TD-001", kind="decision", title="Pick auth")
+    t2 = todo(tmp_path, "TD-002", kind="deferred", title="Later thing")
+    t3 = todo(tmp_path, "TD-003", status="resolved", resolution="done in #4")
+    out = tracker.render_todos([t1, t2, t3])
+    assert "## decision (1)" in out and "## deferred (1)" in out and "## Closed" in out
+
+
+def test_repo_tracker_is_valid_and_boards_fresh():
+    """The real tracker in this repo must validate and the boards must be current."""
+    root = SCRIPTS.parent
+    r = subprocess.run([sys.executable, str(SCRIPTS / "tracker.py"), "render", "--check"],
+                       cwd=root, capture_output=True, text=True)
+    assert r.returncode == 0, r.stdout + r.stderr
+
+
+# -------------------------------------------------------------- review gate
+ALLOWED = {"kingdonk-ops"}
+
+
+def test_gate_requires_marker_from_allowed_author():
+    entries = [{"author": "rando", "body": "KERP-REVIEW: APPROVED patch-id=abc1234", "at": "2026-11-08T01:00:00Z"}]
+    ok, why = gate.decide(gate.parse_markers(entries, ALLOWED), "abc1234")
+    assert not ok and "no KERP-REVIEW" in why
+
+
+def test_gate_latest_verdict_wins_and_patch_id_must_match():
+    entries = [
+        {"author": "kingdonk-ops", "body": "KERP-REVIEW: CHANGES_REQUESTED patch-id=aaaaaaa", "at": "2026-11-08T01:00:00Z"},
+        {"author": "Kingdonk-Ops", "body": "LGTM\nKERP-REVIEW: APPROVED patch-id=bbbbbbbcafe", "at": "2026-11-08T02:00:00Z"},
+    ]
+    v = gate.parse_markers(entries, ALLOWED)
+    assert gate.decide(v, "bbbbbbbcafe")[0]
+    assert gate.decide(v, "bbbbbbb")[0]  # short-id prefix ok
+    ok, why = gate.decide(v, "ccccccc")
+    assert not ok and "re-review" in why
+
+
+def test_gate_changes_requested_blocks():
+    entries = [
+        {"author": "kingdonk-ops", "body": "KERP-REVIEW: APPROVED patch-id=aaaaaaa", "at": "2026-11-08T01:00:00Z"},
+        {"author": "kingdonk-ops", "body": "KERP-REVIEW: CHANGES_REQUESTED patch-id=aaaaaaa", "at": "2026-11-08T03:00:00Z"},
+    ]
+    assert not gate.decide(gate.parse_markers(entries, ALLOWED), "aaaaaaa")[0]
+
+
+@pytest.fixture
+def repo(tmp_path):
+    def run(*a):
+        return subprocess.run(["git", *a], cwd=tmp_path, check=True, capture_output=True, text=True).stdout
+
+    run("init", "-q", "-b", "dev")
+    run("config", "user.email", "t@t")
+    run("config", "user.name", "t")
+    (tmp_path / "a.py").write_text("x = 1\n")
+    run("add", ".")
+    run("commit", "-qm", "base")
+    run("checkout", "-qb", "feature")
+    (tmp_path / "a.py").write_text("x = 2\n")
+    run("commit", "-qam", "change")
+    return tmp_path, run
+
+
+def test_patch_id_ignores_tracker_changes(repo, monkeypatch):
+    path, run = repo
+    monkeypatch.chdir(path)
+    before = gate.compute_patch_id("dev")
+    (path / "tracker").mkdir()
+    (path / "tracker" / "T-0001.md").write_text("status: done\n")
+    (path / "docs").mkdir()
+    (path / "docs" / "TASKS.md").write_text("board\n")
+    run("add", ".")
+    run("commit", "-qm", "tracker")
+    assert gate.compute_patch_id("dev") == before
+    (path / "a.py").write_text("x = 3\n")
+    run("commit", "-qam", "code")
+    assert gate.compute_patch_id("dev") != before
