@@ -3,9 +3,9 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 23 · **Closed:** 9
+**Open:** 25 · **Closed:** 9
 
-## decision (4)
+## decision (5)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -13,6 +13,7 @@
 | [TD-004](../tracker/todo/TD-004.md) | Hosting target: Coolify/MinIO (ADR-001) vs AWS (S3, SES) — affects storage/email adapters and deploy | T-0016 | spec-review |
 | [TD-015](../tracker/todo/TD-015.md) | Phase 2 welder/NDE records reference the contacts directory (Phase 3): confirm interim nullable-linkage + backfill-FK default vs. landing a minimal contacts directory before Phase 2 | T-0202 | kerp-planner |
 | [TD-034](../tracker/todo/TD-034.md) | Port/rewrite assessment of remaining Inspection-ERP core packages (jobs, sync, forms, workflow, events, files, schema_engine/items/mapping, reporting) | T-0015 | reviewer |
+| [TD-037](../tracker/todo/TD-037.md) | Bring back any PROPOSAL-port-from-aip extras dropped in spec consolidation (write-back, type inheritance, migration preview, test-fill, section library, report slots, auto_create_itp, competency assignment, programmes)? | T-0102, T-0110, T-0111, T-0113 | kerp-planner |
 
 ## spec-gap (5)
 
@@ -30,7 +31,7 @@
 |---|---|---|---|
 | [TD-011](../tracker/todo/TD-011.md) | forms F13 report-slot mapping + F14 AI import assistant (SPEC-11 §2) not in Phase 1 tasks | T-0110 | planner |
 
-## later (10)
+## later (11)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -44,6 +45,7 @@
 | [TD-028](../tracker/todo/TD-028.md) | Pin backend base image by digest and automate refresh of base image + requirements locks (Dependabot/Renovate) | T-0004 | implementer |
 | [TD-029](../tracker/todo/TD-029.md) | Backend image is linux/amd64 only (locks target x86_64-manylinux_2_28); add arm64 if a deployment target needs it | T-0004 | implementer |
 | [TD-031](../tracker/todo/TD-031.md) | CI hardening: split GHCR publish into a push-only job holding packages:write, pin docker/* actions to commit SHAs, persist-credentials:false; declare packaging as backend dev dep; assert .dockerignore starts with * | T-0004 | reviewer |
+| [TD-036](../tracker/todo/TD-036.md) | Add reportlab (and openpyxl if the Excel renderer is ported) to the heavy-lib lazy-import lint when Inspection-ERP core/reporting is ported | T-0115, T-0119 | kerp-reviewer |
 
 ## risk (3)
 
