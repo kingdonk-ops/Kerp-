@@ -74,7 +74,7 @@ is complete, tested, matches KERP's shape and is faster to adapt than to rewrite
 | Component | Verdict | Why | Lands in |
 |---|---|---|---|
 | `app/modules/registers/service.py`: `is_equipment_calibrated`, `is_person_qualified`, `expiring_*` | **Port and adapt (logic only)** | This is the expiry check that eligibility needs. Two fixes: an empty expiry date must **fail closed** for calibration-gated tools (today it counts as valid forever), and match equipment by reference id, not free-text tag. | T-0112, T-0118, T-0111 (eligibility) |
-| `app/core/reporting/{model,pdf,html,excel}.py`: one report model rendered to HTML, PDF (reportlab) or Excel, with injection-safe branding (`safe_color`, `safe_image_uri`) | **Port and adapt** | Pure Python and tested. Fits the worker plus lazy-import rule once reportlab (and openpyxl) are added to the heavy-lib lint (TD-036). No spec doc names reportlab; this ADR records the choice. Basis for inspection and sign-off certificates and the inspection-request notice PDF. | T-0119, T-0115 |
+| `app/core/reporting/{model,pdf,html,excel}.py`: one report model rendered to HTML, PDF (reportlab) or Excel, with injection-safe branding (`safe_color`, `safe_image_uri`) | **Port and adapt** | Pure Python and tested. Fits the worker plus lazy-import rule once reportlab (and openpyxl) are added to the heavy-lib lint (TD-038). No spec doc names reportlab; this ADR records the choice. Basis for inspection and sign-off certificates and the inspection-request notice PDF. | T-0119, T-0115 |
 | `app/core/forms/evaluation.py` + `tests/test_forms.py` (formula, visibility, versioning, project override) | **Port the tests, not the code** | The evaluator is replaced by CEL. Its test cases become CEL conformance fixtures. | T-0110 |
 | `app/core/validation/gates.py`: required_responses, photos_present, supervisor_signoff (verifier ≠ inspector), inspector_qualified, equipment_calibrated, procedure_approved | **Reference** | Python gates, and a core→module import. Use the list as the starter catalogue of CEL rule sets. | T-0111, T-0122, T-0124 |
 | `app/modules/inspections/*`: server-stamped `sign_off()`, server-derived `required_response_keys`, read-only once terminal, `TransitionLog` | **Reference** | The lifecycle and schema don't match. Rewrite the patterns, don't copy them. | T-0111, T-0119 |
@@ -106,5 +106,5 @@ is complete, tested, matches KERP's shape and is faster to adapt than to rewrite
 - The proposal's other AIP features did not survive spec consolidation: write-back,
   type inheritance, migration preview, publish test-fill, section library, report-slot
   mapping, `auto_create_itp`, competency-aware assignment and programmes. They exist only
-  in the archived proposal, and most are unbuilt in AIP too. TD-037 asks whether to bring
+  in the archived proposal, and most are unbuilt in AIP too. TD-039 asks whether to bring
   any back. Until it is answered, they are out of scope.
