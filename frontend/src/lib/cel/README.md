@@ -24,6 +24,10 @@ if (result.ok) {
   A malformed context throws; CEL failures are returned as `{ok: false, code, message}`.
 - **Error codes**: `errors.ts` (`CEL_ERROR_CODES`, equal to the fixture file's `error_codes`)
   and the cel-js code mapping.
+- **Fail closed**: a rule passes **only** on `result.ok && result.value === true`. Every error and
+  every non-bool value blocks (or hides / invalidates, depending on the rule type). Never use
+  truthiness.
+- **Limits**: expressions over 4096 UTF-8 bytes return `INVALID_ARGUMENT` before parsing.
 - **Caching**: compiled programs are cached per expression text (LRU, 1024 entries).
 - Results are range-checked: an int outside int64 becomes `INT_OVERFLOW` (cel-js uses unbounded
-  `bigint`). Remaining divergences are pinned `known_gap` fixtures (TD-032).
+  `bigint`). Remaining divergences are pinned `known_gap` fixtures (TD-038).

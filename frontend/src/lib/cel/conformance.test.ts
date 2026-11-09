@@ -95,7 +95,11 @@ describe("CEL conformance fixtures (client runtime)", () => {
   it.each(DOCUMENT.fixtures.map((fixture) => [fixture.id, fixture] as const))("%s", (_id, fixture) => {
     const gap = fixture.known_gap;
     if (gap !== undefined) {
-      expect(existsSync(join(TODO_DIR, `${gap.todo}.md`))).toBe(true);
+      const todo = join(TODO_DIR, `${gap.todo}.md`);
+      expect(existsSync(todo)).toBe(true);
+      // Guards against TODO id collisions: the cited TODO must belong to this task.
+      const tasks = /^tasks:\s*\[(.*)\]\s*$/m.exec(readFileSync(todo, "utf8"))?.[1] ?? "";
+      expect(tasks.split(",").map((task) => task.trim())).toContain("T-0017");
     }
     // A documented gap on this runtime is pinned to its current (divergent) result, so a
     // library change is noticed; it is never skipped. See tests/contract/README.md.

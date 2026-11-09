@@ -24,6 +24,8 @@ export const CEL_JS_CODE_MAP: Readonly<Record<string, CelErrorCode>> = {
   no_such_overload: "NO_MATCHING_OVERLOAD",
   no_matching_overload: "NO_MATCHING_OVERLOAD",
   invalid_logical_operand: "NO_MATCHING_OVERLOAD",
+  // A macro predicate (all/exists/exists_one/filter) did not return a bool.
+  invalid_condition_type: "NO_MATCHING_OVERLOAD",
   cannot_index_type: "NO_MATCHING_OVERLOAD",
   invalid_index_type: "NO_MATCHING_OVERLOAD",
   invalid_comparison_type: "NO_MATCHING_OVERLOAD",

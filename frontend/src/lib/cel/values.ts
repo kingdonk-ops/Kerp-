@@ -18,7 +18,7 @@ export class IntOverflowError extends Error {
 const INT64_MIN = -(2n ** 63n);
 const INT64_MAX = 2n ** 63n - 1n;
 const INT_RE = /^-?(0|[1-9][0-9]*)$/;
-const RFC3339_RE = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(\.\d{1,9})?(Z|[+-]\d{2}:\d{2})$/i;
+const RFC3339_RE = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(\.\d{1,9})?(Z|[+-]\d{2}:\d{2})$/; // uppercase T and Z only, like the server
 const DOUBLE_NAMES: Readonly<Record<string, number>> = {
   NaN: Number.NaN,
   Infinity: Number.POSITIVE_INFINITY,

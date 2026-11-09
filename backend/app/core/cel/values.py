@@ -22,9 +22,8 @@ INT64_MIN = -(2**63)
 INT64_MAX = 2**63 - 1
 
 _INT_RE = re.compile(r"-?(0|[1-9][0-9]*)")
-_RFC3339_RE = re.compile(
-    r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,9})?(Z|[+-]\d{2}:\d{2})", re.IGNORECASE
-)
+# Uppercase T and Z only (the client regex is identical): fromisoformat rejects lowercase.
+_RFC3339_RE = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,9})?(Z|[+-]\d{2}:\d{2})")
 _DOUBLE_NAMES = {"NaN": math.nan, "Infinity": math.inf, "-Infinity": -math.inf}
 
 

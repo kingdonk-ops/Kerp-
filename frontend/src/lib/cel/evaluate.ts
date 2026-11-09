@@ -21,6 +21,10 @@ import {
 export type CelResult = { ok: true; value: JsonValue } | { ok: false; code: CelErrorCode; message: string };
 
 export const PROGRAM_CACHE_SIZE = 1024;
+/** Same cap as the server (backend/app/core/cel/runtime.py), counted in UTF-8 bytes. */
+export const MAX_EXPRESSION_BYTES = 4096;
+
+const utf8 = new TextEncoder();
 
 const environment = new Environment({
   // Context variables are untyped (dyn), like celpy's activation.
@@ -74,6 +78,9 @@ export function classifyCelError(error: unknown): { ok: false; code: CelErrorCod
  */
 export function evaluate(expression: string, context: Readonly<Record<string, JsonValue>>): CelResult {
   const activation = decodeContext(context);
+  if (utf8.encode(expression).length > MAX_EXPRESSION_BYTES) {
+    return { ok: false, code: "INVALID_ARGUMENT", message: `expression longer than ${MAX_EXPRESSION_BYTES} bytes` };
+  }
   let result: unknown;
   try {
     result = compile(expression)(activation);

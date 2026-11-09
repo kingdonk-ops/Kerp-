@@ -18,6 +18,14 @@ describe("CEL client wrapper", () => {
     expect(compiledProgramCount()).toBe(before + 1);
   });
 
+  it("caps expressions at 4096 UTF-8 bytes before compiling", () => {
+    const atLimit = `'${"é".repeat(2047)}'`; // 2 + 2047 * 2 = 4096 bytes
+    expect(evaluate(atLimit, {}).ok).toBe(true);
+    const before = compiledProgramCount();
+    expect(evaluate(`'${"é".repeat(2047)}x'`, {})).toMatchObject({ ok: false, code: "INVALID_ARGUMENT" });
+    expect(compiledProgramCount()).toBe(before);
+  });
+
   it("reports parse errors with a message instead of throwing", () => {
     const result = evaluate("1 +", {});
     expect(result.ok).toBe(false);
@@ -42,6 +50,8 @@ describe("CEL client wrapper", () => {
     ["double bad name", { $double: "nan" }],
     ["timestamp date only", { $timestamp: "2024-01-01" }],
     ["timestamp without offset", { $timestamp: "2024-01-01T00:00:00" }],
+    ["timestamp lowercase t", { $timestamp: "2024-01-01t00:00:00Z" }],
+    ["timestamp lowercase z", { $timestamp: "2024-01-01T00:00:00z" }],
     ["non-JSON value", (() => 1) as unknown],
   ])("throws on an invalid context (%s)", (_name, value) => {
     expect(() => evaluate("true", { fields: value as never })).toThrow();

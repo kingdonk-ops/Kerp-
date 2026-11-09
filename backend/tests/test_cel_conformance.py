@@ -96,7 +96,13 @@ def test_fixture_is_well_formed(fixture: dict[str, Any]) -> None:
     if gap is not None:
         assert gap["runtime"] in {"python", "js"}
         assert re.fullmatch(r"TD-\d{3,}", gap["todo"])
-        assert (TODO_DIR / f"{gap['todo']}.md").is_file(), "known_gap must cite an existing TODO"
+        todo = TODO_DIR / f"{gap['todo']}.md"
+        assert todo.is_file(), "known_gap must cite an existing TODO"
+        tasks = re.search(r"^tasks:\s*\[(.*)\]\s*$", todo.read_text(encoding="utf-8"), re.M)
+        assert tasks is not None
+        assert "T-0017" in [t.strip() for t in tasks.group(1).split(",")], (
+            f"{gap['todo']} is not a T-0017 TODO (id collision?)"
+        )
         assert expected_outcome(gap["actual"]) != expected_outcome(fixture["expect"])
         expectations.append(gap["actual"])
     for expect in expectations:

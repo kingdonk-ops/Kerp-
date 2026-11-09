@@ -36,8 +36,12 @@ Suites that load it (both fail if the file is missing, has no fixtures, or has d
 `expect` is the CEL-spec result. A fixture with `known_gap` documents a divergence one runtime
 currently has: the *other* runtime is asserted against `expect`, and the named runtime is asserted
 against the pinned `actual` (not skipped), so a library upgrade that changes either behaviour fails
-the suite and the fixture must be updated. Every gap must cite an open TODO (`TD-032`). Gap fixtures
-do not count toward the T-0131 parity target.
+the suite and the fixture must be updated. Every gap must cite an open TODO that lists `T-0017` in
+its `tasks` (currently `TD-038`; both suites check this). Gap fixtures do not count toward the
+T-0131 parity target.
+
+**Fail closed.** A rule passes only when the result is exactly the bool `true`
+(`CelOk(value=True)` / `{ok: true, value: true}`); every error and every non-bool value blocks.
 
 ### Value encoding ("KERP CEL JSON")
 
@@ -49,11 +53,11 @@ explicitly. The same encoding is used for contexts and results, by both wrappers
 | `null_type` | `null` | |
 | `bool` | `true` / `false` | |
 | `string` | `"..."` | |
-| `double` | plain JSON number, e.g. `3`, `2.5` | **Every plain number is a double**, also `3` (see TD-034) |
+| `double` | plain JSON number, e.g. `3`, `2.5` | **Every plain number is a double**, also `3` (see TD-040) |
 | `double` (non-finite) | `{"$double": "NaN" \| "Infinity" \| "-Infinity"}` | |
 | `int` (int64) | `{"$int": "<decimal string>"}` | string keeps full 64-bit precision |
 | `uint` (uint64) | `{"$uint": "<decimal string>"}` | results only |
-| `timestamp` | `{"$timestamp": "<RFC 3339>"}` | millisecond precision; results are UTC `YYYY-MM-DDTHH:MM:SS.sssZ` |
+| `timestamp` | `{"$timestamp": "<RFC 3339>"}` (uppercase `T`/`Z` only) | millisecond precision; results are UTC `YYYY-MM-DDTHH:MM:SS.sssZ` |
 | `duration` | `{"$duration": "<seconds>s"}` | results only; e.g. `"5400s"`, `"1.5s"` |
 | `list` | JSON array | |
 | `map` | JSON object (string keys) | an object with a single `$`-prefixed key is always a tag; unknown tags are rejected |
@@ -74,5 +78,5 @@ reported as `EVAL_ERROR`.
 | `NO_MATCHING_OVERLOAD` | Type mismatch, or unknown function / method |
 | `DIVIDE_BY_ZERO` | Integer `/` or `%` by zero |
 | `INT_OVERFLOW` | int64 / uint64 out of range (arithmetic, literal, conversion) |
-| `INVALID_ARGUMENT` | Bad argument value: unparsable number / timestamp, invalid regex |
+| `INVALID_ARGUMENT` | Bad argument value: unparsable number / timestamp, invalid regex; expression over 4096 UTF-8 bytes |
 | `EVAL_ERROR` | Anything else, including unencodable results |

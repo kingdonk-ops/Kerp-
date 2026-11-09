@@ -72,6 +72,8 @@ def test_unencodable_results_are_eval_errors(expression: str) -> None:
         {"fields": {"$double": "nan"}},
         {"fields": {"$timestamp": "2024-01-01"}},
         {"fields": {"$timestamp": "2024-01-01T00:00:00"}},
+        {"fields": {"$timestamp": "2024-01-01t00:00:00Z"}},
+        {"fields": {"$timestamp": "2024-01-01T00:00:00z"}},
         {"fields": object()},
     ],
     ids=[
@@ -84,6 +86,8 @@ def test_unencodable_results_are_eval_errors(expression: str) -> None:
         "double-bad-name",
         "timestamp-date-only",
         "timestamp-no-offset",
+        "timestamp-lowercase-t",
+        "timestamp-lowercase-z",
         "non-json",
     ],
 )
@@ -122,6 +126,57 @@ def test_encode_value_plain_python_types() -> None:
         encode_value(2**63)
     with pytest.raises(UnencodableValueError):
         encode_value(datetime(2024, 1, 1))  # naive datetimes are ambiguous
+
+
+def test_expression_length_cap_counts_utf8_bytes_before_compiling() -> None:
+    _compile.cache_clear()
+    at_limit = "'" + "é" * 2047 + "'"  # 2 + 2047 * 2 = 4096 bytes
+    assert isinstance(evaluate(at_limit, {}), CelOk)
+    over = "'" + "é" * 2047 + "x'"  # 4097 bytes
+    result = evaluate(over, {})
+    assert isinstance(result, CelError)
+    assert result.code is CelErrorCode.INVALID_ARGUMENT
+    assert _compile.cache_info().currsize == 1  # the rejected text never reached the cache
+
+
+@pytest.mark.parametrize(
+    ("expression", "code"),
+    [
+        ("1[0]", CelErrorCode.NO_MATCHING_OVERLOAD),
+        ("[1, 2][fields.missing]", CelErrorCode.NO_SUCH_KEY),
+        ("fields.missing[0]", CelErrorCode.NO_SUCH_KEY),
+        ("fields.missing / 2.0", CelErrorCode.NO_SUCH_KEY),
+        ("has()", CelErrorCode.PARSE_ERROR),
+        ("has(fields.a, fields.b)", CelErrorCode.PARSE_ERROR),
+        ("[] && true", CelErrorCode.NO_MATCHING_OVERLOAD),
+        ("true + 1", CelErrorCode.NO_MATCHING_OVERLOAD),
+        ("true || {}", CelErrorCode.NO_MATCHING_OVERLOAD),
+    ],
+)
+def test_strict_operator_edges(expression: str, code: CelErrorCode) -> None:
+    result = evaluate(expression, {"fields": {"a": 1.0}})
+    assert isinstance(result, CelError)
+    assert result.code is code
+
+
+def test_strict_operator_values() -> None:
+    assert evaluate("{'a': 1}['a']", {}) == CelOk({"$int": "1"})
+    assert evaluate("1.0 / 0.0 == 1.0 / 0.0", {}) == CelOk(True)
+    assert evaluate("fields.n / 0.0", {"fields": {"n": {"$double": "NaN"}}}) == CelOk(
+        {"$double": "NaN"}
+    )
+    assert evaluate("string(1u) + string(fields.t)", {"fields": {"t": True}}) == CelOk("1true")
+
+
+def test_string_override_stands_in_for_the_string_type() -> None:
+    from celpy import celtypes
+
+    from app.core.cel.strict import strict_functions
+
+    conversion = strict_functions()["string"]
+    assert conversion == celtypes.StringType
+    assert hash(conversion) == hash(celtypes.StringType)
+    assert type(conversion(True)) is celtypes.StringType
 
 
 def test_returned_eval_error_is_classified(monkeypatch: pytest.MonkeyPatch) -> None:

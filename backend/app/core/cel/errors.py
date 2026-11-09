@@ -23,6 +23,11 @@ class CelErrorCode(StrEnum):
     EVAL_ERROR = "EVAL_ERROR"
 
 
+# The classification below matches celpy *message text* ("undeclared reference to",
+# "does not support field selection", "match error", ValueError("overflow")) as well as
+# exception classes. That text is not a stable API: it is verified against cel-python 0.5.x,
+# which is why pyproject.toml pins `cel-python>=0.5,<0.6`. Re-run the conformance fixtures
+# (and review this mapping) before widening the pin.
 _UNDECLARED_PREFIX = "undeclared reference to '"
 
 
