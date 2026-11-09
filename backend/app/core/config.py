@@ -45,9 +45,12 @@ class Settings(BaseSettings):
     content_security_policy: str = "default-src 'none'; frame-ancestors 'none'"
     hsts_enabled: bool | None = None
 
-    # Declared for the later DB / job-queue tasks; unused by the scaffold.
-    # Kept out of repr so credentials embedded in URLs are never logged.
+    # Database (T-0005). Kept out of repr so credentials embedded in URLs are never logged.
+    # ``database_url`` is the runtime role (NOSUPERUSER NOBYPASSRLS on PostgreSQL);
+    # ``migration_database_url`` is the schema owner Alembic runs as (falls back to the former).
     database_url: str | None = Field(default=None, repr=False)
+    migration_database_url: str | None = Field(default=None, repr=False)
+    # Redis (job queue / revocation, later tasks).
     redis_url: str | None = Field(default=None, repr=False)
 
     @field_validator("log_level", mode="before")

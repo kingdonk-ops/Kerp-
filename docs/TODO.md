@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 22 · **Closed:** 9
+**Open:** 24 · **Closed:** 9
 
 ## decision (3)
 
@@ -23,11 +23,13 @@
 | [TD-022](../tracker/todo/TD-022.md) | Sign off security header values and JSON log schema (T-0021 defaults) | T-0021 | implementer |
 | [TD-027](../tracker/todo/TD-027.md) | Worker queue: CLAUDE.md/plan say ARQ, consolidation spec says SAQ replaces ARQ | T-0022 | implementer |
 
-## deferred (1)
+## deferred (3)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
 | [TD-011](../tracker/todo/TD-011.md) | forms F13 report-slot mapping + F14 AI import assistant (SPEC-11 §2) not in Phase 1 tasks | T-0110 | planner |
+| [TD-032](../tracker/todo/TD-032.md) | tenant_id FK to the tenants directory table (spec §1.1) once the tenants table exists | T-0005 | implementer |
+| [TD-033](../tracker/todo/TD-033.md) | Default soft-delete filtering: exclude deleted_at IS NOT NULL from ORM reads unless opted in | T-0005 | implementer |
 
 ## later (10)
 
