@@ -20,7 +20,7 @@ from app.core.db import (
     JSONType,
     get_db,
     import_all_models,
-    include_name,
+    include_object,
     utcnow,
 )
 from app.main import create_app
@@ -171,10 +171,17 @@ def test_types_compile_natively_on_postgres() -> None:
     assert JSONType().load_dialect_impl(lite).compile(dialect=lite) == "JSON"
 
 
-def test_include_name_skips_extension_tables() -> None:
-    assert include_name("spatial_ref_sys", "table", {}) is False
-    assert include_name("anything_else", "table", {}) is True
-    assert include_name("spatial_ref_sys", "column", {}) is True
+@pytest.mark.parametrize("name", ["spatial_ref_sys", "topology", "layer"])
+def test_include_object_skips_db_only_extension_tables(name: str) -> None:
+    assert include_object(None, name, "table", True, None) is False
+
+
+def test_include_object_keeps_everything_else() -> None:
+    assert include_object(None, "oe_asset_node", "table", True, None) is True
+    # A model table that reuses an extension name is still compared.
+    assert include_object(None, "layer", "table", False, None) is True
+    assert include_object(None, "layer", "table", True, object()) is True
+    assert include_object(None, "layer", "column", True, None) is True
 
 
 # --- sessions / app wiring -------------------------------------------------------------

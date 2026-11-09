@@ -16,7 +16,7 @@ from __future__ import annotations
 import importlib
 import pkgutil
 import uuid
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterator
 from datetime import UTC, datetime
 from typing import Any, Final
 
@@ -152,14 +152,21 @@ class BaseRecordMixin:
             self.deleted_at = at or utcnow()
 
 
-# Tables created by PostgreSQL extensions (PostGIS) live in ``public`` but are not ours.
-# Alembic autogenerate and the migration check must ignore them.
-EXTENSION_TABLES: Final[frozenset[str]] = frozenset({"spatial_ref_sys"})
+# Tables created by PostgreSQL extensions (PostGIS ``spatial_ref_sys``; ``postgis_topology``
+# ``topology``/``layer``, visible through the PostGIS image's search_path). They are not ours,
+# so Alembic autogenerate and the migration check must not try to drop them.
+EXTENSION_TABLES: Final[frozenset[str]] = frozenset({"spatial_ref_sys", "topology", "layer"})
 
 
-def include_name(name: str | None, type_: str, parent_names: Mapping[str, str | None]) -> bool:
-    """Alembic ``include_name`` hook: skip extension-owned tables."""
-    return not (type_ == "table" and name in EXTENSION_TABLES)
+def include_object(
+    obj: object, name: str | None, type_: str, reflected: bool, compare_to: object | None
+) -> bool:
+    """Alembic ``include_object`` hook: ignore extension tables found only in the database.
+
+    Only a *reflected* table with no model counterpart is skipped, so a KERP model that
+    happened to reuse one of these names would still be compared.
+    """
+    return not (type_ == "table" and reflected and compare_to is None and name in EXTENSION_TABLES)
 
 
 # Column name → whether it must be NOT NULL. The contract test checks every table against it.

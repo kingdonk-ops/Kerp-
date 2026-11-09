@@ -15,7 +15,7 @@ from alembic.util.exc import CommandError
 from sqlalchemy import Column, MetaData, String, Table, create_engine, inspect
 
 from app.core.config import get_settings
-from app.core.db import include_name
+from app.core.db import include_object
 from tests.db_support import ON_POSTGRES, database_url
 
 ALEMBIC_INI = Path(__file__).resolve().parents[1] / "alembic.ini"
@@ -58,7 +58,7 @@ def test_autogenerate_detects_drift(url: str) -> None:
         md = MetaData()
         Table("drifted", md, Column("id", String(36), primary_key=True))
         with engine.connect() as conn:
-            ctx = MigrationContext.configure(conn, opts={"include_name": include_name})
+            ctx = MigrationContext.configure(conn, opts={"include_object": include_object})
             diff = compare_metadata(ctx, md)
         assert any(op[0] == "add_table" and op[1].name == "drifted" for op in diff)
     finally:
