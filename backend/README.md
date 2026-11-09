@@ -53,6 +53,35 @@ Wired in `create_app()`; values are provisional pending sign-off (see the T-0021
   when HSTS is active. `/docs`, `/redoc` and the OAuth2 redirect get a docs CSP that allows the
   Swagger UI / ReDoc CDN assets.
 
+## Heavy libraries are imported lazily
+
+Heavy work (PDF, OCR, CAD, P6 parse, rollups) runs in the background worker, and
+heavy libraries must never be imported at module level, so the API process stays
+small and starts fast (`CLAUDE.md` §6). This is enforced by ruff rule **TID253**
+(`banned-module-level-imports`, configured under
+`[tool.ruff.lint.flake8-tidy-imports]` in `pyproject.toml`); `ruff check .` fails on
+a top-level import of any listed module or its submodules.
+
+Banned at module level: `celpy`, `cv2`, `fitz`, `pymupdf`, `pyhanko`, `pytesseract`,
+`rectpack`. Add a new heavy dependency to that list in the same PR that introduces it.
+
+```python
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:          # fine: type-only, never imported at runtime
+    import celpy
+
+
+def evaluate(expr: str, activation: dict[str, object]) -> celpy.Value:
+    import celpy           # fine: imported when the function / worker task runs
+
+    ...
+```
+
+`tests/test_lint_heavy_imports.py` proves the rule fires for every listed module.
+
 ## Develop
 
 ```bash

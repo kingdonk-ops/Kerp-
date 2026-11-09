@@ -33,7 +33,20 @@ line-length = 100
 extend-exclude = [".venv"]
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "N", "UP", "B", "SIM", "RUF", "C4", "PT", "ANN"]
+select = ["E", "F", "W", "I", "N", "UP", "B", "SIM", "RUF", "C4", "PT", "ANN", "TID253"]
+
+[tool.ruff.lint.flake8-tidy-imports]
+# CLAUDE.md §6 / T-0022: heavy libs are imported lazily (inside the function or
+# worker task that needs them; `if TYPE_CHECKING:` is fine). Submodules are covered.
+banned-module-level-imports = [
+    "celpy",        # CEL rule evaluator (server-side sync payload validation)
+    "cv2",          # OpenCV (drawing / image processing)
+    "fitz",         # PyMuPDF, legacy import name (PDF compile / text extraction)
+    "pyhanko",      # PAdES signing at turnover
+    "pymupdf",      # PyMuPDF, current import name
+    "pytesseract",  # Tesseract OCR (calibration certs, dockets, MTRs)
+    "rectpack",     # 2D sheet/plate nesting
+]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["ANN"]
