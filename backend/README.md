@@ -34,7 +34,7 @@ hardcoded config, no `.env` file is read).
 
 ## Observability and security headers
 
-Wired in `create_app()`; values are provisional pending sign-off (see the T-0021 spec-gap TODO).
+Wired in `create_app()`; values are provisional pending sign-off (see the T-0021 spec-gap TODO TD-022).
 
 - **Request id** (`app/core/request_context.py`, pure ASGI): an incoming `X-Request-ID`
   is honoured if it is 1–128 chars of `[A-Za-z0-9._-]`, otherwise a uuid4 is generated.
