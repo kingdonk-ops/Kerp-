@@ -10,7 +10,7 @@ blocking rule into a passing one on the hard server gate. Raising ``TypeError`` 
 (NO_MATCHING_OVERLOAD / INDEX_OUT_OF_RANGE), exactly like celpy's own failures.
 
 Macros (``all``/``exists``/``exists_one``/``filter``/``map``) are hard-wired in celpy's
-evaluator and cannot be overridden here; their remaining gaps are pinned fixtures (TD-038).
+evaluator and cannot be overridden here; their remaining gaps are pinned fixtures (TD-041).
 """
 
 from __future__ import annotations

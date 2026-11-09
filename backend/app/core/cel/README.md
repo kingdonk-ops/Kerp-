@@ -41,6 +41,6 @@ match result:
 - **Limits**: expressions over 4096 UTF-8 bytes return `INVALID_ARGUMENT` before parsing.
 - **Parity**: `tests/test_cel_conformance.py` runs every fixture in
   `tests/contract/conformance_fixtures.json`. Remaining celpy deviations are pinned there as
-  `known_gap` fixtures (TD-038): avoid non-bool `filter()` predicates (fails open), int-left mixed
+  `known_gap` fixtures (TD-041): avoid non-bool `filter()` predicates (fails open), int-left mixed
   ordering (`1 < 2.0`) and `== null` on fields that may hold a value (both fail closed).
-- Only standard CEL functions are available (`size()`, not `count()` — TD-039).
+- Only standard CEL functions are available (`size()`, not `count()` — TD-042).

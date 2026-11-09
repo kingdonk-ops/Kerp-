@@ -37,7 +37,7 @@ Suites that load it (both fail if the file is missing, has no fixtures, or has d
 currently has: the *other* runtime is asserted against `expect`, and the named runtime is asserted
 against the pinned `actual` (not skipped), so a library upgrade that changes either behaviour fails
 the suite and the fixture must be updated. Every gap must cite an open TODO that lists `T-0017` in
-its `tasks` (currently `TD-038`; both suites check this). Gap fixtures do not count toward the
+its `tasks` (currently `TD-041`; both suites check this). Gap fixtures do not count toward the
 T-0131 parity target.
 
 **Fail closed.** A rule passes only when the result is exactly the bool `true`

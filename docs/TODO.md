@@ -3,9 +3,9 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 30 · **Closed:** 9
+**Open:** 33 · **Closed:** 9
 
-## decision (5)
+## decision (6)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -14,8 +14,9 @@
 | [TD-015](../tracker/todo/TD-015.md) | Phase 2 welder/NDE records reference the contacts directory (Phase 3): confirm interim nullable-linkage + backfill-FK default vs. landing a minimal contacts directory before Phase 2 | T-0202 | kerp-planner |
 | [TD-034](../tracker/todo/TD-034.md) | Port/rewrite assessment of remaining Inspection-ERP core packages (jobs, sync, forms, workflow, events, files, schema_engine/items/mapping, reporting) | T-0015 | reviewer |
 | [TD-039](../tracker/todo/TD-039.md) | Bring back any PROPOSAL-port-from-aip extras dropped in spec consolidation (write-back, type inheritance, migration preview, test-fill, section library, report slots, auto_create_itp, competency assignment, programmes)? | T-0102, T-0110, T-0111, T-0113 | kerp-planner |
+| [TD-040](../tracker/todo/TD-040.md) | CEL value encoding: plain JSON numbers are CEL double on both runtimes; ints/timestamps need explicit tags | T-0017 | implementer |
 
-## spec-gap (5)
+## spec-gap (6)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -24,14 +25,16 @@
 | [TD-021](../tracker/todo/TD-021.md) | Outbox envelope: align frontend db field created_at_utc with master spec 1.3 timestamp_utc (decide in T-0126/T-0127 before the table is used; Dexie still at version 1) | T-0002 | reviewer |
 | [TD-022](../tracker/todo/TD-022.md) | Sign off security header values and JSON log schema (T-0021 defaults) | T-0021 | implementer |
 | [TD-027](../tracker/todo/TD-027.md) | Worker queue: CLAUDE.md/plan say ARQ, consolidation spec says SAQ replaces ARQ | T-0022 | implementer |
+| [TD-042](../tracker/todo/TD-042.md) | EDGE-SCREENS 2.1 hold-gating example uses count(list), which is not standard CEL | T-0017 | implementer |
 
-## deferred (3)
+## deferred (4)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
 | [TD-011](../tracker/todo/TD-011.md) | forms F13 report-slot mapping + F14 AI import assistant (SPEC-11 §2) not in Phase 1 tasks | T-0110 | planner |
 | [TD-032](../tracker/todo/TD-032.md) | tenant_id FK to the tenants directory table (spec §1.1) once the tenants table exists | T-0005 | implementer |
 | [TD-033](../tracker/todo/TD-033.md) | Default soft-delete filtering: exclude deleted_at IS NOT NULL from ORM reads unless opted in | T-0005 | implementer |
+| [TD-041](../tracker/todo/TD-041.md) | CEL parity gaps between celpy 0.5.0 and @marcbachmann/cel-js 8 (pinned known_gap fixtures) must be closed or accepted before T-0131 | T-0017, T-0018 | implementer |
 
 ## later (14)
 
