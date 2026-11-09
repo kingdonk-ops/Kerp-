@@ -5,12 +5,13 @@ from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as package_version
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PACKAGE_NAME = "kerp-backend"
 
 Environment = Literal["development", "test", "production"]
+LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 
 
 def _installed_version() -> str:
@@ -36,10 +37,30 @@ class Settings(BaseSettings):
     debug: bool = False
     version: str = Field(default_factory=_installed_version)
 
+    # Observability (T-0021).
+    log_level: LogLevel = "INFO"
+
+    # Security headers (T-0021). The API never serves HTML (the SPA is hosted separately),
+    # so the default CSP denies everything. ``hsts_enabled=None`` means "only in production".
+    content_security_policy: str = "default-src 'none'; frame-ancestors 'none'"
+    hsts_enabled: bool | None = None
+
     # Declared for the later DB / job-queue tasks; unused by the scaffold.
     # Kept out of repr so credentials embedded in URLs are never logged.
     database_url: str | None = Field(default=None, repr=False)
     redis_url: str | None = Field(default=None, repr=False)
+
+    @field_validator("log_level", mode="before")
+    @classmethod
+    def _upper_log_level(cls, value: object) -> object:
+        return value.upper() if isinstance(value, str) else value
+
+    @property
+    def hsts_active(self) -> bool:
+        """Whether ``Strict-Transport-Security`` is sent (explicit setting, else production)."""
+        if self.hsts_enabled is None:
+            return self.environment == "production"
+        return self.hsts_enabled
 
 
 @lru_cache(maxsize=1)

@@ -3,11 +3,11 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 2/66 tasks done (3%) · **ready now:** 6 · **epics awaiting breakdown:** 39
+**Overall:** 3/66 tasks done (5%) · **ready now:** 5 · **epics awaiting breakdown:** 39
 
 | Phase | Tasks done | Progress |
 |---|---|---|
-| 0 · Platform foundations | 2/27 | `░░░░░░░░░░` 7% |
+| 0 · Platform foundations | 3/27 | `█░░░░░░░░░` 11% |
 | 1 · Asset & Quality backbone | 0/30 | `░░░░░░░░░░` 0% |
 | 2 · Welding quality | 0/9 | `░░░░░░░░░░` 0% |
 | 3 · Logistics | 0/0 (+7 epics) | `░░░░░░░░░░` 0% |
@@ -41,7 +41,7 @@
 | ⬜ | [T-0018](../tracker/tasks/T-0018.md) | Verification engine shell: run_checks(context, rule_set), rule sets as data (CEL), findings log | validation | M | T-0006, T-0017 |  |
 | ⬜ | [T-0019](../tracker/tasks/T-0019.md) | notifications module (in-app) | notifications | S | T-0012 |  |
 | ⬜ | [T-0020](../tracker/tasks/T-0020.md) | saved_views module | saved_views | S | T-0012 |  |
-| ▶ | [T-0021](../tracker/tasks/T-0021.md) | Observability + security headers (request id, structured logs, CSP/HSTS) | platform | S | T-0001 |  |
+| ✅ | [T-0021](../tracker/tasks/T-0021.md) | Observability + security headers (request id, structured logs, CSP/HSTS) | platform | S | T-0001 | #9 |
 | ▶ | [T-0022](../tracker/tasks/T-0022.md) | Lint rule: heavy libs (fitz, cv2, rectpack, celpy, pyhanko) lazily imported | platform | S | T-0001 |  |
 | ⬜ | [T-0023](../tracker/tasks/T-0023.md) | onboarding: first-run provisioning (tenant, admin, default project) | onboarding | S | T-0012, T-0014 |  |
 | ⬜ | [T-0024](../tracker/tasks/T-0024.md) | Frontend shell: auth, design tokens, 8-group nav (4 pillars + Backbone/Overview/Documents/Admin), project switcher + All-Projects, generated API client | frontend | M | T-0002, T-0008 |  |
