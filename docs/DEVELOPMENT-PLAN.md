@@ -71,5 +71,5 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
 | Frontend | 8-group IA on 4 pillars; RegisterPage/DetailPage/Dynamic Form Renderer first; **Dexie** offline outbox |
 
 ## Open decisions (see `TODO.md`)
-TD-001 (port vs rewrite the proven core), TD-003 (SSO vs local JWT), TD-004 (hosting target),
-TD-013 (review-gate ignores tracker). TD-002/005/007/008/009/012 are resolved by this merge.
+TD-003 (SSO vs local JWT), TD-004 (hosting target),
+TD-013 (review-gate ignores tracker). TD-002/005/007/008/009/012 are resolved by this merge; TD-001 by ADR 0001 (`docs/decisions/`).

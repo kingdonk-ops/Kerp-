@@ -3,13 +3,12 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 23 · **Closed:** 8
+**Open:** 22 · **Closed:** 9
 
-## decision (4)
+## decision (3)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
-| [TD-001](../tracker/todo/TD-001.md) | Port Inspection-ERP's proven core (BaseRecordMixin, RLS, auth, audit, loader, validation) or rewrite from the spec? | T-0005 | spec-review |
 | [TD-003](../tracker/todo/TD-003.md) | Identity: local JWT only, or SSO (Entra ID / Windows) for staff + email/password for invited clients? | T-0008 | spec-review |
 | [TD-004](../tracker/todo/TD-004.md) | Hosting target: Coolify/MinIO (ADR-001) vs AWS (S3, SES) — affects storage/email adapters and deploy | T-0016 | spec-review |
 | [TD-015](../tracker/todo/TD-015.md) | Phase 2 welder/NDE records reference the contacts directory (Phase 3): confirm interim nullable-linkage + backfill-FK default vs. landing a minimal contacts directory before Phase 2 | T-0202 | kerp-planner |
@@ -57,6 +56,7 @@
 
 | | ID | Title | Resolution |
 |---|---|---|---|
+| ✅ | [TD-001](../tracker/todo/TD-001.md) | Port Inspection-ERP's proven core (BaseRecordMixin, RLS, auth, audit, loader, validation) or rewrite from the spec? | Port selectively per ADR 0001: port+adapt DB layer, RLS/project scope, auth deps + scrypt, module loader; rewrite audit (hash chain), JWT layer (RS256/EdDSA), login throttle; do not port validation engine/gates (EAV + Python gates vs JSONB + CEL run_checks). |
 | ✅ | [TD-002](../tracker/todo/TD-002.md) | Adopt PROPOSAL-port-from-aip (one forms/item_types engine, eligibility service, inspection_requests)? | Adopted — PR #24 is part of the spec (user, 2026-11-08) |
 | ⚫ | [TD-005](../tracker/todo/TD-005.md) | module_builder (runtime/no-code modules) has no buildable spec | module_builder culled per consolidation diff §1 (runtime no-code authoring out of scope). |
 | ✅ | [TD-007](../tracker/todo/TD-007.md) | 'Single company' vs tenant_id + RLS everywhere — keep multi-tenant plumbing with one tenant per deploy? | Yes — keep tenant_id + project-scoped RLS everywhere, with 4 bypass contract tests (diff §4). |
