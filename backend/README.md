@@ -57,10 +57,21 @@ Wired in `create_app()`; values are provisional pending sign-off (see the T-0021
 
 Heavy work (PDF, OCR, CAD, P6 parse, rollups) runs in the background worker, and
 heavy libraries must never be imported at module level, so the API process stays
-small and starts fast (`CLAUDE.md` §6). This is enforced by ruff rule **TID253**
-(`banned-module-level-imports`, configured under
-`[tool.ruff.lint.flake8-tidy-imports]` in `pyproject.toml`); `ruff check .` fails on
-a top-level import of any listed module or its submodules.
+small and starts fast (`CLAUDE.md` §6). A banned module (or any of its submodules)
+may only be imported inside a function / worker task or an `if TYPE_CHECKING:` body.
+Two checks share the job, both reading the list under
+`[tool.ruff.lint.flake8-tidy-imports]` in `pyproject.toml`:
+
+- ruff rule **TID253** (`banned-module-level-imports`): `ruff check .` fails on a plain
+  top-level import (fast editor and CI feedback). It does **not** see imports nested
+  at module scope.
+- the AST contract test in `tests/test_lint_heavy_imports.py` (part of `pytest`) walks
+  every file under `app/` and fails on banned imports nested at module scope too:
+  inside `try`/`except`, a plain `if` (or the `else` of `if TYPE_CHECKING:`), `with`,
+  or a class body.
+
+Neither check detects dynamic imports such as module-scope
+`importlib.import_module("fitz")` or `__import__("fitz")`, so don't use them for heavy libs.
 
 Banned at module level: `celpy`, `cv2`, `fitz`, `pymupdf`, `pyhanko`, `pytesseract`,
 `rectpack`. Add a new heavy dependency to that list in the same PR that introduces it.
@@ -80,7 +91,7 @@ def evaluate(expr: str, activation: dict[str, object]) -> celpy.Value:
     ...
 ```
 
-`tests/test_lint_heavy_imports.py` proves the rule fires for every listed module.
+`tests/test_lint_heavy_imports.py` also proves TID253 fires for every listed module.
 
 ## Develop
 
