@@ -3,11 +3,11 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 7/66 tasks done (11%) · **ready now:** 4 · **epics awaiting breakdown:** 39
+**Overall:** 7/70 tasks done (10%) · **ready now:** 8 · **epics awaiting breakdown:** 39
 
 | Phase | Tasks done | Progress |
 |---|---|---|
-| 0 · Platform foundations | 7/27 | `██░░░░░░░░` 26% |
+| 0 · Platform foundations | 7/31 | `██░░░░░░░░` 23% |
 | 1 · Asset & Quality backbone | 0/30 | `░░░░░░░░░░` 0% |
 | 2 · Welding quality | 0/9 | `░░░░░░░░░░` 0% |
 | 3 · Logistics | 0/0 (+7 epics) | `░░░░░░░░░░` 0% |
@@ -48,6 +48,10 @@
 | ⬜ | [T-0025](../tracker/tasks/T-0025.md) | Reusable UI shells: RegisterPage, DetailPage (gate banner, tabs, audit), Dynamic Form Renderer | frontend | M | T-0024, T-0017 |  |
 | ⬜ | [T-0026](../tracker/tasks/T-0026.md) | Admin UI: user manager, personas, project/site scope assignment | frontend | M | T-0024, T-0014 |  |
 | ⬜ | [T-0027](../tracker/tasks/T-0027.md) | Playwright setup + Phase 0 exit journey | e2e | S | T-0023, T-0024, T-0018 |  |
+| ▶ | [T-0028](../tracker/tasks/T-0028.md) | CI hardening: detect in ci-gate needs, least-privilege GHCR publish, SHA-pinned actions, base image digest + Renovate, drop empty postgres extra | platform | S | T-0004 |  |
+| ▶ | [T-0029](../tracker/tasks/T-0029.md) | review-gate: include tracker/ in the patch-id (normalise bookkeeping fields, exclude generated boards) | platform | S | — |  |
+| ▶ | [T-0030](../tracker/tasks/T-0030.md) | Backend hardening: httpx/httpcore loggers at WARNING; hide /docs, /redoc, /openapi.json in production | platform | S | T-0021 |  |
+| ▶ | [T-0031](../tracker/tasks/T-0031.md) | Frontend ESLint (typescript-eslint, react-hooks) + npm run lint in the CLAUDE.md §4 gate and CI | platform | S | T-0002 |  |
 
 ## Phase 1 — Asset & Quality backbone
 
@@ -66,7 +70,7 @@
 | ⬜ | [T-0112](../tracker/tasks/T-0112.md) | Equipment calibration register + lifecycle + SAQ OCR cert ingest + QA-review-on-discrepancy + supersede lock + hard gate | equipment | M | T-0015, T-0016, T-0111 |  |
 | ⬜ | [T-0113](../tracker/tasks/T-0113.md) | qms: master ITP template authoring + audit registers + calibration records | qms | M | T-0111 |  |
 | ⬜ | [T-0114](../tracker/tasks/T-0114.md) | construction_control: conformance criteria + hold/witness evaluation via run_checks (no own inspection table) | construction_control | M | T-0113 |  |
-| ⬜ | [T-0115](../tracker/tasks/T-0115.md) | inspection_requests: RFI/call-out workflow (draft→requested→confirmed→witnessed\|waived\|no_show\|failed) + client delay attribution | inspection_requests | M | T-0111 |  |
+| 🟥 | [T-0115](../tracker/tasks/T-0115.md) | inspection_requests: RFI/call-out workflow (draft→requested→confirmed→witnessed\|waived\|no_show\|failed) + client delay attribution *(blocked by TD-045)* | inspection_requests | M | T-0111 |  |
 | ⬜ | [T-0116](../tracker/tasks/T-0116.md) | ncr: Non-Conformance Reports + dispositions (scrap/rework/repair/use-as-is) anchored to Asset/RSW/Item | ncr | S | T-0111 |  |
 | ⬜ | [T-0117](../tracker/tasks/T-0117.md) | punchlist: Cat A/B/C punch items + spatial pins on drawings | punchlist | S | T-0111 |  |
 | ⬜ | [T-0118](../tracker/tasks/T-0118.md) | credentials: professional credentials register + expiry (feeds eligibility) | credentials | S | T-0012 |  |

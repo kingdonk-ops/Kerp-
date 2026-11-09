@@ -20,7 +20,7 @@ python scripts/review_gate.py --patch-id origin/dev        # the id your verdict
 ## Check, in order
 1. **Scope & acceptance** — every acceptance criterion in the task file is actually met by code + tests (not just ticked). Nothing out of scope slipped in.
 2. **Spec fidelity** — matches the referenced spec sections (entities, fields, rules, anchors). Deviations are recorded in task Notes and as TODOs.
-3. **Hard rules** (`CLAUDE.md` §6) — BaseRecordMixin + RLS on every new table, no cross-module table access, tenant only from JWT, anchors (RSW/Item), external keys not FKs, `run_checks` on verifiable transitions, `source="ai"` + human confirm, lazy heavy imports, additive migrations, i18n, generated API client untouched.
+3. **Hard rules** (`CLAUDE.md` §6) — BaseRecordMixin + RLS on every new table, no cross-module table access, tenant only from JWT, anchors (RSW/Item), external keys not FKs, `run_checks` on verifiable transitions, `source="ai"` + human confirm, lazy heavy imports (every new heavy dependency added to `banned-module-level-imports` in `backend/pyproject.toml` in the same PR), additive migrations, i18n, generated API client untouched.
 4. **Tests** — meaningful (would fail if the code were wrong), cover error paths and the contract tests; no skips/xfails without a TD id; nothing weakened (lint, mypy, coverage, CI).
 5. **Gates** — re-run the quality gates in `CLAUDE.md` §4 yourself. Red = CHANGES_REQUESTED.
 6. **Security & data** — authz on every endpoint, input validation, no secrets, synthetic fixtures, no SQL built from strings.
