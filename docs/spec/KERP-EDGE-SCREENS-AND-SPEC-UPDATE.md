@@ -333,7 +333,7 @@ The following table demonstrates the precise syntax deployed across KERP templat
 | **Validation** | Enforce substrate temperature rule for protective coatings | `fields.steel_temp >= fields.dew_point + 3.0` | Client and server block submission if steel temperature is within 3°C of dew point. |
 | **Dynamic Math**| Calculate average Dry Film Thickness (DFT) | `(fields.dft_1 + fields.dft_2 + fields.dft_3) / 3.0` | Live calculated property rendered read-only in form field. |
 | **Range Check** | Verify pipe wall thickness meets minimum engineering spec | `fields.measured_thickness >= asset.attributes.min_wall_thickness` | Flags out-of-tolerance reading; prompts immediate Non-Conformance (NCR) generation. |
-| **Hold Gating** | Release test pack for hydrostatic fill | `count(test_pack.open_cat_a_punches) == 0 && count(test_pack.uninspected_welds) == 0` | Blocks test pack status transition to `FILL_AND_PRESSURIZE` until zero Category A snags remain. |
+| **Hold Gating** | Release test pack for hydrostatic fill | `size(test_pack.open_cat_a_punches) == 0 && size(test_pack.uninspected_welds) == 0` | Blocks test pack status transition to `FILL_AND_PRESSURIZE` until zero Category A snags remain. |
 
 ### 2.2 Template Schema Integration
 CEL expressions are stored directly in the versioned JSON definition of the form template:

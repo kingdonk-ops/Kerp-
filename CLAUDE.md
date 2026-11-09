@@ -68,7 +68,7 @@ an automatic `CHANGES_REQUESTED`.
 - Systems of record are referenced by `external_source` + `external_id` (+ `synced_at`), never FKs. Money is a read-only mirror.
 - Verification is configuration: every verifiable transition calls `run_checks(context, rule_set)`.
 - AI-initiated mutations carry `source="ai"` and need human confirmation before applying.
-- Heavy work (PDF, OCR, CAD, P6 parse, rollups) runs in the ARQ worker; heavy libs are imported lazily.
+- Heavy work (PDF, OCR, CAD, P6 parse, rollups) runs in the SAQ worker (Redis; interactive + batch queues); heavy libs are imported lazily.
 - Additive migrations by default; destructive migrations and core-table changes need an ADR in `docs/decisions/`.
 - Every user-visible string through i18n `t()`. Never hand-edit `frontend/src/api/` (generated).
 - No secrets in the repo. No real client data in fixtures — synthetic only.
