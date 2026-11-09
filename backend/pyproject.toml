@@ -10,7 +10,9 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "alembic>=1.16",
+    "cel-python>=0.5,<0.6",
     "fastapi>=0.121",
+    "lark>=1.1",  # celpy parse trees (used by app/core/cel)
     "pydantic>=2.7",
     "pydantic-settings>=2.3",
     "psycopg[binary]>=3.2",
@@ -51,6 +53,7 @@ banned-module-level-imports = [
     "celpy",        # CEL rule evaluator (server-side sync payload validation)
     "cv2",          # OpenCV (drawing / image processing)
     "fitz",         # PyMuPDF, legacy import name (PDF compile / text extraction)
+    "lark",         # CEL parser (celpy dependency; parse trees in app/core/cel)
     "pyhanko",      # PAdES signing at turnover
     "pymupdf",      # PyMuPDF, current import name
     "pytesseract",  # Tesseract OCR (calibration certs, dockets, MTRs)

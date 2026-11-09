@@ -12,6 +12,7 @@ Single-page app for the KERP Field Operations Platform (`docs/spec/`).
 | Routing | React Router v7 (library / data-router mode, `src/app/routes.tsx`) |
 | Server state | TanStack Query v5 (`src/app/queryClient.ts`) |
 | Offline outbox | Dexie 4 on IndexedDB (`src/db/`) |
+| Rule expressions | CEL via `@marcbachmann/cel-js` (`src/lib/cel/`) |
 | i18n | i18next + react-i18next (`src/i18n/`) |
 | Tests | Vitest 5 + jsdom + Testing Library; `fake-indexeddb` for Dexie |
 
@@ -35,6 +36,7 @@ src/
   app/        providers (AppRoot/AppProviders), router, layout, query client
   db/         Dexie database (KerpDb) + offline outbox helpers
   i18n/       i18next instance + message catalogues (locales/en.ts)
+  lib/cel/    offline CEL rule evaluation (@marcbachmann/cel-js), parity with the server
   pages/      route components
   test/       Vitest setup
 ```
