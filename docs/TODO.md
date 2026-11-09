@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 16 · **Closed:** 7
+**Open:** 18 · **Closed:** 7
 
 ## decision (4)
 
@@ -29,7 +29,7 @@
 |---|---|---|---|
 | [TD-011](../tracker/todo/TD-011.md) | forms F13 report-slot mapping + F14 AI import assistant (SPEC-11 §2) not in Phase 1 tasks | T-0110 | planner |
 
-## later (6)
+## later (7)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -39,12 +39,14 @@
 | [TD-019](../tracker/todo/TD-019.md) | Frontend: PWA manifest + service worker (app-shell caching) for offline-first field use | T-0002 | implementer |
 | [TD-020](../tracker/todo/TD-020.md) | Frontend: add ESLint (typescript-eslint, react-hooks) + lint gate in CLAUDE.md section 4 and CI | T-0002 | implementer |
 | [TD-023](../tracker/todo/TD-023.md) | Distributed tracing / metrics (OpenTelemetry, Prometheus endpoint) for API and ARQ worker | T-0021 | implementer |
+| [TD-025](../tracker/todo/TD-025.md) | Backend errors: request-context middleware renders unhandled 500s itself, so add_exception_handler(Exception) never runs; document or make the renderer pluggable before an error-format task; move _restore_logging autouse fixture to tests/conftest.py | T-0021 | reviewer |
 
-## risk (1)
+## risk (2)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
 | [TD-013](../tracker/todo/TD-013.md) | review-gate patch-id ignores tracker/ — on planning PRs task content can change after approval without re-review | — | coordinator |
+| [TD-024](../tracker/todo/TD-024.md) | Backend logging: httpx/httpcore INFO lines log full outbound URLs (incl. query-string tokens) via the root JSON handler; set them to WARNING before any integration makes outbound calls | T-0021 | reviewer |
 
 ## Closed
 
