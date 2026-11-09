@@ -18,9 +18,9 @@ import pkgutil
 import uuid
 from collections.abc import Iterator
 from datetime import UTC, datetime
-from typing import Any, Final
+from typing import Annotated, Any, Final
 
-from fastapi import Request
+from fastapi import Depends, Request
 from sqlalchemy import (
     CHAR,
     JSON,
@@ -122,8 +122,10 @@ class BaseRecordMixin:
     * ``deleted_at``: soft-delete marker. Rows are never hard-deleted by services.
     * ``custom_fields``: JSONB attribute bag, validated by the field registry. The spec
       has no EAV tables.
-    * ``created_by`` / ``updated_by`` / ``source`` / ``revision``: provenance and an
-      optimistic-concurrency counter, used for offline sync conflicts and ``source="ai"``.
+    * ``created_by`` / ``updated_by`` / ``source``: provenance (``source="ai"`` marks writes
+      that need human confirmation).
+    * ``revision``: incremented on every update. It is the base revision that offline sync
+      compares against. Nothing enforces optimistic locking on it yet (see TD-035).
     """
 
     id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
@@ -295,9 +297,18 @@ class Database:
 def get_db(request: Request) -> Iterator[Session]:
     """FastAPI dependency: one unit-of-work session per request.
 
-    T-0007 extends this to bind the tenant/project RLS context from the verified JWT.
+    Always use it through ``DbSession``. That alias pins ``scope="function"``, so the
+    commit runs *before* the response is sent, and a write that fails at commit returns
+    a 500, never a 200. A failed commit can come from a constraint, an RLS ``WITH CHECK``
+    rule or a serialization failure. The default scope commits after the response has
+    gone. T-0007 extends this dependency to bind the tenant/project RLS context from the
+    verified JWT.
     """
     database: Database | None = getattr(request.app.state, "db", None)
     if database is None:
         raise RuntimeError("database not configured (set KERP_DATABASE_URL)")
     yield from database.session()
+
+
+# The only sanctioned way for endpoints to obtain a database session.
+DbSession = Annotated[Session, Depends(get_db, scope="function")]

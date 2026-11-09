@@ -4,19 +4,20 @@ import uuid
 from collections.abc import Iterator
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import get_args
 
 import pytest
-from fastapi import Depends, FastAPI
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import select, text
 from sqlalchemy.dialects import postgresql, sqlite
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
 
 from app.core.config import Settings
 from app.core.db import (
     GUID,
     Database,
+    DbSession,
     JSONType,
     get_db,
     import_all_models,
@@ -226,11 +227,61 @@ def test_get_db_dependency_yields_session(tmp_path: Path) -> None:
     app = create_app(Settings(environment="test", database_url=database_url(tmp_path)))
 
     @app.get("/_probe")
-    def probe(session: Session = Depends(get_db)) -> dict[str, int]:  # noqa: B008
+    def probe(session: DbSession) -> dict[str, int]:
         return {"one": int(session.execute(text("SELECT 1")).scalar_one())}
 
     with TestClient(app) as client:
         assert client.get("/_probe").json() == {"one": 1}
+
+
+@pytest.fixture
+def db_app(tmp_path: Path) -> Iterator[FastAPI]:
+    app = create_app(Settings(environment="test", database_url=database_url(tmp_path)))
+    database: Database = app.state.db
+    ScratchBase.metadata.create_all(database.engine)
+    try:
+        yield app
+    finally:
+        ScratchBase.metadata.drop_all(database.engine)
+
+
+def _widget_count(app: FastAPI) -> int:
+    database: Database = app.state.db
+    with database.sessionmaker() as s:
+        return len(s.scalars(select(Widget.id)).all())
+
+
+def test_db_session_commits_before_the_response(db_app: FastAPI) -> None:
+    @db_app.post("/_widgets")
+    def create(session: DbSession) -> dict[str, bool]:
+        session.add(Widget(tenant_id=TENANT, name="ok"))
+        return {"ok": True}
+
+    with TestClient(db_app) as client:
+        assert client.post("/_widgets").status_code == 200
+    assert _widget_count(db_app) == 1
+
+
+def test_db_session_commit_failure_is_a_500_and_nothing_is_written(db_app: FastAPI) -> None:
+    # tenant_id is missing: autoflush is off, so the NOT NULL violation surfaces only at
+    # commit. Under scope="function" that is before the response, so it becomes a 500,
+    # never a 200 for a write that was rolled back.
+    @db_app.post("/_widgets")
+    def create(session: DbSession) -> dict[str, bool]:
+        session.add(Widget(name="orphan"))
+        return {"ok": True}
+
+    with TestClient(db_app, raise_server_exceptions=False) as client:
+        response = client.post("/_widgets")
+    assert response.status_code == 500
+    assert response.json() != {"ok": True}
+    assert _widget_count(db_app) == 0
+
+
+def test_db_session_alias_pins_function_scope() -> None:
+    dependency = get_args(DbSession)[1]
+    assert dependency.dependency is get_db
+    assert dependency.scope == "function"
 
 
 def test_get_db_without_database_fails_loudly() -> None:
@@ -238,7 +289,7 @@ def test_get_db_without_database_fails_loudly() -> None:
     assert app.state.db is None
 
     @app.get("/_probe")
-    def probe(session: Session = Depends(get_db)) -> dict[str, bool]:  # noqa: B008
+    def probe(session: DbSession) -> dict[str, bool]:
         return {"ok": True}  # pragma: no cover - never reached
 
     # The request-context middleware turns the RuntimeError into a logged, generic 500.

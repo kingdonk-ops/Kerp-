@@ -167,11 +167,15 @@ Every model derives from `Base` and `BaseRecordMixin`. The mixin gives each tabl
 these columns.
 
 ```bash
-pip install -e ".[dev,postgres]"     # psycopg for PostgreSQL
+pip install -e ".[dev]"              # psycopg (PostgreSQL driver) is a core dependency
 alembic upgrade head                 # uses KERP_MIGRATION_DATABASE_URL / KERP_DATABASE_URL
 alembic revision --autogenerate -m "..."   # after adding models; commit the revision
 alembic check                        # also enforced by tests/test_migrations.py
 ```
+
+Endpoints get a session through `DbSession` (`Annotated[Session, Depends(get_db,
+scope="function")]`), never a bare `Depends(get_db)`. That way the unit of work commits
+before the response is sent, and a write that fails at commit returns a 500, never a 200.
 
 Tests run on a temporary SQLite file. When `KERP_DATABASE_URL` points at PostgreSQL, as
 in CI's second backend step, the same DB tests run against PostgreSQL 16.

@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 25 · **Closed:** 9
+**Open:** 26 · **Closed:** 9
 
 ## decision (4)
 
@@ -32,7 +32,7 @@
 | [TD-032](../tracker/todo/TD-032.md) | tenant_id FK to the tenants directory table (spec §1.1) once the tenants table exists | T-0005 | implementer |
 | [TD-033](../tracker/todo/TD-033.md) | Default soft-delete filtering: exclude deleted_at IS NOT NULL from ORM reads unless opted in | T-0005 | implementer |
 
-## later (10)
+## later (11)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -46,6 +46,7 @@
 | [TD-028](../tracker/todo/TD-028.md) | Pin backend base image by digest and automate refresh of base image + requirements locks (Dependabot/Renovate) | T-0004 | implementer |
 | [TD-029](../tracker/todo/TD-029.md) | Backend image is linux/amd64 only (locks target x86_64-manylinux_2_28); add arm64 if a deployment target needs it | T-0004 | implementer |
 | [TD-031](../tracker/todo/TD-031.md) | CI hardening: split GHCR publish into a push-only job holding packages:write, pin docker/* actions to commit SHAs, persist-credentials:false; declare packaging as backend dev dep; assert .dockerignore starts with * | T-0004 | reviewer |
+| [TD-035](../tracker/todo/TD-035.md) | Optimistic locking on BaseRecordMixin.revision (version_id_col or explicit base_revision check) | T-0005 | reviewer |
 
 ## risk (3)
 

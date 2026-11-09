@@ -9,16 +9,19 @@ description = "KERP Field Operations Platform - backend (FastAPI modular monolit
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "alembic>=1.14",
-    "fastapi>=0.115",
+    "alembic>=1.16",
+    "fastapi>=0.121",
     "pydantic>=2.7",
     "pydantic-settings>=2.3",
+    "psycopg[binary]>=3.2",
     "sqlalchemy>=2.0.36",
     "uvicorn>=0.30",
 ]
 
 [project.optional-dependencies]
-postgres = ["psycopg[binary]>=3.2"]
+# psycopg is a core dependency (the runtime image needs it). This extra stays empty so
+# CI's `pip install -e ".[dev,postgres]"` keeps working.
+postgres = []
 dev = [
     "httpx>=0.27",
     "mypy>=1.11",
@@ -69,9 +72,6 @@ warn_required_dynamic_aliases = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-markers = [
-    "postgres: needs a real PostgreSQL database (KERP_DATABASE_URL); skipped on SQLite",
-]
 addopts = "-ra --strict-markers --cov=app --cov-report=term-missing --cov-fail-under=90"
 
 [tool.coverage.run]

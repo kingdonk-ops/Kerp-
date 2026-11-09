@@ -16,7 +16,7 @@ from sqlalchemy import Column, MetaData, String, Table, create_engine, inspect
 
 from app.core.config import get_settings
 from app.core.db import include_object
-from tests.db_support import ON_POSTGRES, database_url
+from tests.db_support import database_url
 
 ALEMBIC_INI = Path(__file__).resolve().parents[1] / "alembic.ini"
 
@@ -67,8 +67,6 @@ def test_autogenerate_detects_drift(url: str) -> None:
 
 
 def test_env_falls_back_to_settings(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    if ON_POSTGRES:
-        pytest.skip("settings-driven URL is exercised with the SQLite file only")
     target = "sqlite:///" + (tmp_path / "from_settings.db").as_posix()
     monkeypatch.setenv("KERP_MIGRATION_DATABASE_URL", target)
     get_settings.cache_clear()
