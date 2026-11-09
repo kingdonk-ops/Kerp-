@@ -11,6 +11,7 @@ FastAPI modular monolith (see `docs/spec/` and `CLAUDE.md` §6).
 | `app/core/db.py` | `Base`, `BaseRecordMixin`, portable `GUID`/`JSONType`, `Database` + `get_db`, metadata contract check |
 | `migrations/`, `alembic.ini` | Alembic (URL from settings, metadata from every module's `models.py`) |
 | `app/api/health.py` | `GET /health` liveness endpoint |
+| `app/core/cel/` | CEL rule evaluation (celpy, lazy) with the KERP error taxonomy — see its `README.md` |
 | `app/modules/<name>/` | Domain modules (`manifest.py`, `models.py`, `router.py`, `service.py`, `schemas.py`, `README.md`) — added by later tasks |
 | `tests/` | pytest suite |
 
@@ -77,7 +78,7 @@ Two checks share the job, both reading the list under
 Neither check detects dynamic imports such as module-scope
 `importlib.import_module("fitz")` or `__import__("fitz")`, so don't use them for heavy libs.
 
-Banned at module level: `celpy`, `cv2`, `fitz`, `pymupdf`, `pyhanko`, `pytesseract`,
+Banned at module level: `celpy`, `cv2`, `fitz`, `lark`, `pymupdf`, `pyhanko`, `pytesseract`,
 `rectpack`. Add a new heavy dependency to that list in the same PR that introduces it.
 
 ```python
