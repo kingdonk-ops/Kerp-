@@ -65,6 +65,50 @@ ruff check . && mypy app && pytest
 uvicorn app.main:create_app --factory --reload
 ```
 
+## Container image
+
+`Dockerfile` (build context `backend/`) is multi-stage: the `build` stage installs the
+runtime dependencies into `/opt/venv` and builds the `kerp-backend` wheel with hatchling in a
+throwaway venv; the `runtime` stage (`python:3.12-slim-bookworm`, pinned by tag) copies only
+`/opt/venv` and runs as the non-root user `kerp` (uid/gid `10001`). Every `pip install` uses
+`--only-binary=:all:` (no sdists, no compiler) and the lock files are installed with
+`--require-hashes`. `.dockerignore` is an allowlist (`app/`, `pyproject.toml`, `README.md`,
+lock files), so `.venv`, tests, caches and `.env*` never reach the build.
+
+```bash
+docker build -t kerp-backend backend
+docker run --rm -p 8000:8000 -e KERP_ENVIRONMENT=development kerp-backend
+```
+
+The image defaults to `KERP_ENVIRONMENT=production` (HSTS on); it listens on port 8000
+(`uvicorn app.main:create_app --factory`) and has a `HEALTHCHECK` against `/health` using the
+standard library only. CI (`backend-image` job) builds and smoke-tests the image on every PR and
+pushes `ghcr.io/kingdonk-ops/kerp-backend:<short-sha>` and `:<branch>` on pushes to `dev`/`main`.
+
+### Lock files
+
+| File | Contents | Installed into |
+|---|---|---|
+| `requirements.lock` | `[project.dependencies]` + transitive deps, exact pins + sha256 hashes | `/opt/venv` (runtime) |
+| `requirements-build.lock` | `requirements-build.in` (= `[build-system].requires`) | build stage only |
+
+Both target the image platform (CPython 3.12, `x86_64-manylinux_2_28`). Regenerate after
+changing dependencies in `pyproject.toml` (or `requirements-build.in`) with
+[uv](https://docs.astral.sh/uv/); add `--upgrade` to move to newer releases:
+
+```bash
+cd backend
+uv pip compile pyproject.toml --python-version 3.12 --python-platform x86_64-manylinux_2_28 \
+  --generate-hashes --only-binary :all: -o requirements.lock
+uv pip compile requirements-build.in --python-version 3.12 --python-platform x86_64-manylinux_2_28 \
+  --generate-hashes --only-binary :all: -o requirements-build.lock
+```
+
+`tests/test_container.py` fails if a `pyproject.toml` dependency is missing from the lock or
+pinned to a version outside its specifier, if a pin has no hash, or if the Dockerfile loses
+`--only-binary=:all:`, `--require-hashes` or its non-root `USER`. The local dev install
+(`pip install -e ".[dev]"`) is not locked.
+
 ## Endpoints
 
 - `GET /health` → `200 {"status": "ok", "version": "<version>"}`

@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 18 · **Closed:** 7
+**Open:** 21 · **Closed:** 8
 
 ## decision (4)
 
@@ -29,24 +29,27 @@
 |---|---|---|---|
 | [TD-011](../tracker/todo/TD-011.md) | forms F13 report-slot mapping + F14 AI import assistant (SPEC-11 §2) not in Phase 1 tasks | T-0110 | planner |
 
-## later (7)
+## later (9)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
 | [TD-016](../tracker/todo/TD-016.md) | Backend tests: move TestClient transport from httpx to httpx2 (Starlette 1.x deprecation warning) | T-0001 | implementer |
-| [TD-017](../tracker/todo/TD-017.md) | Backend: add a dependency lock file (pinned versions) before T-0004 Dockerfile needs reproducible builds | T-0001 | reviewer |
 | [TD-018](../tracker/todo/TD-018.md) | Frontend: wire npm run gen:api (OpenAPI -> frontend/src/api/) once the backend exposes an OpenAPI schema | T-0002 | implementer |
 | [TD-019](../tracker/todo/TD-019.md) | Frontend: PWA manifest + service worker (app-shell caching) for offline-first field use | T-0002 | implementer |
 | [TD-020](../tracker/todo/TD-020.md) | Frontend: add ESLint (typescript-eslint, react-hooks) + lint gate in CLAUDE.md section 4 and CI | T-0002 | implementer |
 | [TD-023](../tracker/todo/TD-023.md) | Distributed tracing / metrics (OpenTelemetry, Prometheus endpoint) for API and ARQ worker | T-0021 | implementer |
 | [TD-025](../tracker/todo/TD-025.md) | Backend errors: request-context middleware renders unhandled 500s itself, so add_exception_handler(Exception) never runs; document or make the renderer pluggable before an error-format task; move _restore_logging autouse fixture to tests/conftest.py | T-0021 | reviewer |
+| [TD-028](../tracker/todo/TD-028.md) | Pin backend base image by digest and automate refresh of base image + requirements locks (Dependabot/Renovate) | T-0004 | implementer |
+| [TD-029](../tracker/todo/TD-029.md) | Backend image is linux/amd64 only (locks target x86_64-manylinux_2_28); add arm64 if a deployment target needs it | T-0004 | implementer |
+| [TD-031](../tracker/todo/TD-031.md) | CI hardening: split GHCR publish into a push-only job holding packages:write, pin docker/* actions to commit SHAs, persist-credentials:false; declare packaging as backend dev dep; assert .dockerignore starts with * | T-0004 | reviewer |
 
-## risk (2)
+## risk (3)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
 | [TD-013](../tracker/todo/TD-013.md) | review-gate patch-id ignores tracker/ — on planning PRs task content can change after approval without re-review | — | coordinator |
 | [TD-024](../tracker/todo/TD-024.md) | Backend logging: httpx/httpcore INFO lines log full outbound URLs (incl. query-string tokens) via the root JSON handler; set them to WARNING before any integration makes outbound calls | T-0021 | reviewer |
+| [TD-030](../tracker/todo/TD-030.md) | CI: detect job is not in ci-gate.needs - if detect fails, backend/frontend/e2e/backend-image are skipped and ci-gate still passes; add detect to needs and fail on non-success | T-0004 | reviewer |
 
 ## Closed
 
@@ -59,3 +62,4 @@
 | ✅ | [TD-009](../tracker/todo/TD-009.md) | Scope: ~94 modules. Define an MVP cut line (suggest: end of Phase 2 + documents) for a first pilot | M2 cut line = Phase 0+1+2 + Documents-Lite + P6 round-trip (~85–95 tasks), diff §7. |
 | ⚫ | [TD-010](../tracker/todo/TD-010.md) | Architecture suite (Inspection-ERP PR #22) is still open/unmerged — imported from its branch as reference only | PR #22 is not a spec input; moved to docs/archive |
 | ✅ | [TD-012](../tracker/todo/TD-012.md) | audit log (T-0013) has thin spec coverage — only DEVELOPMENT-PLAN principles 3/10/11 | Audit fully specified: append-only hash-chained ledger + REVOKE UPDATE/DELETE (diff §4). |
+| ✅ | [TD-017](../tracker/todo/TD-017.md) | Backend: add a dependency lock file (pinned versions) before T-0004 Dockerfile needs reproducible builds | Hashed runtime + build lock files (backend/requirements.lock, requirements-build.lock) with sync tests, added in T-0004 |

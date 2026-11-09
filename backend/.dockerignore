@@ -1,0 +1,20 @@
+# Allowlist: only what the Dockerfile needs is sent to the build context.
+*
+!app/
+!pyproject.toml
+!README.md
+!requirements.lock
+!requirements-build.lock
+
+# Never in the image, even if re-included above by mistake.
+.venv
+tests
+**/__pycache__
+**/*.py[cod]
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.coverage
+htmlcov
+.env
+.env.*
