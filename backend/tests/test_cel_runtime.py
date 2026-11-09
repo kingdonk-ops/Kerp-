@@ -168,15 +168,37 @@ def test_strict_operator_values() -> None:
     assert evaluate("string(1u) + string(fields.t)", {"fields": {"t": True}}) == CelOk("1true")
 
 
-def test_string_override_stands_in_for_the_string_type() -> None:
-    from celpy import celtypes
-
+def test_string_table_entry_is_untouched() -> None:
+    # string() strictness lives in the evaluator, so the `string` type identifier keeps
+    # being celpy's StringType (type(x) == string, type(type(x)) == type(string)).
     from app.core.cel.strict import strict_functions
 
-    conversion = strict_functions()["string"]
-    assert conversion == celtypes.StringType
-    assert hash(conversion) == hash(celtypes.StringType)
-    assert type(conversion(True)) is celtypes.StringType
+    assert "string" not in strict_functions()
+
+
+@pytest.mark.parametrize(
+    ("expression", "outcome"),
+    [
+        ("string()", CelErrorCode.NO_MATCHING_OVERLOAD),
+        ("string(1, 2)", CelErrorCode.NO_MATCHING_OVERLOAD),
+        ("string(1 / 0)", CelErrorCode.DIVIDE_BY_ZERO),
+        ("string(b'\\xff')", CelErrorCode.INVALID_ARGUMENT),
+        ("string(fields.missing)", CelErrorCode.NO_SUCH_KEY),
+        ("[1, 0].filter(x, 1 / x > 0)", CelErrorCode.DIVIDE_BY_ZERO),
+    ],
+)
+def test_strict_string_and_macro_errors(expression: str, outcome: CelErrorCode) -> None:
+    result = evaluate(expression, {"fields": {}})
+    assert isinstance(result, CelError)
+    assert result.code is outcome
+
+
+def test_strict_macros_leave_valid_predicates_alone() -> None:
+    context = {"fields": {"r": [1.0, 0.0, 2.5]}}
+    assert evaluate("fields.r.filter(v, v > 0.5)", context) == CelOk([1.0, 2.5])
+    assert evaluate("fields.r.exists_one(v, v > 2.0)", context) == CelOk(True)
+    assert evaluate("fields.r.map(v, v * 2.0)", context) == CelOk([2.0, 0.0, 5.0])
+    assert evaluate("string(-2) + string(2.5)", {}) == CelOk("-22.5")
 
 
 def test_returned_eval_error_is_classified(monkeypatch: pytest.MonkeyPatch) -> None:

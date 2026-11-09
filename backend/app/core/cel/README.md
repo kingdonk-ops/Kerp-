@@ -34,13 +34,15 @@ match result:
   `isinstance(result, CelOk) and result.value is True`. Every `CelError` and every non-bool value
   (including `CelOk("a")`, `CelOk(None)`) blocks. Never use truthiness.
 - **Strict operators** (`strict.py`): celpy 0.5 returns values where CEL says error (`1 / 2.0`,
-  `2.5 * 2`, `true && 'a'`, `'abc'[0]`, `[1][-1]`, ...). The wrapper overrides `+ - * / %`,
-  `&& ||`, `[]` and `string()` in celpy's function table, and rejects at compile time what
-  cel-js's checker rejects (`has(x)` without a field selection, literal non-bool `&&`/`||`
-  operands and macro predicates).
+  `2.5 * 2`, `true && 'a'`, `'abc'[0]`, `[1][-1]`, `string(null)`, `filter()` on a null flag,
+  ...). The wrapper overrides `+ - * / %`, `&& ||` and `[]` in celpy's function table, runs a
+  strict `Evaluator` subclass (`Environment(runner_class=...)`) that requires bool macro
+  predicates and restricts `string()` to the types CEL converts, and rejects at compile time
+  what cel-js's checker rejects (`has(x)` without a field selection, literal non-bool `&&`/`||`
+  operands and macro predicates, celpy's non-standard `min()`/`reduce()`).
 - **Limits**: expressions over 4096 UTF-8 bytes return `INVALID_ARGUMENT` before parsing.
 - **Parity**: `tests/test_cel_conformance.py` runs every fixture in
   `tests/contract/conformance_fixtures.json`. Remaining celpy deviations are pinned there as
-  `known_gap` fixtures (TD-041): avoid non-bool `filter()` predicates (fails open), int-left mixed
-  ordering (`1 < 2.0`) and `== null` on fields that may hold a value (both fail closed).
+  `known_gap` fixtures (TD-041); none fails open. Avoid int-left mixed ordering (`1 < 2.0`) and
+  `== null` on fields that may hold a value (both error on the server).
 - Only standard CEL functions are available (`size()`, not `count()` — TD-042).

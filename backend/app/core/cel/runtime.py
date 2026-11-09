@@ -8,7 +8,7 @@ from functools import lru_cache
 from typing import TYPE_CHECKING
 
 from app.core.cel.errors import CelErrorCode, classify_celpy_error, short_message
-from app.core.cel.strict import strict_functions
+from app.core.cel.strict import strict_functions, strict_runner_class
 from app.core.cel.values import JsonValue, UnencodableValueError, decode_context, encode_value
 
 if TYPE_CHECKING:
@@ -48,7 +48,7 @@ class _Compiled:
 def _environment() -> celpy.Environment:
     import celpy
 
-    return celpy.Environment()
+    return celpy.Environment(runner_class=strict_runner_class())
 
 
 class _MacroArgumentError(Exception):
@@ -60,6 +60,8 @@ class _StaticTypeError(Exception):
 
 
 _PREDICATE_MACROS = frozenset({"all", "exists", "exists_one", "filter"})
+# celpy-only extension macros; not CEL and not available on the client.
+_NON_STANDARD_MACROS = frozenset({"min", "reduce"})
 
 
 def _unwrap(node: object) -> object:
@@ -115,6 +117,8 @@ def _check_tree(ast: Tree[Token]) -> frozenset[str]:
             selected = arguments[0].children if arguments else []
             if len(selected) != 1 or getattr(_unwrap(selected[0]), "data", None) != "member_dot":
                 raise _MacroArgumentError("has() requires a single field selection argument")
+        if node.data == "member_dot_arg" and set(names) & _NON_STANDARD_MACROS:
+            raise _StaticTypeError(f"{names[0]}() is not a CEL function")
         if node.data == "member_dot_arg" and set(names) & _PREDICATE_MACROS:
             macro_args = arguments[1].children if len(arguments) > 1 else []
             if len(macro_args) == 2 and _is_non_bool_literal(macro_args[1]):

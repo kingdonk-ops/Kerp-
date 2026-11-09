@@ -9,19 +9,25 @@ blocking rule into a passing one on the hard server gate. Raising ``TypeError`` 
 ``IndexError`` here becomes a ``CELEvalError`` that ``errors.classify_celpy_error`` maps
 (NO_MATCHING_OVERLOAD / INDEX_OUT_OF_RANGE), exactly like celpy's own failures.
 
-Macros (``all``/``exists``/``exists_one``/``filter``/``map``) are hard-wired in celpy's
-evaluator and cannot be overridden here; their remaining gaps are pinned fixtures (TD-041).
+Macros and ``string()`` are not table entries: ``strict_runner_class()`` returns an
+``InterpretedRunner`` whose ``Evaluator`` subclass requires bool macro predicates
+(``filter``/``exists_one`` raise, ``all``/``exists`` yield an error value that ``false`` /
+``true`` can still absorb) and restricts ``string()`` to the types CEL converts.
 """
 
 from __future__ import annotations
 
 import math
 import operator
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
+from datetime import datetime, timedelta
+from functools import lru_cache
 from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
-    from celpy.evaluation import CELFunction
+    import celpy
+    from celpy.evaluation import CELFunction, Context, Result
+    from lark import Token, Tree
 
 _Binary = Callable[[object, object], object]
 
@@ -135,30 +141,101 @@ def _index(container: object, index: object) -> object:
     raise _no_overload("[]", container, index)
 
 
-def _string_conversion() -> type:
-    """``string()`` with CEL's lowercase bool spelling.
+def strict_string(value: object) -> object:
+    """CEL ``string()``: only string, bool, int, uint, double, bytes, timestamp, duration.
 
-    The ``string`` entry is both the conversion function and the type identifier used in
-    ``type(x) == string`` (celpy's ``type()`` returns the Python class). The replacement is
-    therefore a ``StringType`` subclass whose *class* compares equal to ``StringType``; the
-    values it creates are plain ``StringType`` instances.
+    celpy's ``StringType(x)`` is Python ``str()``, so ``string(null)`` was ``'None'``,
+    ``string([1])`` a Python repr and ``string(true)`` ``'True'``.
     """
     from celpy import celtypes
 
-    class _SameAsStringType(type):
-        def __eq__(cls, other: object) -> bool:
-            return other is celtypes.StringType or other is cls
+    if _is_bool(value):
+        return celtypes.StringType("true" if value else "false")
+    if isinstance(value, bytes):
+        return celtypes.StringType(value.decode("utf-8"))  # invalid UTF-8: ValueError
+    if isinstance(value, str | int | float | datetime | timedelta):
+        return celtypes.StringType(str(value))  # celpy types format per CEL (1e+20, 5400s)
+    raise TypeError(f"no such overload: string({type(value).__name__})")
 
-        def __hash__(cls) -> int:
-            return hash(celtypes.StringType)
 
-    class StringConversion(celtypes.StringType, metaclass=_SameAsStringType):
-        def __new__(cls, source: object = "") -> celtypes.StringType:  # type: ignore[misc]
-            if _is_bool(source):
-                return celtypes.StringType("true" if source else "false")
-            return celtypes.StringType(source)  # type: ignore[arg-type]
+@lru_cache(maxsize=1)
+def strict_runner_class() -> type[celpy.Runner]:
+    """``InterpretedRunner`` using the strict evaluator (pass as ``runner_class``)."""
+    import celpy
+    from celpy.evaluation import CELEvalError, Evaluator
 
-    return StringConversion
+    def not_bool(macro: str, result: object) -> CELEvalError:
+        message = f"{macro}() predicate must return bool, got {type(result).__name__}"
+        return CELEvalError(message, TypeError, (message,))
+
+    class StrictEvaluator(Evaluator):
+        def sub_evaluator(self, ast: Tree[Token]) -> Evaluator:
+            # Macro bodies (incl. nested macros) must use the strict evaluator too.
+            return StrictEvaluator(ast, activation=self.activation)
+
+        def member_dot_arg(self, tree: Tree[Token]) -> object:
+            # A macro body raises its error (celpy's nested evaluate()); return it as a
+            # value instead so `false && <macro>` / `true || <macro>` can absorb it.
+            try:
+                return super().member_dot_arg(tree)
+            except CELEvalError as exc:
+                return exc
+
+        def build_macro_eval(self, child: Tree[Token]) -> Callable[[celpy.celtypes.Value], object]:
+            predicate = super().build_macro_eval(child)
+            macro = str(child.children[1])
+            if macro not in ("filter", "exists_one"):
+                return predicate  # map(): any result type is fine
+
+            def checked(value: celpy.celtypes.Value) -> object:
+                result = predicate(value)  # errors are raised by the nested evaluator
+                if not _is_bool(result):
+                    raise not_bool(macro, result)
+                return result
+
+            return checked
+
+        def build_ss_macro_eval(
+            self, child: Tree[Token]
+        ) -> Callable[[celpy.celtypes.Value], object]:
+            predicate = super().build_ss_macro_eval(child)
+            macro = str(child.children[1])
+
+            def checked(value: celpy.celtypes.Value) -> object:
+                # all()/exists() reduce with &&/||: an error value is still absorbed by a
+                # false (all) / true (exists) element, as on the client.
+                result = predicate(value)
+                if _is_bool(result) or isinstance(result, CELEvalError):
+                    return result
+                return not_bool(macro, result)
+
+            return checked
+
+        def function_eval(
+            self, name_token: Token, exprlist: Iterable[object] | None = None
+        ) -> Result:
+            if name_token.value != "string":
+                return super().function_eval(name_token, exprlist)  # type: ignore[arg-type]
+            # Errors in the argument list propagate unchanged, as in celpy's own function_eval.
+            if isinstance(exprlist, CELEvalError):
+                return exprlist
+            arguments = list(exprlist or [])
+            for argument in arguments:
+                if isinstance(argument, CELEvalError):
+                    return argument
+            try:
+                if len(arguments) != 1:
+                    raise TypeError("string() takes exactly one argument")
+                return cast("Result", strict_string(arguments[0]))
+            except (TypeError, ValueError) as exc:
+                return CELEvalError(str(exc), exc.__class__, exc.args, token=name_token)
+
+    class StrictRunner(celpy.InterpretedRunner):
+        def evaluate(self, context: Context) -> celpy.celtypes.Value:
+            evaluator = StrictEvaluator(ast=self.ast, activation=self.new_activation())
+            return evaluator.evaluate(context)
+
+    return StrictRunner
 
 
 def strict_functions() -> dict[str, CELFunction]:
@@ -172,6 +249,5 @@ def strict_functions() -> dict[str, CELFunction]:
         "_&&_": _logical(absorbing=False),
         "_||_": _logical(absorbing=True),
         "_[_]": _index,
-        "string": _string_conversion(),
     }
     return cast("dict[str, CELFunction]", functions)
