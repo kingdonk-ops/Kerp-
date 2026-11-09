@@ -21,7 +21,10 @@ Commands
     show ID                       print an item
     set ID [--status S] [--pr N] [--owner X] [--note TEXT]
     new-task --id ID --title T --phase P --module M --size S|M [--depends a,b] [--spec path] [--epic E]
-    new-todo --title T --kind K [--task ID] [--source TEXT] [--body TEXT]
+    new-todo --title T --kind K [--task ID] [--source TEXT] [--body TEXT] [--id TD-xxx] [--offline]
+                                  id is above every TD-xxx on any local/origin branch and open PR
+    check-ids [--base REF] [--head REF]
+                                  fail if a TODO id added on head is used on base for a different title
     stats
 """
 from __future__ import annotations
@@ -30,7 +33,9 @@ import argparse
 import datetime as _dt
 import json
 import re
+import subprocess
 import sys
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -342,9 +347,109 @@ def render_todos(todos: list[Item]) -> str:
 
 
 # --------------------------------------------------------------------- CLI
-def _next_todo_id(todos: list[Item]) -> str:
-    nums = [int(t.id.split("-")[1]) for t in todos if TODO_ID_RE.match(t.id)]
-    return f"TD-{(max(nums) + 1) if nums else 1:03d}"
+# ---------------------------------------------- remote-aware TODO allocation
+# Parallel agents branch from `dev` and each raise TODOs in their own PR, so
+# "local max + 1" makes them all pick the same ids. `allocate_todo_id` takes the
+# max over every TD-xxx visible anywhere: the local tree, every local and
+# origin/* branch (after a fetch), and the files of every open PR (via gh).
+Runner = Callable[[list[str]], str]
+_GIT_ERRORS = (OSError, subprocess.SubprocessError)
+TODO_FILE_RE = re.compile(r"^(?:tracker/todo/)?(TD-\d{3,4})\.md$")
+
+
+def _run_cmd(cmd: list[str]) -> str:
+    """Run a command in the repo root; raise OSError/SubprocessError on any failure."""
+    return subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True, encoding="utf-8",
+                          timeout=60, check=True).stdout
+
+
+def todo_ids_in_paths(paths: Iterable[str]) -> set[str]:
+    """TD ids named by paths such as `tracker/todo/TD-032.md`; other paths are ignored."""
+    out: set[str] = set()
+    for raw in paths:
+        m = TODO_FILE_RE.match(raw.strip().replace("\\", "/"))
+        if m:
+            out.add(m.group(1))
+    return out
+
+
+def remote_todo_ids(run: Runner = _run_cmd, fetch: bool = True) -> tuple[set[str], list[str]]:
+    """TD ids used on any local or origin/* branch and in any open PR. Returns (ids, warnings)."""
+    ids: set[str] = set()
+    warns: list[str] = []
+    if fetch:
+        try:
+            run(["git", "fetch", "--quiet", "--prune", "origin"])
+        except _GIT_ERRORS as e:
+            warns.append(f"git fetch failed ({type(e).__name__}); origin/* refs may be stale")
+    try:
+        refs = run(["git", "for-each-ref", "--format=%(refname)", "refs/heads", "refs/remotes/origin"]).split()
+    except _GIT_ERRORS as e:
+        warns.append(f"cannot list git refs ({type(e).__name__}); branches not checked")
+        refs = []
+    for ref in refs:
+        if ref.endswith("/HEAD"):
+            continue
+        try:
+            ids |= todo_ids_in_paths(run(["git", "ls-tree", "--name-only", ref, "tracker/todo/"]).splitlines())
+        except _GIT_ERRORS:
+            warns.append(f"cannot list tracker/todo/ on {ref}")
+    try:
+        out = run(["gh", "pr", "list", "--state", "open", "--limit", "200", "--json", "number,files"])
+        for pr in json.loads(out or "[]"):
+            ids |= todo_ids_in_paths(str(f.get("path", "")) for f in pr.get("files") or [])
+    except (*_GIT_ERRORS, ValueError, AttributeError, TypeError) as e:
+        warns.append(f"gh pr list unavailable ({type(e).__name__}); open PRs not checked")
+    return ids, warns
+
+
+def allocate_todo_id(local: Iterable[Item], run: Runner = _run_cmd, fetch: bool = True,
+                     offline: bool = False) -> tuple[str, list[str]]:
+    """Next TD id above every id used locally, on any branch and in any open PR. Returns (id, warnings)."""
+    used = {t.id for t in local if TODO_ID_RE.match(t.id)}
+    if offline:
+        warns = ["--offline: only the local tree was checked; the id may collide with other branches"]
+    else:
+        remote, warns = remote_todo_ids(run, fetch)
+        used |= remote
+    nums = [int(i.split("-")[1]) for i in used]
+    return f"TD-{(max(nums) + 1) if nums else 1:03d}", warns
+
+
+# ------------------------------------------------- merge collision detection
+def _titles_at(ref: str, ids: Iterable[str], run: Runner) -> dict[str, str]:
+    out: dict[str, str] = {}
+    for i in ids:
+        path = f"tracker/todo/{i}.md"
+        out[i] = str(parse_text(run(["git", "show", f"{ref}:{path}"]), Path(path)).get("title"))
+    return out
+
+
+def todo_id_collisions(head: dict[str, str], base: dict[str, str], ancestor: set[str]) -> list[str]:
+    """Ids added on head (absent at the merge base) that base also uses for a different title."""
+    errs = []
+    for i in sorted((set(head) & set(base)) - ancestor):
+        if head[i] != base[i]:
+            errs.append(f"{i}: id collision: this branch uses it for {head[i]!r}, base uses it for "
+                        f"{base[i]!r}. Re-raise this branch's TODO with `tracker.py new-todo` "
+                        f"(fresh id) and update every reference to it.")
+    return errs
+
+
+def check_id_collisions(base: str, head: str | None, local: list[Item], run: Runner = _run_cmd) -> list[str]:
+    """Compare head (a git ref, or the working tree when None) with base for TODO id collisions."""
+    def ls(ref: str) -> set[str]:
+        return todo_ids_in_paths(run(["git", "ls-tree", "--name-only", ref, "tracker/todo/"]).splitlines())
+
+    ancestor = ls(run(["git", "merge-base", base, head or "HEAD"]).strip())
+    base_ids = ls(base)
+    head_ids = {t.id for t in local} if head is None else ls(head)
+    candidates = (head_ids & base_ids) - ancestor
+    if head is None:
+        head_titles = {t.id: str(t.get("title")) for t in local if t.id in candidates}
+    else:
+        head_titles = _titles_at(head, candidates, run)
+    return todo_id_collisions(head_titles, _titles_at(base, candidates, run), ancestor)
 
 
 def _report(errs: list[str]) -> None:
@@ -379,6 +484,11 @@ def main(argv: list[str] | None = None) -> int:
     for a in ("--task", "--body"):
         nd.add_argument(a, default="")
     nd.add_argument("--source", default="agent")
+    nd.add_argument("--id", default="", help="explicit TD-xxx id (skips allocation; must be unused locally)")
+    nd.add_argument("--offline", action="store_true", help="skip git/gh lookups; check the local tree only")
+    ci = sub.add_parser("check-ids")
+    ci.add_argument("--base", default="origin/dev")
+    ci.add_argument("--head", default=None, help="git ref to check (default: the working tree)")
     sub.add_parser("stats")
     args = ap.parse_args(argv)
 
@@ -479,7 +589,15 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.cmd == "new-todo":
-        tid = _next_todo_id(todos)
+        if args.id:
+            tid = args.id
+            if not TODO_ID_RE.match(tid) or any(t.id == tid for t in todos):
+                print(f"--id {tid}: must match TD-xxx and be unused locally", file=sys.stderr)
+                return 1
+        else:
+            tid, warns = allocate_todo_id(todos, offline=args.offline)
+            for w in warns:
+                print("WARNING", w, file=sys.stderr)
         meta = {
             "id": tid, "title": args.title, "kind": args.kind, "status": "open",
             "tasks": [x for x in args.task.split(",") if x], "source": args.source,
@@ -490,6 +608,16 @@ def main(argv: list[str] | None = None) -> int:
         p.write_text(dump(Item(p, meta, (args.body or "").strip() + "\n")), encoding="utf-8")
         print(tid)
         return 0
+
+    if args.cmd == "check-ids":
+        try:
+            errs = check_id_collisions(args.base, args.head, todos)
+        except (*_GIT_ERRORS, ValueError) as e:
+            print(f"ERROR check-ids: cannot read git refs ({e})", file=sys.stderr)
+            return 1
+        _report(errs)
+        print(f"TODO ids vs {args.base}: {'OK' if not errs else f'{len(errs)} collision(s)'}")
+        return 1 if errs else 0
 
     if args.cmd == "stats":
         from collections import Counter

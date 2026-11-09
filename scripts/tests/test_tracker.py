@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -104,6 +105,112 @@ def test_repo_tracker_is_valid_and_boards_fresh():
     r = subprocess.run([sys.executable, str(SCRIPTS / "tracker.py"), "render", "--check"],
                        cwd=root, capture_output=True, text=True)
     assert r.returncode == 0, r.stdout + r.stderr
+
+
+# ------------------------------------------- remote-aware TODO id allocation
+def fake_git(trees: dict[str, list[str]], prs: list[dict] | None = None, fail: set[str] = frozenset(),
+             files: dict[tuple[str, str], str] | None = None, merge_base: str = "mb"):
+    """A Runner that answers git/gh commands from in-memory data (no network, no repo)."""
+    calls: list[list[str]] = []
+
+    def run(cmd: list[str]) -> str:
+        calls.append(cmd)
+        key = " ".join(cmd[:2])
+        if key in fail or cmd[0] in fail:
+            raise subprocess.CalledProcessError(1, cmd)
+        if key == "git fetch":
+            return ""
+        if key == "git for-each-ref":
+            return "\n".join(trees) + "\n"
+        if key == "git ls-tree":
+            return "\n".join(f"tracker/todo/{n}" for n in trees[cmd[3]]) + "\n"
+        if key == "git merge-base":
+            return merge_base + "\n"
+        if key == "git show":
+            ref, path = cmd[2].split(":", 1)
+            return files[(ref, path)]
+        if key == "gh pr":
+            return json.dumps(prs or [])
+        raise AssertionError(f"unexpected command {cmd}")
+
+    run.calls = calls  # type: ignore[attr-defined]
+    return run
+
+
+def test_todo_ids_in_paths_only_counts_todo_files():
+    paths = ["tracker/todo/TD-007.md", "TD-012.md", "tracker/tasks/T-0001.md", "docs/TD-999.md",
+             "tracker\\todo\\TD-020.md", "tracker/todo/README.md"]
+    assert tracker.todo_ids_in_paths(paths) == {"TD-007", "TD-012", "TD-020"}
+
+
+def test_allocate_takes_max_over_local_branches_and_open_prs(tmp_path):
+    local = [todo(tmp_path, "TD-001"), todo(tmp_path, "TD-031")]
+    run = fake_git(
+        {"refs/remotes/origin/dev": ["TD-001.md", "TD-039.md"],
+         "refs/remotes/origin/HEAD": ["TD-900.md"],  # symbolic ref: skipped
+         "refs/heads/task/T-0017-x": ["TD-001.md", "TD-041.md"]},
+        prs=[{"number": 15, "files": [{"path": "tracker/todo/TD-044.md"}, {"path": "backend/x.py"}]}],
+    )
+    tid, warns = tracker.allocate_todo_id(local, run=run)
+    assert tid == "TD-045" and warns == []
+    assert ["git", "fetch", "--quiet", "--prune", "origin"] in run.calls
+    assert not any("refs/remotes/origin/HEAD" in c for c in run.calls)
+
+
+def test_allocate_falls_back_to_local_with_warnings_when_git_and_gh_missing(tmp_path):
+    local = [todo(tmp_path, "TD-031")]
+    run = fake_git({}, fail={"git", "gh"})
+    tid, warns = tracker.allocate_todo_id(local, run=run)
+    assert tid == "TD-032"
+    text = " ".join(warns)
+    assert "git fetch failed" in text and "cannot list git refs" in text and "open PRs not checked" in text
+
+
+def test_allocate_uses_stale_refs_when_fetch_fails(tmp_path):
+    run = fake_git({"refs/remotes/origin/dev": ["TD-050.md"]}, fail={"git fetch", "gh"})
+    tid, warns = tracker.allocate_todo_id([], run=run)
+    assert tid == "TD-051"
+    assert any("may be stale" in w for w in warns)
+
+
+def test_allocate_offline_never_runs_commands(tmp_path):
+    run = fake_git({"refs/remotes/origin/dev": ["TD-050.md"]})
+    tid, warns = tracker.allocate_todo_id([todo(tmp_path, "TD-003")], run=run, offline=True)
+    assert tid == "TD-004" and run.calls == [] and "--offline" in warns[0]
+
+
+def test_todo_id_collisions_flags_only_new_ids_with_different_titles():
+    head = {"TD-032": "CEL parity", "TD-033": "Same thing", "TD-010": "Retitled on branch"}
+    base = {"TD-032": "tenant FK", "TD-033": "Same thing", "TD-010": "Old title"}
+    errs = tracker.todo_id_collisions(head, base, ancestor={"TD-010"})
+    assert len(errs) == 1 and errs[0].startswith("TD-032: id collision")
+
+
+def _td_text(id_: str, title: str) -> str:
+    return tracker.dump(tracker.Item(Path(f"{id_}.md"), {"id": id_, "title": title, "kind": "bug", "status": "open"}))
+
+
+def test_check_id_collisions_between_refs():
+    run = fake_git(
+        {"mb": ["TD-031.md"], "origin/dev": ["TD-031.md", "TD-032.md", "TD-033.md"],
+         "pr": ["TD-031.md", "TD-032.md", "TD-033.md", "TD-034.md"]},
+        files={("origin/dev", "tracker/todo/TD-032.md"): _td_text("TD-032", "tenant FK"),
+               ("pr", "tracker/todo/TD-032.md"): _td_text("TD-032", "CEL parity"),
+               ("origin/dev", "tracker/todo/TD-033.md"): _td_text("TD-033", "same"),
+               ("pr", "tracker/todo/TD-033.md"): _td_text("TD-033", "same")},
+    )
+    errs = tracker.check_id_collisions("origin/dev", "pr", [], run=run)
+    assert len(errs) == 1 and "TD-032" in errs[0] and "'CEL parity'" in errs[0] and "'tenant FK'" in errs[0]
+    assert ["git", "merge-base", "origin/dev", "pr"] in run.calls
+
+
+def test_check_id_collisions_against_working_tree(tmp_path):
+    local = [todo(tmp_path, "TD-031"), todo(tmp_path, "TD-032", title="CEL parity")]
+    run = fake_git({"mb": ["TD-031.md"], "origin/dev": ["TD-031.md", "TD-032.md"]},
+                   files={("origin/dev", "tracker/todo/TD-032.md"): _td_text("TD-032", "tenant FK")})
+    errs = tracker.check_id_collisions("origin/dev", None, local, run=run)
+    assert len(errs) == 1 and "TD-032" in errs[0]
+    assert ["git", "merge-base", "origin/dev", "HEAD"] in run.calls
 
 
 # -------------------------------------------------------------- review gate
