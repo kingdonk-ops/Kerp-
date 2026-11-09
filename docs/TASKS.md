@@ -3,11 +3,11 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 6/66 tasks done (9%) · **ready now:** 4 · **epics awaiting breakdown:** 39
+**Overall:** 7/66 tasks done (11%) · **ready now:** 4 · **epics awaiting breakdown:** 39
 
 | Phase | Tasks done | Progress |
 |---|---|---|
-| 0 · Platform foundations | 6/27 | `██░░░░░░░░` 22% |
+| 0 · Platform foundations | 7/27 | `██░░░░░░░░` 26% |
 | 1 · Asset & Quality backbone | 0/30 | `░░░░░░░░░░` 0% |
 | 2 · Welding quality | 0/9 | `░░░░░░░░░░` 0% |
 | 3 · Logistics | 0/0 (+7 epics) | `░░░░░░░░░░` 0% |
@@ -37,7 +37,7 @@
 | ⬜ | [T-0014](../tracker/tasks/T-0014.md) | admin module: tenant/user/role administration API | admin | S | T-0010, T-0011 |  |
 | ⬜ | [T-0015](../tracker/tasks/T-0015.md) | SAQ worker + Redis + jobs module (enqueue/status/poll), interactive+batch priority queues | jobs | M | T-0003, T-0011 |  |
 | ⬜ | [T-0016](../tracker/tasks/T-0016.md) | Storage service + presigned uploads (presign/complete, sha256 verify, scan stub, orphan sweep) | uploads | M | T-0015 |  |
-| 🟪 | [T-0017](../tracker/tasks/T-0017.md) | CEL runtime substrate: celpy (server) + JS CEL (client) + shared conformance_fixtures.json harness | platform | M | T-0001, T-0002 | #15 |
+| ✅ | [T-0017](../tracker/tasks/T-0017.md) | CEL runtime substrate: celpy (server) + JS CEL (client) + shared conformance_fixtures.json harness | platform | M | T-0001, T-0002 | #15 |
 | ⬜ | [T-0018](../tracker/tasks/T-0018.md) | Verification engine shell: run_checks(context, rule_set), rule sets as data (CEL), findings log | validation | M | T-0006, T-0017 |  |
 | ⬜ | [T-0019](../tracker/tasks/T-0019.md) | notifications module (in-app) | notifications | S | T-0012 |  |
 | ⬜ | [T-0020](../tracker/tasks/T-0020.md) | saved_views module | saved_views | S | T-0012 |  |
