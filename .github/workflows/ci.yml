@@ -33,11 +33,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # check-ids needs the base branch and the merge base
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - name: Validate tracker
         run: python scripts/tracker.py validate
+      - name: TODO ids do not collide with base
+        if: github.event_name == 'pull_request'
+        run: >-
+          python scripts/tracker.py check-ids
+          --base "origin/${{ github.base_ref }}"
+          --head "${{ github.event.pull_request.head.sha }}"
       - name: Boards up to date
         run: python scripts/tracker.py render --check
       - name: Pipeline script tests

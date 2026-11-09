@@ -54,6 +54,7 @@ an automatic `CHANGES_REQUESTED`.
 - Implementers update **only their own task file** (status, notes, ticked acceptance criteria).
 - Anything found but not done — missed requirement, deferred edge case, follow-up, bug in another module, unanswered question — becomes a TODO **in the same PR**:
   `python scripts/tracker.py new-todo --kind missed|deferred|later|bug|spec-gap|decision|risk --title "..." --task T-xxxx --source implementer`
+- TODO ids are global across parallel branches. `new-todo` fetches and picks an id above every `TD-xxx` on any local/`origin/*` branch and open PR. Never hand-pick an id or copy "local max + 1". If it prints a `WARNING` (offline, no `gh`), push the branch soon so later allocations see it. CI's `check-ids` fails a PR whose new TODO id is used on `dev` for a different item; fix it by re-raising with `new-todo` and updating references.
 - Status flow: `todo → in_progress → in_review → done` (or `blocked`). `done` needs a PR number.
 - Every PR that touches `tracker/` runs `python scripts/tracker.py render` and commits the boards.
 - Epics (`needs-breakdown`) are never implemented directly; the planner splits them into S/M tasks.
