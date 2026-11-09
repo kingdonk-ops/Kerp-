@@ -3,11 +3,11 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 1/66 tasks done (2%) · **ready now:** 5 · **epics awaiting breakdown:** 39
+**Overall:** 2/66 tasks done (3%) · **ready now:** 6 · **epics awaiting breakdown:** 39
 
 | Phase | Tasks done | Progress |
 |---|---|---|
-| 0 · Platform foundations | 1/27 | `░░░░░░░░░░` 4% |
+| 0 · Platform foundations | 2/27 | `░░░░░░░░░░` 7% |
 | 1 · Asset & Quality backbone | 0/30 | `░░░░░░░░░░` 0% |
 | 2 · Welding quality | 0/9 | `░░░░░░░░░░` 0% |
 | 3 · Logistics | 0/0 (+7 epics) | `░░░░░░░░░░` 0% |
@@ -22,7 +22,7 @@
 | | ID | Title | Module | Size | Depends on | PR |
 |---|---|---|---|---|---|---|
 | ✅ | [T-0001](../tracker/tasks/T-0001.md) | Backend scaffold: FastAPI app factory, settings, /health | platform | S | — | #7 |
-| 🟪 | [T-0002](../tracker/tasks/T-0002.md) | Frontend scaffold: Vite + React 18 + TS strict, Tailwind, TanStack Query, Dexie, router, i18n, Vitest | platform | S | — | #8 |
+| ✅ | [T-0002](../tracker/tasks/T-0002.md) | Frontend scaffold: Vite + React 18 + TS strict, Tailwind, TanStack Query, Dexie, router, i18n, Vitest | platform | S | — | #8 |
 | ▶ | [T-0003](../tracker/tasks/T-0003.md) | Dev infra: docker-compose (PG16+PostGIS+ltree, Redis7, MinIO), Makefile, .env.example | platform | S | T-0001 |  |
 | ▶ | [T-0004](../tracker/tasks/T-0004.md) | Backend Dockerfile (multi-stage, --only-binary) + CI image build to GHCR | platform | S | T-0001 |  |
 | ▶ | [T-0005](../tracker/tasks/T-0005.md) | Database layer + BaseRecordMixin + Alembic + metadata contract test | platform | M | T-0001 |  |
@@ -37,7 +37,7 @@
 | ⬜ | [T-0014](../tracker/tasks/T-0014.md) | admin module: tenant/user/role administration API | admin | S | T-0010, T-0011 |  |
 | ⬜ | [T-0015](../tracker/tasks/T-0015.md) | SAQ worker + Redis + jobs module (enqueue/status/poll), interactive+batch priority queues | jobs | M | T-0003, T-0011 |  |
 | ⬜ | [T-0016](../tracker/tasks/T-0016.md) | Storage service + presigned uploads (presign/complete, sha256 verify, scan stub, orphan sweep) | uploads | M | T-0015 |  |
-| ⬜ | [T-0017](../tracker/tasks/T-0017.md) | CEL runtime substrate: celpy (server) + JS CEL (client) + shared conformance_fixtures.json harness | platform | M | T-0001, T-0002 |  |
+| ▶ | [T-0017](../tracker/tasks/T-0017.md) | CEL runtime substrate: celpy (server) + JS CEL (client) + shared conformance_fixtures.json harness | platform | M | T-0001, T-0002 |  |
 | ⬜ | [T-0018](../tracker/tasks/T-0018.md) | Verification engine shell: run_checks(context, rule_set), rule sets as data (CEL), findings log | validation | M | T-0006, T-0017 |  |
 | ⬜ | [T-0019](../tracker/tasks/T-0019.md) | notifications module (in-app) | notifications | S | T-0012 |  |
 | ⬜ | [T-0020](../tracker/tasks/T-0020.md) | saved_views module | saved_views | S | T-0012 |  |

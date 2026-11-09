@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 13 · **Closed:** 7
+**Open:** 14 · **Closed:** 7
 
 ## decision (4)
 
@@ -14,12 +14,13 @@
 | [TD-004](../tracker/todo/TD-004.md) | Hosting target: Coolify/MinIO (ADR-001) vs AWS (S3, SES) — affects storage/email adapters and deploy | T-0016 | spec-review |
 | [TD-015](../tracker/todo/TD-015.md) | Phase 2 welder/NDE records reference the contacts directory (Phase 3): confirm interim nullable-linkage + backfill-FK default vs. landing a minimal contacts directory before Phase 2 | T-0202 | kerp-planner |
 
-## spec-gap (2)
+## spec-gap (3)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
 | [TD-006](../tracker/todo/TD-006.md) | Offline sync listed in Phase 4 modules but plan §9 requires it from Phase 0/1 — moved core to Phase 1 (T-0125/T-0126) | T-0126 | spec-review |
 | [TD-014](../tracker/todo/TD-014.md) | Relationship between inspection record kind='rfi' (T-0111) and the inspection_requests module (T-0115) is undefined — both model 'Request for Inspection' | T-0115 | kerp-planner |
+| [TD-021](../tracker/todo/TD-021.md) | Outbox envelope: align frontend db field created_at_utc with master spec 1.3 timestamp_utc (decide in T-0126/T-0127 before the table is used; Dexie still at version 1) | T-0002 | reviewer |
 
 ## deferred (1)
 
