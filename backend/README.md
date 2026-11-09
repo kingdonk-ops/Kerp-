@@ -8,12 +8,15 @@ FastAPI modular monolith (see `docs/spec/` and `CLAUDE.md` §6).
 |---|---|
 | `app/main.py` | `create_app()` application factory |
 | `app/core/config.py` | Typed settings (`pydantic-settings`, env prefix `KERP_`) |
+| `app/core/db.py` | `Base`, `BaseRecordMixin`, portable `GUID`/`JSONType`, `Database` + `get_db`, metadata contract check |
+| `migrations/`, `alembic.ini` | Alembic (URL from settings, metadata from every module's `models.py`) |
 | `app/api/health.py` | `GET /health` liveness endpoint |
 | `app/modules/<name>/` | Domain modules (`manifest.py`, `models.py`, `router.py`, `service.py`, `schemas.py`, `README.md`) — added by later tasks |
 | `tests/` | pytest suite |
 
-The module loader, database layer, auth and RLS are later Phase 0 tasks. Whether
-the core is ported from Inspection-ERP or rewritten is open decision **TD-001**.
+The module loader, auth and RLS are later Phase 0 tasks. Parts of the core are ported
+from Inspection-ERP. ADR 0001 (`docs/decisions/0001-port-inspection-erp-core.md`) lists
+which parts.
 
 ## Settings
 
@@ -26,7 +29,8 @@ hardcoded config, no `.env` file is read).
 | `KERP_ENVIRONMENT` | `development` | `development` / `test` / `production` |
 | `KERP_DEBUG` | `false` | FastAPI debug mode |
 | `KERP_VERSION` | installed package version | Reported by `/health` |
-| `KERP_DATABASE_URL` | unset | SQLAlchemy URL (used once the DB layer exists) |
+| `KERP_DATABASE_URL` | unset | SQLAlchemy URL of the runtime role (e.g. `postgresql+psycopg://…`, `sqlite:///…`) |
+| `KERP_MIGRATION_DATABASE_URL` | unset (= `KERP_DATABASE_URL`) | Schema-owner URL Alembic runs as |
 | `KERP_REDIS_URL` | unset | Redis URL (used once the job queue exists) |
 | `KERP_LOG_LEVEL` | `INFO` | Root log level (`DEBUG`…`CRITICAL`, case-insensitive) |
 | `KERP_CONTENT_SECURITY_POLICY` | `default-src 'none'; frame-ancestors 'none'` | CSP for API responses |
@@ -152,3 +156,26 @@ pinned to a version outside its specifier, if a pin has no hash, or if the Docke
 ## Endpoints
 
 - `GET /health` → `200 {"status": "ok", "version": "<version>"}`
+
+## Database (T-0005)
+
+Every model derives from `Base` and `BaseRecordMixin`. The mixin gives each table `id`
+(UUID PK), `tenant_id` (NOT NULL), `project_id` (`NULL` means a tenant-level row),
+`created_at`, `updated_at`, `deleted_at` (soft delete), `custom_fields` (JSONB),
+`created_by`, `updated_by`, `source` (`ui|api|import|sync|ai|system`) and `revision`
+(bumped on every update). `tests/test_db_contract.py` fails CI if any table is missing
+these columns.
+
+```bash
+pip install -e ".[dev]"              # psycopg (PostgreSQL driver) is a core dependency
+alembic upgrade head                 # uses KERP_MIGRATION_DATABASE_URL / KERP_DATABASE_URL
+alembic revision --autogenerate -m "..."   # after adding models; commit the revision
+alembic check                        # also enforced by tests/test_migrations.py
+```
+
+Endpoints get a session through `DbSession` (`Annotated[Session, Depends(get_db,
+scope="function")]`), never a bare `Depends(get_db)`. That way the unit of work commits
+before the response is sent, and a write that fails at commit returns a 500, never a 200.
+
+Tests run on a temporary SQLite file. When `KERP_DATABASE_URL` points at PostgreSQL, as
+in CI's second backend step, the same DB tests run against PostgreSQL 16.
