@@ -88,8 +88,8 @@ from the terminology pack), `tag_no`, `tagged_at`, `tagged_by`, `restrictions`, 
 The scaffold card always shows: **tagged? last tagged when, by whom, next due**.
 
 ### 4.2 Re-inspection interval
-Project setting `scaffolding.default_inspection_interval_days` (set to the site's rule; the pack
-ships a default the project must confirm) plus event triggers that make an inspection due
+Project setting `scaffolding.default_inspection_interval_days` (set to the site's rule; the
+interval default comes from the client pack and the project confirms it — TD-082) plus event triggers that make an inspection due
 immediately: modification completed, adverse weather event recorded in the daily log, incident
 linked to the scaffold, tag status change to restricted.
 
@@ -107,6 +107,9 @@ linked to the scaffold, tag status change to restricted.
    **invalid**; this fails the AWP scaffolding gate (E-06b-02), the `planner` readiness of
    linked plan lines, and any permit rule that requires a valid scaffold tag. Escalation
    notification to the custodian's manager.
+
+Defaults confirmed (TD-082, user 2026-11-10): `lead_days` 2, interval from the client pack,
+overdue tags **hard-block** linked plan lines and permits, assignment rule `supervisor`.
 
 ### 4.4 Request to tag / inspect
 Any user can press **Request inspection** on a scaffold (or scan its QR, §8): creates the same

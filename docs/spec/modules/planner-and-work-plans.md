@@ -85,7 +85,7 @@ check eligibility.
 | `code`, `title` | numbering pattern per project (e.g. `{project}-WP-{seq:3}`); free `client_ref` for the client's shut code (e.g. a shut number like `SHUT-0001`) |
 | `kind` | configurable list; defaults: `shutdown`, `break_in`, `campaign`, `look_ahead`, `recovery`, `other` |
 | `mode` | `overlay` or `interrupt` (§5.1) |
-| `interrupt_scope` | for `interrupt`: `project`, `nodes` (subtree list), `resource_groups` (list) or both |
+| `interrupt_scope` | for `interrupt`: a list of breakdown **node subtrees** (each a root node id; the subtree below it is interrupted). Subtrees only — not the whole project and not resource groups (ADR 0006 Acceptance, 2026-11-10) |
 | `window_start`, `window_end` | planned window; `calendar_id`, `shift_pattern_id` |
 | `scope_nodes` | site / area / asset subtrees the plan covers (for filtering and stats) |
 | `status` | §8 |
@@ -107,8 +107,10 @@ check eligibility.
   - is a KERP forecast layer only — it **never** writes P6-owned fields (ADR 0005);
   - is shown as ghost bars on the overlay Gantt (§9);
   - is exported as a forecast update / fragnet for the scheduler to bring into P6 (ADR 0006).
-- `interrupt_scope = resource_groups` stops only the work of those groups (e.g. all
-  Painter/Blaster crews are pulled onto the shut, mechanical online work continues).
+- `interrupt_scope` is always a set of breakdown subtrees (ADR 0006 Acceptance): programme
+  activities linked to nodes inside those subtrees stop; everything outside continues. Pulling
+  one trade onto a shut while other work continues is modelled as an `overlay` plan whose demand
+  the capacity check (§7.3) shows against that trade, not as a resource-group interrupt.
 
 Both modes can be mixed across plans; a later plan is evaluated against the programme **plus**
 already-approved plans.

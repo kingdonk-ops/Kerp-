@@ -73,6 +73,7 @@ Field operations frequently occur in remote mine sites, offshore vessels, tank i
   1. **Strict Deterministic Ordering**: The sync server validates state transitions using domain-specific state machine rules rather than crude database timestamp overwrites.
   2. **Field Sign-Off Protection (Immutable Approvals)**: If an inspection step has been signed off by a Client Witness Inspector, an offline supervisor device cannot regress that step's status. The server rejects regression and emits an actionable reconciliation event.
   3. **Last-Write-Wins (LWW) with Conflict Log**: Applied to non-critical text fields (e.g., supervisor progress commentary). If both users edit the same text offline, the latest client timestamp wins, but the superseded text is preserved in `entity_history_audit`.
+  4. **Amended by ADR 0005 (accepted 2026-11-10).** Tablet mutations carry only the changed paths, each with a base hash (`changes`, not a whole `payload`), and are applied per field against a field-ownership map (`p6` / `office` / `field`); LWW above applies only to `office` text edited concurrently by two desktop users. Office edits to field-owned values of a checked-out record are blocked. Detail: `docs/spec/modules/p6-import-and-rsw-matching.md` §7–§8.
 
 ---
 
@@ -654,6 +655,7 @@ ITP Hold Point Lifecycle:
 #### 2. ITP Step & Quality Hold Point State Machine
 * `PENDING`: Step awaiting preceding execution completion.
 * `RFI_ISSUED`: Formal inspection call-out dispatched to Client Inspector / Verifier with minimum required contractual notice (e.g., 24 hours).
+* **Amended (TD-045, decided 2026-11-10):** "RFI" means Request for Information, so `RFI_ISSUED` is renamed — planner default `INSPECTION_REQUESTED`, pending the TD-045 spec — and the call-out itself is a separate `inspection_request` record. See `docs/spec/modules/quality-and-inspection.md` §Unified inspection record.
 * `INSPECTED_PASSED`: Verifier signs off the physical check point. Requires authenticated digital signature, current UTC timestamp, and geographic coordinates.
 * `INSPECTED_FAILED`: Inspection fails to meet technical criteria. The engine automatically forces creation of an associated `punch_items` record (Category A) or formal `non_conformance_reports` record.
 * `LOCKED_FOR_TURNOVER`: Record verified and immutable. No modifications permitted; queued for MDR document collation.
@@ -686,6 +688,7 @@ Client Device                                              Sync Gateway Server
 1. **Critical Quality Protection**: If the central database state for an `itp_step_executions` record is already `INSPECTED_PASSED`, any incoming offline update attempting to revert the status or edit technical measurement data is rejected with code `ERR_CONFLICT_IMMUTABLE_QUALITY_RECORD`. The server writes the rejection to the `sync_conflict_log` for administrative review.
 2. **Concurrent Entity Modification**: When two supervisors edit non-conflicting attributes of the same entity (e.g., Supervisor A logs installed linear meters while Supervisor B adds a crane delay note on the shift log), the mutations are merged automatically.
 3. **Array Mutation Preservation**: For child collections (e.g., punchlist photos, shift worker allocations), mutations are treated as additive list operations rather than destructive array overwrites.
+4. **Per-field three-way apply (ADR 0005).** Rule 2 is decided per changed path: a path not owned by `field` is rejected (`ERR_FIELD_NOT_OWNED`), a locked record is rejected (rule 1), an unchanged server value is overwritten, a changed server value is kept and the tablet value goes to `sync_conflict_log` with a review item. `base_revision` stays on the envelope for idempotency and diagnostics only. See `docs/spec/modules/p6-import-and-rsw-matching.md` §8.
 
 ---
 

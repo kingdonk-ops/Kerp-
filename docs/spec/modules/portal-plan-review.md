@@ -156,6 +156,11 @@ External (magic-link) approvers count only if the project setting
 `portal.allow_external_approval` is on; otherwise their decision is recorded as a comment-level
 "endorsement".
 
+Defaults confirmed (TD-081, user 2026-11-10): magic-link participants endorse only
+(`portal.allow_external_approval` off), no proxy votes (§6), a new revision resets all votes
+(§7.4), `override_approval` held by the PM and the client project lead, overrides limited to
+approvers of the overrider's own organisation (§7.3).
+
 ### 7.3 Override for absent approvers
 If a required approver has neither voted nor attended any session for the revision, a user with
 the `override_approval` capability (default: PM PER-02 and the client project lead role) can

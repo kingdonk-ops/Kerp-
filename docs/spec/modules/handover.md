@@ -147,8 +147,13 @@ On **submit**:
 2. **First shift:** the first time a recipient opens the project on or after `period_end`
    (or straight away if already on shift) they get a "Handover from {author}" screen before
    their home page. They can read now or "Read later" — it stays pinned. `first_seen_at` is
-   recorded. When a roster / time-capture source exists (E-04-05), a first time entry also
-   counts as first shift (decision TD-073).
+   recorded. **Decided (TD-073, 2026-11-10): the first shift comes from the roster** kept under
+   staff/project settings — start dates, two or more teams (day/night, back-to-back), people
+   assigned to teams, extra teams with from/to dates (e.g. a shutdown day/night crew); rosters
+   also feed task scheduling. The recipient's first rostered shift on or after `period_end`
+   triggers the screen; until the roster exists (spec in TD-083, owned by the planner resource
+   pool) the first project sign-in on or after `period_end` is the fallback (planner default,
+   recorded on TD-083 for confirmation).
 3. **Acknowledge:** "I have read this handover", with an optional reply/questions box.
    Acknowledgement is recorded per recipient (audit ledger) and notifies the author.
 4. **Escalation:** not acknowledged within `ack_deadline_hours` of `first_seen_at` →

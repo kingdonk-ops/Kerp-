@@ -523,13 +523,28 @@ KERP enforces tenant isolation where every individual industrial project runs as
 ALTER TABLE functional_tags ENABLE ROW LEVEL SECURITY;
 ALTER TABLE functional_tags FORCE ROW LEVEL SECURITY;
 
--- Dynamic Tenant Context Policy
+-- Dynamic Tenant Context Policy (no TO clause: applies to PUBLIC, TD-054)
 CREATE POLICY project_isolation_policy ON functional_tags
     FOR ALL
-    TO kerp_app_role
     USING (project_id = NULLIF(current_setting('app.current_project_id', true), '')::UUID)
     WITH CHECK (project_id = NULLIF(current_setting('app.current_project_id', true), '')::UUID);
 ```
+
+**Amendments (user, 2026-11-10).**
+- **Policies have no `TO` clause (TD-054).** They apply to `PUBLIC`, i.e. to every role that is
+  not `SUPERUSER`/`BYPASSRLS`; the runtime role name is deployment configuration (CI uses
+  `kerp_app`). The implemented policies (`project_isolation_policy` with tenant + exact project
+  scope, `tenant_level_read_policy` for tenant-level rows) are described in
+  `backend/app/core/tenancy/README.md` (T-0007).
+- **Explicit multi-project scope (TD-053).** Cross-project reads (portfolio dashboards, PER-01 /
+  PER-10 / PER-11 / PER-12 / PER-13) bind an explicit list of allowed project ids to the session
+  (`app.allowed_project_ids`, derived from the user's memberships, never from request
+  parameters). Reads see rows of any listed project; writes stay limited to the single bound
+  `app.current_project_id`. No session has an implicit "all projects of the tenant" scope.
+- **Membership-based policy on tenant-level tables (TD-053).** The `projects` table and other
+  tenant-level tables that describe a project (e.g. memberships) use a stricter policy: a row is
+  visible only when its project is in the session's allowed list (or the session is a tenant
+  administrator). A client-portal user bound to project A cannot list project B.
 
 ### Session Initialization Handshake
 Every API request and background job sets the runtime project identifier within the database transaction:
@@ -552,6 +567,8 @@ The rolling-wave development model enforces a formal automated test gate ending 
 1. **Schema Immutability**: Continuous integration tests assert that no columns in `oe_asset_node` or `oe_asset_item` can be modified or dropped without an accepted, peer-reviewed Architectural Decision Record (`docs/decisions/ADR-xxxx.md`).
 2. **CEL Evaluator Conformance**: A test suite executes 120 shared mathematical and logical expressions across both Python (`celpy`) and TypeScript (`cel-js`) environments, asserting exact parity of results and error codes.
 3. **Seam Verification**: Service contracts for `run_checks`, `eligibility`, and the VFS routing resolver are cryptographically hash-checked to block unapproved signature drift.
+
+**Freeze scope amendments (ADR 0003, ADR 0004, ADR 0005; accepted 2026-11-10).** The freeze also covers: the `oe_asset_level_def` shape and the **role names** (`grouping`, `physical`, `work_anchor`, `inspection_anchor`, `progress_unit`, `schedule_link`) — level names and keys stay project data; `oe_asset_item.work_anchor_id`; the rule-store shape (`oe_validation_rule_set`, `oe_validation_rule`) with its `kind` values (`check`, `digest`, `autolink`, `notify`, `p6_grammar`, `p6_eligibility`) and `engine` values (`cel`, `regex`); the per-record override record (ADR 0004 Amendment A); and the field-ownership map (`p6` / `office` / `field`).
 
 ### 7.2 Updated Task Sequencing Roadmap
 ```

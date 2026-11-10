@@ -43,6 +43,25 @@ Each weld joint links the pipe/fitting **heat numbers** and **MTR (mill cert)** 
 mechanical properties pulled from `materials` (SAQ OCR of the MTR → joint properties). See
 [`materials-and-traceability.md`](materials-and-traceability.md).
 
+**Remediation welds to existing steel (TD-091, user 2026-11-10).** Welding new steel to existing
+steel needs heat numbers for the **new** steel only; the existing side is recorded as
+existing/unknown heat and does not break the MDR heat→MTR invariant. New steel without a heat
+number: **KAEFER-supplied** → raise an NCR; **client-supplied** → hard lock on the weld until the
+heat number is obtained from the client **or** the client representative signs a **waiver**. The
+waiver is a record attached to the inspection record and included in the MDR.
+
+Rules (testable):
+- each weld joint side records `steel_origin` (`new` / `existing`) and, for new steel,
+  `supplied_by` (`kaefer` / `client`) and `heat_number`;
+- an `existing` side needs no heat number and is reported as "existing steel" in the MDR heat
+  trace;
+- a `new` + `kaefer` side without a heat number raises an NCR (`ncr` service) when the weld is
+  submitted;
+- a `new` + `client` side without a heat number puts a hard lock on the weld (its inspection
+  cannot pass the `check` gate) until a heat number is entered **or** a signed client-rep waiver
+  record (signer, date, reason, scope) is attached to the inspection; the waiver is included in
+  the MDR.
+
 ## Continuity & notifications
 `GET /wps/continuity-watch` report; expiry/continuity alerts via a **SAQ cron** worker.
 
