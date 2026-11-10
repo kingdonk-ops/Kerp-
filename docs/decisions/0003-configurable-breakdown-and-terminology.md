@@ -1,6 +1,6 @@
 # ADR 0003 — Configurable work breakdown, anchor roles and client terminology
 
-- **Status:** proposed
+- **Status:** accepted (user, 2026-11-10; see "Amendments on acceptance")
 - **Date:** 2026-11-10
 - **Resolves (on acceptance):** TD-071
 - **Evidence:** [`docs/research/legacy-spreadsheet-inventory.md`](../research/legacy-spreadsheet-inventory.md)
@@ -163,3 +163,30 @@ they were captured on (records pin `template_revision_id`), new records use the 
 - **Not decided here:** whether a project may have two parallel trees (physical location vs.
   work packages) linked many-to-many. Every file reviewed fits one tree; raise if a client
   needs both.
+
+## Amendments on acceptance (user, 2026-11-10, TD-071)
+
+Accepted with these changes. Where they conflict with the Decision above, they win. The spec
+and task edits are tracked in TD-112.
+
+1. **One work anchor per branch, not per project.** Replaces "exactly one level per project
+   carries `work_anchor`": every root-to-leaf path has exactly one work-anchor node, and work
+   anchors are never nested. A project may use several breakdown templates side by side
+   (e.g. remediation and CUI under one contract, or work at Asset level with no RSW).
+2. **One tree plus collections.** Keep one physical/work tree. Job packs, shutdown windows,
+   test packs and work plans (ADR 0006) are named **collections** linked to nodes
+   many-to-many. This settles the "two parallel trees" question left open above.
+3. **Restructure with history.** Replaces "edits after work exists are additive only":
+   move / split / merge / retire operations keep node lineage (`superseded_by`,
+   `derived_from`). Inspections, time and NCRs stay on the original node and roll up through
+   the lineage. Level keys are still never re-keyed.
+4. **Configurable code uniqueness.** Each level def sets whether codes are unique per parent,
+   per level or per project.
+5. **Inspection without work.** Inspections (condition surveys, CUI scans) may sit on an
+   `inspection_anchor` node with no work under it yet; findings (TD-106) can raise the work.
+6. **Terminology per language, with plurals.** Terminology packs carry values per locale
+   (at least en and de) and plural forms.
+7. **Pack upgrades are offered, never forced.** A changed client pack shows existing projects
+   a "changes available" prompt with a diff; nothing is rewritten automatically (as ADR 0004).
+8. **Time without a work anchor.** Time lines may book to a delay or overhead code (standby,
+   induction) with no work anchor (see TD-108).
