@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 74 · **Closed:** 54
+**Open:** 76 · **Closed:** 55
 
 ## decision (2)
 
@@ -50,12 +50,13 @@
 | [TD-120](../tracker/todo/TD-120.md) | Login tenant resolution: how a user picks the tenant at sign-in (multi-tenant accounts, MOD-01 cross-tenant collaboration) | T-0008 | implementer |
 | [TD-121](../tracker/todo/TD-121.md) | Refresh-token lifetime, absolute session lifetime and SPA refresh-token transport are unspecified | T-0008 | implementer |
 
-## missed (2)
+## missed (3)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
 | [TD-094](../tracker/todo/TD-094.md) | Per-RSW area handover sheet required by the ITP closeout (not the shift handover module) | T-0113, E-04-10 | planner |
 | [TD-125](../tracker/todo/TD-125.md) | Booking modules must call work_anchor_for and return 422 when the path has no work anchor (progress, time lines against a work anchor, completion gate) | T-0101, T-0116, T-0124, E-04-03, E-04-05 | reviewer |
+| [TD-131](../tracker/todo/TD-131.md) | Add a root .env.example for the dev stack (the implementer agent's permission rules block writing .env* files) | T-0003 | implementer |
 
 ## deferred (7)
 
@@ -83,7 +84,6 @@
 | [TD-043](../tracker/todo/TD-043.md) | Entra ID SSO for KAEFER staff behind the AuthProvider seam, before the first pilot | T-0008 | user |
 | [TD-048](../tracker/todo/TD-048.md) | SHA-pin actions in promote.yml and review-gate.yml (persist-credentials:false where no push is needed) and digest-pin the CI service images (postgis, redis) | T-0028, T-0032 | implementer |
 | [TD-051](../tracker/todo/TD-051.md) | CI: backend-publish rebuilds the image instead of pushing the smoke-tested one; export/push the tested image by digest | T-0028, T-0032 | reviewer |
-| [TD-052](../tracker/todo/TD-052.md) | PostgreSQL-only RLS tests skip in the SQLite run and on machines without Postgres: add a local Postgres (compose/testcontainers) recipe | T-0007, T-0003 | implementer |
 | [TD-055](../tracker/todo/TD-055.md) | Data migrations under FORCE RLS see no rows: add a per-tenant/project backfill helper or a dedicated BYPASSRLS migration role (ADR) | T-0007 | implementer |
 | [TD-056](../tracker/todo/TD-056.md) | Deploy: runtime DB role must never own RLS tables (owner can disable FORCE); migrations run as a separate owner role | T-0007 | reviewer |
 | [TD-058](../tracker/todo/TD-058.md) | Audit ledger: anchor chain heads outside the database (tail truncation / re-hashed forgery by the table owner or a DB superuser is undetectable by in-DB verification) | T-0006 | implementer |
@@ -98,8 +98,9 @@
 | [TD-127](../tracker/todo/TD-127.md) | Frontend: project module settings screen (toggle via /api/v1/modules) and hide disabled modules in the navigation | T-0011 | implementer |
 | [TD-128](../tracker/todo/TD-128.md) | Concurrent first toggle of the same module in one project races on uq_project_module_setting_module and returns 500; retry or upsert | T-0011 | implementer |
 | [TD-130](../tracker/todo/TD-130.md) | Module loader: require CurrentPrincipal on every mounted module router by default (opt-out for public routes) | T-0011 | implementer |
+| [TD-133](../tracker/todo/TD-133.md) | Dev stack: separate dev database from kerp_test, and create the kerp-vault MinIO bucket + backend storage settings | T-0003 | implementer |
 
-## risk (5)
+## risk (6)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -108,6 +109,7 @@
 | [TD-069](../tracker/todo/TD-069.md) | Legacy inspection exports contain real client data and must not be committed as fixtures | T-0113 | planner |
 | [TD-102](../tracker/todo/TD-102.md) | Eligibility API is frozen at M1 (T-0131) but must accept a requirement set (role baseline + client/site overlays + task-bound rules) | T-0131, T-0118 | planner |
 | [TD-111](../tracker/todo/TD-111.md) | All coastal input files (planning, comm matrix, registers, reports, templates) contain real client and personal data: extend TD-069 beyond the inspection exports | T-0113, T-0107 | planner |
+| [TD-132](../tracker/todo/TD-132.md) | docker-compose dev stack never run end to end (no Docker on the T-0003 implementer machine): verify make test-pg once | T-0003 | implementer |
 
 ## Closed
 
@@ -141,6 +143,7 @@
 | ✅ | [TD-039](../tracker/todo/TD-039.md) | Bring back any PROPOSAL-port-from-aip extras dropped in spec consolidation (write-back, type inheritance, migration preview, test-fill, section library, report slots, auto_create_itp, competency assignment, programmes)? | Out of scope for Phase 1. Revisit auto_create_itp and asset write-back as Phase 3 candidates (user, 2026-11-09) |
 | ✅ | [TD-040](../tracker/todo/TD-040.md) | CEL value encoding: plain JSON numbers are CEL double on both runtimes; ints/timestamps need explicit tags | Confirmed: plain JSON numbers are CEL double; int64/timestamp/uint/duration use $-tagged encoding. Binding for sync payloads and form templates (user, 2026-11-09) |
 | ✅ | [TD-042](../tracker/todo/TD-042.md) | EDGE-SCREENS 2.1 hold-gating example uses count(list), which is not standard CEL | Use standard size(); EDGE-SCREENS §2.1 hold-gating example corrected (user, 2026-11-09) |
+| ✅ | [TD-052](../tracker/todo/TD-052.md) | PostgreSQL-only RLS tests skip in the SQLite run and on machines without Postgres: add a local Postgres (compose/testcontainers) recipe | T-0003: docker-compose PG16 (CI's postgis image) + shared infra/postgres/initdb/20-kerp-app.sql (kerp_app NOSUPERUSER NOBYPASSRLS, also run by CI) + make test-pg (fails on any skip); documented in backend/README.md. End-to-end local run tracked by TD-132. |
 | ✅ | [TD-053](../tracker/todo/TD-053.md) | Tenant-wide (cross-project) reads under project RLS: portfolio views, admin, and the visibility of tenant-level rows such as the project row | Explicit multi-project scope (session binds a list of allowed project ids) plus a stricter membership-based policy on the projects table and other tenant-level tables.  Implement in T-0010/T-0014. (user, 2026-11-10); follow-up edits in TD-112 |
 | ✅ | [TD-054](../tracker/todo/TD-054.md) | Edge spec §6 policy targets 'TO kerp_app_role'; T-0007 applies it to PUBLIC | Confirm policy without a TO clause (PUBLIC); amend edge spec section 6. (user, 2026-11-10); follow-up edits in TD-112 |
 | ✅ | [TD-057](../tracker/todo/TD-057.md) | Audit ledger: diff §4 names the columns only; chain_key scope, hash algorithm, canonical serialisation and verification are implementer defaults | Accept the T-0006 implementer design (backend/app/core/audit/README.md) into the spec. (user, 2026-11-10); follow-up edits in TD-112 |

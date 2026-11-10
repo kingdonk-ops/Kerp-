@@ -194,3 +194,31 @@ table is under project-scoped RLS (`app/core/tenancy/README.md`).
 
 Tests run on a temporary SQLite file. When `KERP_DATABASE_URL` points at PostgreSQL, as
 in CI's second backend step, the same DB tests run against PostgreSQL 16.
+
+## Local PostgreSQL stack (T-0003)
+
+RLS, roles and `REVOKE` do not exist on SQLite, so `tests/test_rls_bypass.py`,
+`tests/test_audit_ledger_pg.py` and `tests/test_pg_extensions.py` skip without PostgreSQL
+(skip reason points at TD-052). To run them locally the way CI does, use the
+docker-compose stack at the repository root (needs Docker with Compose v2 and GNU make; on
+Windows run it from Git Bash, `make` is not bundled with Git for Windows, e.g.
+`choco install make`):
+
+```bash
+# from the repository root, with the backend venv active (or PYTHON=<absolute path to python>)
+make test-pg        # docker compose up -d --wait, then the PG tests; any skip fails the run
+make test-pg-all    # the whole backend suite on PostgreSQL, like CI's "Tests (PostgreSQL + RLS)"
+make down           # stop (keeps data); `make reset` also drops the volumes
+```
+
+| Piece | What |
+|---|---|
+| `docker-compose.yml` | `postgres` (`postgis/postgis:16-3.4`, same image, user, password and database as CI), `redis` (`redis:7-alpine`, as CI), `minio` (S3-compatible storage; console on `:9001`). Ports bind to `127.0.0.1` only |
+| `infra/postgres/initdb/20-kerp-app.sql` | Creates `ltree` + `postgis` and the login role `kerp_app` (`NOSUPERUSER NOBYPASSRLS`), gives it the database and owns `public` for it. CI's backend job runs **the same file** (`psql -f`); compose mounts it into `/docker-entrypoint-initdb.d/`, so it runs once on an empty volume (`make reset` to re-run) |
+| `Makefile` | Exports dev-only defaults matching CI: `KERP_DATABASE_URL` (as `kerp_app`), `KERP_TEST_OWNER_URL` (superuser `kerp`), `KERP_REDIS_URL`. Override in an optional, git-ignored `.env` (plain `KEY=VALUE`) or on the command line. No JWT key is set: outside production an ephemeral one is generated |
+| `KERP_FAIL_ON_SKIP=1` | Set by `make test-pg` (hook in `tests/skip_guard.py`): a run that skips anything exits non-zero, so a missing stack cannot look green |
+
+`tests/test_dev_infra.py` (part of the normal suite, no Docker needed) fails if the compose
+images, superuser settings or Makefile URLs drift from `.github/workflows/ci.yml`, if the
+init script stops creating `kerp_app` as `NOSUPERUSER NOBYPASSRLS`, or if CI stops running
+the shared script.
