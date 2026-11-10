@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 76 · **Closed:** 55
+**Open:** 77 · **Closed:** 55
 
 ## decision (2)
 
@@ -70,7 +70,7 @@
 | [TD-122](../tracker/todo/TD-122.md) | Bind the request's project scope from the authorised project (tenancy context is tenant-level after T-0008) | T-0008 | implementer |
 | [TD-129](../tracker/todo/TD-129.md) | Guard the module toggle API (PUT /api/v1/modules/{name}) with the admin capability tier once RBAC lands (T-0010/T-0014) | T-0011 | implementer |
 
-## later (25)
+## later (26)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -99,6 +99,7 @@
 | [TD-128](../tracker/todo/TD-128.md) | Concurrent first toggle of the same module in one project races on uq_project_module_setting_module and returns 500; retry or upsert | T-0011 | implementer |
 | [TD-130](../tracker/todo/TD-130.md) | Module loader: require CurrentPrincipal on every mounted module router by default (opt-out for public routes) | T-0011 | implementer |
 | [TD-133](../tracker/todo/TD-133.md) | Dev stack: separate dev database from kerp_test, and create the kerp-vault MinIO bucket + backend storage settings | T-0003 | implementer |
+| [TD-134](../tracker/todo/TD-134.md) | Dev infra follow-ups from PR #33 review: .gitattributes eol=lf for Makefile/*.sql/*.yml/*.sh, explicit pyyaml dev dep, test_pg_extensions.py in PG_TESTS guard | T-0003 | reviewer |
 
 ## risk (6)
 
