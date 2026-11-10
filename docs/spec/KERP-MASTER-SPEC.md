@@ -655,7 +655,7 @@ ITP Hold Point Lifecycle:
 #### 2. ITP Step & Quality Hold Point State Machine
 * `PENDING`: Step awaiting preceding execution completion.
 * `RFI_ISSUED`: Formal inspection call-out dispatched to Client Inspector / Verifier with minimum required contractual notice (e.g., 24 hours).
-* **Amended (TD-045, decided 2026-11-10):** "RFI" means Request for Information, so `RFI_ISSUED` is renamed — planner default `INSPECTION_REQUESTED`, pending the TD-045 spec — and the call-out itself is a separate `inspection_request` record. See `docs/spec/modules/quality-and-inspection.md` §Unified inspection record.
+* **Amended (TD-045, decided 2026-11-10):** "RFI" means Request for Information, so `RFI_ISSUED` is renamed — `INSPECTION_REQUESTED` (name confirmed by the user on TD-045) — and the call-out itself is a separate `inspection_request` record. See `docs/spec/modules/quality-and-inspection.md` §Unified inspection record.
 * `INSPECTED_PASSED`: Verifier signs off the physical check point. Requires authenticated digital signature, current UTC timestamp, and geographic coordinates.
 * `INSPECTED_FAILED`: Inspection fails to meet technical criteria. The engine automatically forces creation of an associated `punch_items` record (Category A) or formal `non_conformance_reports` record.
 * `LOCKED_FOR_TURNOVER`: Record verified and immutable. No modifications permitted; queued for MDR document collation.

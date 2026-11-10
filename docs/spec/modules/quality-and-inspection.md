@@ -18,15 +18,14 @@ Shared palette of field types used by every form, ITP and asset-schema field:
 Single store across all kinds: **`kind IN (inspection, itp)`**. TD-045 (decided 2026-11-10)
 renames the old `rfi` kind and `RFI_ISSUED` state because RFI means Request for Information; the
 Request for Inspection becomes its own `inspection_request` record (§`inspection_requests`).
-The names used here are the **planner default pending the TD-045 spec**: no `rfi` kind, and the
+The names used here are **confirmed by the user (TD-045, 2026-11-10)**: no `rfi` kind, and the
 call-out state is `INSPECTION_REQUESTED`. Anchors to **any node whose level has the `inspection_anchor` role, or an Item**
 (ADR 0003 §6; e.g. Line in `cui-line`, RSW and Item in `remediation-*`), including a node with no
 work under it yet (ADR 0003 Amendment 5). Holds responses authored against a template revision
 (pins `template_revision_id`), `status` lifecycle, `reading_*`, `signed_off_*` (user, signature
 hash, UTC timestamp, geolocation). Lifecycle (master spec §4.2):
 `PENDING → INSPECTION_REQUESTED → INSPECTED_PASSED → LOCKED_FOR_TURNOVER`, with
-`INSPECTED_FAILED → (Cat A punch | NCR) → RE_INSPECT` (state name default pending the TD-045
-spec). Every transition calls `run_checks`.
+`INSPECTED_FAILED → (Cat A punch | NCR) → RE_INSPECT` (state name confirmed on TD-045). Every transition calls `run_checks`.
 
 - **Dates (ADR 0004 Amendments C–D).** Each record stores `inspection_date` (when the work was
   inspected, entered by the user) and `entered_at` (server time of entry). Validity checks
@@ -100,7 +99,8 @@ item types: a register type is a versioned JSONSchema, so a project can add colu
 certificate/VOC documents (not a read-only LMS mirror). A tenant-wide **qualification-type
 catalogue** defines: name, whether it expires, expiry as a period from the issue date (or none),
 and which inspection categories / work-task categories it applies to. Detailed catalogue and
-competency-matrix spec: TD-099, TD-100; catalogue ownership: TD-118.
+competency-matrix spec: TD-099, TD-100; catalogue ownership decided in TD-118 (tenant administrator; PER-09 may add
+project-level types; no super admin).
 
 ## `qms` — master ITP authoring + audit + calibration records
 Strictly: ITP template authoring (on the one-engine), audit registers, and calibration

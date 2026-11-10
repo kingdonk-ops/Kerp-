@@ -134,8 +134,8 @@ they were captured on (records pin `template_revision_id`), new records use the 
 - **Spec edits** (separate PR after acceptance): `asset-and-tagging.md` (level defs, roles,
   `work_anchor_id`), `quality-and-inspection.md` (request-anchor link, role binding),
   CLAUDE.md §6 wording (as amended by Amendment 1): "work anchors to a **work-anchor node** —
-  exactly one per root-to-leaf path, never nested (RSW by default); inspections to any
-  `inspection_anchor` level; no BOQ anchor anywhere."
+  at most one per root-to-leaf path, never nested (RSW by default); inspections to any
+  `inspection_anchor` level or an Item. No BOQ anchor anywhere."
 - **Task changes** (same set as the Affects header and TD-071):
   - T-0101 — adds `oe_asset_level_def` (roles, unique `(project_id, key)`), `level_def_id` on
     nodes and the one-work-anchor-per-path invariant, never nested (Amendment 1; replaces "RSW is
@@ -172,8 +172,9 @@ Accepted with these changes. Where they conflict with anything above (Decision o
 and task edits are tracked in TD-112.
 
 1. **One work anchor per branch, not per project.** Replaces "exactly one level per project
-   carries `work_anchor`": every root-to-leaf path has exactly one work-anchor node, and work
-   anchors are never nested. A project may use several breakdown templates side by side
+   carries `work_anchor`": every root-to-leaf path has **at most one** work-anchor node, and work
+   anchors are never nested. A path may have none yet (inspection without work, Amendment 5);
+   booking work needs one on the path (TD-113, user 2026-11-10). A project may use several breakdown templates side by side
    (e.g. remediation and CUI under one contract, or work at Asset level with no RSW).
 2. **One tree plus collections.** Keep one physical/work tree. Job packs, shutdown windows,
    test packs and work plans (ADR 0006) are named **collections** linked to nodes
