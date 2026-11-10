@@ -110,11 +110,15 @@ def test_soft_delete_marks_once(db: Database) -> None:
         w.soft_delete(at=datetime(2027, 1, 1, tzinfo=UTC))
         assert w.is_deleted
     with db.sessionmaker() as s:
-        deleted_at = s.get_one(Widget, widget_id).deleted_at
+        # Reads hide soft-deleted rows by default (TD-033); include_deleted opts back in.
+        assert s.get(Widget, widget_id) is None
+        include = {"include_deleted": True}
+        deleted_at = s.get_one(Widget, widget_id, execution_options=include).deleted_at
         assert deleted_at is not None
         assert _as_utc(deleted_at) == first
         # Soft-deleted rows are still physically present.
-        assert s.scalar(select(Widget.id).where(Widget.id == widget_id)) == widget_id
+        stmt = select(Widget.id).where(Widget.id == widget_id).execution_options(**include)
+        assert s.scalar(stmt) == widget_id
 
 
 def test_soft_delete_defaults_to_now() -> None:

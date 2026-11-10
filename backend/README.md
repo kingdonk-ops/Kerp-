@@ -11,11 +11,12 @@ FastAPI modular monolith (see `docs/spec/` and `CLAUDE.md` §6).
 | `app/core/db.py` | `Base`, `BaseRecordMixin`, portable `GUID`/`JSONType`, `Database` + `get_db`, metadata contract check |
 | `migrations/`, `alembic.ini` | Alembic (URL from settings, metadata from every module's `models.py`) |
 | `app/api/health.py` | `GET /health` liveness endpoint |
+| `app/core/tenancy/` | Project-scoped RLS, tenancy context, ORM scope + soft-delete filter — see its `README.md` |
 | `app/core/cel/` | CEL rule evaluation (celpy, lazy) with the KERP error taxonomy — see its `README.md` |
 | `app/modules/<name>/` | Domain modules (`manifest.py`, `models.py`, `router.py`, `service.py`, `schemas.py`, `README.md`) — added by later tasks |
 | `tests/` | pytest suite |
 
-The module loader, auth and RLS are later Phase 0 tasks. Parts of the core are ported
+The module loader and auth are later Phase 0 tasks. Parts of the core are ported
 from Inspection-ERP. ADR 0001 (`docs/decisions/0001-port-inspection-erp-core.md`) lists
 which parts.
 
@@ -180,6 +181,9 @@ alembic check                        # also enforced by tests/test_migrations.py
 Endpoints get a session through `DbSession` (`Annotated[Session, Depends(get_db,
 scope="function")]`), never a bare `Depends(get_db)`. That way the unit of work commits
 before the response is sent, and a write that fails at commit returns a 500, never a 200.
+
+Reads hide soft-deleted rows unless `execution_options(include_deleted=True)` is set, and every
+table is under project-scoped RLS (`app/core/tenancy/README.md`).
 
 Tests run on a temporary SQLite file. When `KERP_DATABASE_URL` points at PostgreSQL, as
 in CI's second backend step, the same DB tests run against PostgreSQL 16.
