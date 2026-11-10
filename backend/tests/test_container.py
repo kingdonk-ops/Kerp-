@@ -113,6 +113,10 @@ def test_base_images_are_pinned_python_312_slim() -> None:
             continue  # FROM <earlier stage>
         assert image.startswith("python:3.12-slim"), image
         assert ":latest" not in image
+        # Reproducible: pinned by digest; the tag stays for humans and Dependabot (T-0028).
+        assert re.fullmatch(r"python:3\.12-slim[\w.-]*@sha256:[0-9a-f]{64}", image), image
+    bases = {s[0][1].split()[0] for s in _stages()} - {s[0][1].split()[-1] for s in _stages()}
+    assert len(bases) == 1, f"build and runtime stages must share one base image: {bases}"
 
 
 def test_every_pip_install_is_binary_only() -> None:
@@ -182,6 +186,16 @@ def test_no_secrets_or_env_files_copied() -> None:
 # --- .dockerignore ----------------------------------------------------------------------
 
 
+def test_dockerignore_is_an_allowlist() -> None:
+    """The first rule excludes everything; only ``!`` re-includes may follow (T-0028)."""
+    rules = [
+        line.strip()
+        for line in DOCKERIGNORE.read_text(encoding="utf-8").splitlines()
+        if line.strip() and not line.strip().startswith("#")
+    ]
+    assert rules[0] == "*"
+
+
 @pytest.mark.parametrize(
     "pattern",
     [".venv", "tests", "**/__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", ".env"],
@@ -218,6 +232,16 @@ def test_runtime_lock_matches_pyproject_dependencies() -> None:
         assert requirement.specifier.contains(version, prereleases=True), (
             f"{name}=={version} violates {requirement.specifier}; regenerate the lock"
         )
+
+
+def test_test_imports_are_declared_dev_dependencies() -> None:
+    """This module imports ``packaging``; it must not rely on a transitive install."""
+    project = _pyproject()["project"]
+    assert isinstance(project, dict)
+    optional = project["optional-dependencies"]
+    dev = {str(canonicalize_name(Requirement(s).name)) for s in optional["dev"]}
+    assert "packaging" in dev
+    assert set(optional) == {"dev"}, "only the dev extra exists (empty postgres extra removed)"
 
 
 def test_runtime_lock_contains_no_dev_dependencies() -> None:
