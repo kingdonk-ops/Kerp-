@@ -20,23 +20,23 @@ ADR 0003, ADR 0004 (rule-set defaults), `p6-import-and-rsw-matching.md` §9,
 1. **Two document numbers on everything.** Every client deliverable carries the client's
    controlled number (`P-<project 7d>-<area 4d>-<discipline letter>-<doc type>-<seq 5d>`, e.g.
    `…-Q-PLN-…` for ITPs and report procedures, `…-S-REP-…` for structural reports) **and** the
-   contractor number (`WES-QAC-ITP-<6d>`, `WES-QAC-REP-<6d>`), each with its own revision.
+   contractor number (`<CTR>-<DEPT>-ITP-<6d>`, `<CTR>-<DEPT>-REP-<6d>`), each with its own revision.
    Templates themselves carry a controlled form number + rev in the footer
-   (`P-0000000-0000-D-TMP-00004 Rev 0` cover sheet; `CW …-SI-W P-QA-08-03-0002 Rev 0` weld report;
-   `COR-SMP-FRM-<6d>_<rev>` corporate forms). The legacy inventory lists ITP double numbering but
+   (`P-<7d>-<4d>-D-TMP-<5d> Rev <n>` cover sheet; `<contract>-SI-W P-QA-<2d>-<2d>-<4d> Rev <n>` weld report;
+   `<form>-<6d>_<rev>` corporate forms). The legacy inventory lists ITP double numbering but
    not as a general document property. → **Gap (documents):** every generated document has
    `client_doc_no`, `client_rev`, `contractor_doc_no`, `contractor_rev`, `template_control_no`,
    `template_rev`; all render in header/footer.
 2. **Record numbering is per discipline, and the prefixes are inconsistent today.** Seen:
-   `KIS-YANDI3-CV-RFI-<4d>` (civil), `KIS-YANDI3-SS-RFI-<4d>` (mechanical/structural),
-   `KIS-YANDI3-RFI-<4d>` (coating; no discipline token), `KIS-YD3-BT-<3d>`, `KIS-YAN3-W-<4d> Rev n`,
-   `KIS-YAN3-PAI-<4d>_<n>_Rev<n>`, TQ `KAE-YANDI3-TQ-<3d> rev n`. File names use yet another key:
-   `<asset abbrev>-<RSW>-<discipline>-<seq>` (`CLFL-911.1-W-0126`, `CLFL-908.2-BT-102`).
+   `<CTR>-<SITE>-CV-RFI-<4d>` (civil), `<CTR>-<SITE>-SS-RFI-<4d>` (mechanical/structural),
+   `<CTR>-<SITE>-RFI-<4d>` (coating; no discipline token), `<CTR>-<SITE>-BT-<3d>`, `<CTR>-<SITE>-W-<4d> Rev n`,
+   `<CTR>-<SITE>-PAI-<4d>_<n>_Rev<n>`, TQ `<CTR>-<SITE>-TQ-<3d> rev n`. File names use yet another key:
+   `<asset abbrev>-<RSW>-<discipline>-<seq>` (e.g. `<ASSET>-<rsw>-W-<4d>`, `<ASSET>-<rsw>-BT-<3d>`).
    → numbering patterns must be per project **and** per record type, with one project prefix
    token (no hand-typed prefixes), plus a configurable **file-name pattern** separate from the
    document number.
 3. **RSW identity has three forms.** Full client id `<FLOC>_<seq>` / `<FLOC>-<seq>-<rev>`
-   (`3010CV01ASTRU_402`, `3022BD33ST-917-0`, `3019YPP3CLFLSTRU-911-1_Rev1`), short site form
+   (`<FLOC>_<seq>`, `<FLOC>-<rsw>-<rev>`, `<FLOC>-<rsw>-<n>_Rev<n>`), short site form
    `911.1`, `908.2`, `934.1` (RSW + sub-number), and grouped form on the ITP (`908`). Several
    records cover several RSWs (`918 & 920`; TQ lists five RSWs; RSW cell `102.1-2 / VA-018`).
    → alias table per RSW node (full id, short code, legacy codes) + multi-anchor link (ADR 0003 §2
@@ -62,7 +62,7 @@ ADR 0003, ADR 0004 (rule-set defaults), `p6-import-and-rsw-matching.md` §9,
    approved Coating ITR adds an `RFI No.` header field and the approved Welding ITR adds an
    `RFI#` column **per weld**. → link inspection request ↔ ITR (header) and ↔ row/Item.
 8. **Spec/TQ-driven acceptance limits.** Acceptance criteria cite clause numbers
-   (`Section 6.15.2 of SS-P118 Rev 4`), and TQs grant project-specific deviations ("refer TQ-033
+   (`Section 6.15.2 of <client spec P> Rev <n>`), and TQs grant project-specific deviations ("refer TQ-<3d>
    for approval to use <product>"). Confirms TD-065 (limits tied to spec/TQ reference).
 9. **Legacy outputs leak formula debris** to the client: `0/1/1900`, `00/01/00 0:00`, `#N/A`,
    `#REF!`, `0 µm` rows, `12:00 AM` in empty RFI slots, contact email `#N/A`. → render rule:
@@ -77,7 +77,7 @@ ADR 0003, ADR 0004 (rule-set defaults), `p6-import-and-rsw-matching.md` §9,
 
 ---
 
-## 1. YTT210211-ITP-00002_Signed.pdf — signed ITP (THE target style)
+## 1. Signed ITP (coating) — signed ITP (THE target style)
 
 **What it is.** Client-format ITP "Surface Preparation and Protective Coating – Two Coat System
 (Corrosivity C5 – lower 600 mm columns and base plates)", contractor rev 1, 6 pages, signed by
@@ -247,7 +247,7 @@ multi-anchor link.
 
 ---
 
-## 3. CLFL-911.1-W-0126 Rev 1 CLIENT Signed — Welding Quality Assurance Report (completed)
+## 3. Signed welding report (client-signed) — Welding Quality Assurance Report (completed)
 
 **Structure.** Landscape, 2 pages. Header: Contract · Site · RSW No (`911.1`) · Document Revision ·
 Asset · DWG Number (+ drawing rev) · Report no (`<prefix>-W-<4d> Rev 1`) · Revision Date. Column
@@ -258,7 +258,7 @@ UT Thickness Report No. · Material Identification / Heat Nos (values like "Unkn
 "<heat>, Unknown Existing") · Weld Length (m) · Electrode Type · % NDT · NDT Method · Joint Type ·
 Weld Compliant · NDT Report No. · Comments (location: gridmesh panel # banding repair).
 Page 2: **Weld traceability maps** (marked-up sketches with weld IDs), Specifications block
-(acceptance code and edition AS 1554.1; test specification; client specification SS-C111), NDT
+(acceptance code and edition AS 1554.1; test specification; client specification <client spec C1>), NDT
 method legend (Vis/RT/UT/PT/MT), "Repair complete and weld compliant", Y / N/A legend. Reviewer
 table: Contractor / client / 3rd Party × Name, Position, Date (QC/QA Inspector, QA/QC
 Advisor). Footer: template control no + "1 of 2" + Rev.
@@ -286,7 +286,7 @@ Advisor). Footer: template control no + "1 of 2" + Rev.
 
 ---
 
-## 4. CLFL-908.2-BT-102 Signed and Bolt Tensioning FIC for Supervisors
+## 4. Signed bolt-tensioning report and the supervisors' bolt tensioning FIC
 
 **Signed client record (FIC → now ITR).** Header: Client · Contract · Site · Report Number
 (`<prefix>-BT-<3d>`) · Asset · RSW No. · SI No (N/A; meaning unconfirmed – likely Site
@@ -318,7 +318,7 @@ and **photo checkpoints** "After step 2 / 3 / 5". No client sign-off.
 ## 5. Coating_report-_Sample.pdf — Structural Integrity Coating Inspection Report (completed)
 
 **Structure (landscape, client-branded "CLIENT Structural Integrity" footer + contractor doc no
-`WES-QAC-REP-<6d>`).**
+`<CTR>-<DEPT>-REP-<6d>`).**
 - Project details: Project (+contract) · RSW No. (asset abbrev + RSW) · Report No.
   (`<prefix>-PAI-<4d>_<n>_Rev<n>`) · Item/Location · Asset · Dwg No (+rev) · Specification ·
   ITP No. · Coating System (C5 – steelwork requiring colour-coded topcoats) · Work Description.
@@ -345,7 +345,7 @@ and **photo checkpoints** "After step 2 / 3 / 5". No client sign-off.
 
 ### GAPS
 - G-C-1 DFT statistics: per coat n readings, min, max, avg, cumulative DFT, and the **80/20 rule**
-  (SS-P118 §6.17.1 cited in TQ) as CEL; the spec's fixed 3-reading average is too narrow.
+  (<client spec P> §6.17.1 cited in TQ) as CEL; the spec's fixed 3-reading average is too narrow.
   (T-0110 / coatings rule set)
 - G-C-2 Dew-point guard uses ΔT = surface − dew point > 3 °C per hourly reading; RH 20–85 %,
   substrate 10–45 °C from the ITP. Limits must be project parameters with clause refs (TD-065).
@@ -360,11 +360,11 @@ and **photo checkpoints** "After step 2 / 3 / 5". No client sign-off.
 
 ---
 
-## 6. MJ_PP1_CNV1 – client Structural Integrity Inspection Detailed Report, and 3022BD33ST-917-0
+## 6. Client structural-integrity inspection detailed report, and a single-RSW client report
 
 **What they are.** The **source documents for RSWs**: client structural-inspection report
 (`P-<7d>-2000-S-REP-<5d>` Rev 1) by a third-party inspecting company; one RSW per defect,
-3–4 pages each on client template `CLIENT-AM-<7d> rev 2`. `3022BD33ST-917-0` is a single-RSW
+3–4 pages each on client template `<client template> rev 2`. the second file is a single-RSW
 extract of the same template (scope/drawing sheet for one RSW).
 
 **Per-RSW page set and fields.**
@@ -380,8 +380,8 @@ extract of the same template (scope/drawing sheet for one RSW).
 - *Remedial Scope of Works*: corrosion environment (C3 – Medium / Class 3), **mandated completion
   date** (year), **notification no.** (client CMMS notification; "No Noti required" allowed),
   remedial works text referencing standard repair drawings (`AS-0000-S-<5d>` detail/section),
-  general requirements (standard notes drawing, steel spec SS-C111, concrete SS-C108, coatings
-  SS-P118, design DC-C001), client-only preliminary considerations (online/offline + isolations,
+  general requirements (standard notes drawing, steel spec <client spec C1>, concrete <client spec C2>, coatings
+  <client spec P>, design <design doc>), client-only preliminary considerations (online/offline + isolations,
   access, quantities).
 - *Defect Map*.
 
@@ -395,9 +395,9 @@ client template id + rev is printed on every page, which makes recognition deter
   remedial works text, referenced standard drawings[], governing specs[], preventive Y/N.
   (T-0101/T-0102 field schema; E-05-09 extraction targets)
 - G-RSW-2 Template recognition keys on the printed template id + rev
-  (`CLIENT-AM-<7d> rev 2`); one PDF → many RSWs, page→RSW map by header RSW number. (E-05-09)
+  (`<client template> rev 2`); one PDF → many RSWs, page→RSW map by header RSW number. (E-05-09)
 - G-RSW-3 Mandated completion date drives schedule risk findings (E-05-10 reconciliation).
-- G-RSW-4 Governing specs on the RSW (SS-C111/C108/P118) select which ITPs / rule sets apply
+- G-RSW-4 Governing specs on the RSW (<client spec C1>/C108/P118) select which ITPs / rule sets apply
   to the work anchor (auto-suggest ITP instances per RSW; TD-039 noted auto_create_itp as Phase 3
   candidate).
 - G-RSW-5 RSW revision handling: RSW rev changes (client re-issues) must version the scope text
@@ -405,7 +405,7 @@ client template id + rev is printed on every page, which makes recognition deter
 
 ---
 
-## 7. 11.3_DTH_TQ.pdf — Technical Queries register + TQ forms
+## 7. Technical query register — Technical Queries register + TQ forms
 
 **Register** (supplier-side, page header: client, PO no, client contact, project, job
 description, scope job no.): TQ Number (+rev) · TQ Date · Author · Issue · Action · Target Date ·
@@ -586,7 +586,7 @@ rebar > 10 % loss lap 30 d, 25 mm square edge, clean surface), 2 Blast (2.1–2.
 at 500 mm, zinc primer 135 µm WFT within 1 h), 3 Formwork (watertight, 20×20 chamfer),
 4 Pre-pouring, 5 Pour (max aggregate mm, slump mm, ambient/substrate/concrete temp, vibrated,
 cylinders taken), 6 Curing (7 days min, AS 3600 Table 4.4; cylinder results 7 d / 28 d (2) /
-56 d with test certificate no and MPa), 7 Finish (SS-C108 §14.8). Sign-off rows: Sub-contractor,
+56 d with test certificate no and MPa), 7 Finish (<client spec C2> §14.8). Sign-off rows: Sub-contractor,
 Contractor, client project representative (name, signature, date). Photos sheet. Diff: title.
 GAPS: G-CP-1 record stays **open for deferred results** (7/28/56-day cylinders) with due-date
 reminders; completion of the work anchor is blocked until the 28-day result (configurable).
@@ -600,8 +600,8 @@ Rows `Item | Description | Sign-offs (Contractor | client) | N/A or P/L (punchli
 1 Initial inspection & paint removal (1.1–1.4 incl. UTT and remediation requirements agreed),
 2 Steel/flooring replacement & dust plate (panel gap < 10 mm), 3 Hilti clips (≥ 4 discs/m², 6 in
 high vibration; 8 Nm torque with calibrated wrench), 4 Site welding (fabricate per approved
-remediation list, fit-up, record welding data, visual per SS-C111 Rev 8, NDT), 5 Blast & paint
-(SS-P118 Rev 4), 6 Final inspection & punch listing. Remarks; final verification contractor /
+remediation list, fit-up, record welding data, visual per <client spec C1> Rev 8, NDT), 5 Blast & paint
+(<client spec P> Rev <n>), 6 Final inspection & punch listing. Remarks; final verification contractor /
 client (name/position, signature, date). Diff: title (FIC → ITR).
 GAPS: G-S-1 `P/L` outcome on a row creates a punch item (T-0117) and the row shows as
 "complete with punch"; G-S-2 rows 1.3 / 4.3 / 4.5 link to the UTT ITR, weld report and NDE records
@@ -623,7 +623,7 @@ Length m"; data validations: compliant Yes/No list, specified size integer 3–1
 integer 3–20. Rows are formula-fed from the weld register workbook (`#REF!` in the template) →
 in KERP the report is a **view over weld Items**, not a typed form. (T-0203, G-W-3)
 
-### 9.8 Grout Placement Record (docx) – approved vs `COR-SMP-FRM-002582_0` original
+### 9.8 Grout Placement Record (docx) – approved vs `<form>-<6d>_<rev>` original
 Structure: General data (project name/no, area, location/facility, system, sub-system,
 description, drawing no.); Pre-pour checks 1–6 (OK / N/A / Punch); Pour general info (date,
 time, grout product, batch no); Temperature checks; Pour checks 7–9; Post-pour 10–14; Remarks;
@@ -640,13 +640,13 @@ Diff (client demands):
 - item 12: cementitious chamfers **45°**;
 - item 14 "curing compound applied" replaced by **"Grout check 7 days after formwork removed for
   cracking, surface imperfections & finishes"**.
-- approved file lost the corporate form number (`COR-SMP-FRM-…`) – template control number must
+- approved file lost the corporate form number (`<form>-…`) – template control number must
   survive (§0.1).
 GAPS: G-G-1 limits printed next to fields **and** validated (block/warn per TD-065);
 G-G-2 conditional rule (ambient > 35 → grout temp < 35); G-G-3 deferred 7-day check
 (same mechanism as G-CP-1).
 
-### 9.9 COR-SMP-FRM-002455_0 Grating & Gridmesh ITR (original only)
+### 9.9 <form>-<6d>_<rev> Grating & Gridmesh ITR (original only)
 11 OK/N/A/Punch checks (component damage, kick plates and banding, load-bar direction, collars
 welded, handrail sleeves, panel fastening, gridmesh clips, weight signage on removable panels,
 touch-ups, swarf removed, area safe), remarks, completed/reviewed/accepted by. **No approved

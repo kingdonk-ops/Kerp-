@@ -328,16 +328,16 @@ results per weld back-filled into the welding report → trackers updated.
 
 ---
 
-## 6. CUI-department inspection system (itemcat + usecases + templates in `D:\Tempaltes\`)
+## 6. CUI-department inspection system (item-category, use-case and template exports)
 
 ### 6.1 What the exports contain
 - **Item categories** (12): `CUI Inspection` (types Backscatter, C-Arm, C-Arm / X-Arm, X-Arm —
-  30 attribute usages each, can have children), `CUI Inspection AP` (C-Arm), `CUI Inspection
-  Chevron` (C-Arm, C-Arm/X-Arm, X-Arm, Module), `Divider`, `Equipment` (Backscatter, C-Arm,
+  30 attribute usages each, can have children), `CUI Inspection client A` (C-Arm), `CUI Inspection
+  client B` (C-Arm, C-Arm/X-Arm, X-Arm, Module), `Divider`, `Equipment` (Backscatter, C-Arm,
   X-Arm, X-Ray Crawler units — 5 attributes: name, serial, calibration due, in use, onsite),
   `Inspection Equipment`, `Inspection Point` (child, no tag number), `Inspections` (Weld → Dust
   Assessment, Coating ITR), `Inspection Scope` (**MODULE**: client scopes), `Inspection Scope
-  AP`, `Progress Report` (Daily Report), `Weld Locating` (C-Arm → Weld Location).
+  client A`, `Progress Report` (Daily Report), `Weld Locating` (C-Arm → Weld Location).
   `applicableFor` = ITEM | MODULE | ANY.
 - **Attribute definitions** (51): typed `STRING / NUMERIC / DATE / SELECTOR / MULTISELECTOR /
   MULTI_LINE_STRING`, `uom` (Celsius, Meters, hr), options as `key / displayText / order`,
@@ -361,12 +361,12 @@ results per weld back-filled into the welding report → trackers updated.
   partialInspectionMethodType/partialTotalMeasure, copyItemTypeAttachments,
   includeReportInAttachments (+ category "Report"), restrictEditableAttachmentTypes,
   scope description (HTML), enabledItemTypes.
-- **Templates** (13): KCUIR family (base, C-Arm & X-Arm, AP, AP no-inspection-point, Chevron ×2,
-  CSBP), KIPS (per-component: C-ARM, X-ARM, C-ARM/X-ARM), KWLR (weld location), TM, TM (CH),
+- **Templates** (13): KCUIR family (base, C-Arm & X-Arm, client A, client A no-inspection-point, client B ×2,
+  client C), KIPS (per-component: C-ARM, X-ARM, C-ARM/X-ARM), KWLR (weld location), TM, TM (client B),
   DU (daily update). Revisions 0–23, all APPROVED. One section, one check each (except TM: four).
   CUI check = FORM with pass/fail/N-A ("Pass = no CUI, Fail = CUI, NA = not tested") +
   confirmation texts, allowed issue types + default, `minRequiredPhotos=1`, 12 photo-caption
-  snippets, `carryOverValues/Issues=true`, `repeatForComponents` (KIPS/AP: one block per child
+  snippets, `carryOverValues/Issues=true`, `repeatForComponents` (KIPS/client A: one block per child
   Inspection Point, heading "Inspection Point – {{name}}").
   Fields: HEADER, ITEM_SELECTOR (test equipment filtered by equipment item-type uuid), STRING bound
   to line attribute (insulation class), RADIO (insulation consistent with isometrics? Yes/No →
@@ -377,9 +377,9 @@ results per weld back-filled into the welding report → trackers updated.
   (Nil/Mild/Moderate/Heavy), RADIO scan restrictions (Yes auto-raises Test Restriction), comments.
   JS check validator: "Poor jacketing requires an issue" — **broken**: it reads
   `JacketingCondition` while the field key is `jacketingCondition`, so it never fires.
-- **Defect/issue types** (6 base + 5 AP + 6 CSBP + Weld Location): CUI (prefix ID), Test
+- **Defect/issue types** (6 base + 5 client A + 6 client C + Weld Location): CUI (prefix ID), Test
   Restriction (TR), Damage to Cladding (CC), Mastic Condition (MC), Water Presence (WP), Ice
-  Presence (IP); AP and CSBP copies with suffixes and own prefixes (LOC, SC); Weld Location (WL).
+  Presence (IP); client A and client C copies with suffixes and own prefixes (LOC, SC); Weld Location (WL).
   Each: scope DEFECT, business-key prefix, required photos, dynamic fields (inspection point or
   pipe support, CUI class Mild/Moderate/Heavy, clock location 360°/12/3/6/9 o'clock/Other,
   water location, "does it affect your scan"), 8–27 text snippets, priority shown, JS that sets
@@ -400,7 +400,7 @@ results per weld back-filled into the welding report → trackers updated.
   includeEquipmentCertificates, excludeChecksWithNaResult, excludeIssueSummary,
   issuesOnSeparatePages, header/footer type, template code in footer, "UNCONTROLLED WHEN
   PRINTED", print borders, compact layout, header rows on subsequent pages.
-- **TM / TM (CH)** — see §7. **DU** — Daily Update FORM: date, daily work scope, changes to scope
+- **TM / TM (client B)** — see §7. **DU** — Daily Update FORM: date, daily work scope, changes to scope
   by client, planned activities next day, issues/concerns (with predefined texts).
 
 ### 6.2 Concept mapping (legacy → KERP)
@@ -414,7 +414,7 @@ Status: **C** covered by spec/ADR, **T** covered by an open TODO, **P** partial,
 | 3 | (implicit) job package / drawing list | level def `job_package` (cui-line pack) | C |
 | 4 | Item category "CUI Inspection" item (a line) | level def `line`, roles `work_anchor`, `inspection_anchor`, `progress_unit` | C |
 | 5 | **Item type = test technique** (C-Arm, X-Arm, Backscatter, C/X) | line attribute `technique` (choice) + template applicability rule on that attribute; *not* a separate level or item type | P → G-CUI-1 |
-| 6 | Client copies of categories (AP, Chevron) | client pack field schema for the `line` level; no forks | P → G-CUI-9 |
+| 6 | Client copies of categories (client A, client B) | client pack field schema for the `line` level; no forks | P → G-CUI-9 |
 | 7 | Item category "Inspection Point" (child, no tag) | Item of item type `cui_test_point` under the line (ADR 0003 §4 item types) | C |
 | 8 | Repeat check per Inspection Point (`repeatForComponents`, `{{name}}`) | repeating block per child Item | T (TD-062) |
 | 9 | Item category "Equipment" (C-Arm/X-Arm/Backscatter/crawler units; serial, calibration due, in use, onsite) | equipment register T-0112 / E-03-07 (`oe_equipment_asset`) | P → G-CUI-16 |
@@ -446,7 +446,7 @@ Status: **C** covered by spec/ADR, **T** covered by an open TODO, **P** partial,
 | 35 | Which register a CUI finding lives in | NCR (T-0116) = *our* nonconformance; punch (T-0117) = completion items; **client-asset condition finding has no home** | G-CUI-6 |
 | 36 | Priority scale (Critical / High Priority / Remaining Actions) + JS derivation from CUI class | configurable priority scale + CEL derivation | G-CUI-7 |
 | 37 | Assessment forms (CUIA, TRA, WPA) + issuesMustBeAssessed | issue lifecycle step "assessment" (≠ close-out form of TD-066) | G-CUI-8 |
-| 38 | Issue type forks per client (CUI AP, CUI-CSBP) | base issue type + client-pack overlay | G-CUI-9 |
+| 38 | Issue type forks per client (CUI client A, CUI-client C) | base issue type + client-pack overlay | G-CUI-9 |
 | 39 | businessKeyPrefix | numbering pattern per issue type (ADR 0003 §4.5 extended) | T (TD-066) |
 | 40 | Weld Location issue type (position marker, near pipe support) | create/locate a child **Item** (weld) from an inspection | G-CUI-15 |
 | 41 | reportMetadata (header rows, printed attributes, issue summary columns, photo layout, signature, footer) | report profile | T (TD-067) |
@@ -509,7 +509,7 @@ Status: **C** covered by spec/ADR, **T** covered by an open TODO, **P** partial,
   issue type / field schema (labels, option subsets, printed attributes, issue-type allowed list,
   prefixes) so fixes to the base propagate; forks remain possible. Note TD-039 dropped "type
   inheritance" from Phase 1 — this is the evidence to revisit it (decision). Test: base KCUIR
-  rev 19 change appears in the Chevron overlay without editing it; an overlay field override wins.
+  rev 19 change appears in the client B overlay without editing it; an overlay field override wins.
 - **G-CUI-10 Shared attribute catalogue + per-type usage**: one project/pack-level attribute
   definition reused by several levels / item types, each usage adding default value and
   mandatory flag. Test: changing the unit of "Operating Temperature" in the catalogue applies to
@@ -552,10 +552,10 @@ Status: **C** covered by spec/ADR, **T** covered by an open TODO, **P** partial,
 
 ---
 
-## 7. Time Management templates (TM, TM (CH)) — impact on `field_time`
+## 7. Time Management templates (TM, TM (client B)) — impact on `field_time`
 
 **What it is.** Time is captured as an "inspection" on each line (inspection category TM,
-concurrent with the CUI inspection). TM (CH) is a byte-for-byte copy (99.95 %) bound to the Chevron
+concurrent with the CUI inspection). TM (client B) is a byte-for-byte copy (99.95 %) bound to the client B
 category — client variant by fork.
 
 **Structure.**

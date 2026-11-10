@@ -129,7 +129,7 @@ already-approved plans.
 | `qty`, `uom` | optional earned-quantity basis (m², kg, Lm, m³, ea) |
 | `depends_on` | links to other lines (FS/SS + lag) and to programme activities |
 | `required_competencies` | credential types (§4) |
-| `needs_access` | none / scaffold / EWP / rope access — `scaffold` creates or links a scaffold requirement (scaffolding module, [`scaffold-management.md`](scaffold-management.md) §6) |
+| `needs_access` | none / scaffold / EWP / rope access — `scaffold` creates or links a scaffold requirement (scaffolding module, [`scaffold-management.md`](scaffold-management.md) §5) |
 | `status` | `planned`, `ready`, `in_progress`, `done`, `deferred` (after commit, from `tasks` progress) |
 | `notes`, attachments | free text, RSW pdf / drawing links via `documents` |
 
