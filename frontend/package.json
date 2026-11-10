@@ -12,7 +12,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "build": "tsc --noEmit && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "gen:api": "npm run gen:api:schema && npm run gen:api:types",
+    "gen:api:schema": "cd ../backend && python -m app.openapi ../frontend/src/api/openapi.json",
+    "gen:api:types": "openapi-typescript src/api/openapi.json --output src/api/schema.ts"
   },
   "dependencies": {
     "@marcbachmann/cel-js": "^8.0.0",
@@ -35,6 +38,7 @@
     "@vitejs/plugin-react": "^6.2.1",
     "fake-indexeddb": "^6.2.8",
     "jsdom": "^28.1.0",
+    "openapi-typescript": "^7.13.0",
     "tailwindcss": "^4.3.5",
     "typescript": "~5.9.3",
     "vite": "^8.3.6",

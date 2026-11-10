@@ -15,6 +15,7 @@ from app.core.auth.runtime import close_auth_runtime
 from app.core.config import Settings, get_settings
 from app.core.db import Database
 from app.core.logging import configure_logging
+from app.core.module_loader.loader import DEFAULT_PACKAGE, install_modules
 from app.core.request_context import RequestContextMiddleware
 from app.core.security_headers import SecurityHeadersMiddleware
 from app.core.tenancy.scope import OutOfScopeError
@@ -24,8 +25,13 @@ async def _out_of_scope_handler(_request: Request, _exc: Exception) -> JSONRespo
     return JSONResponse({"detail": "Not Found"}, status_code=404)
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
-    """Build a configured FastAPI app. Uses environment settings unless ``settings`` is given."""
+def create_app(
+    settings: Settings | None = None, *, modules_package: str = DEFAULT_PACKAGE
+) -> FastAPI:
+    """Build a configured FastAPI app. Uses environment settings unless ``settings`` is given.
+
+    ``modules_package`` is where the module loader finds domain modules (tests swap it).
+    """
     if settings is None:
         settings = get_settings()
 
@@ -65,6 +71,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.include_router(health_router)
     app.include_router(auth_router)  # core auth + JWKS (T-0008)
-    # Domain modules (app/modules/<name>/) are mounted by the module loader (later task).
+    # Domain modules (app/modules/<name>/) and the per-project toggle API (T-0011).
+    install_modules(app, modules_package)
 
     return app

@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 71 · **Closed:** 52
+**Open:** 74 · **Closed:** 54
 
 ## decision (2)
 
@@ -57,7 +57,7 @@
 | [TD-094](../tracker/todo/TD-094.md) | Per-RSW area handover sheet required by the ITP closeout (not the shift handover module) | T-0113, E-04-10 | planner |
 | [TD-125](../tracker/todo/TD-125.md) | Booking modules must call work_anchor_for and return 422 when the path has no work anchor (progress, time lines against a work anchor, completion gate) | T-0101, T-0116, T-0124, E-04-03, E-04-05 | reviewer |
 
-## deferred (6)
+## deferred (7)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -67,19 +67,18 @@
 | [TD-047](../tracker/todo/TD-047.md) | Automate refresh of backend/requirements*.lock (uv pip compile output): Dependabot pip does not find *.lock files or re-run uv; options: scheduled uv --upgrade workflow opening a PR, or Renovate pip-compile manager | T-0028, T-0032 | implementer |
 | [TD-074](../tracker/todo/TD-074.md) | Handover: offline drafting on tablets via the Dexie outbox | E-04-11 | planner |
 | [TD-122](../tracker/todo/TD-122.md) | Bind the request's project scope from the authorised project (tenancy context is tenant-level after T-0008) | T-0008 | implementer |
+| [TD-129](../tracker/todo/TD-129.md) | Guard the module toggle API (PUT /api/v1/modules/{name}) with the admin capability tier once RBAC lands (T-0010/T-0014) | T-0011 | implementer |
 
-## later (23)
+## later (25)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
 | [TD-016](../tracker/todo/TD-016.md) | Backend tests: move TestClient transport from httpx to httpx2 (Starlette 1.x deprecation warning) | T-0001 | implementer |
-| [TD-018](../tracker/todo/TD-018.md) | Frontend: wire npm run gen:api (OpenAPI -> frontend/src/api/) once the backend exposes an OpenAPI schema | T-0002 | implementer |
 | [TD-019](../tracker/todo/TD-019.md) | Frontend: PWA manifest + service worker (app-shell caching) for offline-first field use | T-0002 | implementer |
 | [TD-020](../tracker/todo/TD-020.md) | Frontend: add ESLint (typescript-eslint, react-hooks) + lint gate in CLAUDE.md section 4 and CI | T-0002 | implementer |
 | [TD-023](../tracker/todo/TD-023.md) | Distributed tracing / metrics (OpenTelemetry, Prometheus endpoint) for API and ARQ worker | T-0021 | implementer |
 | [TD-025](../tracker/todo/TD-025.md) | Backend errors: request-context middleware renders unhandled 500s itself, so add_exception_handler(Exception) never runs; document or make the renderer pluggable before an error-format task; move _restore_logging autouse fixture to tests/conftest.py | T-0021 | reviewer |
 | [TD-035](../tracker/todo/TD-035.md) | Optimistic locking on BaseRecordMixin.revision (version_id_col or explicit base_revision check) | T-0005 | reviewer |
-| [TD-036](../tracker/todo/TD-036.md) | Guard against bare Depends(get_db) outside app/core/db.py (endpoints must use DbSession) | T-0005 | reviewer |
 | [TD-038](../tracker/todo/TD-038.md) | Add reportlab (and openpyxl if the Excel renderer is ported) to the heavy-lib lazy-import lint when Inspection-ERP core/reporting is ported | T-0115, T-0119 | kerp-reviewer |
 | [TD-043](../tracker/todo/TD-043.md) | Entra ID SSO for KAEFER staff behind the AuthProvider seam, before the first pilot | T-0008 | user |
 | [TD-048](../tracker/todo/TD-048.md) | SHA-pin actions in promote.yml and review-gate.yml (persist-credentials:false where no push is needed) and digest-pin the CI service images (postgis, redis) | T-0028, T-0032 | implementer |
@@ -95,6 +94,10 @@
 | [TD-115](../tracker/todo/TD-115.md) | P6 supply formats deferred by TD-077: Excel schedule exports via import mapping profiles, and a direct P6 API connector | T-0105 | planner |
 | [TD-123](../tracker/todo/TD-123.md) | Password login has no throttling yet; extend T-0009's Redis lockout to /api/v1/auth/login | T-0008 | implementer |
 | [TD-124](../tracker/todo/TD-124.md) | Fail fast at startup when production auth config (JWT key, KERP_REDIS_URL) is missing | T-0008 | implementer |
+| [TD-126](../tracker/todo/TD-126.md) | CI drift check: fail when frontend/src/api/ (openapi.json, schema.ts) is stale against the backend OpenAPI schema | T-0011 | implementer |
+| [TD-127](../tracker/todo/TD-127.md) | Frontend: project module settings screen (toggle via /api/v1/modules) and hide disabled modules in the navigation | T-0011 | implementer |
+| [TD-128](../tracker/todo/TD-128.md) | Concurrent first toggle of the same module in one project races on uq_project_module_setting_module and returns 500; retry or upsert | T-0011 | implementer |
+| [TD-130](../tracker/todo/TD-130.md) | Module loader: require CurrentPrincipal on every mounted module router by default (opt-out for public routes) | T-0011 | implementer |
 
 ## risk (5)
 
@@ -124,6 +127,7 @@
 | ✅ | [TD-014](../tracker/todo/TD-014.md) | Relationship between inspection record kind='rfi' (T-0111) and the inspection_requests module (T-0115) is undefined — both model 'Request for Inspection' | RFI means Request for Information (its own module). Request for Inspection is an inspection notification/booking record in scheduling, stored with the RFI system; full spec pending in TD-045, T-0115 blocked on it (user, 2026-11-09) |
 | ✅ | [TD-015](../tracker/todo/TD-015.md) | Phase 2 welder/NDE records reference the contacts directory (Phase 3): confirm interim nullable-linkage + backfill-FK default vs. landing a minimal contacts directory before Phase 2 | Confirmed default: nullable contact references in Phase 2; add the FK constraints when contacts (E-03-01) lands (user, 2026-11-09) |
 | ✅ | [TD-017](../tracker/todo/TD-017.md) | Backend: add a dependency lock file (pinned versions) before T-0004 Dockerfile needs reproducible builds | Hashed runtime + build lock files (backend/requirements.lock, requirements-build.lock) with sync tests, added in T-0004 |
+| ✅ | [TD-018](../tracker/todo/TD-018.md) | Frontend: wire npm run gen:api (OpenAPI -> frontend/src/api/) once the backend exposes an OpenAPI schema | Done in T-0011: npm run gen:api runs python -m app.openapi (backend) and openapi-typescript; frontend/src/api/openapi.json and schema.ts are committed. A CI drift check is TD-126. |
 | ✅ | [TD-022](../tracker/todo/TD-022.md) | Sign off security header values and JSON log schema (T-0021 defaults) | T-0021 defaults accepted; no HSTS preload; /docs, /redoc, /openapi.json hidden in production (T-0030); log shipping on AWS decided with deploy; admin-side settings spec in TD-046 (user, 2026-11-09) |
 | ✅ | [TD-026](../tracker/todo/TD-026.md) | Extend TID253 heavy-import ban list as heavy deps land (DXF/XER parsers, PDF compile libs) | Standing check added to the kerp-reviewer checklist: every new heavy dependency is added to banned-module-level-imports in the same PR (user, 2026-11-09) |
 | ✅ | [TD-027](../tracker/todo/TD-027.md) | Worker queue: CLAUDE.md/plan say ARQ, consolidation spec says SAQ replaces ARQ | SAQ over Redis (interactive + batch queues), per the consolidated spec; CLAUDE.md §6 wording updated (user, 2026-11-09) |
@@ -132,6 +136,7 @@
 | ✅ | [TD-030](../tracker/todo/TD-030.md) | CI: detect job is not in ci-gate.needs - if detect fails, backend/frontend/e2e/backend-image are skipped and ci-gate still passes; add detect to needs and fail on non-success | T-0028: detect is in ci-gate.needs; scripts/ci_gate.py fails the gate unless every needed job is success, or skipped only when its component is absent (detect output false) or it is the push-only publish job on a non-push event. Tested in scripts/tests/test_ci_gate.py. |
 | ✅ | [TD-031](../tracker/todo/TD-031.md) | CI hardening: split GHCR publish into a push-only job holding packages:write, pin docker/* actions to commit SHAs, persist-credentials:false; declare packaging as backend dev dep; assert .dockerignore starts with * | T-0028: GHCR publish moved to the push-only backend-publish job, the only job with packages:write; all actions in ci.yml (incl. docker/*) pinned to commit SHAs; every checkout sets persist-credentials:false; packaging declared as a backend dev dependency; test asserts .dockerignore starts with *. |
 | ✅ | [TD-033](../tracker/todo/TD-033.md) | Default soft-delete filtering: exclude deleted_at IS NOT NULL from ORM reads unless opted in | Done in T-0007: app/core/tenancy/scope.py adds a do_orm_execute with_loader_criteria filter on BaseRecordMixin that hides deleted_at IS NOT NULL rows from every ORM SELECT unless the statement sets execution_options(include_deleted=True). Raw SQL and Core table selects are not filtered. |
+| ✅ | [TD-036](../tracker/todo/TD-036.md) | Guard against bare Depends(get_db) outside app/core/db.py (endpoints must use DbSession) | Done in T-0011: backend/tests/test_lint_get_db.py walks every file under backend/app and fails if anything other than app/core/db.py names get_db (import, call, attribute or alias), so endpoints must use DbSession. |
 | ✅ | [TD-037](../tracker/todo/TD-037.md) | Drop the empty 'postgres' extra from backend/pyproject.toml once CI's install line stops referencing it | T-0028: empty postgres extra removed from backend/pyproject.toml and ci.yml installs .[dev]. |
 | ✅ | [TD-039](../tracker/todo/TD-039.md) | Bring back any PROPOSAL-port-from-aip extras dropped in spec consolidation (write-back, type inheritance, migration preview, test-fill, section library, report slots, auto_create_itp, competency assignment, programmes)? | Out of scope for Phase 1. Revisit auto_create_itp and asset write-back as Phase 3 candidates (user, 2026-11-09) |
 | ✅ | [TD-040](../tracker/todo/TD-040.md) | CEL value encoding: plain JSON numbers are CEL double on both runtimes; ints/timestamps need explicit tags | Confirmed: plain JSON numbers are CEL double; int64/timestamp/uint/duration use $-tagged encoding. Binding for sync payloads and form templates (user, 2026-11-09) |
