@@ -26,13 +26,14 @@ npm run dev        # local dev server
 npm run typecheck  # tsc --noEmit (strict)
 npm run test       # vitest run (all suites)
 npm run build      # typecheck + production build to dist/
+npm run gen:api    # regenerate src/api/ from the backend OpenAPI schema (backend venv active)
 ```
 
 ## Layout
 
 ```
 src/
-  api/        generated API client — never hand-edit (see src/api/README.md)
+  api/        generated API types (openapi.json, schema.ts) — never hand-edit (see src/api/README.md)
   app/        providers (AppRoot/AppProviders), router, layout, query client
   db/         Dexie database (KerpDb) + offline outbox helpers
   i18n/       i18next instance + message catalogues (locales/en.ts)
