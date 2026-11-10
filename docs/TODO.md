@@ -3,16 +3,14 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 69 · **Closed:** 48
+**Open:** 67 · **Closed:** 50
 
-## decision (4)
+## decision (2)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
 | [TD-034](../tracker/todo/TD-034.md) | Port/rewrite assessment of remaining Inspection-ERP core packages (jobs, sync, forms, workflow, events, files, schema_engine/items/mapping, reporting) | T-0015 | reviewer |
 | [TD-096](../tracker/todo/TD-096.md) | Approved coating ITR dropped the residual-dust rating row the ITP requires; Grating and Gridmesh ITR has no approved version: confirm with the client before shipping default templates | T-0113 | planner |
-| [TD-116](../tracker/todo/TD-116.md) | ADR 0004 Amendment B: two-person unlock of a locked rule names approval_routes (E-06-07, Phase 6) - who is the second approver until then? | T-0018, T-0034 | planner |
-| [TD-118](../tracker/todo/TD-118.md) | Qualification-type catalogue (TD-101): who is the 'super admin', and may a project-scoped PER-09 edit a tenant-wide (global) catalogue? | T-0118 | planner |
 
 ## spec-gap (32)
 
@@ -156,3 +154,5 @@
 | ✅ | [TD-106](../tracker/todo/TD-106.md) | Client-asset findings register (CUI, water, cladding damage) vs NCR vs punch, with configurable priority derivation and an assessment step that can spawn follow-up work | Separate findings register (not NCR/punch) with an assessment step. It is a project-level setting: the register's name, its finding types, and whether follow-up work can be raised from it are configurable per project. (user, 2026-11-10); follow-up edits in TD-112 |
 | ✅ | [TD-107](../tracker/todo/TD-107.md) | Revisit template / issue-type overlay inheritance for client variants instead of copies (TD-039 dropped inheritance) | Keep copies with a 'derived from' link, a compare view and upgrade offers (as ADR 0004); no inheritance. (user, 2026-11-10); follow-up edits in TD-112 |
 | ✅ | [TD-112](../tracker/todo/TD-112.md) | Apply the 2026-11-10 TODO triage: amend spec, CLAUDE.md section 6 and tasks for accepted ADRs 0003-0006 and resolved decisions | Planner pass landed: spec amended (asset-and-tagging, quality-and-inspection, p6-import-and-rsw-matching, edge spec sections 6 and 7.1, consolidation diff section 4 audit ledger, master spec 1.3/4.3 pointers, handover/portal/scaffold/welding decision notes); tasks T-0010, T-0014, T-0018, T-0101, T-0103..T-0108, T-0111, T-0112, T-0115, T-0116, T-0118, T-0124, T-0126, T-0131, T-0133 updated; new tasks T-0032..T-0036 and T-0134..T-0140; blocked_by TD-112 removed. CLAUDE.md section 6 anchor wording left for the human (agents may not edit CLAUDE.md). |
+| ✅ | [TD-116](../tracker/todo/TD-116.md) | ADR 0004 Amendment B: two-person unlock of a locked rule names approval_routes (E-06-07, Phase 6) - who is the second approver until then? | Interim default approved: until approval_routes (E-06-07) exists, a second, different PER-13 or PER-01 user approves an unlock of a locked rule (user, 2026-11-10) |
+| ✅ | [TD-118](../tracker/todo/TD-118.md) | Qualification-type catalogue (TD-101): who is the 'super admin', and may a project-scoped PER-09 edit a tenant-wide (global) catalogue? | No super admin: the tenant administrator edits the tenant-wide qualification catalogue; PER-09 Project Administrator may add project-level types (user, 2026-11-10) |
