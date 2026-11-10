@@ -9,7 +9,7 @@ entitlement gate is **not** ported; per-project enable/disable replaces it.
 | `manifest.py` | `ModuleManifest`, `REQUIRED_FILES`, `RESERVED_NAMES`, `manifest_problems()` |
 | `registry.py` | `ModuleRegistry` (modules in dependency order), `order_by_dependencies()`, `ModuleLoadError` |
 | `loader.py` | `discover_modules()`, `mount_modules()`, `install_modules()` (called by `create_app`) |
-| `models.py` | `project_module_setting` table (one row per project per toggled module; migration `0003`) |
+| `models.py` | `project_module_setting` table (one row per project per toggled module; migration `0004`) |
 | `service.py` | `project_states()`, `is_enabled()`, `set_enabled()` |
 | `gate.py` | `module_gate(name)` route dependency (404 while off), `registry_of(app)` |
 | `router.py`, `schemas.py` | Toggle API: `GET /api/v1/modules`, `PUT /api/v1/modules/{name}` |
