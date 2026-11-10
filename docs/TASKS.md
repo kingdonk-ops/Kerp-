@@ -110,7 +110,7 @@
 | ⬜ | [T-0202](../tracker/tasks/T-0202.md) | Welders + welder qualifications (range, expiry, continuity) → eligibility | wps | M | T-0201, T-0118 |  |
 | ⬜ | [T-0203](../tracker/tasks/T-0203.md) | Welds as Items (kind weld) + weld state machine | wps | M | T-0202, T-0103 |  |
 | ⬜ | [T-0204](../tracker/tasks/T-0204.md) | NDE results (oe_weld_nde_result): RT/UT/MT/PT | wps | S | T-0203, T-0016 |  |
-| ⬜ | [T-0205](../tracker/tasks/T-0205.md) | Heat/MTR traceability: heat_number + MTR OCR (SAQ) → weld joint properties | materials | M | T-0204, T-0015, T-0016 |  |
+| ⬜ | [T-0205](../tracker/tasks/T-0205.md) | Heat/MTR traceability: heat_number + MTR OCR (SAQ) → weld joint properties | materials | M | T-0204, T-0015, T-0016, T-0116 |  |
 | ⬜ | [T-0206](../tracker/tasks/T-0206.md) | Rules weld.accept / welder.assign (R-WPS-1..4) via run_checks + logged findings | wps | M | T-0204, T-0124 |  |
 | ⬜ | [T-0207](../tracker/tasks/T-0207.md) | Continuity watch report + expiry notifications (SAQ cron) | wps | S | T-0206, T-0019, T-0015 |  |
 | ⬜ | [T-0208](../tracker/tasks/T-0208.md) | Frontend: WPS register, welder quals, weld register | frontend | M | T-0206, T-0128 |  |

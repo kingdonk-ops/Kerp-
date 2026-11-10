@@ -15,16 +15,18 @@ Shared palette of field types used by every form, ITP and asset-schema field:
 (CEL expression). No per-module field designers.
 
 ## Unified inspection record — `oe_inspections_inspection`
-Single store across all kinds: **`kind IN (inspection, itp, rfi)`** — the `rfi` kind and the
-`RFI_ISSUED` state are being renamed because RFI means Request for Information and the Request
-for Inspection becomes its own `inspection_request` record (TD-045, decided 2026-11-10; spec
-pending there). Anchors to **any node whose level has the `inspection_anchor` role, or an Item**
+Single store across all kinds: **`kind IN (inspection, itp)`**. TD-045 (decided 2026-11-10)
+renames the old `rfi` kind and `RFI_ISSUED` state because RFI means Request for Information; the
+Request for Inspection becomes its own `inspection_request` record (§`inspection_requests`).
+The names used here are the **planner default pending the TD-045 spec**: no `rfi` kind, and the
+call-out state is `INSPECTION_REQUESTED`. Anchors to **any node whose level has the `inspection_anchor` role, or an Item**
 (ADR 0003 §6; e.g. Line in `cui-line`, RSW and Item in `remediation-*`), including a node with no
 work under it yet (ADR 0003 Amendment 5). Holds responses authored against a template revision
 (pins `template_revision_id`), `status` lifecycle, `reading_*`, `signed_off_*` (user, signature
 hash, UTC timestamp, geolocation). Lifecycle (master spec §4.2):
-`PENDING → RFI_ISSUED → INSPECTED_PASSED → LOCKED_FOR_TURNOVER`, with
-`INSPECTED_FAILED → (Cat A punch | NCR) → RE_INSPECT`. Every transition calls `run_checks`.
+`PENDING → INSPECTION_REQUESTED → INSPECTED_PASSED → LOCKED_FOR_TURNOVER`, with
+`INSPECTED_FAILED → (Cat A punch | NCR) → RE_INSPECT` (state name default pending the TD-045
+spec). Every transition calls `run_checks`.
 
 - **Dates (ADR 0004 Amendments C–D).** Each record stores `inspection_date` (when the work was
   inspected, entered by the user) and `entered_at` (server time of entry). Validity checks
@@ -44,7 +46,9 @@ hash, UTC timestamp, geolocation). Lifecycle (master spec §4.2):
   the latest revision. A client-variant template is a copy with a `derived_from` link and a
   compare view, not an inheritance overlay (TD-107).
 - **Close-out bulk signing (TD-095).** An ITP close-out may sign all `R`/`S`/`M` rows of one party
-  with one date in one action; `H` and `W` points are always signed individually.
+  with one date in one action (one sign-off ledger entry per row, same signer and date); `H` and
+  `W` points are always signed individually — a bulk request that includes any `H` or `W` row is
+  rejected as a whole (422) and nothing is signed.
 
 ### Request anchors
 A Request for Inspection or NDT request may cover several anchors (e.g. one NDT request for
@@ -60,6 +64,21 @@ of the decision. Request, reason, approver, decision and timestamps go to the re
 history and the audit ledger. The approval is bound to a hash of the exact values checked
 (equipment, specification revision, date…); changing any of them voids it and the block returns.
 This is separate from unlocking a rule (ADR 0004 §5 and Amendment B).
+
+`oe_validation_override` (module `validation`, `BaseRecordMixin` + project RLS; shape frozen at M1,
+T-0131):
+
+| Column | Purpose |
+|---|---|
+| `record_type`, `record_id` | the blocked record (e.g. `inspection`, its id) |
+| `rule_set_key`, `rule_key`, `rule_version` | the blocking rule as evaluated |
+| `finding_id` | the blocking finding the request answers |
+| `requested_by`, `requested_at`, `reason` | requester and mandatory typed reason (non-blank) |
+| `approver_persona`, `approver_user_id` | routed approver (PER-06, or PER-02 when the requester is PER-06); never the requester |
+| `decision` | `pending` → `approved` \| `rejected` \| `void` |
+| `decided_by`, `decided_at`, `decision_comment` | the decision |
+| `checked_values_hash` | SHA-256 of the canonical JSON of the values the rule checked (equipment id, specification revision, inspection date…); a later evaluation with a different hash sets `decision = void` and the block returns |
+| `audit_chain_key` | ledger chain the request and decision were appended to (`<record_type>:<record_id>`) |
 
 ## `eligibility` service (stateless, no tables)
 Answers "is this person / instrument / material valid **on the inspection date**?" (ADR 0004

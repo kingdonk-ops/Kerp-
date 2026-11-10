@@ -152,7 +152,8 @@ On **submit**:
    assigned to teams, extra teams with from/to dates (e.g. a shutdown day/night crew); rosters
    also feed task scheduling. The recipient's first rostered shift on or after `period_end`
    triggers the screen; until the roster exists (spec in TD-083, owned by the planner resource
-   pool) the first project sign-in on or after `period_end` is the fallback.
+   pool) the first project sign-in on or after `period_end` is the fallback (planner default,
+   recorded on TD-083 for confirmation).
 3. **Acknowledge:** "I have read this handover", with an optional reply/questions box.
    Acknowledgement is recorded per recipient (audit ledger) and notifies the author.
 4. **Escalation:** not acknowledged within `ack_deadline_hours` of `first_seen_at` →

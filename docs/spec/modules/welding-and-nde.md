@@ -50,6 +50,18 @@ number: **KAEFER-supplied** → raise an NCR; **client-supplied** → hard lock 
 heat number is obtained from the client **or** the client representative signs a **waiver**. The
 waiver is a record attached to the inspection record and included in the MDR.
 
+Rules (testable):
+- each weld joint side records `steel_origin` (`new` / `existing`) and, for new steel,
+  `supplied_by` (`kaefer` / `client`) and `heat_number`;
+- an `existing` side needs no heat number and is reported as "existing steel" in the MDR heat
+  trace;
+- a `new` + `kaefer` side without a heat number raises an NCR (`ncr` service) when the weld is
+  submitted;
+- a `new` + `client` side without a heat number puts a hard lock on the weld (its inspection
+  cannot pass the `check` gate) until a heat number is entered **or** a signed client-rep waiver
+  record (signer, date, reason, scope) is attached to the inspection; the waiver is included in
+  the MDR.
+
 ## Continuity & notifications
 `GET /wps/continuity-watch` report; expiry/continuity alerts via a **SAQ cron** worker.
 
