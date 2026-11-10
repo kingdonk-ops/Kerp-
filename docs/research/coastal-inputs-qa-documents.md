@@ -22,7 +22,7 @@ ADR 0003, ADR 0004 (rule-set defaults), `p6-import-and-rsw-matching.md` §9,
    `…-Q-PLN-…` for ITPs and report procedures, `…-S-REP-…` for structural reports) **and** the
    contractor number (`<CTR>-<DEPT>-ITP-<6d>`, `<CTR>-<DEPT>-REP-<6d>`), each with its own revision.
    Templates themselves carry a controlled form number + rev in the footer
-   (`P-<7d>-<4d>-D-TMP-<5d> Rev <n>` cover sheet; `<contract>-SI-W P-QA-<2d>-<2d>-<4d> Rev <n>` weld report;
+   (`P-<7d>-<4d>-D-TMP-<5d> Rev <n>` cover sheet; `<contract>-<disc> <tmpl>-<2d>-<2d>-<4d> Rev <n>` weld report;
    `<form>-<6d>_<rev>` corporate forms). The legacy inventory lists ITP double numbering but
    not as a general document property. → **Gap (documents):** every generated document has
    `client_doc_no`, `client_rev`, `contractor_doc_no`, `contractor_rev`, `template_control_no`,
@@ -87,7 +87,7 @@ e-signature envelope (envelope ID stamped top-left on every page). Instance for 
 ### Layout for the template engine
 
 **Page 1 – client "Contractor Document Cover Sheet" (portrait A4, client template).**
-- Header: client logo (left, red block), title "CONTRACTOR DOCUMENT COVER SHEET"; rule; project
+- Header: client logo (left), title "CONTRACTOR DOCUMENT COVER SHEET"; rule; project
   title banner in grey caps.
 - *Document details* (2-col label/value grid): Document Title (2 lines) · Sustaining Capital
   Document No (client doc no) · Asset Document Number · Project / Job Number · Document Sub Type
@@ -99,7 +99,7 @@ e-signature envelope (envelope ID stamped top-left on every page). Instance for 
   Approved By`. Superseded rows greyed. Rev sequence `A, B` = Issued for Review, `0, 1` = Issued
   for Use. (In the source the dates/names are shifted by one row – a hand-edit error; generated
   output must bind each row from the revision record.)
-- *Document Review Status ***RT OFFICE USE ONLY**** (red-bordered box): four check boxes
+- *Document Review Status **<client> OFFICE USE ONLY** (red-bordered box): four check boxes
   `A Accepted · B Accepted – Subject to Comments · C Rejected – Revise and Resubmit · D Reviewed
   for Information only (Receipt acknowledged)`; Reviewed by: Name / Signature / Review Date;
   disclaimer "Review or acceptance … does not relieve the originator of contractual or statutory
@@ -315,7 +315,7 @@ and **photo checkpoints** "After step 2 / 3 / 5". No client sign-off.
 
 ---
 
-## 5. Coating_report-_Sample.pdf — Structural Integrity Coating Inspection Report (completed)
+## 5. Sample coating report — Structural Integrity Coating Inspection Report (completed)
 
 **Structure (landscape, client-branded "CLIENT Structural Integrity" footer + contractor doc no
 `<CTR>-<DEPT>-REP-<6d>`).**
@@ -371,7 +371,7 @@ extract of the same template (scope/drawing sheet for one RSW).
 - Common header (every page): Site · Asset · Asset FLOC · Inspection date · Inspecting company ·
   Inspector names · Next inspection (year) · RSW number (`<FLOC>_<3d>` or `<FLOC>-<3d>-<rev>`) ·
   RSW rev · Risk class (I–IV / Class 1–4) · Secondary location (`component – zone – level – side`,
-  e.g. "Guarding – Truss – Idler 10 – RHS").
+  e.g. "<component> – <member> – <position> – <section>").
 - *Defect Identification*: captioned photos, observation text (thickness-loss %).
 - *Defect Risk Assessment*: risk scenario, consequence (safety / production / other, production
   rate t/h, production loss h), likelihood A–G, personnel exposure %, exposure-adjusted
@@ -435,7 +435,7 @@ Information); no spec text.
 
 ---
 
-## 8. CDRL_Requirements.pdf — Contractor Data Requirements List
+## 8. Client CDRL — Contractor Data Requirements List
 
 **What it is.** Client controlled document `<contract>-CDRL-0001`, Rev 1 Issued for Use,
 originator / reviewer / approver (roles: contractor-side QA advisor; client), contract phase
@@ -600,7 +600,7 @@ Rows `Item | Description | Sign-offs (Contractor | client) | N/A or P/L (punchli
 1 Initial inspection & paint removal (1.1–1.4 incl. UTT and remediation requirements agreed),
 2 Steel/flooring replacement & dust plate (panel gap < 10 mm), 3 Hilti clips (≥ 4 discs/m², 6 in
 high vibration; 8 Nm torque with calibrated wrench), 4 Site welding (fabricate per approved
-remediation list, fit-up, record welding data, visual per <client spec C1> Rev 8, NDT), 5 Blast & paint
+remediation list, fit-up, record welding data, visual per <client spec C1> Rev <n>, NDT), 5 Blast & paint
 (<client spec P> Rev <n>), 6 Final inspection & punch listing. Remarks; final verification contractor /
 client (name/position, signature, date). Diff: title (FIC → ITR).
 GAPS: G-S-1 `P/L` outcome on a row creates a punch item (T-0117) and the row shows as

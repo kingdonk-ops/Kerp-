@@ -379,7 +379,7 @@ results per weld back-filled into the welding report → trackers updated.
   `JacketingCondition` while the field key is `jacketingCondition`, so it never fires.
 - **Defect/issue types** (6 base + 5 client A + 6 client C + Weld Location): CUI (prefix ID), Test
   Restriction (TR), Damage to Cladding (CC), Mastic Condition (MC), Water Presence (WP), Ice
-  Presence (IP); client A and client C copies with suffixes and own prefixes (LOC, SC); Weld Location (WL).
+  Presence (IP); client A and client C copies with suffixes and own prefixes (<prefix A>, <prefix C>); Weld Location (WL).
   Each: scope DEFECT, business-key prefix, required photos, dynamic fields (inspection point or
   pipe support, CUI class Mild/Moderate/Heavy, clock location 360°/12/3/6/9 o'clock/Other,
   water location, "does it affect your scan"), 8–27 text snippets, priority shown, JS that sets
