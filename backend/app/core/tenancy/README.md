@@ -23,9 +23,10 @@ cannot write any. Who may read tenant-level rows (e.g. the project row) is open 
 
 ## Binding
 
-- **Requests:** `get_db` binds the session to `get_tenancy_context()` (`context.py`). That
-  dependency is the seam auth (T-0008) fills from the verified JWT. Today it returns `None`.
-  The tenant never comes from request parameters.
+- **Requests:** `get_db` binds the session to `get_tenancy_context()` (`context.py`), which
+  reads the tenant (`tid`) and user (`sub`) of the verified, unrevoked access token
+  (`app/core/auth/bearer.py`, T-0008). No valid token → `None` (unbound). The project is not
+  bound from the request yet (TD-122). The tenant never comes from request parameters.
 - **SAQ jobs, scripts:** `with database.unit_of_work(TenancyContext(tenant_id, project_id)) as s:`.
   A job never inherits the enqueuing request's context.
 - **Core connections:** `bind_connection(conn, ctx)` inside the transaction.

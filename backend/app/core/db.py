@@ -335,8 +335,10 @@ def get_db(
 DbSession = Annotated[Session, Depends(get_db, scope="function")]
 
 # Imported last because they need ``Base``/``BaseRecordMixin`` from this module.
-# ``audit.models``: core tables live outside ``app.modules``; importing them here puts them
-# on ``Base.metadata`` wherever the DB layer is used (Alembic, contract tests). T-0006.
+# ``audit.models`` (T-0006), ``auth.models`` (T-0008): core tables live outside ``app.modules``;
+# importing them here puts them on ``Base.metadata`` wherever the DB layer is used (Alembic,
+# contract tests).
 # ``tenancy.scope``: the soft-delete / tenancy read filters and write guard on every Session.
 from app.core.audit import models as _audit_models  # noqa: E402, F401
+from app.core.auth import models as _auth_models  # noqa: E402, F401
 from app.core.tenancy import scope as _tenancy_scope  # noqa: E402, F401

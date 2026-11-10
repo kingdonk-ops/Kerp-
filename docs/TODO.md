@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 66 · **Closed:** 52
+**Open:** 71 · **Closed:** 52
 
 ## decision (2)
 
@@ -12,7 +12,7 @@
 | [TD-034](../tracker/todo/TD-034.md) | Port/rewrite assessment of remaining Inspection-ERP core packages (jobs, sync, forms, workflow, events, files, schema_engine/items/mapping, reporting) | T-0015 | reviewer |
 | [TD-096](../tracker/todo/TD-096.md) | Approved coating ITR dropped the residual-dust rating row the ITP requires; Grating and Gridmesh ITR has no approved version: confirm with the client before shipping default templates | T-0113 | planner |
 
-## spec-gap (31)
+## spec-gap (33)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -47,6 +47,8 @@
 | [TD-109](../tracker/todo/TD-109.md) | Equipment availability (onsite / in use) and required operator credential per equipment type; resource demand counts equipment units | E-03-07, T-0112, E-04-08 | planner |
 | [TD-114](../tracker/todo/TD-114.md) | P6 open points left by TD-079: run_checks rule-set names for import-commit and link-approval, and link behaviour when schedule_link and work_anchor sit on different levels | T-0104, T-0105, T-0125 | planner |
 | [TD-117](../tracker/todo/TD-117.md) | Findings register (TD-106 decision) has no spec section or task: assessment step, configurable name/types per project, follow-up work, priority derivation | T-0116, T-0117 | planner |
+| [TD-120](../tracker/todo/TD-120.md) | Login tenant resolution: how a user picks the tenant at sign-in (multi-tenant accounts, MOD-01 cross-tenant collaboration) | T-0008 | implementer |
+| [TD-121](../tracker/todo/TD-121.md) | Refresh-token lifetime, absolute session lifetime and SPA refresh-token transport are unspecified | T-0008 | implementer |
 
 ## missed (2)
 
@@ -55,7 +57,7 @@
 | [TD-094](../tracker/todo/TD-094.md) | Per-RSW area handover sheet required by the ITP closeout (not the shift handover module) | T-0113, E-04-10 | planner |
 | [TD-125](../tracker/todo/TD-125.md) | Booking modules must call work_anchor_for and return 422 when the path has no work anchor (progress, time lines against a work anchor, completion gate) | T-0101, T-0116, T-0124, E-04-03, E-04-05 | reviewer |
 
-## deferred (5)
+## deferred (6)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -64,8 +66,9 @@
 | [TD-041](../tracker/todo/TD-041.md) | CEL parity gaps between celpy 0.5.0 and @marcbachmann/cel-js 8 (pinned known_gap fixtures) must be closed or accepted before T-0131 | T-0017, T-0018 | implementer |
 | [TD-047](../tracker/todo/TD-047.md) | Automate refresh of backend/requirements*.lock (uv pip compile output): Dependabot pip does not find *.lock files or re-run uv; options: scheduled uv --upgrade workflow opening a PR, or Renovate pip-compile manager | T-0028, T-0032 | implementer |
 | [TD-074](../tracker/todo/TD-074.md) | Handover: offline drafting on tablets via the Dexie outbox | E-04-11 | planner |
+| [TD-122](../tracker/todo/TD-122.md) | Bind the request's project scope from the authorised project (tenancy context is tenant-level after T-0008) | T-0008 | implementer |
 
-## later (21)
+## later (23)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -90,6 +93,8 @@
 | [TD-068](../tracker/todo/TD-068.md) | Importer for legacy inspection-system exports (template, usecase, itemcat, issuetype) | T-0113 | planner |
 | [TD-110](../tracker/todo/TD-110.md) | Recurring inspection due dates, earned quantity from partial inspections, create Items from an inspection (weld location) | E-06b-01, E-04-03, T-0103 | planner |
 | [TD-115](../tracker/todo/TD-115.md) | P6 supply formats deferred by TD-077: Excel schedule exports via import mapping profiles, and a direct P6 API connector | T-0105 | planner |
+| [TD-123](../tracker/todo/TD-123.md) | Password login has no throttling yet; extend T-0009's Redis lockout to /api/v1/auth/login | T-0008 | implementer |
+| [TD-124](../tracker/todo/TD-124.md) | Fail fast at startup when production auth config (JWT key, KERP_REDIS_URL) is missing | T-0008 | implementer |
 
 ## risk (5)
 

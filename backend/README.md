@@ -14,10 +14,11 @@ FastAPI modular monolith (see `docs/spec/` and `CLAUDE.md` §6).
 | `app/core/tenancy/` | Project-scoped RLS, tenancy context, ORM scope + soft-delete filter — see its `README.md` |
 | `app/core/cel/` | CEL rule evaluation (celpy, lazy) with the KERP error taxonomy — see its `README.md` |
 | `app/core/audit/` | Hash-chained, append-only audit ledger (`append`, `verify_chain`; REVOKE + triggers) — see its `README.md` |
+| `app/core/auth/` | Users, scrypt passwords, EdDSA/RS256 JWTs + JWKS, rotating refresh, Redis `jti` revocation — see its `README.md` |
 | `app/modules/<name>/` | Domain modules (`manifest.py`, `models.py`, `router.py`, `service.py`, `schemas.py`, `README.md`) — added by later tasks |
 | `tests/` | pytest suite |
 
-The module loader and auth are later Phase 0 tasks. Parts of the core are ported
+The module loader is a later Phase 0 task. Parts of the core are ported
 from Inspection-ERP. ADR 0001 (`docs/decisions/0001-port-inspection-erp-core.md`) lists
 which parts.
 
@@ -34,7 +35,8 @@ hardcoded config, no `.env` file is read).
 | `KERP_VERSION` | installed package version | Reported by `/health` |
 | `KERP_DATABASE_URL` | unset | SQLAlchemy URL of the runtime role (e.g. `postgresql+psycopg://…`, `sqlite:///…`) |
 | `KERP_MIGRATION_DATABASE_URL` | unset (= `KERP_DATABASE_URL`) | Schema-owner URL Alembic runs as |
-| `KERP_REDIS_URL` | unset | Redis URL (used once the job queue exists) |
+| `KERP_REDIS_URL` | unset | Redis URL (auth token revocation; job queue later). Required in production |
+| `KERP_JWT_*`, `KERP_ACCESS_TOKEN_MINUTES`, `KERP_REFRESH_TOKEN_DAYS`, `KERP_DEFAULT_TENANT_ID` | see `app/core/auth/README.md` | Token signing keys and lifetimes |
 | `KERP_LOG_LEVEL` | `INFO` | Root log level (`DEBUG`…`CRITICAL`, case-insensitive) |
 | `KERP_CONTENT_SECURITY_POLICY` | `default-src 'none'; frame-ancestors 'none'` | CSP for API responses |
 | `KERP_HSTS_ENABLED` | unset (= on only in `production`) | Force `Strict-Transport-Security` on/off |
@@ -162,6 +164,7 @@ pinned to a version outside its specifier, if a pin has no hash, or if the Docke
 ## Endpoints
 
 - `GET /health` → `200 {"status": "ok", "version": "<version>"}`
+- `GET /.well-known/jwks.json`, `POST /api/v1/auth/{login,refresh,logout}`, `GET /api/v1/auth/me` — see `app/core/auth/README.md`
 
 ## Database (T-0005)
 

@@ -13,6 +13,11 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
+from typing import Annotated
+
+from fastapi import Depends
+
+from app.core.auth.bearer import BearerResult, get_bearer
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,10 +62,16 @@ def use_tenancy(context: TenancyContext) -> Iterator[TenancyContext]:
         current_tenant_id.reset(tenant_token)
 
 
-def get_tenancy_context() -> TenancyContext | None:
-    """FastAPI dependency seam for the request's tenancy context.
+def get_tenancy_context(
+    bearer: Annotated[BearerResult, Depends(get_bearer)],
+) -> TenancyContext | None:
+    """FastAPI dependency: the request's tenancy, from the verified access token only.
 
-    T-0008 replaces this with the verified-JWT tenant and the authorised project. Until
-    then no request is bound. Tests override it through ``app.dependency_overrides``.
+    The tenant and user are the token's ``tid`` and ``sub``. The project is not bound yet
+    (tenant-level session): binding the caller's authorised project is TD-122. Tests
+    override this through ``app.dependency_overrides``.
     """
-    return None
+    claims = bearer.claims
+    if claims is None:
+        return None
+    return TenancyContext(tenant_id=claims.tenant_id, user_id=claims.user_id)
