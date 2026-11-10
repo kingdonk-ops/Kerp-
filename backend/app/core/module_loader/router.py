@@ -1,7 +1,7 @@
 """Module toggle API for the caller's project (T-0011): ``/api/v1/modules``.
 
 Both endpoints need a project in the caller's context; without one they answer 404. The
-admin capability guard arrives with RBAC (T-0010, see TD-125).
+admin capability guard arrives with RBAC (T-0010, see TD-129).
 """
 
 from __future__ import annotations

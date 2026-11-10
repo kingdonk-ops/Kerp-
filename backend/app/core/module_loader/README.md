@@ -74,4 +74,4 @@ Requests without a project in context (tenant-level) are not gated. Modules with
 **Toggle API.** `GET /api/v1/modules` lists every module (dependency order) with its state
 for the caller's project; `PUT /api/v1/modules/{name}` with `{"enabled": bool}` changes it
 and returns the module's new state. Both answer 404 without a project in context and 404 for
-an unknown module. The admin capability guard comes with RBAC (TD-125); the UI is TD-127.
+an unknown module. The admin capability guard comes with RBAC (TD-129); the UI is TD-127.

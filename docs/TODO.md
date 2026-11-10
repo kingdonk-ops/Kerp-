@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 72 · **Closed:** 54
+**Open:** 73 · **Closed:** 54
 
 ## decision (2)
 
@@ -57,7 +57,7 @@
 | [TD-094](../tracker/todo/TD-094.md) | Per-RSW area handover sheet required by the ITP closeout (not the shift handover module) | T-0113, E-04-10 | planner |
 | [TD-125](../tracker/todo/TD-125.md) | Booking modules must call work_anchor_for and return 422 when the path has no work anchor (progress, time lines against a work anchor, completion gate) | T-0101, T-0116, T-0124, E-04-03, E-04-05 | reviewer |
 
-## deferred (6)
+## deferred (7)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -67,6 +67,7 @@
 | [TD-047](../tracker/todo/TD-047.md) | Automate refresh of backend/requirements*.lock (uv pip compile output): Dependabot pip does not find *.lock files or re-run uv; options: scheduled uv --upgrade workflow opening a PR, or Renovate pip-compile manager | T-0028, T-0032 | implementer |
 | [TD-074](../tracker/todo/TD-074.md) | Handover: offline drafting on tablets via the Dexie outbox | E-04-11 | planner |
 | [TD-122](../tracker/todo/TD-122.md) | Bind the request's project scope from the authorised project (tenancy context is tenant-level after T-0008) | T-0008 | implementer |
+| [TD-129](../tracker/todo/TD-129.md) | Guard the module toggle API (PUT /api/v1/modules/{name}) with the admin capability tier once RBAC lands (T-0010/T-0014) | T-0011 | implementer |
 
 ## later (24)
 
