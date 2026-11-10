@@ -15,10 +15,13 @@ FastAPI modular monolith (see `docs/spec/` and `CLAUDE.md` §6).
 | `app/core/cel/` | CEL rule evaluation (celpy, lazy) with the KERP error taxonomy — see its `README.md` |
 | `app/core/audit/` | Hash-chained, append-only audit ledger (`append`, `verify_chain`; REVOKE + triggers) — see its `README.md` |
 | `app/core/auth/` | Users, scrypt passwords, EdDSA/RS256 JWTs + JWKS, rotating refresh, Redis `jti` revocation — see its `README.md` |
-| `app/modules/<name>/` | Domain modules (`manifest.py`, `models.py`, `router.py`, `service.py`, `schemas.py`, `README.md`) — added by later tasks |
+| `app/core/module_loader/` | Module loader + manifest contract, per-project enable/disable, toggle API `/api/v1/modules` — see its `README.md` |
+| `app/modules/<name>/` | Domain modules (`manifest.py`, `models.py`, `router.py`, `service.py`, `schemas.py`, `README.md`), mounted at `/api/v1/<name>` — added by later tasks |
+| `app/openapi.py` | `python -m app.openapi <file>`: writes the OpenAPI schema (used by the frontend's `npm run gen:api`) |
 | `tests/` | pytest suite |
 
-The module loader is a later Phase 0 task. Parts of the core are ported
+Endpoints take their session through `DbSession` only;
+`tests/test_lint_get_db.py` fails on any other use of `get_db` (TD-036). Parts of the core are ported
 from Inspection-ERP. ADR 0001 (`docs/decisions/0001-port-inspection-erp-core.md`) lists
 which parts.
 
