@@ -1,6 +1,6 @@
 # ADR 0004 — Rule sets: shipped defaults on every project, editable per project
 
-- **Status:** proposed
+- **Status:** accepted (user, 2026-11-10; see "Amendments on acceptance")
 - **Date:** 2026-11-10
 - **Resolves (on acceptance):** TD-072
 - **Affects:** T-0018, T-0108, T-0124, T-0131 (M1 freeze), E-04-11 (handover)
@@ -108,3 +108,40 @@ default layer.
 - **Cost:** one copy per project per enabled module (small). Upgrade diff UI is extra work.
 - **Risk:** projects drift from company standard. Mitigated by the update diff, locked rules
   and a tenant report of project rules that differ from the defaults.
+
+## Amendments on acceptance (user, 2026-11-10, TD-072, TD-079)
+
+Accepted with these changes. Where they conflict with anything above (Decision or Consequences), they win. The spec
+and task edits are tracked in TD-112.
+
+### A. Per-record override of a blocked check
+Separate from unlocking a rule (§5). It lets one record proceed past a blocking check:
+
+1. On submit the gate blocks and states why (e.g. "Torque wrench TW-12: calibration expired").
+2. The user clicks **Request override** and must type a reason before the button enables.
+3. The approver is notified and accepts or rejects; the requester is notified of the outcome.
+4. **Approver:** the QA/QC Lead. If the requester is QA/QC, the Project Manager. If the
+   requester is the Project Manager, QA/QC. The requester can never approve their own request.
+5. Request, reason, approver, decision and timestamps are stored on the record's activity
+   history and in the audit ledger.
+6. The approval is bound to the exact values checked. Changing the equipment, specification
+   or date voids it and the block returns.
+
+### B. Unlocking a locked rule needs two people
+Changing a locked rule (§5) needs the PER-13 Quality Director **plus a second approver**
+(via `approval_routes`), with the ADR reference recorded as before.
+
+### C. Validity is evaluated on the inspection date
+Calibration expiry, superseded specification revisions and similar validity checks evaluate
+against the date the inspection was performed, not today. A record that was valid then never
+blocks later (reports render from the completion snapshot, TD-064). Checks rerun live in the
+form whenever the date, equipment or specification changes, and again on the server at submit.
+
+### D. Backdating
+Both the inspection date and the actual entry time are stored. An inspection date more than
+*N* days before entry (per-project setting, default 7) needs a typed reason and is flagged on
+the report.
+
+### E. P6 rule kinds (TD-079)
+The store gains `p6_grammar` (RE2 regex, activity-name grammar) and `p6_eligibility` (CEL)
+kinds, replacing the separate P6 mapping-profile rules.

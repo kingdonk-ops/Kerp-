@@ -1,6 +1,6 @@
 # ADR 0005 — Field checkout, field ownership and per-field sync-back against P6 re-imports
 
-- **Status:** proposed
+- **Status:** accepted (user, 2026-11-10)
 - **Date:** 2026-11-10
 - **Resolves (on acceptance):** TD-075
 - **Spec:** [`docs/spec/modules/p6-import-and-rsw-matching.md`](../spec/modules/p6-import-and-rsw-matching.md) §7–§8
@@ -61,3 +61,8 @@ The current spec does not guarantee that:
 - **Freeze P6 import while anything is checked out** — blocks planners for days; does not scale.
 - **Hold the whole import until checkouts return** — same problem, and hides schedule changes from
   the tablet.
+
+## Acceptance (user, 2026-11-10, TD-075)
+
+Accepted as proposed. Office edits to field-owned values of a checked-out record are
+**blocked** (not queued) until the lease is returned or released.

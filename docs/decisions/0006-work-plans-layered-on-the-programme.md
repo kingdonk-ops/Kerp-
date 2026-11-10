@@ -1,6 +1,6 @@
 # ADR 0006 — Work plans are a KERP layer on the P6 programme (overlay / interrupt)
 
-- **Status:** proposed
+- **Status:** accepted (user, 2026-11-10; interrupt scope = subtree)
 - **Date:** 2026-11-10
 - **Resolves (on acceptance):** TD-080
 - **Affects:** E-04-01 (schedule), E-04-02 (look-ahead), E-04-07 (tasks), E-04-08 (resource_summary), E-04-12 (planner, new), E-07-04 (portal plan review, new), T-0106 (P6 export)
@@ -55,3 +55,8 @@ and nothing is pushed to P6 automatically.
 - **Plans only as documents (PDF) with no schedule effect** — the user requires approved plans
   to be added to the schedule and viewed overlaid.
 - **Full scheduling engine replacing P6** — out of scope; P6 stays the master.
+
+## Acceptance (user, 2026-11-10, TD-080)
+
+Accepted as proposed. Interrupt scope granularity is a **subtree of the breakdown** (not the
+whole project and not resource groups).
