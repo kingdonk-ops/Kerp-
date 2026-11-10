@@ -6,7 +6,8 @@ Run with: ``uvicorn app.main:create_app --factory``.
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 
 from app.api.health import router as health_router
 from app.core.config import Settings, get_settings
@@ -14,6 +15,11 @@ from app.core.db import Database
 from app.core.logging import configure_logging
 from app.core.request_context import RequestContextMiddleware
 from app.core.security_headers import SecurityHeadersMiddleware
+from app.core.tenancy.scope import OutOfScopeError
+
+
+async def _out_of_scope_handler(_request: Request, _exc: Exception) -> JSONResponse:
+    return JSONResponse({"detail": "Not Found"}, status_code=404)
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -50,6 +56,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         hsts=settings.hsts_active,
         docs_paths=frozenset(p for p in docs_paths if p),
     )
+
+    # Another tenant's or project's record is "not found", never "forbidden" (CLAUDE.md §6).
+    app.add_exception_handler(OutOfScopeError, _out_of_scope_handler)
 
     app.include_router(health_router)
     # Domain modules (app/modules/<name>/) are mounted by the module loader (later task).

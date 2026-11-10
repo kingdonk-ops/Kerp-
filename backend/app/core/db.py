@@ -7,7 +7,7 @@ test (``tests/test_db_contract.py``) enforces this through ``contract_violations
 
 The column types are dialect-portable: native ``UUID``/``JSONB`` on PostgreSQL, ``CHAR(36)``
 and ``JSON`` elsewhere. That lets the fast suite run on SQLite, while CI also runs the
-suite on PostgreSQL 16. Tenant/project RLS policies are added by T-0007. The hash-chained
+suite on PostgreSQL 16. Tenant/project RLS lives in ``app.core.tenancy``. The hash-chained
 audit ledger is added by T-0006.
 """
 
@@ -17,6 +17,7 @@ import importlib
 import pkgutil
 import uuid
 from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from typing import Annotated, Any, Final
 
@@ -47,6 +48,8 @@ from sqlalchemy.orm import (
 from sqlalchemy.types import TypeEngine
 
 from app.core.config import Settings, get_settings
+from app.core.tenancy.context import TenancyContext, get_tenancy_context, use_tenancy
+from app.core.tenancy.rls import bind_tenancy, install_pool_reset
 
 # Deterministic constraint names, so Alembic autogenerate produces stable diffs.
 NAMING_CONVENTION: Final[dict[str, str]] = {
@@ -267,6 +270,7 @@ class Database:
 
     def __init__(self, url: str) -> None:
         self.engine = create_db_engine(url)
+        install_pool_reset(self.engine)
         self.sessionmaker: sessionmaker[Session] = sessionmaker(
             bind=self.engine, autoflush=False, expire_on_commit=False
         )
@@ -278,9 +282,13 @@ class Database:
             raise RuntimeError("KERP_DATABASE_URL is not set")
         return cls(settings.database_url)
 
-    def session(self) -> Iterator[Session]:
-        """Unit of work: commit on success, roll back on any error, always close."""
+    def session(self, tenancy: TenancyContext | None = None) -> Iterator[Session]:
+        """Unit of work: commit on success, roll back on any error, always close.
+
+        With ``tenancy`` the session is bound for RLS and the ORM scope before first use.
+        """
         session = self.sessionmaker()
+        bind_tenancy(session, tenancy)
         try:
             yield session
             session.commit()
@@ -290,25 +298,42 @@ class Database:
         finally:
             session.close()
 
+    @contextmanager
+    def unit_of_work(self, tenancy: TenancyContext) -> Iterator[Session]:
+        """A bound unit of work outside a request: SAQ jobs, scripts, service calls.
+
+        A job never inherits the enqueuing request's context; it binds the tenant and
+        project recorded on the job explicitly. The context variables are set too.
+        """
+        with use_tenancy(tenancy), contextmanager(self.session)(tenancy) as session:
+            yield session
+
     def dispose(self) -> None:
         self.engine.dispose()
 
 
-def get_db(request: Request) -> Iterator[Session]:
+def get_db(
+    request: Request,
+    tenancy: Annotated[TenancyContext | None, Depends(get_tenancy_context)],
+) -> Iterator[Session]:
     """FastAPI dependency: one unit-of-work session per request.
 
     Always use it through ``DbSession``. That alias pins ``scope="function"``, so the
     commit runs *before* the response is sent, and a write that fails at commit returns
     a 500, never a 200. A failed commit can come from a constraint, an RLS ``WITH CHECK``
     rule or a serialization failure. The default scope commits after the response has
-    gone. T-0007 extends this dependency to bind the tenant/project RLS context from the
-    verified JWT.
+    gone. The session is bound to the tenancy context from ``get_tenancy_context`` (the
+    seam auth fills in T-0008); without one it is unbound and RLS shows it nothing.
     """
     database: Database | None = getattr(request.app.state, "db", None)
     if database is None:
         raise RuntimeError("database not configured (set KERP_DATABASE_URL)")
-    yield from database.session()
+    yield from database.session(tenancy)
 
 
 # The only sanctioned way for endpoints to obtain a database session.
 DbSession = Annotated[Session, Depends(get_db, scope="function")]
+
+# Registers the soft-delete / tenancy read filters and the write guard on every Session.
+# Imported last because it needs ``BaseRecordMixin`` from this module.
+from app.core.tenancy import scope as _tenancy_scope  # noqa: E402, F401

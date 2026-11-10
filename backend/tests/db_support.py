@@ -33,3 +33,11 @@ class Widget(ScratchBase, BaseRecordMixin):
     __tablename__ = "test_widget"
 
     name: Mapped[str] = mapped_column(String(50), nullable=False)
+
+
+class Gadget(ScratchBase, BaseRecordMixin):
+    """A second table, standing in for another module's data in the cross-module tests."""
+
+    __tablename__ = "test_gadget"
+
+    label: Mapped[str] = mapped_column(String(50), nullable=False)
