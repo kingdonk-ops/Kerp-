@@ -159,7 +159,7 @@ External (magic-link) approvers count only if the project setting
 ### 7.3 Override for absent approvers
 If a required approver has neither voted nor attended any session for the revision, a user with
 the `override_approval` capability (default: PM PER-02 and the client project lead role) can
-record an **override** for that approver with a mandatory reason. The override is a vote with
+record an **override** for that approver with a mandatory reason (by default only for approvers of the overrider's own organisation; a project may widen this, TD-081). The override is a vote with
 `decision=approve`, `override_of=<participant>`, it is shown distinctly everywhere, the absent
 approver is notified, and the ledger records who overrode whom and why. A `reject` vote cannot
 be overridden; it sends the plan to `changes_requested`.

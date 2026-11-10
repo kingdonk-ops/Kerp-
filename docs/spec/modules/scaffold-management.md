@@ -80,7 +80,7 @@ Transitions call `run_checks(context, rule_set)` with project-editable rule sets
 Every inspection is a one-engine inspection (`oe_inspections_inspection`, kind `inspection`,
 T-0111) on the scaffold's Item, using the project's **scaffold inspection template**
 (default template shipped in the pack; editable: checklist rows, photos, restrictions text,
-signature). On completion the scaffold module writes `oe_scaffold_tag`: `inspection_id`,
+signature). On completion the scaffold module writes `oe_scaffold_tag` from the `inspections` completion event / service call (never by reading inspections tables): `inspection_id`,
 `tag_status` (`safe` / green, `restricted` / yellow, `unsafe` / red — colours and names come
 from the terminology pack), `tag_no`, `tagged_at`, `tagged_by`, `restrictions`, `load_class`,
 `next_due_at` = `tagged_at` + `inspection_interval_days`.
