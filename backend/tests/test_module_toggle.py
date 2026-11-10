@@ -7,6 +7,7 @@ and, in CI, on PostgreSQL under project RLS against the migrated schema.
 
 import uuid
 from collections.abc import Iterator
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -15,6 +16,9 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 from app.core.audit.service import chain_entries
+from app.core.auth.deps import Principal, get_current_user, unauthorized
+from app.core.auth.models import User
+from app.core.auth.tokens import TokenClaims
 from app.core.config import Settings
 from app.core.db import Base, Database, contract_violations
 from app.core.module_loader import service
@@ -32,6 +36,9 @@ from app.core.tenancy.context import TenancyContext, get_tenancy_context
 from app.core.tenancy.rls import bind_tenancy, rls_tables
 from app.main import create_app
 from tests.audit_support import migrated_database
+from tests.auth_support import ALICE, PASSWORD, auth_app, make_settings, seed_user
+from tests.auth_support import T1 as AUTH_T1
+from tests.db_support import database_url
 from tests.module_support import FakeModule, ModulePackages
 from tests.tenancy_support import CTX_A, CTX_B, CTX_C, CTX_T1, PA, T1
 
@@ -183,12 +190,35 @@ def packages(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> ModulePackages:
 
 
 class Caller:
-    """Switches the tenancy context the app sees (the seam auth fills in T-0008)."""
+    """Switches the tenancy context and principal the app sees.
+
+    A project-bound request is not possible through a real token until TD-122, so these
+    tests override both seams: ``get_tenancy_context`` (the session binding) and
+    ``get_current_user`` (the authenticated, active user). ``None`` is an anonymous caller.
+    Real-token behaviour (401s, tenant-level 404) is tested further below.
+    """
 
     def __init__(self, app: FastAPI) -> None:
         self.app = app
         self.context: TenancyContext | None = None
         app.dependency_overrides[get_tenancy_context] = lambda: self.context
+        app.dependency_overrides[get_current_user] = self.principal
+
+    def principal(self) -> Principal:
+        if self.context is None:
+            raise unauthorized()
+        now = datetime.now(UTC)
+        claims = TokenClaims(
+            type="access",
+            user_id=USER,
+            tenant_id=self.context.tenant_id,
+            session_id=uuid.uuid4(),
+            jti=uuid.uuid4().hex,
+            issued_at=now,
+            expires_at=now + timedelta(minutes=15),
+        )
+        user = User(id=USER, tenant_id=self.context.tenant_id, email="seam@example.test")
+        return Principal(user=user, claims=claims)
 
     def as_(self, context: TenancyContext | None) -> "Caller":
         self.context = context
@@ -288,6 +318,19 @@ def test_toggle_returns_the_module_state(http: tuple[TestClient, Caller]) -> Non
     }
 
 
+def test_toggle_records_the_principal_as_actor(
+    http: tuple[TestClient, Caller], db: Database
+) -> None:
+    client, caller = http
+    caller.as_(CTX_A)
+    client.put(f"{MODULES}/quality", json={"enabled": False})
+    with db.unit_of_work(CTX_A) as s:
+        row = s.scalars(select(ProjectModuleSetting)).one()
+        assert (row.created_by, row.updated_by) == (USER, USER)
+        (entry,) = chain_entries(s, AUDIT_CHAIN)
+        assert entry.created_by == USER
+
+
 def test_toggle_errors(http: tuple[TestClient, Caller]) -> None:
     client, caller = http
     caller.as_(CTX_A)
@@ -299,11 +342,58 @@ def test_toggle_errors(http: tuple[TestClient, Caller]) -> None:
     assert client.put(f"{MODULES}/quality", json={}).status_code == 422
 
 
-@pytest.mark.parametrize("ctx", [None, CTX_T1])
-def test_the_toggle_api_needs_a_project(
-    http: tuple[TestClient, Caller], ctx: TenancyContext | None
-) -> None:
+def test_the_toggle_api_needs_a_project(http: tuple[TestClient, Caller]) -> None:
     client, caller = http
-    caller.as_(ctx)
+    caller.as_(CTX_T1)
     assert client.get(MODULES).status_code == 404
     assert client.put(f"{MODULES}/quality", json={"enabled": False}).status_code == 404
+
+
+# --- HTTP with real tokens (T-0008 auth): 401 before anything else --------------------------
+
+
+@pytest.fixture
+def auth_client(tmp_path: Path, db: Database) -> Iterator[TestClient]:
+    seed_user(db, AUTH_T1, ALICE)
+    app, _runtime = auth_app(make_settings(database_url=database_url(tmp_path)))
+    with TestClient(app) as client:
+        yield client
+
+
+def _token(client: TestClient) -> dict[str, str]:
+    response = client.post(
+        f"{API_PREFIX}/auth/login",
+        json={"email": ALICE, "password": PASSWORD, "tenant_id": str(AUTH_T1)},
+    )
+    assert response.status_code == 200, response.text
+    return {"Authorization": f"Bearer {response.json()['access_token']}"}
+
+
+def _calls(client: TestClient, headers: dict[str, str]) -> list[tuple[int, str | None]]:
+    responses = [
+        client.get(MODULES, headers=headers),
+        client.put(f"{MODULES}/quality", json={"enabled": False}, headers=headers),
+    ]
+    return [(r.status_code, r.headers.get("www-authenticate")) for r in responses]
+
+
+def test_toggle_api_without_a_token_is_401(auth_client: TestClient) -> None:
+    assert _calls(auth_client, {}) == [(401, "Bearer"), (401, "Bearer")]
+
+
+def test_toggle_api_with_an_invalid_token_is_401(auth_client: TestClient) -> None:
+    challenge = 'Bearer error="invalid_token"'
+    headers = {"Authorization": "Bearer not-a-token"}
+    assert _calls(auth_client, headers) == [(401, challenge), (401, challenge)]
+
+
+def test_toggle_api_for_an_inactive_user_is_401(auth_client: TestClient, db: Database) -> None:
+    headers = _token(auth_client)
+    with db.unit_of_work(TenancyContext(tenant_id=AUTH_T1)) as s:
+        s.scalars(select(User).where(User.email == ALICE)).one().is_active = False
+    assert [status for status, _ in _calls(auth_client, headers)] == [401, 401]
+
+
+def test_toggle_api_with_a_tenant_level_token_is_404(auth_client: TestClient) -> None:
+    # Authenticated, but the token binds no project until TD-122.
+    assert [status for status, _ in _calls(auth_client, _token(auth_client))] == [404, 404]

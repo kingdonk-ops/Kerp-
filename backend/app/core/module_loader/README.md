@@ -73,5 +73,12 @@ Requests without a project in context (tenant-level) are not gated. Modules with
 
 **Toggle API.** `GET /api/v1/modules` lists every module (dependency order) with its state
 for the caller's project; `PUT /api/v1/modules/{name}` with `{"enabled": bool}` changes it
-and returns the module's new state. Both answer 404 without a project in context and 404 for
-an unknown module. The admin capability guard comes with RBAC (TD-129); the UI is TD-127.
+and returns the module's new state. Both require an authenticated, active user
+(`CurrentPrincipal`, 401 with `WWW-Authenticate: Bearer` otherwise), answer 404 without a
+project in context and 404 for an unknown module. The change is recorded with the
+principal's user id. The admin capability guard comes with RBAC (TD-129); the UI is TD-127.
+
+**Until TD-122.** Since T-0008 the tenancy context carries the token's tenant and user but no
+project, so every authenticated request is tenant-level: the toggle API answers 404 and the
+gate never fires. Both go live when TD-122 binds the caller's authorised project. Module
+routers do not get `CurrentPrincipal` from the loader yet (TD-130): each module adds it.

@@ -1,13 +1,16 @@
 """Module toggle API for the caller's project (T-0011): ``/api/v1/modules``.
 
-Both endpoints need a project in the caller's context; without one they answer 404. The
-admin capability guard arrives with RBAC (T-0010, see TD-129).
+Both endpoints require an authenticated, active user (``CurrentPrincipal``: 401 otherwise)
+and a project in the caller's tenancy context (404 otherwise). Binding the project per
+request is TD-122; until then every authenticated call is tenant-level and answers 404.
+The admin capability tier arrives with RBAC (TD-129).
 """
 
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Request, status
 
+from app.core.auth.deps import CurrentPrincipal
 from app.core.db import DbSession
 from app.core.module_loader import service
 from app.core.module_loader.gate import not_found, registry_of
@@ -37,7 +40,9 @@ def _state(manifest: ModuleManifest, enabled: bool) -> ModuleState:
 
 
 @router.get("", response_model=list[ModuleState])
-def list_modules(request: Request, session: DbSession) -> list[ModuleState]:
+def list_modules(
+    principal: CurrentPrincipal, request: Request, session: DbSession
+) -> list[ModuleState]:
     """Every loaded module, dependencies first, with its state for the caller's project."""
     _project_context(session)
     registry = registry_of(request.app)
@@ -46,17 +51,23 @@ def list_modules(request: Request, session: DbSession) -> list[ModuleState]:
 
 
 @router.put("/{name}", response_model=ModuleState)
-def set_module(name: str, body: ModuleToggle, request: Request, session: DbSession) -> ModuleState:
+def set_module(
+    name: str,
+    body: ModuleToggle,
+    principal: CurrentPrincipal,
+    request: Request,
+    session: DbSession,
+) -> ModuleState:
     """Enable or disable module ``name`` for the caller's project.
 
     404 for an unknown module; 409 when the module cannot be disabled or the change would
     break a dependency (the detail says which module to change first).
     """
-    context = _project_context(session)
+    _project_context(session)
     registry = registry_of(request.app)
     try:
         states = service.set_enabled(
-            session, registry, name, body.enabled, actor_id=context.user_id
+            session, registry, name, body.enabled, actor_id=principal.user_id
         )
     except service.UnknownModuleError:
         raise not_found() from None
