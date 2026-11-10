@@ -55,8 +55,9 @@ Site → Asset → RSW → Activity (`remediation-fep`); Scope → Job Package �
 - Decided (TD-113, user 2026-11-10): a path with no work-anchor node is allowed (inspection
   without work); booking work (progress, time against a work anchor, NCRs, completion) requires
   the work-anchor node on the path. When work is raised on a path without one, the user must pick
-  or create the work-anchor node first; a finding (TD-106) may create it when it raises follow-up
-  work. Time may also book to a delay/overhead code with no work anchor (Amendment 8,
+  or create the work-anchor node first; this includes a user raising follow-up work from a
+  finding (TD-106). The check is `asset_management.service.work_anchor_for(node_id)` (T-0101),
+  which raises `NoWorkAnchor` (422) when the path has none. Time may also book to a delay/overhead code with no work anchor (Amendment 8,
   TD-108).
 
 ### Restructure with history (Amendment 3)

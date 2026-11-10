@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 65 · **Closed:** 52
+**Open:** 66 · **Closed:** 52
 
 ## decision (2)
 
@@ -48,11 +48,12 @@
 | [TD-114](../tracker/todo/TD-114.md) | P6 open points left by TD-079: run_checks rule-set names for import-commit and link-approval, and link behaviour when schedule_link and work_anchor sit on different levels | T-0104, T-0105, T-0125 | planner |
 | [TD-117](../tracker/todo/TD-117.md) | Findings register (TD-106 decision) has no spec section or task: assessment step, configurable name/types per project, follow-up work, priority derivation | T-0116, T-0117 | planner |
 
-## missed (1)
+## missed (2)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
 | [TD-094](../tracker/todo/TD-094.md) | Per-RSW area handover sheet required by the ITP closeout (not the shift handover module) | T-0113, E-04-10 | planner |
+| [TD-125](../tracker/todo/TD-125.md) | Booking modules must call work_anchor_for and return 422 when the path has no work anchor (progress, time lines against a work anchor, completion gate) | T-0101, T-0116, T-0124, E-04-03, E-04-05 | reviewer |
 
 ## deferred (5)
 

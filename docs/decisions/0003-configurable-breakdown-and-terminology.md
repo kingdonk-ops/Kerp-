@@ -135,7 +135,7 @@ they were captured on (records pin `template_revision_id`), new records use the 
   `work_anchor_id`), `quality-and-inspection.md` (request-anchor link, role binding),
   CLAUDE.md §6 wording (as amended by Amendment 1): "work anchors to a **work-anchor node** —
   at most one per root-to-leaf path, never nested (RSW by default); inspections to any
-  `inspection_anchor` level; no BOQ anchor anywhere."
+  `inspection_anchor` level or an Item. No BOQ anchor anywhere."
 - **Task changes** (same set as the Affects header and TD-071):
   - T-0101 — adds `oe_asset_level_def` (roles, unique `(project_id, key)`), `level_def_id` on
     nodes and the one-work-anchor-per-path invariant, never nested (Amendment 1; replaces "RSW is
