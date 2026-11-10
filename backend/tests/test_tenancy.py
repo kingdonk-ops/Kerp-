@@ -26,7 +26,10 @@ from app.core.tenancy.context import (
 )
 from app.core.tenancy.rls import (
     POLICY_NAME,
+    POLICY_NAMES,
     PROJECT_SETTING,
+    READ_POLICY_NAME,
+    SESSION_INFO_KEY,
     TENANT_SETTING,
     bind_tenancy,
     rls_policy_sql,
@@ -134,6 +137,41 @@ def test_rebinding_a_session_switches_scope(db: Database) -> None:
         assert session_tenancy(s) is None
 
 
+def test_rebinding_a_session_that_holds_objects_is_refused(db: Database) -> None:
+    a1 = widget_id(db, CTX_A, "a1")
+    with db.sessionmaker() as s:
+        bind_tenancy(s, CTX_A)
+        held = get_or_404(s, Widget, a1)  # the identity map keeps it while referenced
+        assert held.name == "a1"
+        bind_tenancy(s, CTX_A)  # same context: a no-op
+        with pytest.raises(RuntimeError, match="cannot rebind"):
+            bind_tenancy(s, CTX_C)
+        assert session_tenancy(s) == CTX_A
+        # The documented way: commit, empty the identity map, then rebind.
+        s.commit()
+        s.expunge_all()
+        bind_tenancy(s, CTX_C)
+        with pytest.raises(OutOfScopeError):
+            get_or_404(s, Widget, a1)
+
+
+def test_get_or_404_rechecks_identity_map_hits(db: Database) -> None:
+    # session.get answers from the identity map without SQL; the scope must still hold.
+    a1 = widget_id(db, CTX_A, "a1")
+    with db.sessionmaker() as s:
+        bind_tenancy(s, CTX_A)
+        row = get_or_404(s, Widget, a1)  # now in the identity map
+        s.info[SESSION_INFO_KEY] = CTX_C  # skip the rebind guard to plant a stale identity
+        with pytest.raises(OutOfScopeError):
+            get_or_404(s, Widget, a1)
+        s.info[SESSION_INFO_KEY] = CTX_A
+        assert get_or_404(s, Widget, a1) is row
+        row.soft_delete()  # soft-deleted earlier in the same session (TD-033)
+        with pytest.raises(OutOfScopeError):
+            get_or_404(s, Widget, a1)
+        assert get_or_404(s, Widget, a1, include_deleted=True) is row
+
+
 # --- soft delete (TD-033) ----------------------------------------------------------------
 
 
@@ -180,11 +218,34 @@ def test_moving_a_row_to_another_project_is_refused(db: Database) -> None:
     assert "a1" in _names(db, CTX_A)
 
 
-def test_project_session_may_write_its_project_and_tenant_level_rows(db: Database) -> None:
+def test_project_session_writes_only_its_project(db: Database) -> None:
     with db.unit_of_work(CTX_A) as s:
         s.add(Widget(tenant_id=T1, project_id=PA, name="a3"))
+    assert "a3" in _names(db, CTX_A)
+    with pytest.raises(OutOfScopeError), db.unit_of_work(CTX_A) as s:
         s.add(Widget(tenant_id=T1, project_id=None, name="t1-shared"))
-    assert {"a3", "t1-shared"} <= _names(db, CTX_A)
+    assert "t1-shared" not in _names(db, CTX_T1)
+
+
+def test_tenant_level_rows_are_written_only_by_a_tenant_level_session(db: Database) -> None:
+    with db.unit_of_work(CTX_T1) as s:
+        s.add(Widget(tenant_id=T1, project_id=None, name="t1-shared"))
+    assert "t1-shared" in _names(db, CTX_A)
+    library = widget_id(db, CTX_T1, "t1-library")
+    with pytest.raises(OutOfScopeError), db.unit_of_work(CTX_A) as s:
+        s.get_one(Widget, library).name = "hijacked"
+    with pytest.raises(OutOfScopeError), db.unit_of_work(CTX_A) as s:
+        s.delete(s.get_one(Widget, library))
+    assert "t1-library" in _names(db, CTX_T1)
+    with pytest.raises(OutOfScopeError), db.unit_of_work(CTX_T1) as s:
+        s.add(Widget(tenant_id=T1, project_id=PA, name="pushed-down"))
+
+
+def test_demoting_a_project_row_to_tenant_level_is_refused(db: Database) -> None:
+    a1 = widget_id(db, CTX_A, "a1")
+    with pytest.raises(OutOfScopeError), db.unit_of_work(CTX_A) as s:
+        s.get_one(Widget, a1).project_id = None
+    assert "a1" not in _names(db, TenancyContext(tenant_id=T1, project_id=PB))
 
 
 # --- policy helper (dialect-independent parts) --------------------------------------------
@@ -196,15 +257,27 @@ def test_rls_tables_cover_every_tenant_table() -> None:
 
 
 def test_policy_sql_forces_rls_and_guards_empty_settings() -> None:
-    enable, force, drop, create = rls_policy_sql("test_widget")
+    enable, force, drop, create, drop_read, create_read = rls_policy_sql("test_widget")
     assert enable == "ALTER TABLE test_widget ENABLE ROW LEVEL SECURITY"
     assert force == "ALTER TABLE test_widget FORCE ROW LEVEL SECURITY"
     assert drop == f"DROP POLICY IF EXISTS {POLICY_NAME} ON test_widget"
-    assert f"CREATE POLICY {POLICY_NAME} ON test_widget FOR ALL" in create
-    for setting in (TENANT_SETTING, PROJECT_SETTING):
-        # Both in USING and in WITH CHECK, both behind the NULLIF empty-setting guard.
-        assert create.count(f"NULLIF(current_setting('{setting}', true), '')::uuid") == 2
-    assert "WITH CHECK" in create
+    assert drop_read == f"DROP POLICY IF EXISTS {READ_POLICY_NAME} ON test_widget"
+    tenant = f"tenant_id = NULLIF(current_setting('{TENANT_SETTING}', true), '')::uuid"
+    project = (
+        f"project_id IS NOT DISTINCT FROM NULLIF(current_setting('{PROJECT_SETTING}', true), '')"
+        "::uuid"
+    )
+    # Writes: exact scope in both USING and WITH CHECK; NULL project is not a wildcard.
+    assert create == (
+        f"CREATE POLICY {POLICY_NAME} ON test_widget FOR ALL "
+        f"USING ({tenant} AND {project}) WITH CHECK ({tenant} AND {project})"
+    )
+    # Reads only: the tenant's tenant-level rows.
+    assert create_read == (
+        f"CREATE POLICY {READ_POLICY_NAME} ON test_widget FOR SELECT "
+        f"USING ({tenant} AND project_id IS NULL)"
+    )
+    assert POLICY_NAMES == (POLICY_NAME, READ_POLICY_NAME)
 
 
 # --- HTTP: cross-project is a 404 ---------------------------------------------------------

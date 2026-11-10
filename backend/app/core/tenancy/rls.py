@@ -4,10 +4,16 @@ Ported from Inspection-ERP ``core/tenancy/rls.py`` (ADR 0001) and extended from 
 tenant to the project dimension. Every table that carries ``tenant_id`` gets::
 
     ENABLE + FORCE ROW LEVEL SECURITY
-    CREATE POLICY project_isolation_policy ... USING (<visible>) WITH CHECK (<visible>)
+    CREATE POLICY project_isolation_policy ... FOR ALL USING (<exact>) WITH CHECK (<exact>)
+    CREATE POLICY tenant_level_read_policy ... FOR SELECT USING (<tenant-level row>)
 
-where a row is visible when its ``tenant_id`` equals ``app.current_tenant_id`` and its
-``project_id`` is ``NULL`` (a tenant-level row) or equals ``app.current_project_id``.
+``<exact>`` is ``tenant_id = app.current_tenant_id AND project_id IS NOT DISTINCT FROM
+app.current_project_id`` (edge spec §6). A session reads, inserts, updates and deletes rows
+of exactly its scope: a project session writes only its project, and a tenant-level session
+(no project) writes only tenant-level rows. Permissive policies are OR-ed per command, so
+the second policy only adds *read* access to the tenant's tenant-level rows
+(``project_id IS NULL``). A project session cannot create, demote a row to, change or
+delete a tenant-level row.
 
 * ``NULLIF(..., '')``: once a connection has set a custom setting, it reads back as ``''``
   after the transaction, not ``NULL``. ``''::uuid`` would raise; ``NULL`` matches nothing.
@@ -38,6 +44,8 @@ from app.core.tenancy.context import TenancyContext
 TENANT_SETTING: Final = "app.current_tenant_id"
 PROJECT_SETTING: Final = "app.current_project_id"
 POLICY_NAME: Final = "project_isolation_policy"
+READ_POLICY_NAME: Final = "tenant_level_read_policy"
+POLICY_NAMES: Final = (POLICY_NAME, READ_POLICY_NAME)
 SESSION_INFO_KEY: Final = "kerp_tenancy"
 
 # Tables with tenant_id that are deliberately not under RLS, each with its reason
@@ -47,9 +55,12 @@ RLS_EXEMPT: Final[frozenset[str]] = frozenset()
 
 _TENANT_EXPR: Final = f"NULLIF(current_setting('{TENANT_SETTING}', true), '')::uuid"
 _PROJECT_EXPR: Final = f"NULLIF(current_setting('{PROJECT_SETTING}', true), '')::uuid"
-VISIBLE_ROW_SQL: Final = (
-    f"tenant_id = {_TENANT_EXPR} AND (project_id IS NULL OR project_id = {_PROJECT_EXPR})"
+# Read, insert, update and delete: exactly the bound scope.
+SCOPE_ROW_SQL: Final = (
+    f"tenant_id = {_TENANT_EXPR} AND project_id IS NOT DISTINCT FROM {_PROJECT_EXPR}"
 )
+# Read only: the tenant's tenant-level rows.
+TENANT_LEVEL_ROW_SQL: Final = f"tenant_id = {_TENANT_EXPR} AND project_id IS NULL"
 
 
 def rls_tables(metadata: MetaData, *, exempt: frozenset[str] = RLS_EXEMPT) -> list[str]:
@@ -74,7 +85,9 @@ def rls_policy_sql(table: str) -> list[str]:
         f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY",
         f"DROP POLICY IF EXISTS {POLICY_NAME} ON {table}",
         f"CREATE POLICY {POLICY_NAME} ON {table} FOR ALL "
-        f"USING ({VISIBLE_ROW_SQL}) WITH CHECK ({VISIBLE_ROW_SQL})",
+        f"USING ({SCOPE_ROW_SQL}) WITH CHECK ({SCOPE_ROW_SQL})",
+        f"DROP POLICY IF EXISTS {READ_POLICY_NAME} ON {table}",
+        f"CREATE POLICY {READ_POLICY_NAME} ON {table} FOR SELECT USING ({TENANT_LEVEL_ROW_SQL})",
     ]
 
 
@@ -99,12 +112,12 @@ def rls_coverage_problems(connection: Connection, metadata: MetaData) -> list[st
     rows = connection.execute(
         text(
             "SELECT c.relname, c.relrowsecurity, c.relforcerowsecurity,"
-            " EXISTS (SELECT 1 FROM pg_policy p"
-            "         WHERE p.polrelid = c.oid AND p.polname = :policy) AS has_policy"
+            " ARRAY(SELECT p.polname::text FROM pg_policy p WHERE p.polrelid = c.oid)"
+            " AS policies"
             " FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace"
             " WHERE n.nspname = current_schema() AND c.relname = ANY(:tables)"
         ),
-        {"policy": POLICY_NAME, "tables": tables},
+        {"tables": tables},
     ).all()
     found = {row.relname: row for row in rows}
     problems: list[str] = []
@@ -117,8 +130,9 @@ def rls_coverage_problems(connection: Connection, metadata: MetaData) -> list[st
             problems.append(f"{table}: row level security not enabled")
         if not row.relforcerowsecurity:
             problems.append(f"{table}: row level security not forced")
-        if not row.has_policy:
-            problems.append(f"{table}: policy {POLICY_NAME} missing")
+        problems.extend(
+            f"{table}: policy {name} missing" for name in POLICY_NAMES if name not in row.policies
+        )
     return problems
 
 
@@ -153,7 +167,21 @@ def bind_tenancy(session: Session, context: TenancyContext | None) -> None:
 
     The context lives on ``session.info`` and is re-applied at the start of every
     transaction, because after a commit the session may run on another pooled connection.
+
+    Switching a session to a *different* context is only allowed while it holds no loaded
+    objects and no pending changes. Objects loaded under the old scope stay in the
+    identity map, and ``session.get`` would hand them out without any SQL (so neither
+    the ORM scope nor RLS would see the call). Commit and ``expunge_all()`` first, or use
+    a new session per scope.
     """
+    current = session_tenancy(session)
+    if context != current and (
+        len(session.identity_map) or session.new or session.dirty or session.deleted
+    ):
+        raise RuntimeError(
+            "cannot rebind a session that holds objects or pending changes; "
+            "commit and expunge_all() first, or use a new session per scope"
+        )
     if context is None:
         session.info.pop(SESSION_INFO_KEY, None)
     else:

@@ -36,7 +36,17 @@ from app.core.tenancy.rls import (
     rls_policy_sql,
 )
 from tests.db_support import ON_POSTGRES, POSTGRES_URL, Gadget, Widget
-from tests.tenancy_support import CTX_A, CTX_C, PA, PB, T1, VISIBLE_TO_A, seeded_database
+from tests.tenancy_support import (
+    CTX_A,
+    CTX_B,
+    CTX_C,
+    CTX_T1,
+    PA,
+    PB,
+    T1,
+    VISIBLE_TO_A,
+    seeded_database,
+)
 
 pytestmark = pytest.mark.skipif(
     not ON_POSTGRES, reason="needs PostgreSQL RLS; runs in CI's PostgreSQL step (TD-052)"
@@ -160,7 +170,7 @@ def test_cross_module_write_into_another_project_is_rejected(db: Database) -> No
 # --- 3. raw-SQL aggregation ---------------------------------------------------------------------
 
 
-def _raw_row(project: uuid.UUID) -> dict[str, object]:
+def _raw_row(project: uuid.UUID | None) -> dict[str, object]:
     return {
         "id": uuid.uuid4(),
         "tenant_id": T1,
@@ -216,6 +226,34 @@ def test_raw_sql_cannot_touch_another_project(db: Database) -> None:
     assert names == {"b1", "b2", "b3", "t1-library"}
 
 
+def test_project_session_cannot_write_tenant_level_rows_in_raw_sql(db: Database) -> None:
+    # Tenant-level rows are read-only to a project session (tenant_level_read_policy is
+    # FOR SELECT); creating, demoting to, changing or deleting one leaks across projects.
+    with db.engine.begin() as conn:
+        bind_connection(conn, CTX_A)
+        library = {"name": "t1-library"}
+        changed = conn.execute(
+            text("UPDATE test_widget SET name = 'x' WHERE name = :name"), library
+        )
+        assert changed.rowcount == 0
+        deleted = conn.execute(text("DELETE FROM test_widget WHERE name = :name"), library)
+        assert deleted.rowcount == 0
+    with pytest.raises(DBAPIError, match=RLS_ERROR), db.unit_of_work(CTX_A) as s:
+        s.execute(text("UPDATE test_widget SET project_id = NULL WHERE name = 'a1'"))
+    with pytest.raises(DBAPIError, match=RLS_ERROR), db.unit_of_work(CTX_A) as s:
+        s.execute(Widget.__table__.insert().values(**_raw_row(None), name="t1-smuggled"))
+    with db.unit_of_work(CTX_B) as s:
+        names = set(s.execute(text("SELECT name FROM test_widget")).scalars())
+    assert names == {"b1", "b2", "b3", "t1-library"}
+    # The tenant-level session is the one that may write tenant-level rows.
+    with db.unit_of_work(CTX_T1) as s:
+        s.execute(Widget.__table__.insert().values(**_raw_row(None), name="t1-shared"))
+        s.execute(text("DELETE FROM test_widget WHERE name = 't1-library'"))
+    with db.unit_of_work(CTX_A) as s:
+        names = set(s.execute(text("SELECT name FROM test_widget")).scalars())
+    assert names == {"a1", "a2", "a-deleted", "t1-shared"}
+
+
 # --- 4. DB migration ------------------------------------------------------------------------------
 
 
@@ -263,6 +301,7 @@ def test_a_migration_that_forgets_rls_is_caught() -> None:
                 "test_unprotected: row level security not enabled",
                 "test_unprotected: row level security not forced",
                 "test_unprotected: policy project_isolation_policy missing",
+                "test_unprotected: policy tenant_level_read_policy missing",
             ]
             op = Operations(MigrationContext.configure(conn))
             for statement in rls_policy_sql("test_unprotected"):

@@ -5,13 +5,21 @@ Ported from Inspection-ERP `core/tenancy/` (ADR 0001) and extended from tenant t
 
 | Layer | File | Applies to | Off PostgreSQL |
 |---|---|---|---|
-| PostgreSQL RLS (`ENABLE` + `FORCE`, policy `project_isolation_policy`) | `rls.py` | every statement: ORM, Core, raw SQL | n/a |
+| PostgreSQL RLS (`ENABLE` + `FORCE`, policies `project_isolation_policy` + `tenant_level_read_policy`) | `rls.py` | every statement: ORM, Core, raw SQL | n/a |
 | ORM scope (`do_orm_execute` loader criteria + `before_flush` write guard) | `scope.py` | ORM entity selects and flushes | the only filter |
 
-A row is visible and writable when `tenant_id = app.current_tenant_id` and
-`project_id IS NULL` (tenant-level row) or `project_id = app.current_project_id`.
-An unset setting reads as `NULL` (`NULLIF(..., '')`), so an unbound session sees no rows
-and cannot write any.
+| | Project session (tenant T, project P) | Tenant-level session (tenant T, no project) |
+|---|---|---|
+| Reads | rows of P + T's tenant-level rows (`project_id IS NULL`) | T's tenant-level rows |
+| Inserts, updates, deletes | rows of P only | T's tenant-level rows only |
+
+`project_isolation_policy` (`FOR ALL`, `USING` and `WITH CHECK`) requires the exact scope:
+`tenant_id = app.current_tenant_id AND project_id IS NOT DISTINCT FROM app.current_project_id`
+(edge spec §6). `tenant_level_read_policy` (`FOR SELECT` only) adds read access to tenant-level
+rows. A project session therefore cannot create a tenant-level row, demote a project row to
+tenant level (which would leak it to every project), or change or delete a tenant-level row.
+An unset setting reads as `NULL` (`NULLIF(..., '')`), so an unbound session sees no rows and
+cannot write any. Who may read tenant-level rows (e.g. the project row) is open in TD-053.
 
 ## Binding
 
@@ -24,13 +32,22 @@ and cannot write any.
 - `bind_tenancy(session, ctx)` stores the context on `session.info`. An `after_begin` hook
   applies it with `set_config(..., true)` (`SET LOCAL`) at the start of every transaction.
   `install_pool_reset` also clears both settings when a connection returns to the pool.
+- **One scope per session.** `bind_tenancy` raises if asked to switch a session that holds
+  loaded objects or pending changes to a *different* context, because `session.get` would
+  hand out identity-map objects of the old scope without SQL. Commit and `expunge_all()`
+  first, or use a new session (`unit_of_work`) per tenant/project batch.
 
 ## Reads, writes, 404
 
 - Every ORM select hides soft-deleted rows. `execution_options(include_deleted=True)` opts
   back in (TD-033). It never widens the project scope.
-- `get_or_404(session, Model, id)` raises `OutOfScopeError`. A bound session that flushes a
-  row for another tenant/project raises it too. `create_app` maps it to `404 {"detail": "Not Found"}`.
+- `get_or_404(session, Model, id, include_deleted=False)` raises `OutOfScopeError`. It also
+  re-checks identity-map hits against the session's scope and `deleted_at`. A bound session
+  that flushes a row outside its exact write scope raises it too. `create_app` maps it to
+  `404 {"detail": "Not Found"}`.
+- ORM bulk `update()`/`delete()` statements skip the loader criteria and the flush guard.
+  RLS still scopes them on PostgreSQL; on SQLite nothing does. Give them an explicit
+  tenant/project `WHERE`.
 
 ## Migrations
 

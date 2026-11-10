@@ -9,11 +9,15 @@ same on SQLite (where it is the only filter) and on PostgreSQL (where RLS backs 
 * **Tenancy scope**: for a session bound with ``bind_tenancy``, every ORM ``SELECT`` sees
   only rows of the bound tenant whose ``project_id`` is ``NULL`` or the bound project.
   Out-of-scope rows do not exist for the caller: lists omit them, lookups by id 404.
-* **Write guard**: a bound session refuses to flush a row for another tenant or project
-  with ``OutOfScopeError``, which the API answers with 404 (never 403, so the existence of
-  another project's data is not revealed).
+* **Write guard**: a bound session refuses to flush (insert, update or delete) a row
+  outside its exact scope with ``OutOfScopeError``: another tenant, another project, or a
+  tenant-level row from a project session. The API answers 404 (never 403, so the
+  existence of another project's data is not revealed).
 
 An unbound session is not filtered here. On PostgreSQL RLS then shows it nothing.
+ORM bulk ``update()``/``delete()`` statements skip both the loader criteria and the flush
+guard; on PostgreSQL RLS still scopes them, on SQLite nothing does. Use them only with an
+explicit tenant/project ``WHERE``.
 """
 
 from __future__ import annotations
@@ -34,12 +38,33 @@ class OutOfScopeError(LookupError):
     """A record outside the caller's tenant/project. The API maps it to 404."""
 
 
+def is_visible(session: Session, record: BaseRecordMixin, *, include_deleted: bool = False) -> bool:
+    """Whether ``record`` is readable by ``session``: same rule as the read filters."""
+    if record.deleted_at is not None and not include_deleted:
+        return False
+    context = session_tenancy(session)
+    if context is None:
+        return True
+    return record.tenant_id == context.tenant_id and record.project_id in (
+        None,
+        context.project_id,
+    )
+
+
 def get_or_404[RecordT: BaseRecordMixin](
-    session: Session, model: type[RecordT], record_id: uuid.UUID
+    session: Session,
+    model: type[RecordT],
+    record_id: uuid.UUID,
+    *,
+    include_deleted: bool = False,
 ) -> RecordT:
-    """Load a record visible to the session, or raise ``OutOfScopeError``."""
-    record = session.get(model, record_id)
-    if record is None:
+    """Load a record visible to the session, or raise ``OutOfScopeError``.
+
+    ``session.get`` may answer from the identity map without SQL, so the result is
+    re-checked against the session's scope and soft-delete state.
+    """
+    record = session.get(model, record_id, execution_options={INCLUDE_DELETED: include_deleted})
+    if record is None or not is_visible(session, record, include_deleted=include_deleted):
         raise OutOfScopeError(f"{model.__name__} not found")
     return record
 
@@ -86,10 +111,13 @@ def _guard_writes(session: Session, flush_context: UOWTransaction, instances: ob
     context = session_tenancy(session)
     if context is None:
         return
-    for obj in (*session.new, *session.dirty):
+    # Writes need the exact scope (mirrors project_isolation_policy): a project session
+    # writes only its project, a tenant-level session only tenant-level rows. NULL is not
+    # a wildcard here, so a row cannot be created as, or demoted to, a tenant-level row.
+    for obj in (*session.new, *session.dirty, *session.deleted):
         if not isinstance(obj, BaseRecordMixin):
             continue
         if obj.tenant_id is not None and obj.tenant_id != context.tenant_id:
             raise OutOfScopeError(f"{type(obj).__name__} not found")
-        if obj.project_id is not None and obj.project_id != context.project_id:
+        if obj.project_id != context.project_id:
             raise OutOfScopeError(f"{type(obj).__name__} not found")
