@@ -51,7 +51,7 @@ copies of its shape.** Findings that drive this spec:
 | Distinct assets / asset+RSW pairs | 66 / 620 | One RSW has **many** activities (one per activity type) → RSW↔activity is many-to-many. |
 | Activity-type tokens | `WFE, SCA Erect, SCA Dism, B, P, W, CP, SR, BN, G, GR, C, HDNR1, HDNR2, HDBN, Custom, Prov Sums` | Map to the `activity` level / item type via the client pack. |
 | Token spelling variants | `SCA Dism` / `SCA-Dism`, `Prov Sums` / `Prov.Sums` | Project-scoped **alias dictionary** (§5.2). |
-| RSW code variants | `701`, `900.2`, `918 Online` / `918 Shut`, `918-21`, `918.1-16`, `920.1-21` | Grammar must capture base code, sub-code, work window and a suffix whose meaning is **unknown** → spec-gap TODO. |
+| RSW code variants | `305`, `410.2`, `512 Online` / `512 Shut`, `512-21`, `512.1-16` (synthetic examples of the observed shapes) | Grammar must capture base code, sub-code, work window and a suffix whose meaning is **unknown** → spec-gap TODO. |
 | Activity codes | 2 types (`<site> Status`) with values Shutdown, Online Works, On-Hold Priority 1/2 | Mapped to a node attribute (`work_window`, `hold_priority`). |
 | UDFs | `Comment`, `Notes` (values `New`, `Secondary`, `Changed from "C" to "G"`) | Planners record revision deltas in UDFs; surface them on the change report. |
 | Status | all `TK_NotStart` (tender schedule) | Status mirror must cope with an un-progressed baseline. |

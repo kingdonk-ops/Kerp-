@@ -3,9 +3,9 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 50 · **Closed:** 26
+**Open:** 51 · **Closed:** 26
 
-## decision (10)
+## decision (11)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -16,9 +16,10 @@
 | [TD-071](../tracker/todo/TD-071.md) | Accept ADR 0003: configurable breakdown levels, work-anchor role and client terminology packs (CUI Scope/Job Package/Line vs RSW) | T-0101, T-0103, T-0105, T-0106, T-0107, T-0108, T-0111, T-0112, T-0115, T-0116, T-0118, T-0124, T-0131 | planner |
 | [TD-072](../tracker/todo/TD-072.md) | Accept ADR 0004: rule sets ship as defaults on every project; projects edit, disable, delete, add and reset rules; mandatory gates locked | T-0018, T-0108, T-0124, T-0131, E-04-11 | planner |
 | [TD-073](../tracker/todo/TD-073.md) | Handover: what counts as the recipient's first shift - first project sign-in on/after date of leave (proposed) or first roster/time entry (E-04-05) | E-04-11 | planner |
-| [TD-075](../tracker/todo/TD-075.md) | Accept ADR 0005: field checkout lease, field ownership (p6/office/field) and per-field sync-back so P6 re-imports never lose tablet work | T-0126 | planner |
+| [TD-075](../tracker/todo/TD-075.md) | Accept ADR 0005: field checkout lease, field ownership (p6/office/field) and per-field sync-back so P6 re-imports never lose tablet work | T-0126, T-0133 | planner |
 | [TD-077](../tracker/todo/TD-077.md) | P6 supply formats: XER only, plus Primavera XML (T-0105), Excel exports, or a direct P6 API later? | T-0105 | planner |
-| [TD-078](../tracker/todo/TD-078.md) | RSW PDF processing location: self-hosted OCR only, hybrid (local OCR + external AI), or cloud processing | T-0104 | planner |
+| [TD-078](../tracker/todo/TD-078.md) | RSW PDF processing location: self-hosted OCR only, hybrid (local OCR + external AI), or cloud processing | E-05-09 | planner |
+| [TD-079](../tracker/todo/TD-079.md) | Align P6 mapping profile (activity-name regex, eligibility rules) with ADR 0004 single rule store: new rule kinds or extend autolink | T-0104 | reviewer |
 
 ## spec-gap (13)
 

@@ -5,7 +5,7 @@
 - **Resolves (on acceptance):** TD-075
 - **Spec:** [`docs/spec/modules/p6-import-and-rsw-matching.md`](../spec/modules/p6-import-and-rsw-matching.md) §7–§8
 - **Affects:** T-0104, T-0105, T-0126, T-0127, T-0129, T-0131 (M1 freeze), new T-0133
-- **Amends:** master spec §1.3 rule 3 and §4.3 (LWW no longer applies to field-owned values of a checked-out record)
+- **Amends:** master spec §1.3 rule 3 and §4.3 (LWW no longer applies to field-owned values of a checked-out record); supersedes the §1.3 whole-payload envelope shape for tablet mutations (per-path `changes` with base hashes, spec §8.2)
 
 ## Context
 
