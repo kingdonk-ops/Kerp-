@@ -3,9 +3,9 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 42 · **Closed:** 26
+**Open:** 43 · **Closed:** 26
 
-## decision (4)
+## decision (5)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -13,6 +13,7 @@
 | [TD-053](../tracker/todo/TD-053.md) | Tenant-wide (cross-project) reads under project RLS: portfolio views, admin, and the visibility of tenant-level rows such as the project row | T-0007 | implementer |
 | [TD-061](../tracker/todo/TD-061.md) | Legacy inspection-system 'items' vs KERP anchors: where do personnel/material/equipment registers live? | T-0110, T-0111, T-0118 | planner |
 | [TD-070](../tracker/todo/TD-070.md) | Segregation of duties: may an inspector approve or delete their own inspection? | T-0111 | planner |
+| [TD-071](../tracker/todo/TD-071.md) | Accept ADR 0003: configurable breakdown levels, work-anchor role and client terminology packs (CUI Scope/Job Package/Line vs RSW) | T-0101, T-0103, T-0105, T-0106, T-0107, T-0108, T-0111, T-0112, T-0115, T-0116, T-0118, T-0124, T-0131 | planner |
 
 ## spec-gap (12)
 
