@@ -13,14 +13,15 @@ from pathlib import Path
 
 import pytest
 from sqlalchemy import text
-from sqlalchemy.exc import DBAPIError, IntegrityError
+from sqlalchemy.exc import DBAPIError
 
 from app.core.audit.guard import ledger_guard_problems
+from app.core.audit.hashing import GENESIS_HASH
 from app.core.audit.service import append, verify_chain
 from app.core.db import Database
 from tests.audit_support import migrated_database
 from tests.db_support import ON_POSTGRES
-from tests.tenancy_support import CTX_A, CTX_B, PA, T1
+from tests.tenancy_support import CTX_A, CTX_B, PA, PB, T1
 
 pytestmark = pytest.mark.skipif(
     not ON_POSTGRES,
@@ -119,12 +120,20 @@ def test_ledger_is_project_scoped_by_rls(chain: Database) -> None:
         assert verify_chain(s, KEY).length == 0
     with chain.sessionmaker() as s:  # unbound: fails closed
         assert s.execute(text("SELECT count(*) FROM audit_ledger")).scalar_one() == 0
-    # Project B cannot see A's chain, and cannot fork it either: seq 1 already exists.
-    with pytest.raises(IntegrityError), chain.unit_of_work(CTX_B) as s:
-        append(s, KEY, {"forged": True})
+    # Project B appending to the same key starts B's own chain: it neither fails (no
+    # existence oracle) nor blocks or touches A's chain.
+    with chain.unit_of_work(CTX_B) as s:
+        b_entry = append(s, KEY, {"project": "b"})
+        b_report = verify_chain(s, KEY)
+        b_rows = s.execute(text("SELECT count(*) FROM audit_ledger")).scalar_one()
+    assert (b_entry.seq, b_entry.prev_hash, b_entry.project_id) == (1, GENESIS_HASH, PB)
+    assert (b_report.ok, b_report.length, b_rows) == (True, 1, 1)
     with chain.unit_of_work(CTX_A) as s:
-        report = verify_chain(s, KEY)
-    assert (report.ok, report.length) == (True, 3)
+        a_next = append(s, KEY, {"project": "a"})
+        a_report = verify_chain(s, KEY)
+        a_rows = s.execute(text("SELECT count(*) FROM audit_ledger")).scalar_one()
+    assert a_next.seq == 4
+    assert (a_report.ok, a_report.length, a_rows) == (True, 4, 4)
 
 
 def test_concurrent_appends_to_one_chain_do_not_fork(db: Database) -> None:

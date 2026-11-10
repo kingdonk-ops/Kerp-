@@ -24,11 +24,13 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 TABLE = "audit_ledger"
+NIL_UUID = "00000000-0000-0000-0000-000000000000"  # scope_id of tenant-level chains
 
 
 def upgrade() -> None:
     op.create_table(
         TABLE,
+        sa.Column("scope_id", GUID(), nullable=False),
         sa.Column("chain_key", sa.String(length=200), nullable=False),
         sa.Column("seq", sa.BigInteger(), nullable=False),
         sa.Column("prev_hash", sa.String(length=64), nullable=False),
@@ -46,9 +48,15 @@ def upgrade() -> None:
         sa.Column("source", sa.String(length=16), nullable=False),
         sa.Column("revision", sa.Integer(), nullable=False),
         sa.CheckConstraint("seq >= 1", name=op.f("ck_audit_ledger_seq_positive")),
+        sa.CheckConstraint(
+            f"scope_id = COALESCE(project_id, '{NIL_UUID}')", name=op.f("ck_audit_ledger_scope_id")
+        ),
+        sa.CheckConstraint("deleted_at IS NULL", name=op.f("ck_audit_ledger_not_deleted")),
+        sa.CheckConstraint("revision = 1", name=op.f("ck_audit_ledger_first_revision")),
+        sa.CheckConstraint("custom_fields = '{}'", name=op.f("ck_audit_ledger_no_custom_fields")),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_audit_ledger")),
         sa.UniqueConstraint(
-            "tenant_id", "chain_key", "seq", name=op.f("uq_audit_ledger_chain_seq")
+            "tenant_id", "scope_id", "chain_key", "seq", name=op.f("uq_audit_ledger_chain_seq")
         ),
     )
     op.create_index(op.f("ix_audit_ledger_tenant_id"), TABLE, ["tenant_id"])

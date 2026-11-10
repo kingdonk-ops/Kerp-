@@ -15,6 +15,7 @@ import pytest
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
+from app.core.audit import service
 from app.core.audit.guard import ledger_guard_drop_sql, ledger_guard_problems, ledger_guard_sql
 from app.core.audit.hashing import (
     GENESIS_HASH,
@@ -22,8 +23,8 @@ from app.core.audit.hashing import (
     compute_content_hash,
     verify_entries,
 )
-from app.core.audit.models import AppendOnlyError, AuditEntry
-from app.core.audit.service import ChainScopeError, append, chain_entries, verify_chain
+from app.core.audit.models import TENANT_SCOPE, AppendOnlyError, AuditEntry
+from app.core.audit.service import append, chain_entries, verify_chain
 from app.core.db import Base, Database, contract_violations
 from app.core.tenancy.rls import rls_tables
 from tests.audit_support import OWNER_URL, migrated_database, tamper
@@ -121,12 +122,51 @@ def test_guard_check_is_a_no_op_off_postgresql(tmp_path: Path) -> None:
         db.dispose()
 
 
-def test_a_chain_belongs_to_one_scope(db: Database) -> None:
+def test_each_scope_has_its_own_chain_for_a_key(db: Database) -> None:
+    # A well-known key used at tenant level cannot be claimed or blocked by a project:
+    # the project gets its own chain, and both verify on their own.
+    with db.unit_of_work(CTX_A) as s:
+        first_in_a = append(s, "library:checklists", {"v": "project"})
     with db.unit_of_work(CTX_T1) as s:
-        append(s, "library:checklists", {"v": 1})
-    # A project session can read the tenant-level chain, but must not extend it.
-    with pytest.raises(ChainScopeError), db.unit_of_work(CTX_A) as s:
-        append(s, "library:checklists", {"v": 2})
+        tenant_level = [append(s, "library:checklists", {"v": n}) for n in (1, 2)]
+        tenant_report = verify_chain(s, "library:checklists")
+    with db.unit_of_work(CTX_A) as s:
+        second_in_a = append(s, "library:checklists", {"v": "project-2"})
+        project_report = verify_chain(s, "library:checklists")
+    assert [e.seq for e in tenant_level] == [1, 2]
+    assert (first_in_a.seq, first_in_a.prev_hash) == (1, GENESIS_HASH)
+    assert (second_in_a.seq, second_in_a.prev_hash) == (2, first_in_a.content_hash)
+    assert (first_in_a.scope_id, tenant_level[0].scope_id) == (PA, TENANT_SCOPE)
+    assert (tenant_report.ok, tenant_report.length) == (True, 2)
+    assert (project_report.ok, project_report.length) == (True, 2)
+
+
+def test_without_the_lock_a_race_fails_instead_of_forking(
+    db: Database, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Backstop for _lock_chain: a rival appends (and commits) after this writer read the
+    # tail but before it inserts. The unique (tenant, scope, chain_key, seq) rejects it.
+    _append_three(db)
+    monkeypatch.setattr(service, "_lock_chain", lambda *args: None)
+    real_hash = service.compute_content_hash
+    raced: list[AuditEntry] = []
+
+    def hash_after_a_rival_wins(entry: AuditEntry) -> str:
+        if not raced:
+            raced.append(entry)
+            with db.unit_of_work(CTX_A) as rival:
+                append(rival, KEY, {"rival": True})
+        return real_hash(entry)
+
+    monkeypatch.setattr(service, "compute_content_hash", hash_after_a_rival_wins)
+    with pytest.raises(IntegrityError), db.unit_of_work(CTX_A) as s:
+        append(s, KEY, {"loser": True})
+    with db.unit_of_work(CTX_A) as s:
+        report = verify_chain(s, KEY)
+        payloads = [e.payload for e in chain_entries(s, KEY)]
+    assert raced[0].seq == 4
+    assert (report.ok, report.length) == (True, 4)
+    assert payloads[-1] == {"rival": True}
 
 
 def test_duplicate_seq_in_a_chain_is_rejected_by_the_database(db: Database) -> None:
@@ -218,12 +258,29 @@ def test_verify_detects_reordered_rows(db: Database) -> None:
 
 
 @needs_tamper_role
-def test_verify_flags_a_soft_deleted_entry(db: Database) -> None:
+@pytest.mark.parametrize(
+    "change",
+    [
+        "deleted_at = created_at",
+        "revision = 2",
+        "custom_fields = '{\"x\": 1}'",
+        f"scope_id = '{TENANT_SCOPE}'",
+    ],
+    ids=["soft-delete", "revision", "custom-fields", "scope"],
+)
+def test_check_constraints_hold_even_for_a_superuser(db: Database, change: str) -> None:
+    # CHECKs are not skipped by session_replication_role, unlike the triggers.
     _append_three(db)
-    tamper(db, "UPDATE audit_ledger SET deleted_at = created_at WHERE seq = 1")
+    with pytest.raises(IntegrityError):
+        tamper(db, f"UPDATE audit_ledger SET {change} WHERE seq = 1")
     with db.unit_of_work(CTX_A) as s:
-        report = verify_chain(s, KEY)
-    assert report.problems == ["seq 1: entry is marked deleted"]
+        assert verify_chain(s, KEY).ok
+
+
+def test_verify_entries_flags_a_soft_deleted_entry(db: Database) -> None:
+    entries = [_snapshot(e) for e in _append_three(db)]
+    entries[0] = dataclasses.replace(entries[0], deleted_at=entries[0].created_at)
+    assert verify_entries(entries) == ["seq 1: entry is marked deleted"]
 
 
 # --- append-only at the ORM level ----------------------------------------------------------------
