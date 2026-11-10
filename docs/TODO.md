@@ -3,9 +3,9 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 43 · **Closed:** 26
+**Open:** 46 · **Closed:** 26
 
-## decision (5)
+## decision (7)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -14,6 +14,8 @@
 | [TD-061](../tracker/todo/TD-061.md) | Legacy inspection-system 'items' vs KERP anchors: where do personnel/material/equipment registers live? | T-0110, T-0111, T-0118 | planner |
 | [TD-070](../tracker/todo/TD-070.md) | Segregation of duties: may an inspector approve or delete their own inspection? | T-0111 | planner |
 | [TD-071](../tracker/todo/TD-071.md) | Accept ADR 0003: configurable breakdown levels, work-anchor role and client terminology packs (CUI Scope/Job Package/Line vs RSW) | T-0101, T-0103, T-0105, T-0106, T-0107, T-0108, T-0111, T-0112, T-0115, T-0116, T-0118, T-0124, T-0131 | planner |
+| [TD-072](../tracker/todo/TD-072.md) | Accept ADR 0004: rule sets ship as defaults on every project; projects edit, disable, delete, add and reset rules; mandatory gates locked | T-0018, T-0108, T-0124, T-0131, E-04-11 | planner |
+| [TD-073](../tracker/todo/TD-073.md) | Handover: what counts as the recipient's first shift - first project sign-in on/after date of leave (proposed) or first roster/time entry (E-04-05) | E-04-11 | planner |
 
 ## spec-gap (12)
 
@@ -32,7 +34,7 @@
 | [TD-066](../tracker/todo/TD-066.md) | Issue types (defect / observation) as versioned configuration with their own fields and close-out form | T-0111 | planner |
 | [TD-067](../tracker/todo/TD-067.md) | Inspection report layout configuration (header rows from anchor attributes, photo layout) is not specified | T-0113 | planner |
 
-## deferred (4)
+## deferred (5)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -40,6 +42,7 @@
 | [TD-032](../tracker/todo/TD-032.md) | tenant_id FK to the tenants directory table (spec §1.1) once the tenants table exists | T-0005 | implementer |
 | [TD-041](../tracker/todo/TD-041.md) | CEL parity gaps between celpy 0.5.0 and @marcbachmann/cel-js 8 (pinned known_gap fixtures) must be closed or accepted before T-0131 | T-0017, T-0018 | implementer |
 | [TD-047](../tracker/todo/TD-047.md) | Automate refresh of backend/requirements*.lock (uv pip compile output): Dependabot pip does not find *.lock files or re-run uv; options: scheduled uv --upgrade workflow opening a PR, or Renovate pip-compile manager | T-0028 | implementer |
+| [TD-074](../tracker/todo/TD-074.md) | Handover: offline drafting on tablets via the Dexie outbox | E-04-11 | planner |
 
 ## later (19)
 
