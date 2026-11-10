@@ -120,7 +120,7 @@ already-approved plans.
 | Column | Notes |
 |---|---|
 | `plan_id`, `seq`, `group_label` | `group_label` = scope area heading ("Scope Area 1 – Prim. Crusher Maintenance Deck"); grouping is free text or a node |
-| `anchor_node_id` / `anchor_item_id` | any node or item; `anchor_role` recorded (ADR 0003 §2). Usually the work anchor. Multiple anchors via `oe_planner_line_anchor` (one scope area covering RSWs `16-913.1-2` and `21-919.1-2`). |
+| `anchor_node_id` / `anchor_item_id` | any node or item; `anchor_role` recorded (ADR 0003 §2). Usually the work anchor. Multiple anchors via `oe_planner_line_anchor` (one scope area covering RSWs `01-100.1-2` and `02-101.1-2`). |
 | `activity_code` | the FEP / P6 activity (B, P, CP, W, SR, BN, G, HDNR…, SCA Erect, SCA Dism) — a value list from the project's pack |
 | `p6_activity_external_id` | optional link to an existing P6 activity |
 | `client_work_order` | text (client maintenance order no.); multi-value allowed |

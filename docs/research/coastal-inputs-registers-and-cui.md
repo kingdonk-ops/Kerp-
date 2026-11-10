@@ -27,7 +27,7 @@ hand-maintained document.)
 | Group | Columns |
 |---|---|
 | Welder details | Site, Welder ID (shape `XX-W000`), Name |
-| Original test | Plate/Pipe, material type (C/steel), applicable code (AS1554.1), material grade (Gr 350), consumable classification (E7016, E71T-1, E71T-8, "FM1"), WPS used (shape `XXX-000`, some `XXX-013/032`), position(s) tested (3G, 4G, 3F & 4F), process (MMAW, FCAW), joint type (Butt / Fillet), diameter, thickness ("as specified") |
+| Original test | Plate/Pipe, material type (C/steel), applicable code (AS1554.1), material grade (Gr 350), consumable classification (E7016, E71T-1, E71T-8, "FM1"), WPS used (shape `XXX-000`, some `XXX-001/002`), position(s) tested (3G, 4G, 3F & 4F), process (MMAW, FCAW), joint type (Butt / Fillet), diameter, thickness ("as specified") |
 | Approved qualification range | **Butt welds** F · H · VD · VU · OH (x / -) and **Fillet welds** F · H · VD · VU · OH (x / -) |
 | Qualification date & location | original test date, test lab, test report no. |
 | Welding record (continuity) | repeated pairs × 6–7: "6-month revalidation/confirmation record" (an NDT report number such as `000-MT-000` / `000-UT-000`) → "valid until" (+6 months) |
@@ -207,7 +207,7 @@ freeze, see summary); consumers E-04-05, E-04-08, E-06b-02 (AWP labour constrain
 - `Report_` / numbered report sheets — header: contract, site, RSW no., asset, drawing no. + rev,
   report no., document revision, revision date. Body grouped in four bands: *Welding traceability
   & daily weld report* | *Welding consumables report* | *NDT compliance* | *Comments*. Per weld
-  row: weld no. (`CP-1`, `HDNR1`, `BW-13B`), date welded, welder ID, WPS no., process, consumable
+  row: weld no. (`CP-1`, `HDNR1`, `BW-01`), date welded, welder ID, WPS no., process, consumable
   **batch** no., visual compliance (C/NC), **UT-thickness report no.** (pre-weld substrate check),
   material **heat no.**, weld length (m), electrode type, % NDT, NDT method, joint type, weld
   compliant, NDT report no., location description (e.g. "main column – flange west"),

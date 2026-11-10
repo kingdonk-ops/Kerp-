@@ -37,8 +37,8 @@ ADR 0003, ADR 0004 (rule-set defaults), `p6-import-and-rsw-matching.md` §9,
    document number.
 3. **RSW identity has three forms.** Full client id `<FLOC>_<seq>` / `<FLOC>-<seq>-<rev>`
    (`<FLOC>_<seq>`, `<FLOC>-<rsw>-<rev>`, `<FLOC>-<rsw>-<n>_Rev<n>`), short site form
-   `911.1`, `908.2`, `934.1` (RSW + sub-number), and grouped form on the ITP (`908`). Several
-   records cover several RSWs (`918 & 920`; TQ lists five RSWs; RSW cell `102.1-2 / VA-018`).
+   `100.1`, `100.2`, `<rsw>.<sub>` (RSW + sub-number), and grouped form on the ITP (`100`). Several
+   records cover several RSWs (`100 & 101`; TQ lists five RSWs; RSW cell `<rsw>.<sub>-<sub> / <asset>`).
    → alias table per RSW node (full id, short code, legacy codes) + multi-anchor link (ADR 0003 §2
    `oe_inspections_request_anchor` must be generalised to **any record**, not only requests).
 4. **Two parties, each with its own intervention code per step.** ITP rows and every RFI slot
@@ -189,8 +189,8 @@ H/W steps → completion approval → ITP goes into the RSW Completion Pack (MDR
 
 ## 2. Inspection notifications ("RFIs") – 5 files
 
-Files: civil `…-CV-RFI-0103`, `…-CV-RFI-0112`; mechanical `…-SS-RFI-0252` (result); coating
-`…-RFI-0683` (results), `…-RFI-0994` ("for DS" = day shift).
+Files: civil `…-CV-RFI-0001`, `…-CV-RFI-0002`; mechanical `…-SS-RFI-0003` (result); coating
+`…-RFI-0004` (results), `…-RFI-0005` ("for DS" = day shift).
 
 **What they are.** Requests for Inspection (TD-045 – *not* Request for Information): one
 notification per **discipline per day** with **up to 4 inspection slots**; the same sheet is
@@ -249,10 +249,10 @@ multi-anchor link.
 
 ## 3. Signed welding report (client-signed) — Welding Quality Assurance Report (completed)
 
-**Structure.** Landscape, 2 pages. Header: Contract · Site · RSW No (`911.1`) · Document Revision ·
+**Structure.** Landscape, 2 pages. Header: Contract · Site · RSW No (`100.1`) · Document Revision ·
 Asset · DWG Number (+ drawing rev) · Report no (`<prefix>-W-<4d> Rev 1`) · Revision Date. Column
 groups: *Welding traceability & daily weld report* | *Welding consumables report* | *NDT
-compliance* | Comments. Columns: Weld No. (`GR-01…`, prefix by item type – grating) · Date
+compliance* | Comments. Columns: Weld No. (`XX-01…`, prefix by item type – grating) · Date
 Welded · Welder ID No. · WPS No. · Process (MMAW) · Consumables Batch No · Visual Compliance (C) ·
 UT Thickness Report No. · Material Identification / Heat Nos (values like "Unknown Existing",
 "<heat>, Unknown Existing") · Weld Length (m) · Electrode Type · % NDT · NDT Method · Joint Type ·
@@ -363,7 +363,7 @@ and **photo checkpoints** "After step 2 / 3 / 5". No client sign-off.
 ## 6. Client structural-integrity inspection detailed report, and a single-RSW client report
 
 **What they are.** The **source documents for RSWs**: client structural-inspection report
-(`P-<7d>-2000-S-REP-<5d>` Rev 1) by a third-party inspecting company; one RSW per defect,
+(`P-<7d>-<area>-S-REP-<5d>` Rev 1) by a third-party inspecting company; one RSW per defect,
 3–4 pages each on client template `<client template> rev 2`. the second file is a single-RSW
 extract of the same template (scope/drawing sheet for one RSW).
 
@@ -397,7 +397,7 @@ client template id + rev is printed on every page, which makes recognition deter
 - G-RSW-2 Template recognition keys on the printed template id + rev
   (`<client template> rev 2`); one PDF → many RSWs, page→RSW map by header RSW number. (E-05-09)
 - G-RSW-3 Mandated completion date drives schedule risk findings (E-05-10 reconciliation).
-- G-RSW-4 Governing specs on the RSW (<client spec C1>/C108/P118) select which ITPs / rule sets apply
+- G-RSW-4 Governing specs on the RSW (<client spec C1>/<client spec C2>/<client spec P>) select which ITPs / rule sets apply
   to the work anchor (auto-suggest ITP instances per RSW; TD-039 noted auto_create_itp as Phase 3
   candidate).
 - G-RSW-5 RSW revision handling: RSW rev changes (client re-issues) must version the scope text
@@ -416,7 +416,7 @@ Close Date · Variation · NOD · EOT.
 Subject · 1.0 Site Query · 2.0 Proposed Action · Impact: Technical / Schedule / Cost (Y/N) each
 with "attachments included" · Affected documents · Requested by (name, position, signature,
 date) · Client Response (text; response by name, specialist title, date). The client response
-can **narrow scope** ("relates to RSW 604.1 only") and **supersede** the response to an earlier
+can **narrow scope** ("relates to RSW 100.1 only") and **supersede** the response to an earlier
 revision.
 
 **Coverage.** E-06b-02 title mentions "Technical Queries"; E-05-04 rfi/submittals (Request for
