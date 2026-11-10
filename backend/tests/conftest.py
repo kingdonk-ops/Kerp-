@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 
 from app.core.config import Settings, get_settings
 from app.main import create_app
+from tests.skip_guard import pytest_sessionfinish  # noqa: F401  (KERP_FAIL_ON_SKIP hook)
 
 
 @pytest.fixture(autouse=True)

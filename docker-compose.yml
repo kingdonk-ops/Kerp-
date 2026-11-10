@@ -1,0 +1,59 @@
+# KERP local dev stack (T-0003): PostgreSQL 16 + PostGIS + ltree, Redis 7, MinIO.
+# Dev only: fixed throwaway credentials, ports bound to localhost. Use `make up` / `make test-pg`
+# (see Makefile and backend/README.md "Local PostgreSQL stack").
+#
+# postgres and redis mirror the service containers of CI's backend job
+# (.github/workflows/ci.yml); backend/tests/test_dev_infra.py fails if they drift.
+name: kerp
+
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_USER: kerp
+      POSTGRES_PASSWORD: kerp
+      POSTGRES_DB: kerp_test
+    ports:
+      - "127.0.0.1:${KERP_PG_PORT:-5432}:5432"
+    volumes:
+      - kerp-pg-data:/var/lib/postgresql/data
+      # Same script CI runs: ltree + postgis, and the NOSUPERUSER NOBYPASSRLS role kerp_app.
+      # Mounted as a single file so the image's own /docker-entrypoint-initdb.d/10_postgis.sh stays.
+      - ./infra/postgres/initdb/20-kerp-app.sql:/docker-entrypoint-initdb.d/20-kerp-app.sql:ro
+    healthcheck:
+      # TCP, not the Unix socket: during initdb only the socket is up, before kerp_app exists.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U kerp -d kerp_test"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "127.0.0.1:${KERP_REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+
+  minio:
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${KERP_MINIO_ROOT_USER:-kerp-minio}
+      MINIO_ROOT_PASSWORD: ${KERP_MINIO_ROOT_PASSWORD:-kerp-minio-dev-only}
+    ports:
+      - "127.0.0.1:${KERP_MINIO_PORT:-9000}:9000"
+      - "127.0.0.1:${KERP_MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - kerp-minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+
+volumes:
+  kerp-pg-data:
+  kerp-minio-data:

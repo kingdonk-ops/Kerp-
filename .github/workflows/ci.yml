@@ -104,14 +104,14 @@ jobs:
         run: mypy app
       - name: Tests (SQLite)
         run: pytest
+      # Same script docker-compose.yml runs locally (make test-pg): ltree + postgis and the
+      # NOSUPERUSER NOBYPASSRLS role kerp_app. tests/test_dev_infra.py keeps them in sync.
       - name: Create non-superuser app role (RLS must not be bypassed)
         env:
           PGPASSWORD: kerp
-        run: |
-          psql -h localhost -U kerp -d kerp_test -v ON_ERROR_STOP=1 -c \
-            "CREATE ROLE kerp_app LOGIN PASSWORD 'kerp_app' NOSUPERUSER NOBYPASSRLS;
-             GRANT ALL ON DATABASE kerp_test TO kerp_app;
-             ALTER SCHEMA public OWNER TO kerp_app;"
+        run: >-
+          psql -h localhost -U kerp -d kerp_test -v ON_ERROR_STOP=1
+          -f ../infra/postgres/initdb/20-kerp-app.sql
       - name: Tests (PostgreSQL + RLS)
         env:
           KERP_DATABASE_URL: postgresql+psycopg://kerp_app:kerp_app@localhost:5432/kerp_test

@@ -18,6 +18,10 @@ independently reviewed and CI-gated.
 
 Branches: `task/*` → PR → **`dev`** (CI + independent review) → auto-promoted to **`main`** every 5 merges.
 
+Local stack (PostgreSQL 16 + PostGIS + ltree, Redis 7, MinIO): `make help`, and
+`make test-pg` runs the PostgreSQL RLS tests as CI does — see
+[backend/README.md](backend/README.md#local-postgresql-stack-t-0003).
+
 ```bash
 python scripts/tracker.py next        # what's ready
 python scripts/tracker.py render      # regenerate boards
