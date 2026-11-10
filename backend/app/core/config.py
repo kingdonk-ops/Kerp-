@@ -1,11 +1,13 @@
 """Typed application settings, loaded from ``KERP_``-prefixed environment variables."""
 
+import uuid
 from functools import lru_cache
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as package_version
+from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PACKAGE_NAME = "kerp-backend"
@@ -50,8 +52,25 @@ class Settings(BaseSettings):
     # ``migration_database_url`` is the schema owner Alembic runs as (falls back to the former).
     database_url: str | None = Field(default=None, repr=False)
     migration_database_url: str | None = Field(default=None, repr=False)
-    # Redis (job queue / revocation, later tasks).
+    # Redis (job queue, auth token revocation).
     redis_url: str | None = Field(default=None, repr=False)
+
+    # Auth tokens (T-0008, diff §4). Asymmetric JWTs, public keys served as JWKS.
+    # ``jwt_private_key`` is a PEM (RSA for RS256, Ed25519 for EdDSA); ``jwt_private_key_file``
+    # points at one instead. Unset outside production: an ephemeral key is generated per
+    # process (tokens die with it). Production refuses to issue tokens without a key.
+    jwt_algorithm: Literal["EdDSA", "RS256"] = "EdDSA"
+    jwt_private_key: SecretStr | None = Field(default=None, repr=False)
+    jwt_private_key_file: Path | None = None
+    # Public PEMs of retired signing keys, still accepted and published during rotation
+    # (JSON list in the environment).
+    jwt_retired_public_keys: tuple[str, ...] = ()
+    jwt_issuer: str = "kerp"
+    jwt_audience: str = "kerp-api"
+    access_token_minutes: int = Field(default=15, ge=1, le=15)
+    refresh_token_days: int = Field(default=14, ge=1, le=90)
+    # Tenant a login without an explicit ``tenant_id`` signs in to (single-company deployment).
+    default_tenant_id: uuid.UUID | None = None
 
     @field_validator("log_level", mode="before")
     @classmethod

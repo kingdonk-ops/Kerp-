@@ -6,6 +6,7 @@ RLS, so every assertion holds with both layers active.
 
 import uuid
 from collections.abc import Iterator
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -13,6 +14,8 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 
+from app.core.auth.bearer import ANONYMOUS, BearerResult
+from app.core.auth.tokens import TokenClaims
 from app.core.config import Settings
 from app.core.db import Database, DbSession
 from app.core.tenancy.context import (
@@ -79,8 +82,15 @@ def test_use_tenancy_sets_and_resets_context_vars() -> None:
         require_project_id()
 
 
-def test_auth_seam_is_unbound_until_t0008() -> None:
-    assert get_tenancy_context() is None
+def test_tenancy_seam_comes_from_the_verified_token_only() -> None:
+    # No token, or a token that failed verification: the request session stays unbound.
+    assert get_tenancy_context(ANONYMOUS) is None
+    assert get_tenancy_context(BearerResult(claims=None, presented=True)) is None
+    user = uuid.uuid4()
+    now = datetime.now(UTC)
+    claims = TokenClaims("access", user, T1, uuid.uuid4(), "jti", now, now)
+    bound = get_tenancy_context(BearerResult(claims=claims, presented=True))
+    assert bound == TenancyContext(tenant_id=T1, project_id=None, user_id=user)
 
 
 # --- reads -----------------------------------------------------------------------------

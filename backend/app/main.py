@@ -10,6 +10,8 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from app.api.health import router as health_router
+from app.core.auth.router import router as auth_router
+from app.core.auth.runtime import close_auth_runtime
 from app.core.config import Settings, get_settings
 from app.core.db import Database
 from app.core.logging import configure_logging
@@ -34,6 +36,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         yield
+        close_auth_runtime(_app)
         if database is not None:
             database.dispose()
 
@@ -61,6 +64,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.add_exception_handler(OutOfScopeError, _out_of_scope_handler)
 
     app.include_router(health_router)
+    app.include_router(auth_router)  # core auth + JWKS (T-0008)
     # Domain modules (app/modules/<name>/) are mounted by the module loader (later task).
 
     return app

@@ -14,14 +14,17 @@ dependencies = [
     "fastapi>=0.121",
     "lark>=1.1",  # celpy parse trees (used by app/core/cel)
     "pydantic>=2.7",
+    "pyjwt[crypto]>=2.10",  # RS256/EdDSA access + refresh tokens (app/core/auth)
     "pydantic-settings>=2.3",
     "psycopg[binary]>=3.2",
+    "redis>=5.2",  # jti / session revocation store (app/core/auth)
     "sqlalchemy>=2.0.36",
     "uvicorn>=0.30",
 ]
 
 [project.optional-dependencies]
 dev = [
+    "fakeredis>=2.26",  # in-process Redis for the auth revocation tests
     "httpx>=0.27",
     "mypy>=1.11",
     "packaging>=24.0",  # tests/test_container.py parses the lock files
