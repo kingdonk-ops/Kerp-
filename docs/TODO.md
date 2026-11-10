@@ -3,16 +3,18 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 32 · **Closed:** 26
+**Open:** 42 · **Closed:** 26
 
-## decision (2)
+## decision (4)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
 | [TD-034](../tracker/todo/TD-034.md) | Port/rewrite assessment of remaining Inspection-ERP core packages (jobs, sync, forms, workflow, events, files, schema_engine/items/mapping, reporting) | T-0015 | reviewer |
 | [TD-053](../tracker/todo/TD-053.md) | Tenant-wide (cross-project) reads under project RLS: portfolio views, admin, and the visibility of tenant-level rows such as the project row | T-0007 | implementer |
+| [TD-061](../tracker/todo/TD-061.md) | Legacy inspection-system 'items' vs KERP anchors: where do personnel/material/equipment registers live? | T-0110, T-0111, T-0118 | planner |
+| [TD-070](../tracker/todo/TD-070.md) | Segregation of duties: may an inspector approve or delete their own inspection? | T-0111 | planner |
 
-## spec-gap (6)
+## spec-gap (12)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -22,6 +24,12 @@
 | [TD-046](../tracker/todo/TD-046.md) | Admin side: where security and observability settings (headers/CSP, HSTS, API docs exposure, log retention) are shown or configured | T-0021 | user |
 | [TD-054](../tracker/todo/TD-054.md) | Edge spec §6 policy targets 'TO kerp_app_role'; T-0007 applies it to PUBLIC | T-0007 | implementer |
 | [TD-057](../tracker/todo/TD-057.md) | Audit ledger: diff §4 names the columns only; chain_key scope, hash algorithm, canonical serialisation and verification are implementer defaults | T-0006 | implementer |
+| [TD-062](../tracker/todo/TD-062.md) | Form template check layouts (list / form / grid) and check-level settings are not specified | T-0110 | planner |
+| [TD-063](../tracker/todo/TD-063.md) | Hold / witness / review points should be first-class signed ITP steps, not signature cells | T-0113, T-0114, T-0119 | planner |
+| [TD-064](../tracker/todo/TD-064.md) | Lookup fields must bind to a typed item + attribute and snapshot values at inspection time | T-0110 | planner |
+| [TD-065](../tracker/todo/TD-065.md) | CEL rules need a severity (block vs warn) and parameterised acceptance limits tied to a spec/TQ reference | T-0110 | planner |
+| [TD-066](../tracker/todo/TD-066.md) | Issue types (defect / observation) as versioned configuration with their own fields and close-out form | T-0111 | planner |
+| [TD-067](../tracker/todo/TD-067.md) | Inspection report layout configuration (header rows from anchor attributes, photo layout) is not specified | T-0113 | planner |
 
 ## deferred (4)
 
@@ -32,7 +40,7 @@
 | [TD-041](../tracker/todo/TD-041.md) | CEL parity gaps between celpy 0.5.0 and @marcbachmann/cel-js 8 (pinned known_gap fixtures) must be closed or accepted before T-0131 | T-0017, T-0018 | implementer |
 | [TD-047](../tracker/todo/TD-047.md) | Automate refresh of backend/requirements*.lock (uv pip compile output): Dependabot pip does not find *.lock files or re-run uv; options: scheduled uv --upgrade workflow opening a PR, or Renovate pip-compile manager | T-0028 | implementer |
 
-## later (18)
+## later (19)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -54,13 +62,15 @@
 | [TD-058](../tracker/todo/TD-058.md) | Audit ledger: anchor chain heads outside the database (tail truncation / re-hashed forgery by the table owner or a DB superuser is undetectable by in-DB verification) | T-0006 | implementer |
 | [TD-059](../tracker/todo/TD-059.md) | Deploy: runtime role must not own audit_ledger and gets only SELECT, INSERT; assert ledger_guard_problems at startup | T-0006 | implementer |
 | [TD-060](../tracker/todo/TD-060.md) | Migrations: freeze DDL helpers (rls_policy_sql, ledger_guard_sql) in each revision instead of importing live app code | T-0006 | implementer |
+| [TD-068](../tracker/todo/TD-068.md) | Importer for legacy inspection-system exports (template, usecase, itemcat, issuetype) | T-0113 | planner |
 
-## risk (2)
+## risk (3)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
 | [TD-013](../tracker/todo/TD-013.md) | review-gate patch-id ignores tracker/ — on planning PRs task content can change after approval without re-review | — | coordinator |
 | [TD-024](../tracker/todo/TD-024.md) | Backend logging: httpx/httpcore INFO lines log full outbound URLs (incl. query-string tokens) via the root JSON handler; set them to WARNING before any integration makes outbound calls | T-0021 | reviewer |
+| [TD-069](../tracker/todo/TD-069.md) | Legacy inspection exports contain real client data and must not be committed as fixtures | T-0113 | planner |
 
 ## Closed
 
