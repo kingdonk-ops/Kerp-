@@ -3,16 +3,16 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 10/70 tasks done (14%) · **ready now:** 9 · **epics awaiting breakdown:** 40
+**Overall:** 10/71 tasks done (14%) · **ready now:** 8 · **epics awaiting breakdown:** 42
 
 | Phase | Tasks done | Progress |
 |---|---|---|
 | 0 · Platform foundations | 10/31 | `███░░░░░░░` 32% |
-| 1 · Asset & Quality backbone | 0/30 | `░░░░░░░░░░` 0% |
+| 1 · Asset & Quality backbone | 0/31 | `░░░░░░░░░░` 0% |
 | 2 · Welding quality | 0/9 | `░░░░░░░░░░` 0% |
 | 3 · Logistics | 0/0 (+7 epics) | `░░░░░░░░░░` 0% |
 | 4 · Execution | 0/0 (+11 epics) | `░░░░░░░░░░` 0% |
-| 5 · Documents, collaboration & AI | 0/0 (+8 epics) | `░░░░░░░░░░` 0% |
+| 5 · Documents, collaboration & AI | 0/0 (+10 epics) | `░░░░░░░░░░` 0% |
 | 6 · Defense, claims & controls | 0/0 (+8 epics) | `░░░░░░░░░░` 0% |
 | 6b · Work packaging (AWP) | 0/0 (+3 epics) | `░░░░░░░░░░` 0% |
 | 7 · Client portal | 0/0 (+3 epics) | `░░░░░░░░░░` 0% |
@@ -80,12 +80,13 @@
 | ⬜ | [T-0122](../tracker/tasks/T-0122.md) | compliance DSL wired into run_checks (CEL rule sets) | compliance | M | T-0018 |  |
 | ⬜ | [T-0124](../tracker/tasks/T-0124.md) | Rule sets A — completion gates: inspection.close, rsw.complete, asset.status_change (open Cat A/NCR blocks) | validation | M | T-0111, T-0114, T-0116 |  |
 | ⬜ | [T-0125](../tracker/tasks/T-0125.md) | Rule sets B — P6 sync: asset.p6_fields, schedule.p6_import/export | validation | S | T-0104, T-0106 |  |
-| ▶ | [T-0126](../tracker/tasks/T-0126.md) | Offline sync core: outbox_mutations, client_op_id idempotency, vector clock, conflict resolution (immutable approvals, LWW+log) | sync | M | T-0006 |  |
+| 🟥 | [T-0126](../tracker/tasks/T-0126.md) | Offline sync core: outbox_mutations, client_op_id idempotency, vector clock, conflict resolution (immutable approvals, per-field apply per ADR 0005) *(blocked by TD-075)* | sync | M | T-0006 |  |
 | ⬜ | [T-0127](../tracker/tasks/T-0127.md) | Frontend: useOfflineSync tier-1 (Dexie IndexedDB outbox) + offline indicator | frontend | M | T-0126, T-0024 |  |
 | ⬜ | [T-0128](../tracker/tasks/T-0128.md) | Frontend: asset tree + Asset-Details (attributes, items, inspections over descendants) | frontend | M | T-0101, T-0103, T-0025 |  |
 | ⬜ | [T-0129](../tracker/tasks/T-0129.md) | Frontend: P6 import wizard UI (upload, map, unmatched-row linking, commit) | frontend | M | T-0104, T-0128 |  |
 | ⬜ | [T-0130](../tracker/tasks/T-0130.md) | Frontend: inspections register + raise/close + calibration-gated tool pick + gate findings | frontend | M | T-0111, T-0112, T-0124, T-0128 |  |
 | ⬜ | [T-0132](../tracker/tasks/T-0132.md) | Phase 1 exit journey: P6→hierarchy→inspection gates→completion blocked by open NCR; expired tool blocked | e2e | S | T-0129, T-0130 |  |
+| 🟥 | [T-0133](../tracker/tasks/T-0133.md) | Field checkout lease + per-field sync-back contract: P6 re-import during checkout never loses tablet changes *(blocked by TD-075)* | sync | M | T-0126, T-0104 |  |
 | ⬜ | [T-0131](../tracker/tasks/T-0131.md) | [M1] Phase 1 backbone-freeze contract gate: freeze oe_asset_node/oe_asset_item/mixins/run_checks sigs; CEL parity; eligibility/VFS seam hashes | platform | M | T-0005, T-0016, T-0018, T-0101, T-0103, T-0110, T-0111, T-0112, T-0124, T-0132 |  |
 
 ## Phase 2 — Welding quality
@@ -142,6 +143,8 @@
 | 🧩 | [E-05-06](../tracker/tasks/E-05-06.md) | search / retrieval: docket OCR → full-text + vector index (SAQ) | search | L | E-05-01 |  |
 | 🧩 | [E-05-07](../tracker/tasks/E-05-07.md) | integrations: outbound event bus + webhooks (HMAC) + ERP sync bridge (SAP/Xero/P6) | integrations | L | T-0015 |  |
 | 🧩 | [E-05-08](../tracker/tasks/E-05-08.md) | erp_chat / ai_agents: operational assistant (proposals only, human-confirmed) | erp_chat | L | E-05-06 |  |
+| 🧩 | [E-05-09](../tracker/tasks/E-05-09.md) | RSW document ingestion: bulk/ZIP upload, combined-PDF splitting, template recognition, OCR extraction with source traceability | documents | L | T-0104, T-0105 |  |
+| 🧩 | [E-05-10](../tracker/tasks/E-05-10.md) | RSW-P6 matching & reconciliation engine: candidates, versioned weighted scoring, CEL hard/soft rules, verification queue, findings | asset_management | L | T-0104, T-0105, E-05-09 |  |
 
 ## Phase 6 — Defense, claims & controls
 
