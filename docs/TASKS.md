@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 10/71 tasks done (14%) · **ready now:** 9 · **epics awaiting breakdown:** 41
+**Overall:** 10/71 tasks done (14%) · **ready now:** 9 · **epics awaiting breakdown:** 42
 
 | Phase | Tasks done | Progress |
 |---|---|---|
@@ -11,7 +11,7 @@
 | 1 · Asset & Quality backbone | 0/31 | `░░░░░░░░░░` 0% |
 | 2 · Welding quality | 0/9 | `░░░░░░░░░░` 0% |
 | 3 · Logistics | 0/0 (+7 epics) | `░░░░░░░░░░` 0% |
-| 4 · Execution | 0/0 (+10 epics) | `░░░░░░░░░░` 0% |
+| 4 · Execution | 0/0 (+11 epics) | `░░░░░░░░░░` 0% |
 | 5 · Documents, collaboration & AI | 0/0 (+10 epics) | `░░░░░░░░░░` 0% |
 | 6 · Defense, claims & controls | 0/0 (+8 epics) | `░░░░░░░░░░` 0% |
 | 6b · Work packaging (AWP) | 0/0 (+3 epics) | `░░░░░░░░░░` 0% |
@@ -129,6 +129,7 @@
 | 🧩 | [E-04-08](../tracker/tasks/E-04-08.md) | resource_summary: demand rollup from look-ahead/tasks (moved from Phase 3) | resource_summary | L | E-04-02 |  |
 | 🧩 | [E-04-09](../tracker/tasks/E-04-09.md) | safety / hse: SWMS/PTW permits + incident + KPI ingestion | safety | L | T-0012 |  |
 | 🧩 | [E-04-10](../tracker/tasks/E-04-10.md) | site_supervision / commissioning / closeout / defects_liability | site_supervision | L | E-04-03 |  |
+| 🧩 | [E-04-11](../tracker/tasks/E-04-11.md) | handover: shift/swing handover register - free-form sections, record links + hover preview, activity suggestions (rule set), first-shift delivery + acknowledgement | handover | L | T-0006, T-0015, T-0018, T-0019, T-0025, T-0101 |  |
 
 ## Phase 5 — Documents, collaboration & AI
 

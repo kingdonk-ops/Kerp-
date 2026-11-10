@@ -11,7 +11,7 @@ They supersede every legacy document (archived under
 | [KERP-CONSOLIDATION-AND-DIFF.md](KERP-CONSOLIDATION-AND-DIFF.md) | **Binding** scope culls, data-model overhauls, engine/infra, security, calibration, frontend, phasing — the merge of old + new | **1 (wins on conflict)** |
 | [KERP-MASTER-SPEC.md](KERP-MASTER-SPEC.md) | 12-domain architecture catalog, core DDL, module contracts, state machines, event bus, MDR engine | 2 |
 | [KERP-EDGE-SCREENS-AND-SPEC-UPDATE.md](KERP-EDGE-SCREENS-AND-SPEC-UPDATE.md) | 3 Tier-1 offline edge screens, IndexedDB/Dexie outbox, CEL engine, calibration gates, persona matrix, project-RLS | 2 |
-| [modules/](modules/) | Preserved KAEFER domain detail (quality/ITP/eligibility, welding/NDE, coatings/scaffolding, asset/ltree/JSONB, materials/heat, documents/MDR, commercial/claims, P6 import/RSW matching/field-checkout merge) with the overhauls applied | 3 |
+| [modules/](modules/) | Preserved KAEFER domain detail (quality/ITP/eligibility, welding/NDE, coatings/scaffolding, asset/ltree/JSONB, materials/heat, documents/MDR, commercial/claims, shift handover, P6 import/RSW matching/field-checkout merge) with the overhauls applied | 3 |
 
 **Precedence:** consolidation diff → master + edge specs → module detail → (archive, reference only).
 Disagreements found while building → `spec-gap` TODO.

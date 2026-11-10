@@ -1,4 +1,4 @@
-# ADR 0004 — Field checkout, field ownership and per-field sync-back against P6 re-imports
+# ADR 0005 — Field checkout, field ownership and per-field sync-back against P6 re-imports
 
 - **Status:** proposed
 - **Date:** 2026-11-10

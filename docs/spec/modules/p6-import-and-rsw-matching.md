@@ -3,7 +3,7 @@
 Covers the Primavera P6 import wizard (Phase 1: T-0104, T-0105, T-0106, T-0125, T-0129), the
 expected-RSW register built from it, the RSW document ↔ P6 matching and reconciliation engine
 (Phase 5 epic), and the **merge rule between a P6 re-import and work checked out to a tablet**
-(Phase 1 sync core: T-0126, T-0133; decision in ADR 0004).
+(Phase 1 sync core: T-0126, T-0133; decision in ADR 0005).
 
 Written against [ADR 0003](../../decisions/0003-configurable-breakdown-and-terminology.md):
 "RSW" below means **the project's work-anchor level** (RSW in the `remediation-*` packs, Line in
@@ -311,7 +311,7 @@ P6 import:
 8. Approved link is not moved by a re-import that changes the parsed RSW; a proposal is raised.
 9. cp1252 text and calendar blobs parse without error.
 
-Checkout merge (ADR 0004):
+Checkout merge (ADR 0005):
 10. Tablet checks out job; P6 import changes activity dates and name; tablet edits two field
     answers and adds a photo; sync → server has the new P6 dates/name **and** the two answers and
     the photo; every other field is unchanged.
