@@ -11,7 +11,7 @@
 |---|---|---|---|
 | [TD-034](../tracker/todo/TD-034.md) | Port/rewrite assessment of remaining Inspection-ERP core packages (jobs, sync, forms, workflow, events, files, schema_engine/items/mapping, reporting) | T-0015 | reviewer |
 | [TD-053](../tracker/todo/TD-053.md) | Tenant-wide (cross-project) reads under project RLS: portfolio views, admin, and the visibility of tenant-level rows such as the project row | T-0007 | implementer |
-| [TD-071](../tracker/todo/TD-071.md) | Accept ADR 0003: configurable breakdown levels, work-anchor role and client terminology packs (CUI Scope/Job Package/Line vs RSW) | T-0101 | planner |
+| [TD-071](../tracker/todo/TD-071.md) | Accept ADR 0003: configurable breakdown levels, work-anchor role and client terminology packs (CUI Scope/Job Package/Line vs RSW) | T-0101, T-0103, T-0107, T-0108, T-0111, T-0115, T-0116, T-0124, T-0131 | planner |
 
 ## spec-gap (6)
 

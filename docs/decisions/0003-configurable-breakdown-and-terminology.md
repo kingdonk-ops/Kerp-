@@ -4,8 +4,8 @@
 - **Date:** 2026-11-10
 - **Resolves (on acceptance):** TD-071
 - **Evidence:** [`docs/research/legacy-spreadsheet-inventory.md`](../research/legacy-spreadsheet-inventory.md)
-- **Affects:** T-0101, T-0103, T-0105, T-0106, T-0107, T-0108, T-0111, T-0116, T-0124, T-0131 (M1 freeze), E-04-01, E-04-03, E-04-07
-- **Amends:** CLAUDE.md §6 "The anchor model is law" and `docs/spec/modules/asset-and-tagging.md`
+- **Affects:** T-0101, T-0103, T-0105, T-0106, T-0107, T-0108, T-0111, T-0112, T-0115, T-0116, T-0118, T-0124, T-0131 (M1 freeze), E-04-01, E-04-03, E-04-07
+- **Amends:** CLAUDE.md §6 "The anchor model is law", `docs/spec/modules/asset-and-tagging.md` and `docs/spec/modules/quality-and-inspection.md`
 
 ## Context
 
@@ -17,8 +17,8 @@ The operations spreadsheets show at least three real structures (inventory §2):
 
 | | Level 1 | Level 2 | Level 3 | Level 4 | Work anchor | Inspected at |
 |---|---|---|---|---|---|---|
-| Remediation (Yandi) | Site | Asset | **RSW** | Item (weld, HDNR, CP) | RSW | RSW + Item |
-| Remediation (FEP) | Site | Asset | **RSW** | Activity (B/P/G/W…) | RSW | Activity |
+| Remediation A | Site | Asset | **RSW** | Item (weld, HDNR, CP) | RSW | RSW + Item |
+| Remediation B (front-end planning) | Site | Asset | **RSW** | Activity (B/P/G/W…) | RSW | Activity |
 | CUI department | Scope | Job Package | **Line** | (sub-line) | Line | **Line** |
 
 The CUI team has no site, asset or RSW. A hard-coded RSW leaf means either CUI cannot use KERP,
@@ -55,7 +55,7 @@ New config table `oe_asset_level_def` (project-scoped, `BaseRecordMixin`, RLS):
 | `code_pattern` | optional validation/generation pattern; codes are always **text** |
 | `field_schema_id` | JSONSchema for the level's `custom_fields` (priority, shutdown, UOM…) |
 
-`oe_asset_node` gains `level_key` (FK to the project's level def). The `type` enumeration in
+`oe_asset_node` gains `level_def_id` (FK to `oe_asset_level_def.id`; `key` is unique only per project, enforced by a unique `(project_id, key)`). The `type` enumeration in
 the spec becomes data. Rules:
 
 - **Exactly one level per project carries `work_anchor`.** Work (progress, time lines, NCRs,
@@ -64,7 +64,7 @@ the spec becomes data. Rules:
 - **`inspection_anchor` may be on several levels** (CUI: line; remediation: rsw and item).
 - `progress_unit` levels carry `budget_qty`, `uom`, `budget_hours`, `earned_qty` (FEP m²/kg/Lm;
   CUI metres scanned).
-- The node's `code` is free text (handles `923.1`, `SI-004`, `L-420-PR013-1LA3-C1 C4EA`).
+- The node's `code` is free text (handles shapes like `101.1`, `SI-001`, `L-100-XX001-1AA1-C1 C1EA`; examples synthetic).
   A computed `display_code` template (e.g. `{asset} / {activity} / {rsw}`) replaces ad-hoc
   `Control_Code` columns.
 
@@ -74,7 +74,7 @@ the spec becomes data. Rules:
 |---|---|
 | `oe_asset_item.rsw_id` | `work_anchor_id` (FK → node whose level has `work_anchor`) |
 | rule set `rsw.complete` | `work_anchor.complete` |
-| `field_time._line.rsw_code` | `work_anchor_id` |
+| "RSW code" on `field_time._line` (prose only today: `KERP-CONSOLIDATION-AND-DIFF.md` §1) | `work_anchor_id` |
 | NCR/punch "anchored to Asset/RSW/Item" | anchored to any node or item; `anchor_role` recorded |
 
 Multi-anchor documents (one NDT request covering several RSWs) use a link table
@@ -113,7 +113,7 @@ The ingestion wizard (T-0107) saves a **mapping profile**: header synonyms → t
 (level key, node field, `custom_fields` path, item type), tree mode (`ParentRow`, path column,
 or one column per level), update-by-ID mode, and value parsers. Mandatory behaviours from the
 inventory: identifier columns are read as text and date-typed cells in them are flagged; `#N/A`
-style errors become nulls with warnings; multi-value cells (`209.1 and 209.3 ; 906`) split into
+style errors become nulls with warnings; multi-value cells (`101.1 and 101.3 ; 102`) split into
 several anchors; dry-run shows row errors before apply.
 
 ### 6. Forms bind to roles, not names
@@ -135,10 +135,26 @@ they were captured on (records pin `template_revision_id`), new records use the 
   `work_anchor_id`), `quality-and-inspection.md` (request-anchor link, role binding),
   CLAUDE.md §6 wording: "work anchors to the project's **work-anchor level** (RSW by default),
   inspections to any `inspection_anchor` level; no BOQ anchor anywhere."
-- **Task changes:** T-0101 adds `oe_asset_level_def` and the one-work-anchor invariant;
-  T-0103 renames `rsw_id`; T-0107 adds mapping profiles + text-safe identifier parsing; T-0108
-  becomes client packs; T-0124 renames `rsw.complete`; T-0131 freezes the role names, not level
-  names. Probably one new S task: terminology layer in the frontend `t()` resolver.
+- **Task changes** (same set as the Affects header and TD-071):
+  - T-0101 — adds `oe_asset_level_def` (roles, unique `(project_id, key)`), `level_def_id` on
+    nodes and the one-work-anchor-level invariant (replaces "RSW is the leaf work anchor").
+  - T-0103 — `oe_asset_item.rsw_id` → `work_anchor_id`.
+  - T-0105 / T-0106 — "preserve inspection/RSW ties" becomes "preserve inspection/work-anchor
+    ties"; P6 activities link to the level with the `schedule_link` role.
+  - T-0107 — saved import mapping profiles, text-safe identifier parsing, multi-value split.
+  - T-0108 — default packs become client packs (levels, terminology, item types, templates,
+    numbering, register types, mapping profiles, rule sets).
+  - T-0111 — "anchors at any level (Asset / sub-Asset / RSW / Item)" becomes "any
+    `inspection_anchor` level or Item"; header fields bind by role.
+  - T-0112 / T-0118 — register types are versioned JSONSchemas so a project can add columns.
+  - T-0115 — adds `oe_inspections_request_anchor` (one request ↔ many nodes/items).
+  - T-0116 — NCRs anchor to any node or item and record `anchor_role`; completion block is on
+    the work-anchor level.
+  - T-0124 — `rsw.complete` → `work_anchor.complete`.
+  - T-0131 — freezes the role names and `oe_asset_level_def` shape, not level names.
+  - E-04-01 / E-04-03 / E-04-07 — "RSW-linked/anchored" becomes "work-anchor-linked/anchored"
+    when these epics are broken down.
+  - Probably one new S task: terminology layer in the frontend `t()` resolver.
 - **Cost:** one extra join for labels/roles (cacheable per project); pack versioning must be
   designed so pack updates do not rewrite existing projects.
 - **Risk:** too much freedom produces unreportable data. Mitigated by fixed **roles** — every
