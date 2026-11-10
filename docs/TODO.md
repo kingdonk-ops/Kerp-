@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 23 · **Closed:** 25
+**Open:** 24 · **Closed:** 25
 
 ## decision (1)
 
@@ -30,7 +30,7 @@
 | [TD-041](../tracker/todo/TD-041.md) | CEL parity gaps between celpy 0.5.0 and @marcbachmann/cel-js 8 (pinned known_gap fixtures) must be closed or accepted before T-0131 | T-0017, T-0018 | implementer |
 | [TD-047](../tracker/todo/TD-047.md) | Automate refresh of backend/requirements*.lock (uv pip compile output): Dependabot pip does not find *.lock files or re-run uv; options: scheduled uv --upgrade workflow opening a PR, or Renovate pip-compile manager | T-0028 | implementer |
 
-## later (11)
+## later (12)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -45,6 +45,7 @@
 | [TD-038](../tracker/todo/TD-038.md) | Add reportlab (and openpyxl if the Excel renderer is ported) to the heavy-lib lazy-import lint when Inspection-ERP core/reporting is ported | T-0115, T-0119 | kerp-reviewer |
 | [TD-043](../tracker/todo/TD-043.md) | Entra ID SSO for KAEFER staff behind the AuthProvider seam, before the first pilot | T-0008 | user |
 | [TD-048](../tracker/todo/TD-048.md) | SHA-pin actions in promote.yml and review-gate.yml (persist-credentials:false where no push is needed) and digest-pin the CI service images (postgis, redis) | T-0028 | implementer |
+| [TD-051](../tracker/todo/TD-051.md) | CI: backend-publish rebuilds the image instead of pushing the smoke-tested one; export/push the tested image by digest | T-0028 | reviewer |
 
 ## risk (2)
 
