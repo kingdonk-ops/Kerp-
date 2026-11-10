@@ -25,9 +25,13 @@ copied by hand, and a project could silently switch off a gate the spec makes ma
 ### 1. One rule store, several kinds
 Shared kernel tables (in `validation`, the T-0018 module), `BaseRecordMixin` + RLS:
 
-- `oe_rules_rule_set(key, kind, layer, project_id NULL, version, source_pack)`
-- `oe_rules_rule(rule_set_id, rule_key, engine, expression, params JSONB, action, severity,
-  enabled, locked, sort_order, origin_rule_key, origin_version, deleted_at)`
+- `oe_validation_rule_set(key, kind, layer, version, source_pack)`
+- `oe_validation_rule(rule_set_id, rule_key, engine, expression, params JSONB, action, severity,
+  enabled, locked, sort_order, origin_rule_key, origin_version)`
+
+Tenant, project and soft-delete columns (`tenant_id`, `project_id`, `deleted_at`) come from
+`BaseRecordMixin`; `project_id` is NULL on the system and tenant layers. Table names follow
+the owning module (`validation`).
 
 | `kind` | Used by | `engine` |
 |---|---|---|
@@ -41,8 +45,9 @@ Shared kernel tables (in `validation`, the T-0018 module), `BaseRecordMixin` + R
 ### 2. Three layers, copied — not overlaid
 1. **System defaults** — versioned seed files shipped with each module
    (`backend/app/modules/<m>/rules/defaults/*.yaml`) and with client packs (ADR 0003 §4).
-2. **Tenant defaults** — seeded from the system set when a tenant is created; a tenant admin
-   can edit them to make a company standard.
+2. **Tenant defaults** — seeded from the system set when a tenant is created; edited to make a
+   company standard by **PER-13 Quality Director** (`check` rules) or **PER-01 Operations
+   Management** (all other kinds) — see §7.
 3. **Project set** — **copied** from the tenant defaults (or the chosen client pack) when the
    project is created, or when a module is first enabled on the project.
 
@@ -69,18 +74,28 @@ the latest defaults.
 Defaults can be `locked`. A locked rule cannot be deleted, disabled or loosened on a project;
 the project can still **add** stricter rules. Gates the spec makes mandatory ship locked:
 calibration hard gate, "open Cat A punch / NCR blocks completion", eligibility checks.
-Only the tenant layer can unlock a rule, and that change needs an ADR-backed reason recorded
-on the rule.
+Only **PER-13 Quality Director**, at the tenant layer, can unlock a locked rule, and the
+change needs an ADR reference recorded on the rule. Separation of duties: PER-09 Project
+Administrator (SoD-blocked from quality holds) can never unlock, disable or loosen a `check`
+rule. Whether unlocking also needs a second approver (e.g. via `approval_routes`) is open in
+TD-072.
 
 ### 6. Safe editing
 Expressions are compiled on save against the kind's context schema (CEL compile; regex
-compile with a length / timeout limit). A **Try it** action runs a rule against a sample or
+compile with a pattern-length limit). Regex rules use **RE2 syntax** and are evaluated with a
+linear-time engine (`google-re2` on the server, an RE2-compatible subset checked on save for
+the client), so project-written patterns cannot cause catastrophic backtracking. A **Try it** action runs a rule against a sample or
 recent real context before it is enabled.
 
 ### 7. One settings screen
 Project Settings → **Rules**: tabs by kind and module, the same component for the tenant
-default layer. Editing `check` rules needs the QA/QC Lead (PER-06); other kinds need the
-Project Administrator (PER-09).
+default layer.
+
+| Layer | `check` rules | Other kinds |
+|---|---|---|
+| Tenant defaults | PER-13 Quality Director | PER-01 Operations Management |
+| Project set | PER-06 QA/QC Lead | PER-09 Project Administrator |
+| Unlock a locked rule | PER-13 only, with ADR reference | n/a (only `check` rules ship locked) |
 
 ## Consequences
 

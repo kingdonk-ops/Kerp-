@@ -13,8 +13,8 @@ All examples in this document are synthetic.
 
 ## 1. Placement
 
-`handover` is its **own module**, shown in the **Field reports** nav group next to the Daily
-Workface Log (`field_execution`, E-04-04), not a section inside meetings or the diary:
+`handover` is its **own module**, shown in the **Execution** nav group (8-group IA,
+`KERP-CONSOLIDATION-AND-DIFF.md` §6) next to the Daily Workface Log (`field_execution`, E-04-04), not a section inside meetings or the diary:
 
 - its lifecycle is person-to-person (author → named recipients → acknowledgement), unlike a
   diary (one shift, one crew) or minutes (one meeting, many attendees);
@@ -127,7 +127,7 @@ Default rules are generated from the project's breakdown template and numbering 
 
 | Rule | Pattern (illustrative) | Resolves to |
 |---|---|---|
-| work anchor code | `\b(?:RSW)[\s:\-]*(?<code>\d+(?:\.\d+)?)\b` — matches `rsw103`, `RSW: 401.1`, `RSW 16-900` style per pattern | node of the `work_anchor` level with that code |
+| work anchor code | `(?i)\bRSW[\s:\-]*(?P<code>\d+(?:[.\-]\d+)?)\b` (RE2 syntax) — matches `rsw103`, `RSW: 401.1`, `RSW 16-900` | node of the `work_anchor` level with that code |
 | NCR number | the project's NCR numbering pattern | NCR |
 | inspection request number | project numbering pattern | inspection request |
 | asset code | `asset` level `code_pattern` | node |
@@ -200,8 +200,9 @@ A side panel in the editor lists what has happened since `period_start`, for **g
 | Write / edit own draft, submit, add addendum | author |
 | Read | author, recipients, PER-02 / PER-03 on the project; whole project team if `visibility = project` |
 | Acknowledge / reply | recipients |
-| Configure assignments, template, rule sets | PER-09 Project Administrator |
-| Read all handovers in register | PER-01, PER-02, PER-09 |
+| Configure assignments, template, `digest` / `autolink` rule sets | PER-09 Project Administrator |
+| Read all handovers in register (full content) | PER-01, PER-02 |
+| See register metadata only (author, period, recipients, ack / overdue status — no body) | PER-09 |
 
 Tenant from the JWT; cross-tenant and cross-project → 404 (project RLS, T-0007).
 
