@@ -46,11 +46,11 @@ for statement in rls_policy_sql("oe_asset_node"):
 
 `tests/test_rls_bypass.py` fails if a migrated model table is not covered
 (`rls_coverage_problems`) or the runtime role is SUPERUSER/BYPASSRLS
-(`rls_enforcement_problems`). Data migrations see no rows unless they bind a context (TD-050).
+(`rls_enforcement_problems`). Data migrations see no rows unless they bind a context (TD-055).
 
 ## Contract tests
 
 `tests/test_rls_bypass.py` covers the four bypass paths: SAQ worker, cross-module service
 call, raw-SQL aggregation, DB migration. It needs PostgreSQL and runs in CI's PostgreSQL step
-as the `NOSUPERUSER NOBYPASSRLS` role `kerp_app` (skipped elsewhere, TD-047).
+as the `NOSUPERUSER NOBYPASSRLS` role `kerp_app` (skipped elsewhere, TD-052).
 `tests/test_tenancy.py` runs on both dialects.

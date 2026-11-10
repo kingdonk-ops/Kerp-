@@ -3,15 +3,16 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 24 · **Closed:** 25
+**Open:** 27 · **Closed:** 26
 
-## decision (1)
+## decision (2)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
 | [TD-034](../tracker/todo/TD-034.md) | Port/rewrite assessment of remaining Inspection-ERP core packages (jobs, sync, forms, workflow, events, files, schema_engine/items/mapping, reporting) | T-0015 | reviewer |
+| [TD-053](../tracker/todo/TD-053.md) | Tenant-wide (cross-project) reads under project RLS: portfolio views, admin, and the visibility of tenant-level rows such as the project row | T-0007 | implementer |
 
-## spec-gap (4)
+## spec-gap (5)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -19,18 +20,18 @@
 | [TD-044](../tracker/todo/TD-044.md) | Spec the PWA-first client strategy: web-only PWA apps (supervisor, storeman, field report) vs the Android/tablet app, and re-check the frontend tech stack | T-0127 | user |
 | [TD-045](../tracker/todo/TD-045.md) | Spec the Request for Inspection (inspection notification / booking) record; RFI means Request for Information | T-0115 | user |
 | [TD-046](../tracker/todo/TD-046.md) | Admin side: where security and observability settings (headers/CSP, HSTS, API docs exposure, log retention) are shown or configured | T-0021 | user |
+| [TD-054](../tracker/todo/TD-054.md) | Edge spec §6 policy targets 'TO kerp_app_role'; T-0007 applies it to PUBLIC | T-0007 | implementer |
 
-## deferred (5)
+## deferred (4)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
 | [TD-011](../tracker/todo/TD-011.md) | forms F13 report-slot mapping + F14 AI import assistant (SPEC-11 §2) not in Phase 1 tasks | T-0110 | planner |
 | [TD-032](../tracker/todo/TD-032.md) | tenant_id FK to the tenants directory table (spec §1.1) once the tenants table exists | T-0005 | implementer |
-| [TD-033](../tracker/todo/TD-033.md) | Default soft-delete filtering: exclude deleted_at IS NOT NULL from ORM reads unless opted in | T-0005 | implementer |
 | [TD-041](../tracker/todo/TD-041.md) | CEL parity gaps between celpy 0.5.0 and @marcbachmann/cel-js 8 (pinned known_gap fixtures) must be closed or accepted before T-0131 | T-0017, T-0018 | implementer |
 | [TD-047](../tracker/todo/TD-047.md) | Automate refresh of backend/requirements*.lock (uv pip compile output): Dependabot pip does not find *.lock files or re-run uv; options: scheduled uv --upgrade workflow opening a PR, or Renovate pip-compile manager | T-0028 | implementer |
 
-## later (12)
+## later (14)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -46,6 +47,8 @@
 | [TD-043](../tracker/todo/TD-043.md) | Entra ID SSO for KAEFER staff behind the AuthProvider seam, before the first pilot | T-0008 | user |
 | [TD-048](../tracker/todo/TD-048.md) | SHA-pin actions in promote.yml and review-gate.yml (persist-credentials:false where no push is needed) and digest-pin the CI service images (postgis, redis) | T-0028 | implementer |
 | [TD-051](../tracker/todo/TD-051.md) | CI: backend-publish rebuilds the image instead of pushing the smoke-tested one; export/push the tested image by digest | T-0028 | reviewer |
+| [TD-052](../tracker/todo/TD-052.md) | PostgreSQL-only RLS tests skip in the SQLite run and on machines without Postgres: add a local Postgres (compose/testcontainers) recipe | T-0007 | implementer |
+| [TD-055](../tracker/todo/TD-055.md) | Data migrations under FORCE RLS see no rows: add a per-tenant/project backfill helper or a dedicated BYPASSRLS migration role (ADR) | T-0007 | implementer |
 
 ## risk (2)
 
@@ -79,6 +82,7 @@
 | ⚫ | [TD-029](../tracker/todo/TD-029.md) | Backend image is linux/amd64 only (locks target x86_64-manylinux_2_28); add arm64 if a deployment target needs it | Production on AWS x86_64 is enough; reopen if an arm64 (Graviton) target is chosen (user, 2026-11-09) |
 | ✅ | [TD-030](../tracker/todo/TD-030.md) | CI: detect job is not in ci-gate.needs - if detect fails, backend/frontend/e2e/backend-image are skipped and ci-gate still passes; add detect to needs and fail on non-success | T-0028: detect is in ci-gate.needs; scripts/ci_gate.py fails the gate unless every needed job is success, or skipped only when its component is absent (detect output false) or it is the push-only publish job on a non-push event. Tested in scripts/tests/test_ci_gate.py. |
 | ✅ | [TD-031](../tracker/todo/TD-031.md) | CI hardening: split GHCR publish into a push-only job holding packages:write, pin docker/* actions to commit SHAs, persist-credentials:false; declare packaging as backend dev dep; assert .dockerignore starts with * | T-0028: GHCR publish moved to the push-only backend-publish job, the only job with packages:write; all actions in ci.yml (incl. docker/*) pinned to commit SHAs; every checkout sets persist-credentials:false; packaging declared as a backend dev dependency; test asserts .dockerignore starts with *. |
+| ✅ | [TD-033](../tracker/todo/TD-033.md) | Default soft-delete filtering: exclude deleted_at IS NOT NULL from ORM reads unless opted in | Done in T-0007: app/core/tenancy/scope.py adds a do_orm_execute with_loader_criteria filter on BaseRecordMixin that hides deleted_at IS NOT NULL rows from every ORM SELECT unless the statement sets execution_options(include_deleted=True). Raw SQL and Core table selects are not filtered. |
 | ✅ | [TD-037](../tracker/todo/TD-037.md) | Drop the empty 'postgres' extra from backend/pyproject.toml once CI's install line stops referencing it | T-0028: empty postgres extra removed from backend/pyproject.toml and ci.yml installs .[dev]. |
 | ✅ | [TD-039](../tracker/todo/TD-039.md) | Bring back any PROPOSAL-port-from-aip extras dropped in spec consolidation (write-back, type inheritance, migration preview, test-fill, section library, report slots, auto_create_itp, competency assignment, programmes)? | Out of scope for Phase 1. Revisit auto_create_itp and asset write-back as Phase 3 candidates (user, 2026-11-09) |
 | ✅ | [TD-040](../tracker/todo/TD-040.md) | CEL value encoding: plain JSON numbers are CEL double on both runtimes; ints/timestamps need explicit tags | Confirmed: plain JSON numbers are CEL double; int64/timestamp/uint/duration use $-tagged encoding. Binding for sync payloads and form templates (user, 2026-11-09) |

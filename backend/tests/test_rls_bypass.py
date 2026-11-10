@@ -39,7 +39,7 @@ from tests.db_support import ON_POSTGRES, POSTGRES_URL, Gadget, Widget
 from tests.tenancy_support import CTX_A, CTX_C, PA, PB, T1, VISIBLE_TO_A, seeded_database
 
 pytestmark = pytest.mark.skipif(
-    not ON_POSTGRES, reason="needs PostgreSQL RLS; runs in CI's PostgreSQL step (TD-047)"
+    not ON_POSTGRES, reason="needs PostgreSQL RLS; runs in CI's PostgreSQL step (TD-052)"
 )
 
 OWNER_URL = os.environ.get("KERP_TEST_OWNER_URL", "")
@@ -223,7 +223,7 @@ def test_runtime_role_cannot_bypass_rls(db: Database) -> None:
     assert rls_enforcement_problems(db.engine) == []
 
 
-@pytest.mark.skipif(not OWNER_URL, reason="needs KERP_TEST_OWNER_URL (set in CI) (TD-047)")
+@pytest.mark.skipif(not OWNER_URL, reason="needs KERP_TEST_OWNER_URL (set in CI) (TD-052)")
 def test_superuser_role_is_reported() -> None:
     engine = create_engine(OWNER_URL)
     try:
@@ -276,7 +276,7 @@ def test_a_migration_that_forgets_rls_is_caught() -> None:
 
 def test_table_owner_running_a_migration_is_still_subject_to_rls(db: Database) -> None:
     # The role that created the tables owns them; FORCE RLS keeps it under the policy, so
-    # an unbound data migration touches nothing (TD-050) rather than every project.
+    # an unbound data migration touches nothing (TD-055) rather than every project.
     with db.engine.begin() as conn:
         is_owner = conn.execute(
             text("SELECT tableowner = current_user FROM pg_tables WHERE tablename = 'test_widget'")
