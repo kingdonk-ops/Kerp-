@@ -51,7 +51,7 @@ copies of its shape.** Findings that drive this spec:
 | Distinct assets / asset+RSW pairs | 66 / 620 | One RSW has **many** activities (one per activity type) → RSW↔activity is many-to-many. |
 | Activity-type tokens | `WFE, SCA Erect, SCA Dism, B, P, W, CP, SR, BN, G, GR, C, HDNR1, HDNR2, HDBN, Custom, Prov Sums` | Map to the `activity` level / item type via the client pack. |
 | Token spelling variants | `SCA Dism` / `SCA-Dism`, `Prov Sums` / `Prov.Sums` | Project-scoped **alias dictionary** (§5.2). |
-| RSW code variants | `305`, `410.2`, `512 Online` / `512 Shut`, `512-21`, `512.1-16` (synthetic examples of the observed shapes) | Grammar must capture base code, sub-code, work window and a suffix whose meaning is **unknown** → spec-gap TODO. |
+| RSW code variants | `305`, `410.2`, `512 Online` / `512 Shut`, `512-21`, `512.1-16` (synthetic examples of the observed shapes) | Grammar captures base code, sub-code, work window and suffix; default meaning per TD-076 (§5.1). |
 | Activity codes | 2 types (`<site> Status`) with values Shutdown, Online Works, On-Hold Priority 1/2 | Mapped to a node attribute (`work_window`, `hold_priority`). |
 | UDFs | `Comment`, `Notes` (values `New`, `Secondary`, `Changed from "C" to "G"`) | Planners record revision deltas in UDFs; surface them on the change report. |
 | Status | all `TK_NotStart` (tender schedule) | Status mirror must cope with an un-progressed baseline. |
@@ -75,7 +75,9 @@ Upload .xer ─► store original (sha256, immutable) ─► SAQ batch: parse �
   earlier import.
 - A failed parse leaves no partial mirror rows: staging is written, commit is a separate
   transaction.
-- Primavera XML (T-0105) produces the same staging shape.
+- Primavera XML (T-0105) produces the same staging shape. Supply formats (TD-077): **XER and
+  Primavera XML now**; Excel schedule exports (via import mapping profiles) and a direct P6 API
+  connector later (TD-115). Every source produces this staging shape.
 
 ---
 
@@ -91,7 +93,7 @@ Module: `asset_management` owns the mirror and links (other modules call its `se
 | `oe_p6_activity` | **Persistent identity** of an activity | unique `(project_id, external_activity_id)` = `task_code`; `p6_guid`; `current_version_id`; `schedule_state` (`active` / `removed_from_schedule` / `cancelled`) |
 | `oe_p6_activity_version` | Immutable snapshot per import | `activity_id`, `import_id`, `wbs_id`, `name`, `task_type`, `status_code`, planned/target/early/late/actual dates, `codes jsonb`, `udfs jsonb`, `content_hash`, `source_line` |
 | `oe_p6_relationship` | Predecessor/successor per import | `import_id`, `pred_activity_id`, `succ_activity_id`, `type` (FS/FF/SS/SF), `lag_hours` |
-| `oe_p6_anchor_link` | **Many-to-many** activity ↔ work-anchor node (and optional asset node) | `activity_id`, `node_id`, `relationship_type` (`primary`, `supporting`, `shared`, `parent`, `schedule`, `area`), `allocation_pct` (nullable), `match_method` (`name_grammar`, `manual`, `matching_engine`), `match_score`, `status` (`proposed → confirmed → approved` / `rejected`), `verified_by/at`; unique `(activity_id, node_id, relationship_type)` |
+| `oe_p6_anchor_link` | **Many-to-many** activity ↔ work-anchor node (and optional asset node) | `activity_id`, `node_id`, `relationship_type` (`primary`, `supporting`, `shared`, `parent`, `schedule`, `area`), `allocation_pct` (nullable), `work_window` (nullable, e.g. `Online`/`Shut`, TD-076), `match_method` (`name_grammar`, `manual`, `matching_engine`), `match_score`, `status` (`proposed → confirmed → approved` / `rejected`), `verified_by/at`; unique `(activity_id, node_id, relationship_type)` |
 | `oe_p6_change` | One row per detected change in an import | `import_id`, `activity_id`, `change_type` (§6), `field`, `old jsonb`, `new jsonb`, `impact jsonb` (affected nodes, checked-out jobs), `decision` |
 
 Resource rates and costs in `RSRCRATE`/`TASKRSRC` are **not** imported (money is a read-only
@@ -100,10 +102,17 @@ reconciliation.
 
 ---
 
-## 5. Mapping profile (per project, from the client pack — ADR 0003 §5)
+## 5. Mapping profile and P6 rules (per project, from the client pack — ADR 0003 §5, ADR 0004)
 
-### 5.1 Activity-name grammar
-A versioned profile holds one or more patterns with named groups, tried in order:
+The versioned P6 **mapping profile** holds source precedence (§5.1), the alias dictionary (§5.2)
+and field mappings. The **name grammar** and **eligibility** rules are not profile fields: they
+live in the single rule store (ADR 0004 Amendment E, TD-079) as kinds **`p6_grammar`** (engine
+`regex`, RE2 syntax) and **`p6_eligibility`** (engine `cel`), shipped as client-pack defaults,
+copied to the project and editable there like every other rule. `oe_p6_import` records the
+mapping-profile revision and the rule-set versions it ran with.
+
+### 5.1 Activity-name grammar (`p6_grammar` rules)
+One or more `p6_grammar` rules with named groups, tried in `sort_order`:
 
 ```
 ^(?P<asset>.+?) / (?P<activity_type>[^/]+?) / (?P<anchor_code>\d+(\.\d+)?)(?:-(?P<suffix>\d+))?(?: (?P<window>Online|Shut))?$
@@ -112,7 +121,11 @@ A versioned profile holds one or more patterns with named groups, tried in order
 - `asset` → node on the level with role `physical` (created if missing, as `proposed`).
 - `anchor_code` → node on the **work-anchor** level under that asset (the RSW).
 - `activity_type` → node on the `activity` level (remediation-fep pack) or item type, via §5.2.
-- `window`/`suffix` → node attributes; meaning of `suffix` is an open question (TD raised).
+- `suffix` and `window` (TD-076, configurable default in the shipped `p6_grammar` rule params):
+  a **suffix** (`-16`, `-21`) makes a **different work-anchor node** (`512-21` ≠ `512`; the
+  suffix is part of the node code); a **window** (`Online` / `Shut`) is the **same work-anchor
+  node in two work windows** (`512 Online` and `512 Shut` → node `512`, one `oe_p6_anchor_link`
+  per activity, `work_window` recorded on the link). A project may change either default.
 - No pattern matches → activity goes to the **Unmatched-Row Linking Screen** (T-0105), never
   dropped, never guessed.
 - Other sources the profile may use instead of the name: an activity-code type, a UDF, or the WBS
@@ -124,8 +137,8 @@ A versioned profile holds one or more patterns with named groups, tried in order
 - Project-scoped alias dictionary: `SCA-Dism → SCA Dism`, `Prov.Sums → Prov Sums`,
   `TK1002 / TK 1002 → TK-1002`. Aliases never resolve across projects.
 
-### 5.3 Eligibility (which activities expect an RSW)
-CEL rules in the profile, e.g. `task_type == "TT_Mile" → no_placeholder`,
+### 5.3 Eligibility (which activities expect an RSW) — `p6_eligibility` rules
+CEL rules in the rule store, e.g. `task_type == "TT_Mile" → no_placeholder`,
 `activity_type in ["Prov Sums","Custom"] → no_placeholder`, everything that parsed →
 placeholder. Ineligible activities are still mirrored and visible; they just do not create
 expected RSWs.
@@ -135,6 +148,16 @@ On commit, each eligible parsed activity ensures (idempotently) its asset node, 
 and `oe_p6_anchor_link`. New work-anchor nodes start in state **`awaiting_document`**
 ("Draft — awaiting RSW upload"). This is what lets the missing-RSW dashboard know what should
 exist before any PDF arrives.
+
+### 5.5 Gated transitions and level placement (default pending TD-114)
+- `oe_p6_import` `previewed → committed` calls `run_checks` with rule set **`p6.import.commit`**;
+  `oe_p6_anchor_link` `confirmed → approved` calls **`p6.link.approve`**. Both ship as locked
+  system defaults (ADR 0004 §5); a project may add stricter rules.
+- The link targets the node on the level with the **`schedule_link`** role. The work anchor for
+  progress is the work-anchor node on the same root-to-leaf path: ancestor-or-self when
+  `schedule_link` is at or below the work-anchor level; when it is above, the link resolves only
+  if `anchor_code` names exactly one work-anchor node below it, otherwise the activity goes to the
+  Unmatched-Row Linking Screen. Never guessed.
 
 ---
 
@@ -155,6 +178,7 @@ activity, it is a **renumber** (proposed, planner confirms).
 | `cancelled` | status/code mapped to cancelled | links flagged for planner review |
 | `renumbered` | new `task_code`, known `guid` | identity carried over after confirmation |
 | `unchanged` | `content_hash` equal | nothing written |
+| `kerp_layer_matched` | new `task_code` equal to the KERP id of a committed work-plan item exported as a fragnet (ADR 0006 §5) | mirrored as a normal activity; the KERP-layer copy is marked `superseded_by_p6`; no duplicate |
 
 The report also lists **which affected records are currently checked out to a device** (§8) and
 states that their field data will not be touched. A planner may accept the whole report or
@@ -177,7 +201,8 @@ part of the M1 freeze.
 Rules: the import writes `p6` fields only. A tablet may write `field` fields only (sending any
 other owner's field → `ERR_FIELD_NOT_OWNED`, logged, rest of the batch still applied). Office
 users may not edit `field` fields of a record while it is checked out (409, "checked out to
-<user>/<device>") unless a supervisor force-releases the checkout.
+<user>/<device>") unless a supervisor force-releases the checkout. Such office edits are
+**blocked, not queued** (ADR 0005 acceptance, 2026-11-10).
 
 ---
 
@@ -250,7 +275,10 @@ layouts), RSW-number detection, header/footer and page-sequence analysis, AI onl
 are unsure. Stores the original file, page numbers, the split PDFs and the page→RSW map. OCR via
 the pluggable parser adapter (Docling / PaddleOCR candidates, engine swappable), running in the
 SAQ worker. Two passes: local extraction for everything, AI/vision only for low-confidence
-fields. Every extracted value keeps original text, numeric value, unit, source page/field and
+fields. **Processing location (TD-078): hybrid** — OCR runs locally in the SAQ worker; the
+second pass calls an external AI provider hosted in an **Australian region**. The provider is
+configured per company (tenant setting): OpenAI or Anthropic Claude, whichever the company uses,
+otherwise a self-hosted Hugging Face model. AI output stays a proposal (`source="ai"`). Every extracted value keeps original text, numeric value, unit, source page/field and
 confidence. One failed document never fails the batch.
 
 **Matching (E-05-10).** Three separate stages, each with its own score and audit:
@@ -325,11 +353,18 @@ Checkout merge (ADR 0005):
 
 ---
 
-## 12. Open questions (raised as TODOs)
+## 12. Decisions and open questions
 
-- Meaning of the RSW code suffix (`-16`, `-21`) and of `Online`/`Shut` variants: same RSW in two
-  windows, or two RSWs?
-- P6 supply format beyond XER: Primavera XML (T-0105), Excel exports, direct P6 API later?
-- Where RSW PDF processing runs: self-hosted OCR only, hybrid (local OCR + external AI), or cloud.
-- Whether office edits to field-owned values on a checked-out record should be blocked (this
-  spec) or queued.
+Decided 2026-11-10:
+- Suffix `-16`/`-21` = a different RSW; `Online`/`Shut` = the same RSW in two windows;
+  configurable default (TD-076, §5.1).
+- Supply formats: XER + Primavera XML now; Excel and direct P6 API later (TD-077, TD-115).
+- RSW PDF processing: hybrid, local OCR + external AI in an Australian region, provider per
+  company (TD-078, §9).
+- Office edits to field-owned values of a checked-out record are blocked, not queued (ADR 0005).
+- Grammar and eligibility rules are `p6_grammar` / `p6_eligibility` kinds in the rule store
+  (TD-079, §5).
+
+Open:
+- Rule-set names for import commit / link approval and link placement when `schedule_link` and
+  `work_anchor` are on different levels — defaults in §5.5, confirmation in TD-114.

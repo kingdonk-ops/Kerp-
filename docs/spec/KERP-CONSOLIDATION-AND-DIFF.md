@@ -105,6 +105,17 @@ Replaces the duplicated designers spread across `forms`, `asset_management`
 - **Cryptographic signing (phased):**
   - Phase 0/1: **append-only hash-chained** event ledgers (`seq`, `chain_key`, `prev_hash`,
     `content_hash`, `payload`) with DB `REVOKE UPDATE, DELETE FROM app_role`.
+    Ledger design (TD-057, accepted 2026-11-10 from the T-0006 implementation; detail in
+    `backend/app/core/audit/README.md`): a chain is `(tenant, scope, chain_key)` where scope is
+    the session's project or the tenant level (`scope_id` = `project_id` or the nil UUID;
+    unique `(tenant_id, scope_id, chain_key, seq)`; keys embed the entity id, e.g.
+    `inspection:<uuid>`). `content_hash` = SHA-256 lower-case hex over
+    `b"kerp-audit-ledger\n"` + canonical JSON (sorted keys, compact separators, UTF-8; floats and
+    NUL rejected) of `{v, tenant_id, project_id, chain_key, seq, prev_hash, created_at,
+    created_by, source, payload}`; genesis `prev_hash` = 64 zeros; `seq` contiguous from 1.
+    Verification checks contiguous `seq`, `prev_hash` links and the recomputed hash. Enforced
+    by ORM guard, `REVOKE UPDATE, DELETE, TRUNCATE`, row/statement triggers and CHECKs; appends
+    to one chain serialise on an advisory lock. Changing the hash format needs a new `v`.
   - Final turnover: MDRs and commercial Delay Notices signed with **pyHanko** →
     **ETSI PAdES-B-LTA** + **RFC 3161** trusted timestamp tokens.
 - **Auth hardening:** **RS256 / EdDSA** JWTs via a **JWKS** endpoint (replaces symmetric
