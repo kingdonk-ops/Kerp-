@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 67 · **Closed:** 50
+**Open:** 65 · **Closed:** 52
 
 ## decision (2)
 
@@ -12,7 +12,7 @@
 | [TD-034](../tracker/todo/TD-034.md) | Port/rewrite assessment of remaining Inspection-ERP core packages (jobs, sync, forms, workflow, events, files, schema_engine/items/mapping, reporting) | T-0015 | reviewer |
 | [TD-096](../tracker/todo/TD-096.md) | Approved coating ITR dropped the residual-dust rating row the ITP requires; Grating and Gridmesh ITR has no approved version: confirm with the client before shipping default templates | T-0113 | planner |
 
-## spec-gap (32)
+## spec-gap (31)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -45,7 +45,6 @@
 | [TD-105](../tracker/todo/TD-105.md) | Template applicability by anchor attribute value (e.g. the test technique on the line picks the template) | T-0110, T-0111 | planner |
 | [TD-108](../tracker/todo/TD-108.md) | field_time: headcount mode, delay-code catalogue in the client pack, NPT vs coded delay, mob/demob allowance, equipment hours from the register, derived totals, roster crew pickers | E-04-05, E-04-04, E-06-03 | planner |
 | [TD-109](../tracker/todo/TD-109.md) | Equipment availability (onsite / in use) and required operator credential per equipment type; resource demand counts equipment units | E-03-07, T-0112, E-04-08 | planner |
-| [TD-113](../tracker/todo/TD-113.md) | Work-anchor invariant: ADR 0003 Amendment 1 says exactly one work-anchor node per root-to-leaf path, Amendment 5 allows inspection anchors with no work under them yet - may a path have no work-anchor node? | T-0101 | planner |
 | [TD-114](../tracker/todo/TD-114.md) | P6 open points left by TD-079: run_checks rule-set names for import-commit and link-approval, and link behaviour when schedule_link and work_anchor sit on different levels | T-0104, T-0105, T-0125 | planner |
 | [TD-117](../tracker/todo/TD-117.md) | Findings register (TD-106 decision) has no spec section or task: assessment step, configurable name/types per project, follow-up work, priority derivation | T-0116, T-0117 | planner |
 
@@ -65,7 +64,7 @@
 | [TD-047](../tracker/todo/TD-047.md) | Automate refresh of backend/requirements*.lock (uv pip compile output): Dependabot pip does not find *.lock files or re-run uv; options: scheduled uv --upgrade workflow opening a PR, or Renovate pip-compile manager | T-0028, T-0032 | implementer |
 | [TD-074](../tracker/todo/TD-074.md) | Handover: offline drafting on tablets via the Dexie outbox | E-04-11 | planner |
 
-## later (22)
+## later (21)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -90,7 +89,6 @@
 | [TD-068](../tracker/todo/TD-068.md) | Importer for legacy inspection-system exports (template, usecase, itemcat, issuetype) | T-0113 | planner |
 | [TD-110](../tracker/todo/TD-110.md) | Recurring inspection due dates, earned quantity from partial inspections, create Items from an inspection (weld location) | E-06b-01, E-04-03, T-0103 | planner |
 | [TD-115](../tracker/todo/TD-115.md) | P6 supply formats deferred by TD-077: Excel schedule exports via import mapping profiles, and a direct P6 API connector | T-0105 | planner |
-| [TD-119](../tracker/todo/TD-119.md) | CLAUDE.md section 6 anchor bullet still says 'work anchors to an RSW': apply the ADR 0003 amended wording (human edit; agents may not change CLAUDE.md) | T-0101 | planner |
 
 ## risk (5)
 
@@ -154,5 +152,7 @@
 | ✅ | [TD-106](../tracker/todo/TD-106.md) | Client-asset findings register (CUI, water, cladding damage) vs NCR vs punch, with configurable priority derivation and an assessment step that can spawn follow-up work | Separate findings register (not NCR/punch) with an assessment step. It is a project-level setting: the register's name, its finding types, and whether follow-up work can be raised from it are configurable per project. (user, 2026-11-10); follow-up edits in TD-112 |
 | ✅ | [TD-107](../tracker/todo/TD-107.md) | Revisit template / issue-type overlay inheritance for client variants instead of copies (TD-039 dropped inheritance) | Keep copies with a 'derived from' link, a compare view and upgrade offers (as ADR 0004); no inheritance. (user, 2026-11-10); follow-up edits in TD-112 |
 | ✅ | [TD-112](../tracker/todo/TD-112.md) | Apply the 2026-11-10 TODO triage: amend spec, CLAUDE.md section 6 and tasks for accepted ADRs 0003-0006 and resolved decisions | Planner pass landed: spec amended (asset-and-tagging, quality-and-inspection, p6-import-and-rsw-matching, edge spec sections 6 and 7.1, consolidation diff section 4 audit ledger, master spec 1.3/4.3 pointers, handover/portal/scaffold/welding decision notes); tasks T-0010, T-0014, T-0018, T-0101, T-0103..T-0108, T-0111, T-0112, T-0115, T-0116, T-0118, T-0124, T-0126, T-0131, T-0133 updated; new tasks T-0032..T-0036 and T-0134..T-0140; blocked_by TD-112 removed. CLAUDE.md section 6 anchor wording left for the human (agents may not edit CLAUDE.md). |
+| ✅ | [TD-113](../tracker/todo/TD-113.md) | Work-anchor invariant: ADR 0003 Amendment 1 says exactly one work-anchor node per root-to-leaf path, Amendment 5 allows inspection anchors with no work under them yet - may a path have no work-anchor node? | At most one work-anchor node per root-to-leaf path, never nested; a path may have none (inspection without work); booking work needs one on the path, and the user picks or creates it first (user, 2026-11-10) |
 | ✅ | [TD-116](../tracker/todo/TD-116.md) | ADR 0004 Amendment B: two-person unlock of a locked rule names approval_routes (E-06-07, Phase 6) - who is the second approver until then? | Interim default approved: until approval_routes (E-06-07) exists, a second, different PER-13 or PER-01 user approves an unlock of a locked rule (user, 2026-11-10) |
 | ✅ | [TD-118](../tracker/todo/TD-118.md) | Qualification-type catalogue (TD-101): who is the 'super admin', and may a project-scoped PER-09 edit a tenant-wide (global) catalogue? | No super admin: the tenant administrator edits the tenant-wide qualification catalogue; PER-09 Project Administrator may add project-level types (user, 2026-11-10) |
+| ✅ | [TD-119](../tracker/todo/TD-119.md) | CLAUDE.md section 6 anchor bullet still says 'work anchors to an RSW': apply the ADR 0003 amended wording (human edit; agents may not change CLAUDE.md) | CLAUDE.md section 6 anchor bullet updated to the ADR 0003 wording with 'at most one per root-to-leaf path' (TD-113) (user, 2026-11-10) |

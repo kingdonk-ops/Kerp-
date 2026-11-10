@@ -64,7 +64,7 @@ an automatic `CHANGES_REQUESTED`.
 
 - Modular monolith: `backend/app/modules/<name>/` with `manifest.py`, `models.py`, `router.py`, `service.py`, `schemas.py`, `README.md`. **No cross-module table access** — call the other module's `service.py`.
 - Every table uses `BaseRecordMixin` and gets an RLS policy. Tenant comes from the JWT only; cross-tenant → 404.
-- The anchor model is law: work anchors to an **RSW**, inspections to an **Item**. No BOQ anchor anywhere.
+- The anchor model is law (ADR 0003): work anchors to a **work-anchor node** — at most one per root-to-leaf path, never nested (RSW by default); inspections to any `inspection_anchor` level or an Item. No BOQ anchor anywhere.
 - Systems of record are referenced by `external_source` + `external_id` (+ `synced_at`), never FKs. Money is a read-only mirror.
 - Verification is configuration: every verifiable transition calls `run_checks(context, rule_set)`.
 - AI-initiated mutations carry `source="ai"` and need human confirmation before applying.

@@ -46,15 +46,17 @@ Site → Asset → RSW → Activity (`remediation-fep`); Scope → Job Package �
   (RSW by default; Line in `cui-line`). **At most one work-anchor node on any root-to-leaf path;
   work anchors are never nested** (no work-anchor node has a work-anchor ancestor). Progress,
   time lines, NCR completion blocks and completion gates (`work_anchor.complete`) use it.
-  Whether a path may have *no* work anchor yet is TD-113 (default below).
+  A path may have no work anchor yet (TD-113, below).
 - **Inspections anchor to any node whose level has `inspection_anchor`, or to an Item**
   (CUI: line; remediation: rsw and item). An inspection may sit on an `inspection_anchor` node
   with no work under it yet (condition surveys, CUI scans; Amendment 5); its findings (TD-106)
   can raise the work.
 - **No BOQ anchor anywhere.**
-- Default pending TD-113: a path with no work-anchor node is allowed (inspection without work);
-  booking work (progress, time against a work anchor, completion) requires the work-anchor node
-  on the path. Time may also book to a delay/overhead code with no work anchor (Amendment 8,
+- Decided (TD-113, user 2026-11-10): a path with no work-anchor node is allowed (inspection
+  without work); booking work (progress, time against a work anchor, NCRs, completion) requires
+  the work-anchor node on the path. When work is raised on a path without one, the user must pick
+  or create the work-anchor node first; a finding (TD-106) may create it when it raises follow-up
+  work. Time may also book to a delay/overhead code with no work anchor (Amendment 8,
   TD-108).
 
 ### Restructure with history (Amendment 3)
