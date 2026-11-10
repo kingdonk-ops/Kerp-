@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 28 · **Closed:** 26
+**Open:** 31 · **Closed:** 26
 
 ## decision (2)
 
@@ -12,7 +12,7 @@
 | [TD-034](../tracker/todo/TD-034.md) | Port/rewrite assessment of remaining Inspection-ERP core packages (jobs, sync, forms, workflow, events, files, schema_engine/items/mapping, reporting) | T-0015 | reviewer |
 | [TD-053](../tracker/todo/TD-053.md) | Tenant-wide (cross-project) reads under project RLS: portfolio views, admin, and the visibility of tenant-level rows such as the project row | T-0007 | implementer |
 
-## spec-gap (5)
+## spec-gap (6)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -21,6 +21,7 @@
 | [TD-045](../tracker/todo/TD-045.md) | Spec the Request for Inspection (inspection notification / booking) record; RFI means Request for Information | T-0115 | user |
 | [TD-046](../tracker/todo/TD-046.md) | Admin side: where security and observability settings (headers/CSP, HSTS, API docs exposure, log retention) are shown or configured | T-0021 | user |
 | [TD-054](../tracker/todo/TD-054.md) | Edge spec §6 policy targets 'TO kerp_app_role'; T-0007 applies it to PUBLIC | T-0007 | implementer |
+| [TD-057](../tracker/todo/TD-057.md) | Audit ledger: diff §4 names the columns only; chain_key scope, hash algorithm, canonical serialisation and verification are implementer defaults | T-0006 | implementer |
 
 ## deferred (4)
 
@@ -31,7 +32,7 @@
 | [TD-041](../tracker/todo/TD-041.md) | CEL parity gaps between celpy 0.5.0 and @marcbachmann/cel-js 8 (pinned known_gap fixtures) must be closed or accepted before T-0131 | T-0017, T-0018 | implementer |
 | [TD-047](../tracker/todo/TD-047.md) | Automate refresh of backend/requirements*.lock (uv pip compile output): Dependabot pip does not find *.lock files or re-run uv; options: scheduled uv --upgrade workflow opening a PR, or Renovate pip-compile manager | T-0028 | implementer |
 
-## later (15)
+## later (17)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -50,6 +51,8 @@
 | [TD-052](../tracker/todo/TD-052.md) | PostgreSQL-only RLS tests skip in the SQLite run and on machines without Postgres: add a local Postgres (compose/testcontainers) recipe | T-0007 | implementer |
 | [TD-055](../tracker/todo/TD-055.md) | Data migrations under FORCE RLS see no rows: add a per-tenant/project backfill helper or a dedicated BYPASSRLS migration role (ADR) | T-0007 | implementer |
 | [TD-056](../tracker/todo/TD-056.md) | Deploy: runtime DB role must never own RLS tables (owner can disable FORCE); migrations run as a separate owner role | T-0007 | reviewer |
+| [TD-058](../tracker/todo/TD-058.md) | Audit ledger: anchor chain heads outside the database (tail truncation / re-hashed forgery by a DB superuser is undetectable by in-DB verification) | T-0006 | implementer |
+| [TD-059](../tracker/todo/TD-059.md) | Deploy: runtime role gets only SELECT, INSERT on audit_ledger; assert ledger_guard_problems at startup | T-0006 | implementer |
 
 ## risk (2)
 

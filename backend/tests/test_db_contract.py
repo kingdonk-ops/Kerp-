@@ -2,7 +2,7 @@
 
 Adapted from Inspection-ERP ``tests/test_contract.py`` (ADR 0001). A table may skip the
 mixin only when it is listed in ``MIXIN_EXEMPT`` with its reason. The hash-chained audit
-ledger (T-0006) will be the first entry.
+ledger (T-0006) carries the mixin too, so nothing is exempt.
 """
 
 from sqlalchemy import Column, Integer, MetaData, String, Table

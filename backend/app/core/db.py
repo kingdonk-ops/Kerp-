@@ -8,7 +8,7 @@ test (``tests/test_db_contract.py``) enforces this through ``contract_violations
 The column types are dialect-portable: native ``UUID``/``JSONB`` on PostgreSQL, ``CHAR(36)``
 and ``JSON`` elsewhere. That lets the fast suite run on SQLite, while CI also runs the
 suite on PostgreSQL 16. Tenant/project RLS lives in ``app.core.tenancy``. The hash-chained
-audit ledger is added by T-0006.
+audit ledger lives in ``app.core.audit`` (T-0006).
 """
 
 from __future__ import annotations
@@ -334,6 +334,9 @@ def get_db(
 # The only sanctioned way for endpoints to obtain a database session.
 DbSession = Annotated[Session, Depends(get_db, scope="function")]
 
-# Registers the soft-delete / tenancy read filters and the write guard on every Session.
-# Imported last because it needs ``BaseRecordMixin`` from this module.
+# Imported last because they need ``Base``/``BaseRecordMixin`` from this module.
+# ``audit.models``: core tables live outside ``app.modules``; importing them here puts them
+# on ``Base.metadata`` wherever the DB layer is used (Alembic, contract tests). T-0006.
+# ``tenancy.scope``: the soft-delete / tenancy read filters and write guard on every Session.
+from app.core.audit import models as _audit_models  # noqa: E402, F401
 from app.core.tenancy import scope as _tenancy_scope  # noqa: E402, F401

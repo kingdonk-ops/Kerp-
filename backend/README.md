@@ -13,6 +13,7 @@ FastAPI modular monolith (see `docs/spec/` and `CLAUDE.md` §6).
 | `app/api/health.py` | `GET /health` liveness endpoint |
 | `app/core/tenancy/` | Project-scoped RLS, tenancy context, ORM scope + soft-delete filter — see its `README.md` |
 | `app/core/cel/` | CEL rule evaluation (celpy, lazy) with the KERP error taxonomy — see its `README.md` |
+| `app/core/audit/` | Hash-chained, append-only audit ledger (`append`, `verify_chain`; REVOKE + triggers) — see its `README.md` |
 | `app/modules/<name>/` | Domain modules (`manifest.py`, `models.py`, `router.py`, `service.py`, `schemas.py`, `README.md`) — added by later tasks |
 | `tests/` | pytest suite |
 
