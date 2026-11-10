@@ -1,0 +1,31 @@
+# Dependency refresh (T-0028). PRs target dev like every other change and go through
+# ci-gate + review-gate. Dependabot was chosen over Renovate: it needs no app install.
+version: 2
+updates:
+  # Backend base image: proposes new python:3.12-slim-bookworm digests (and patch tags).
+  - package-ecosystem: docker
+    directory: /backend
+    target-branch: dev
+    schedule:
+      interval: weekly
+    ignore:
+      # Stay on CPython 3.12: the lock files target --python-version 3.12.
+      - dependency-name: python
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+    commit-message:
+      prefix: "chore(deps)"
+
+  # SHA-pinned actions in .github/workflows (the tag stays in the trailing comment).
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: dev
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: "chore(deps)"
+
+# Not covered: backend/requirements*.lock (uv pip compile output). Dependabot's pip
+# ecosystem neither finds *.lock files nor re-runs uv; see the TODO raised by T-0028.

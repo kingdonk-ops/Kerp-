@@ -6,12 +6,12 @@
 # Reproducible: every Python dependency comes from a hashed lock file
 # (requirements.lock / requirements-build.lock, see README "Container image") and is
 # installed as a pre-built wheel only (--only-binary=:all:), so no compiler is needed
-# and nothing is built from an sdist. The base image is pinned by tag.
-
-ARG PYTHON_IMAGE=python:3.12-slim-bookworm
+# and nothing is built from an sdist. The base image is pinned by tag + multi-arch index
+# digest, written in each FROM (not via ARG) so Dependabot (.github/dependabot.yml) can
+# propose digest refreshes. Keep both FROM lines identical.
 
 # --- build: runtime virtualenv + the kerp-backend wheel -----------------------------------
-FROM ${PYTHON_IMAGE} AS build
+FROM python:3.12-slim-bookworm@sha256:935c3c5b12357a7e10caa9c1e6ca5692344d97cf229832ef584be2cec9fc03df AS build
 
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PIP_NO_CACHE_DIR=1 \
@@ -37,7 +37,7 @@ RUN /opt/buildenv/bin/hatchling build --target wheel --directory /wheels \
     && /opt/venv/bin/pip check
 
 # --- runtime ------------------------------------------------------------------------------
-FROM ${PYTHON_IMAGE} AS runtime
+FROM python:3.12-slim-bookworm@sha256:935c3c5b12357a7e10caa9c1e6ca5692344d97cf229832ef584be2cec9fc03df AS runtime
 
 ENV PATH=/opt/venv/bin:$PATH \
     PYTHONDONTWRITEBYTECODE=1 \

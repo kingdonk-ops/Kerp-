@@ -114,7 +114,8 @@ uvicorn app.main:create_app --factory --reload
 
 `Dockerfile` (build context `backend/`) is multi-stage: the `build` stage installs the
 runtime dependencies into `/opt/venv` and builds the `kerp-backend` wheel with hatchling in a
-throwaway venv; the `runtime` stage (`python:3.12-slim-bookworm`, pinned by tag) copies only
+throwaway venv; the `runtime` stage (`python:3.12-slim-bookworm`, pinned by tag + index digest;
+Dependabot proposes digest refreshes, `.github/dependabot.yml`) copies only
 `/opt/venv` and runs as the non-root user `kerp` (uid/gid `10001`). Every `pip install` uses
 `--only-binary=:all:` (no sdists, no compiler) and the lock files are installed with
 `--require-hashes`. `.dockerignore` is an allowlist (`app/`, `pyproject.toml`, `README.md`,
@@ -127,8 +128,10 @@ docker run --rm -p 8000:8000 -e KERP_ENVIRONMENT=development kerp-backend
 
 The image defaults to `KERP_ENVIRONMENT=production` (HSTS on); it listens on port 8000
 (`uvicorn app.main:create_app --factory`) and has a `HEALTHCHECK` against `/health` using the
-standard library only. CI (`backend-image` job) builds and smoke-tests the image on every PR and
-pushes `ghcr.io/kingdonk-ops/kerp-backend:<short-sha>` and `:<branch>` on pushes to `dev`/`main`.
+standard library only. CI's `backend-image` job builds and smoke-tests the image on every run
+with a read-only token. On pushes to `dev`/`main`, the separate `backend-publish` job is the only
+job with `packages: write`. It runs after the tests and the smoke test pass, and pushes
+`ghcr.io/kingdonk-ops/kerp-backend:<short-sha>` and `:<branch>`.
 
 ### Lock files
 

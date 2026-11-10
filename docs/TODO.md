@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 25 · **Closed:** 21
+**Open:** 23 · **Closed:** 25
 
 ## decision (1)
 
@@ -20,7 +20,7 @@
 | [TD-045](../tracker/todo/TD-045.md) | Spec the Request for Inspection (inspection notification / booking) record; RFI means Request for Information | T-0115 | user |
 | [TD-046](../tracker/todo/TD-046.md) | Admin side: where security and observability settings (headers/CSP, HSTS, API docs exposure, log retention) are shown or configured | T-0021 | user |
 
-## deferred (4)
+## deferred (5)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -28,8 +28,9 @@
 | [TD-032](../tracker/todo/TD-032.md) | tenant_id FK to the tenants directory table (spec §1.1) once the tenants table exists | T-0005 | implementer |
 | [TD-033](../tracker/todo/TD-033.md) | Default soft-delete filtering: exclude deleted_at IS NOT NULL from ORM reads unless opted in | T-0005 | implementer |
 | [TD-041](../tracker/todo/TD-041.md) | CEL parity gaps between celpy 0.5.0 and @marcbachmann/cel-js 8 (pinned known_gap fixtures) must be closed or accepted before T-0131 | T-0017, T-0018 | implementer |
+| [TD-047](../tracker/todo/TD-047.md) | Automate refresh of backend/requirements*.lock (uv pip compile output): Dependabot pip does not find *.lock files or re-run uv; options: scheduled uv --upgrade workflow opening a PR, or Renovate pip-compile manager | T-0028 | implementer |
 
-## later (13)
+## later (11)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -39,21 +40,18 @@
 | [TD-020](../tracker/todo/TD-020.md) | Frontend: add ESLint (typescript-eslint, react-hooks) + lint gate in CLAUDE.md section 4 and CI | T-0002 | implementer |
 | [TD-023](../tracker/todo/TD-023.md) | Distributed tracing / metrics (OpenTelemetry, Prometheus endpoint) for API and ARQ worker | T-0021 | implementer |
 | [TD-025](../tracker/todo/TD-025.md) | Backend errors: request-context middleware renders unhandled 500s itself, so add_exception_handler(Exception) never runs; document or make the renderer pluggable before an error-format task; move _restore_logging autouse fixture to tests/conftest.py | T-0021 | reviewer |
-| [TD-028](../tracker/todo/TD-028.md) | Pin backend base image by digest and automate refresh of base image + requirements locks (Dependabot/Renovate) | T-0004 | implementer |
-| [TD-031](../tracker/todo/TD-031.md) | CI hardening: split GHCR publish into a push-only job holding packages:write, pin docker/* actions to commit SHAs, persist-credentials:false; declare packaging as backend dev dep; assert .dockerignore starts with * | T-0004 | reviewer |
 | [TD-035](../tracker/todo/TD-035.md) | Optimistic locking on BaseRecordMixin.revision (version_id_col or explicit base_revision check) | T-0005 | reviewer |
 | [TD-036](../tracker/todo/TD-036.md) | Guard against bare Depends(get_db) outside app/core/db.py (endpoints must use DbSession) | T-0005 | reviewer |
-| [TD-037](../tracker/todo/TD-037.md) | Drop the empty 'postgres' extra from backend/pyproject.toml once CI's install line stops referencing it | T-0005 | reviewer |
 | [TD-038](../tracker/todo/TD-038.md) | Add reportlab (and openpyxl if the Excel renderer is ported) to the heavy-lib lazy-import lint when Inspection-ERP core/reporting is ported | T-0115, T-0119 | kerp-reviewer |
 | [TD-043](../tracker/todo/TD-043.md) | Entra ID SSO for KAEFER staff behind the AuthProvider seam, before the first pilot | T-0008 | user |
+| [TD-048](../tracker/todo/TD-048.md) | SHA-pin actions in promote.yml and review-gate.yml (persist-credentials:false where no push is needed) and digest-pin the CI service images (postgis, redis) | T-0028 | implementer |
 
-## risk (3)
+## risk (2)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
 | [TD-013](../tracker/todo/TD-013.md) | review-gate patch-id ignores tracker/ — on planning PRs task content can change after approval without re-review | — | coordinator |
 | [TD-024](../tracker/todo/TD-024.md) | Backend logging: httpx/httpcore INFO lines log full outbound URLs (incl. query-string tokens) via the root JSON handler; set them to WARNING before any integration makes outbound calls | T-0021 | reviewer |
-| [TD-030](../tracker/todo/TD-030.md) | CI: detect job is not in ci-gate.needs - if detect fails, backend/frontend/e2e/backend-image are skipped and ci-gate still passes; add detect to needs and fail on non-success | T-0004 | reviewer |
 
 ## Closed
 
@@ -76,7 +74,11 @@
 | ✅ | [TD-022](../tracker/todo/TD-022.md) | Sign off security header values and JSON log schema (T-0021 defaults) | T-0021 defaults accepted; no HSTS preload; /docs, /redoc, /openapi.json hidden in production (T-0030); log shipping on AWS decided with deploy; admin-side settings spec in TD-046 (user, 2026-11-09) |
 | ✅ | [TD-026](../tracker/todo/TD-026.md) | Extend TID253 heavy-import ban list as heavy deps land (DXF/XER parsers, PDF compile libs) | Standing check added to the kerp-reviewer checklist: every new heavy dependency is added to banned-module-level-imports in the same PR (user, 2026-11-09) |
 | ✅ | [TD-027](../tracker/todo/TD-027.md) | Worker queue: CLAUDE.md/plan say ARQ, consolidation spec says SAQ replaces ARQ | SAQ over Redis (interactive + batch queues), per the consolidated spec; CLAUDE.md §6 wording updated (user, 2026-11-09) |
+| ✅ | [TD-028](../tracker/todo/TD-028.md) | Pin backend base image by digest and automate refresh of base image + requirements locks (Dependabot/Renovate) | T-0028: base image pinned by multi-arch index digest in both FROM lines; .github/dependabot.yml (Dependabot, no app install) refreshes the base image digest and the action SHAs. Lock-file refresh split out to TD-047. |
 | ⚫ | [TD-029](../tracker/todo/TD-029.md) | Backend image is linux/amd64 only (locks target x86_64-manylinux_2_28); add arm64 if a deployment target needs it | Production on AWS x86_64 is enough; reopen if an arm64 (Graviton) target is chosen (user, 2026-11-09) |
+| ✅ | [TD-030](../tracker/todo/TD-030.md) | CI: detect job is not in ci-gate.needs - if detect fails, backend/frontend/e2e/backend-image are skipped and ci-gate still passes; add detect to needs and fail on non-success | T-0028: detect is in ci-gate.needs; scripts/ci_gate.py fails the gate unless every needed job is success, or skipped only when its component is absent (detect output false) or it is the push-only publish job on a non-push event. Tested in scripts/tests/test_ci_gate.py. |
+| ✅ | [TD-031](../tracker/todo/TD-031.md) | CI hardening: split GHCR publish into a push-only job holding packages:write, pin docker/* actions to commit SHAs, persist-credentials:false; declare packaging as backend dev dep; assert .dockerignore starts with * | T-0028: GHCR publish moved to the push-only backend-publish job, the only job with packages:write; all actions in ci.yml (incl. docker/*) pinned to commit SHAs; every checkout sets persist-credentials:false; packaging declared as a backend dev dependency; test asserts .dockerignore starts with *. |
+| ✅ | [TD-037](../tracker/todo/TD-037.md) | Drop the empty 'postgres' extra from backend/pyproject.toml once CI's install line stops referencing it | T-0028: empty postgres extra removed from backend/pyproject.toml and ci.yml installs .[dev]. |
 | ✅ | [TD-039](../tracker/todo/TD-039.md) | Bring back any PROPOSAL-port-from-aip extras dropped in spec consolidation (write-back, type inheritance, migration preview, test-fill, section library, report slots, auto_create_itp, competency assignment, programmes)? | Out of scope for Phase 1. Revisit auto_create_itp and asset write-back as Phase 3 candidates (user, 2026-11-09) |
 | ✅ | [TD-040](../tracker/todo/TD-040.md) | CEL value encoding: plain JSON numbers are CEL double on both runtimes; ints/timestamps need explicit tags | Confirmed: plain JSON numbers are CEL double; int64/timestamp/uint/duration use $-tagged encoding. Binding for sync payloads and form templates (user, 2026-11-09) |
 | ✅ | [TD-042](../tracker/todo/TD-042.md) | EDGE-SCREENS 2.1 hold-gating example uses count(list), which is not standard CEL | Use standard size(); EDGE-SCREENS §2.1 hold-gating example corrected (user, 2026-11-09) |
