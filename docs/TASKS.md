@@ -3,19 +3,19 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 10/71 tasks done (14%) · **ready now:** 8 · **epics awaiting breakdown:** 42
+**Overall:** 10/71 tasks done (14%) · **ready now:** 8 · **epics awaiting breakdown:** 47
 
 | Phase | Tasks done | Progress |
 |---|---|---|
 | 0 · Platform foundations | 10/31 | `███░░░░░░░` 32% |
-| 1 · Asset & Quality backbone | 0/31 | `░░░░░░░░░░` 0% |
+| 1 · Asset & Quality backbone | 0/31 (+1 epics) | `░░░░░░░░░░` 0% |
 | 2 · Welding quality | 0/9 | `░░░░░░░░░░` 0% |
 | 3 · Logistics | 0/0 (+7 epics) | `░░░░░░░░░░` 0% |
-| 4 · Execution | 0/0 (+11 epics) | `░░░░░░░░░░` 0% |
+| 4 · Execution | 0/0 (+14 epics) | `░░░░░░░░░░` 0% |
 | 5 · Documents, collaboration & AI | 0/0 (+10 epics) | `░░░░░░░░░░` 0% |
 | 6 · Defense, claims & controls | 0/0 (+8 epics) | `░░░░░░░░░░` 0% |
 | 6b · Work packaging (AWP) | 0/0 (+3 epics) | `░░░░░░░░░░` 0% |
-| 7 · Client portal | 0/0 (+3 epics) | `░░░░░░░░░░` 0% |
+| 7 · Client portal | 0/0 (+4 epics) | `░░░░░░░░░░` 0% |
 
 ## Phase 0 — Platform foundations
 
@@ -87,6 +87,7 @@
 | ⬜ | [T-0130](../tracker/tasks/T-0130.md) | Frontend: inspections register + raise/close + calibration-gated tool pick + gate findings | frontend | M | T-0111, T-0112, T-0124, T-0128 |  |
 | ⬜ | [T-0132](../tracker/tasks/T-0132.md) | Phase 1 exit journey: P6→hierarchy→inspection gates→completion blocked by open NCR; expired tool blocked | e2e | S | T-0129, T-0130 |  |
 | 🟥 | [T-0133](../tracker/tasks/T-0133.md) | Field checkout lease + per-field sync-back contract: P6 re-import during checkout never loses tablet changes *(blocked by TD-075)* | sync | M | T-0126, T-0104 |  |
+| 🧩 | [E-01-01](../tracker/tasks/E-01-01.md) | register views: column catalogue (level/item-type fields, ancestors, rollups, cross-module providers), filter AST, shared saved views, grouped totals, bulk actions | saved_views | L | T-0020, T-0025, T-0102 |  |
 | ⬜ | [T-0131](../tracker/tasks/T-0131.md) | [M1] Phase 1 backbone-freeze contract gate: freeze oe_asset_node/oe_asset_item/mixins/run_checks sigs; CEL parity; eligibility/VFS seam hashes | platform | M | T-0005, T-0016, T-0018, T-0101, T-0103, T-0110, T-0111, T-0112, T-0124, T-0132 |  |
 
 ## Phase 2 — Welding quality
@@ -130,6 +131,9 @@
 | 🧩 | [E-04-09](../tracker/tasks/E-04-09.md) | safety / hse: SWMS/PTW permits + incident + KPI ingestion | safety | L | T-0012 |  |
 | 🧩 | [E-04-10](../tracker/tasks/E-04-10.md) | site_supervision / commissioning / closeout / defects_liability | site_supervision | L | E-04-03 |  |
 | 🧩 | [E-04-11](../tracker/tasks/E-04-11.md) | handover: shift/swing handover register - free-form sections, record links + hover preview, activity suggestions (rule set), first-shift delivery + acknowledgement | handover | L | T-0006, T-0015, T-0018, T-0019, T-0025, T-0101 |  |
+| 🧩 | [E-04-12](../tracker/tasks/E-04-12.md) | planner: work plans (shutdown/break-in/campaign) in overlay or interrupt mode, resource pool (groups, people, crews, rosters), allocation grid by day/shift, capacity check, overlay Gantt, commit into programme | planner | L | E-04-01, E-04-07, T-0101, T-0018, T-0019, T-0118 |  |
+| 🧩 | [E-04-13](../tracker/tasks/E-04-13.md) | scaffolding: scaffold register (location, build/approve/tag data, files, photos), lifecycle, tagging on one-engine inspections, automatic re-inspection tasks + overdue gate, build/modify/dismantle requests, QR card | scaffolding | L | T-0101, T-0103, T-0111, T-0118, T-0016, T-0019, E-04-07 |  |
+| 🧩 | [E-04-14](../tracker/tasks/E-04-14.md) | scope_changes: change-of-scope register anchored to RSW/node (current-scope snapshot, proposed lines, photos, walk-down, party responses), agree then scope revision via asset service, portal exposure, variation link | scope_changes | L | T-0101, T-0102, T-0016, T-0018 |  |
 
 ## Phase 5 — Documents, collaboration & AI
 
@@ -174,3 +178,4 @@
 | 🧩 | [E-07-01](../tracker/tasks/E-07-01.md) | portal v1: client read-only hierarchy + registers (magic link) | portal | L | T-0131 |  |
 | 🧩 | [E-07-02](../tracker/tasks/E-07-02.md) | portal v2: client co-sign reports & ITPs (report.cosign / itp.cosign, pyHanko) | portal | L | E-07-01, T-0119 |  |
 | 🧩 | [E-07-03](../tracker/tasks/E-07-03.md) | portal v3: visit scheduler (witness/final) + client NCR input/sign-off | portal | L | E-07-02 |  |
+| 🧩 | [E-07-04](../tracker/tasks/E-07-04.md) | portal v4: plan review - layouts per client role, distribution matrix, send with PDF + magic link, anchored comment threads, multi-session review with attendance, revision-bound approvals + absent-approver override, commit on approval | portal | L | E-07-01, E-04-12, E-06-07, T-0009, T-0019, T-0119 |  |
