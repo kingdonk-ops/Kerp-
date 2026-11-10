@@ -587,7 +587,7 @@ delay attribution on no-show; ADR 0003 `budget_hours` on progress units.
 - TT-2 **Delay-code catalogue** as pack configuration: numeric code, group (meetings, permits,
   planning, tools/equipment, weather, training), label, `attributable_to[client|kaefer|neutral]`,
   `billable` flag; one catalogue shared by NPT reasons, look-ahead RNC and delay events
-  (E-06-03). Test: code 61 "Permitry – field sign-on delay" marked client-attributable appears in
+  (E-06-03). Test: code 01 "permit delay (synthetic)" marked client-attributable appears in
   the delay-attribution report.
 - TT-3 **Delay vs non-productive time are different measures**: NPT (standing allowance, default
   4.5 h/day here — travel/pre-start) vs coded delay hours. Field_time line carries `npt_hours`

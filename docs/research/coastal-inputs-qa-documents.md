@@ -205,7 +205,7 @@ later updated with results and re-issued as "Result(s)".
   removal of formwork, Visual finishing, Review; mechanical = Visual weld, Bolt tensioning,
   Gridmesh & clip check, Final inspection; coating = Blast, 1st/2nd/3rd coat, Final) ·
   `Intervention Point` grid with **one row per party** (KAEFER, client) × Hold/Witness/
-  Surveillance/Review · `Asset` · `RSW No.` (may hold several: `918 & 920`) · `Scheduled
+  Surveillance/Review · `Asset` · `RSW No.` (may hold several: `100 & 101`) · `Scheduled
   Inspection Time` · `Inspection Result` (Accepted / Rejected / Rescheduled; coating adds
   Other) · `Comments` (location – grids, levels, batch numbers, items inspected e.g. CP numbers,
   bolt counts `18 x M20-90/100`, deviations found).
@@ -215,7 +215,7 @@ later updated with results and re-issued as "Result(s)".
 **Data-quality notes.** Civil sheets carry a *different contract number format* from the other
 disciplines (template constant, wrong); ITP No. sometimes full client number, sometimes `002`;
 unused slots print `0` and `12:00 AM`; contact email `#N/A`. Coating "batch" = coating work lot
-(`Batch #5 [South of Grid G(1-2)]`) – a sub-anchor of the RSW, not a material batch.
+(`Batch #<n> [<grid ref>]`) – a sub-anchor of the RSW, not a material batch.
 
 **Workflow.** Supervisor drafts by ~day before → sent to client → client attends/doesn't →
 result recorded per slot (Accepted / Rejected / Rescheduled) → re-issued as result copy →

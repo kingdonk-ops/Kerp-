@@ -18,7 +18,7 @@ Precedence: module detail (3). Disagreements → `spec-gap` TODO.
 
 | Example | What it shows | Where it lands |
 |---|---|---|
-| P6 construction schedule (XER, ~3,000 activities) | WBS Project → Site → Online/Shutdown circuit → Asset; activity names `Asset / Activity / RSW` (e.g. `CV101 / CP / 101`); activity code "Status" = Shutdown / Online Works / On-Hold P1 / P2; one calendar per shut window (`… CD3P`, `… PLT01 Preps`); labour resources per trade per region (Scaffolder, Painter/Blaster, Mechanical, Civil) with hours per activity; scaffold activities `SCA Erect` / `SCA Dism` | baseline programme (§3), resource groups (§4), calendars (§3.2) |
+| P6 construction schedule (XER, ~3,000 activities) | WBS Project → Site → Online/Shutdown circuit → Asset; activity names `Asset / Activity / RSW` (e.g. `CV01 / CP / 100`); activity code "Status" = Shutdown / Online Works / On-Hold P1 / P2; one calendar per shut window (`… <shut code>`, `… <shut code> Preps`); labour resources per trade per region (Scaffolder, Painter/Blaster, Mechanical, Civil) with hours per activity; scaffold activities `SCA Erect` / `SCA Dism` | baseline programme (§3), resource groups (§4), calendars (§3.2) |
 | Basis of schedule | WBS levels, online works 12 h × 7 d, shutdown works 12 h per shift (DS + NS), schedule depends on client shut dates and isolations | calendars and plan kinds (§3, §5) |
 | Front-end planning workbook | per Asset / RSW / Activity: budget qty + UOM, budget hrs, scaffold hrs, Shutdown flag, grouping / workpack, sequence priority, offsite fab, outsource; summary of budget hours Online vs Shutdown per asset, with and without scaffolding | plan lines and stats (§6, §9); register columns ([`register-views.md`](register-views.md)) |
 | Shut resource allocation & forecast (one week shut) | rows = "Scope Area n – description" (Asset, RSW #, client work-order #, hours by trade B&P / Mech / SR / DW); second sheet = crew blocks (Painting crew 13 DS + 6 NS, Mechanical 7 DS + 3 NS, Scaffolding 9 DS) × day × AM/PM with heads per scope area and totals per shift; milestones on the timeline (JSE start, junction start, loop start) | allocation grid (§7) |
@@ -48,7 +48,7 @@ the work anchor (`schedule_link` role), budgeted labour units per resource group
 
 ### 3.2 Calendars and shifts
 - P6 calendars are imported as read-only `external_source="p6"` calendars (work days, hours,
-  exceptions). A shut window calendar (e.g. "Shut PLT01") is shown as a shaded band.
+  exceptions). A shut window calendar (e.g. "Shut <shut code>") is shown as a shaded band.
 - KERP calendars (`oe_planner_calendar`) are created for plans that have no P6 calendar.
 - **Shift pattern** (`oe_planner_shift_pattern`): named shifts with start/end and paid hours,
   e.g. `DS 06:00–18:00 11.5 h`, `NS 18:00–06:00 11.5 h`, or `AM` / `PM` halves. The allocation
@@ -119,7 +119,7 @@ already-approved plans.
 
 | Column | Notes |
 |---|---|
-| `plan_id`, `seq`, `group_label` | `group_label` = scope area heading ("Scope Area 1 – Prim. Crusher Maintenance Deck"); grouping is free text or a node |
+| `plan_id`, `seq`, `group_label` | `group_label` = scope area heading ("Scope Area 1 – <area description>"); grouping is free text or a node |
 | `anchor_node_id` / `anchor_item_id` | any node or item; `anchor_role` recorded (ADR 0003 §2). Usually the work anchor. Multiple anchors via `oe_planner_line_anchor` (one scope area covering RSWs `01-100.1-2` and `02-101.1-2`). |
 | `activity_code` | the FEP / P6 activity (B, P, CP, W, SR, BN, G, HDNR…, SCA Erect, SCA Dism) — a value list from the project's pack |
 | `p6_activity_external_id` | optional link to an existing P6 activity |
