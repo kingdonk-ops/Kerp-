@@ -111,7 +111,7 @@ default layer.
 
 ## Amendments on acceptance (user, 2026-11-10, TD-072, TD-079)
 
-Accepted with these changes. Where they conflict with the Decision above, they win. The spec
+Accepted with these changes. Where they conflict with anything above (Decision or Consequences), they win. The spec
 and task edits are tracked in TD-112.
 
 ### A. Per-record override of a blocked check

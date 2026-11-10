@@ -133,11 +133,13 @@ they were captured on (records pin `template_revision_id`), new records use the 
 
 - **Spec edits** (separate PR after acceptance): `asset-and-tagging.md` (level defs, roles,
   `work_anchor_id`), `quality-and-inspection.md` (request-anchor link, role binding),
-  CLAUDE.md §6 wording: "work anchors to the project's **work-anchor level** (RSW by default),
-  inspections to any `inspection_anchor` level; no BOQ anchor anywhere."
+  CLAUDE.md §6 wording (as amended by Amendment 1): "work anchors to a **work-anchor node** —
+  exactly one per root-to-leaf path, never nested (RSW by default); inspections to any
+  `inspection_anchor` level; no BOQ anchor anywhere."
 - **Task changes** (same set as the Affects header and TD-071):
   - T-0101 — adds `oe_asset_level_def` (roles, unique `(project_id, key)`), `level_def_id` on
-    nodes and the one-work-anchor-level invariant (replaces "RSW is the leaf work anchor").
+    nodes and the one-work-anchor-per-path invariant, never nested (Amendment 1; replaces "RSW is
+    the leaf work anchor").
   - T-0103 — `oe_asset_item.rsw_id` → `work_anchor_id`.
   - T-0105 / T-0106 — "preserve inspection/RSW ties" becomes "preserve inspection/work-anchor
     ties"; P6 activities link to the level with the `schedule_link` role.
@@ -166,7 +168,7 @@ they were captured on (records pin `template_revision_id`), new records use the 
 
 ## Amendments on acceptance (user, 2026-11-10, TD-071)
 
-Accepted with these changes. Where they conflict with the Decision above, they win. The spec
+Accepted with these changes. Where they conflict with anything above (Decision or Consequences), they win. The spec
 and task edits are tracked in TD-112.
 
 1. **One work anchor per branch, not per project.** Replaces "exactly one level per project

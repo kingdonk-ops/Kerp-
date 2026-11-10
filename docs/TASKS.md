@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 10/71 tasks done (14%) · **ready now:** 9 · **epics awaiting breakdown:** 47
+**Overall:** 10/71 tasks done (14%) · **ready now:** 7 · **epics awaiting breakdown:** 47
 
 | Phase | Tasks done | Progress |
 |---|---|---|
@@ -38,7 +38,7 @@
 | ⬜ | [T-0015](../tracker/tasks/T-0015.md) | SAQ worker + Redis + jobs module (enqueue/status/poll), interactive+batch priority queues | jobs | M | T-0003, T-0011 |  |
 | ⬜ | [T-0016](../tracker/tasks/T-0016.md) | Storage service + presigned uploads (presign/complete, sha256 verify, scan stub, orphan sweep) | uploads | M | T-0015 |  |
 | ✅ | [T-0017](../tracker/tasks/T-0017.md) | CEL runtime substrate: celpy (server) + JS CEL (client) + shared conformance_fixtures.json harness | platform | M | T-0001, T-0002 | #15 |
-| ▶ | [T-0018](../tracker/tasks/T-0018.md) | Verification engine shell: run_checks(context, rule_set), rule sets as data (CEL), findings log | validation | M | T-0006, T-0017 |  |
+| 🟥 | [T-0018](../tracker/tasks/T-0018.md) | Verification engine shell: run_checks(context, rule_set), rule sets as data (CEL), findings log *(blocked by TD-112)* | validation | M | T-0006, T-0017 |  |
 | ⬜ | [T-0019](../tracker/tasks/T-0019.md) | notifications module (in-app) | notifications | S | T-0012 |  |
 | ⬜ | [T-0020](../tracker/tasks/T-0020.md) | saved_views module | saved_views | S | T-0012 |  |
 | ✅ | [T-0021](../tracker/tasks/T-0021.md) | Observability + security headers (request id, structured logs, CSP/HSTS) | platform | S | T-0001 | #9 |
@@ -57,7 +57,7 @@
 
 | | ID | Title | Module | Size | Depends on | PR |
 |---|---|---|---|---|---|---|
-| ⬜ | [T-0101](../tracker/tasks/T-0101.md) | Asset hierarchy oe_asset_node: ltree tree_path (GiST) + parent_id source-of-truth + display_path, PostGIS, subtree move, tree API | asset_management | M | T-0012, T-0018 |  |
+| 🟥 | [T-0101](../tracker/tasks/T-0101.md) | Asset hierarchy oe_asset_node: ltree tree_path (GiST) + parent_id source-of-truth + display_path, PostGIS, subtree move, tree API *(blocked by TD-112)* | asset_management | M | T-0012, T-0018 |  |
 | ⬜ | [T-0102](../tracker/tasks/T-0102.md) | Dynamic field registry: oe_asset_field_def (JSONSchema registry) + custom_fields JSONB (EAV deleted), GIN jsonb_path_ops + functional B-tree | asset_management | M | T-0101, T-0110 |  |
 | ⬜ | [T-0103](../tracker/tasks/T-0103.md) | Items oe_asset_item: typed inspectable items + reserved CML stub fields (no calc engine) | asset_management | M | T-0102 |  |
 | ⬜ | [T-0104](../tracker/tasks/T-0104.md) | P6 .xer import: SAQ parser → staging → hierarchy mapping, unique (project_id, external_activity_id) | asset_management | M | T-0101, T-0015 |  |
@@ -80,13 +80,13 @@
 | ⬜ | [T-0122](../tracker/tasks/T-0122.md) | compliance DSL wired into run_checks (CEL rule sets) | compliance | M | T-0018 |  |
 | ⬜ | [T-0124](../tracker/tasks/T-0124.md) | Rule sets A — completion gates: inspection.close, rsw.complete, asset.status_change (open Cat A/NCR blocks) | validation | M | T-0111, T-0114, T-0116 |  |
 | ⬜ | [T-0125](../tracker/tasks/T-0125.md) | Rule sets B — P6 sync: asset.p6_fields, schedule.p6_import/export | validation | S | T-0104, T-0106 |  |
-| ▶ | [T-0126](../tracker/tasks/T-0126.md) | Offline sync core: outbox_mutations, client_op_id idempotency, vector clock, conflict resolution (immutable approvals, per-field apply per ADR 0005) | sync | M | T-0006 |  |
+| 🟥 | [T-0126](../tracker/tasks/T-0126.md) | Offline sync core: outbox_mutations, client_op_id idempotency, vector clock, conflict resolution (immutable approvals, per-field apply per ADR 0005) *(blocked by TD-112)* | sync | M | T-0006 |  |
 | ⬜ | [T-0127](../tracker/tasks/T-0127.md) | Frontend: useOfflineSync tier-1 (Dexie IndexedDB outbox) + offline indicator | frontend | M | T-0126, T-0024 |  |
 | ⬜ | [T-0128](../tracker/tasks/T-0128.md) | Frontend: asset tree + Asset-Details (attributes, items, inspections over descendants) | frontend | M | T-0101, T-0103, T-0025 |  |
 | ⬜ | [T-0129](../tracker/tasks/T-0129.md) | Frontend: P6 import wizard UI (upload, map, unmatched-row linking, commit) | frontend | M | T-0104, T-0128 |  |
 | ⬜ | [T-0130](../tracker/tasks/T-0130.md) | Frontend: inspections register + raise/close + calibration-gated tool pick + gate findings | frontend | M | T-0111, T-0112, T-0124, T-0128 |  |
 | ⬜ | [T-0132](../tracker/tasks/T-0132.md) | Phase 1 exit journey: P6→hierarchy→inspection gates→completion blocked by open NCR; expired tool blocked | e2e | S | T-0129, T-0130 |  |
-| ⬜ | [T-0133](../tracker/tasks/T-0133.md) | Field checkout lease + per-field sync-back contract: P6 re-import during checkout never loses tablet changes | sync | M | T-0126, T-0104 |  |
+| 🟥 | [T-0133](../tracker/tasks/T-0133.md) | Field checkout lease + per-field sync-back contract: P6 re-import during checkout never loses tablet changes *(blocked by TD-112)* | sync | M | T-0126, T-0104 |  |
 | 🧩 | [E-01-01](../tracker/tasks/E-01-01.md) | register views: column catalogue (level/item-type fields, ancestors, rollups, cross-module providers), filter AST, shared saved views, grouped totals, bulk actions | saved_views | L | T-0020, T-0025, T-0102 |  |
 | ⬜ | [T-0131](../tracker/tasks/T-0131.md) | [M1] Phase 1 backbone-freeze contract gate: freeze oe_asset_node/oe_asset_item/mixins/run_checks sigs; CEL parity; eligibility/VFS seam hashes | platform | M | T-0005, T-0016, T-0018, T-0101, T-0103, T-0110, T-0111, T-0112, T-0124, T-0132 |  |
 
