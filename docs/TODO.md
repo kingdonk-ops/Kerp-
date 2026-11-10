@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 73 · **Closed:** 54
+**Open:** 74 · **Closed:** 54
 
 ## decision (2)
 
@@ -69,7 +69,7 @@
 | [TD-122](../tracker/todo/TD-122.md) | Bind the request's project scope from the authorised project (tenancy context is tenant-level after T-0008) | T-0008 | implementer |
 | [TD-129](../tracker/todo/TD-129.md) | Guard the module toggle API (PUT /api/v1/modules/{name}) with the admin capability tier once RBAC lands (T-0010/T-0014) | T-0011 | implementer |
 
-## later (24)
+## later (25)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -97,6 +97,7 @@
 | [TD-126](../tracker/todo/TD-126.md) | CI drift check: fail when frontend/src/api/ (openapi.json, schema.ts) is stale against the backend OpenAPI schema | T-0011 | implementer |
 | [TD-127](../tracker/todo/TD-127.md) | Frontend: project module settings screen (toggle via /api/v1/modules) and hide disabled modules in the navigation | T-0011 | implementer |
 | [TD-128](../tracker/todo/TD-128.md) | Concurrent first toggle of the same module in one project races on uq_project_module_setting_module and returns 500; retry or upsert | T-0011 | implementer |
+| [TD-130](../tracker/todo/TD-130.md) | Module loader: require CurrentPrincipal on every mounted module router by default (opt-out for public routes) | T-0011 | implementer |
 
 ## risk (5)
 
