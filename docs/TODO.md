@@ -3,9 +3,9 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 51 · **Closed:** 26
+**Open:** 83 · **Closed:** 26
 
-## decision (11)
+## decision (20)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -20,8 +20,17 @@
 | [TD-077](../tracker/todo/TD-077.md) | P6 supply formats: XER only, plus Primavera XML (T-0105), Excel exports, or a direct P6 API later? | T-0105 | planner |
 | [TD-078](../tracker/todo/TD-078.md) | RSW PDF processing location: self-hosted OCR only, hybrid (local OCR + external AI), or cloud processing | E-05-09 | planner |
 | [TD-079](../tracker/todo/TD-079.md) | Align P6 mapping profile (activity-name regex, eligibility rules) with ADR 0004 single rule store: new rule kinds or extend autolink | T-0104 | reviewer |
+| [TD-080](../tracker/todo/TD-080.md) | Accept ADR 0006: work plans as a KERP layer on the P6 programme (overlay / interrupt with displaced forecast, fragnet export, KERP-id match on re-import) | E-04-12, E-04-01, T-0106 | planner |
+| [TD-081](../tracker/todo/TD-081.md) | Portal plan approval: may magic-link (no account) participants cast approvals, and may a chair record proxy approvals in a session | E-07-04, T-0009 | planner |
+| [TD-082](../tracker/todo/TD-082.md) | Scaffold re-inspection: default interval, event triggers and auto-assignment rule (supervisor vs automatic inspector pool) | E-04-13 | planner |
+| [TD-091](../tracker/todo/TD-091.md) | Remediation welds on existing steel record heat as unknown-existing: reconcile with the MDR 100 percent heat MTR invariant, and how heat validity is checked before materials (Phase 3) exists | T-0205, E-05-05, E-03-03 | planner |
+| [TD-095](../tracker/todo/TD-095.md) | Close-out bulk signing of R/S rows on an ITP (one date per party): allowed, and never for H points? | T-0119, T-0113 | planner |
+| [TD-096](../tracker/todo/TD-096.md) | Approved coating ITR dropped the residual-dust rating row the ITP requires; Grating and Gridmesh ITR has no approved version: confirm with the client before shipping default templates | T-0113 | planner |
+| [TD-101](../tracker/todo/TD-101.md) | Training/LMS as system of record: does KERP mirror completions read-only (external_source/external_id) or author them | T-0118 | planner |
+| [TD-106](../tracker/todo/TD-106.md) | Client-asset findings register (CUI, water, cladding damage) vs NCR vs punch, with configurable priority derivation and an assessment step that can spawn follow-up work | T-0111, T-0116, T-0117 | planner |
+| [TD-107](../tracker/todo/TD-107.md) | Revisit template / issue-type overlay inheritance for client variants instead of copies (TD-039 dropped inheritance) | T-0108, T-0113 | planner |
 
-## spec-gap (13)
+## spec-gap (32)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -38,6 +47,31 @@
 | [TD-066](../tracker/todo/TD-066.md) | Issue types (defect / observation) as versioned configuration with their own fields and close-out form | T-0111 | planner |
 | [TD-067](../tracker/todo/TD-067.md) | Inspection report layout configuration (header rows from anchor attributes, photo layout) is not specified | T-0113 | planner |
 | [TD-076](../tracker/todo/TD-076.md) | P6 activity-name grammar: meaning of RSW code suffix (-16, -21) and Online/Shut variants (same RSW in two windows, or two RSWs?) | T-0104 | planner |
+| [TD-083](../tracker/todo/TD-083.md) | Resource pool for planning (named workers without a login, crews, rosters, availability) vs the HR/payroll cull | E-04-12, T-0118, E-03-01 | planner |
+| [TD-084](../tracker/todo/TD-084.md) | Outbound email transport and templates (send-for-review with PDF attachment, digests, magic links) not specified | E-07-04, E-05-07 | planner |
+| [TD-085](../tracker/todo/TD-085.md) | Distribution / communication matrix as shared project config (formats x contacts, To/Cc, frequency, due rule) reused by reports, transmittals and plan review | E-07-04, E-05-03, E-03-01 | planner |
+| [TD-086](../tracker/todo/TD-086.md) | Per-party intervention codes on ITP steps and inspection-request slots (contractor and client code each; code sets per form with notice/blocking/signature flags) | T-0113, T-0114, T-0115 | planner |
+| [TD-087](../tracker/todo/TD-087.md) | Master ITP vs ITP instance (instance bound to one asset + RSW set, own ITP id, pinned master revision) and generated ITP layout matching the signed reference style | T-0113, E-05-05 | planner |
+| [TD-088](../tracker/todo/TD-088.md) | CDRL register: requirement rows, milestone-relative due rules, deliverables with client review codes A/B/C/D, submissions, cdrl rule set, Contractor Data Schedule export | T-0120, T-0121, E-05-01, E-05-03, E-05-05 | planner |
+| [TD-089](../tracker/todo/TD-089.md) | Document metadata: client and contractor numbers + revisions, template control number, file-name pattern separate from document number; renders never show spreadsheet error text | E-05-01, T-0113 | planner |
+| [TD-090](../tracker/todo/TD-090.md) | Weld report entity and missing weld fields (RFI no, weld size specified/achieved, consumable batch, electrode, length, location text, UT report link, drawing, visual result, baking log) | T-0203, T-0208, T-0111 | planner |
+| [TD-092](../tracker/todo/TD-092.md) | Technical Query record (multi-anchor, impact flags, client response, supersession) and approved TQ as a concession overriding acceptance limits; cost/schedule impact prompts variation/NOD/EOT | E-05-04, T-0122, E-06-03 | planner |
+| [TD-093](../tracker/todo/TD-093.md) | Deferred-result checks (concrete 7/28/56-day, 7-day grout/repair) keep the record open with reminders | T-0111, T-0113 | planner |
+| [TD-097](../tracker/todo/TD-097.md) | Welder qualification as a range (process, consumable class, plate/pipe, joint type) independent of one WPS, butt/fillet positions incl. VU/VD, append-only 6-monthly revalidation events from NDT evidence | T-0202, T-0206, T-0207 | planner |
+| [TD-098](../tracker/todo/TD-098.md) | NDT sampling percentage per spec/method with tested length and per-welder/asset/process compliance; NDT request to the NDT provider distinct from the client call-out | T-0204, T-0206, T-0115 | planner |
+| [TD-099](../tracker/todo/TD-099.md) | Credential type catalogue (scheme, level, issuer, validity rule), certificate vs card number, external verification evidence, restricted sensitive fields, OCR ingest, credential snapshot printed on sign-off | T-0118, T-0111, T-0119 | planner |
+| [TD-100](../tracker/todo/TD-100.md) | Role catalogue + competency requirement matrix (mandatory / task-bound / optional, validity years) with client/site overlays and compliance view; one trade/role catalogue shared with planner resource groups | T-0118, E-04-12, E-04-08 | planner |
+| [TD-103](../tracker/todo/TD-103.md) | Inspection profiles per inspection category: supervisor review, issues must be assessed, reinspect only open issues, photo carry-over, concurrent inspections, next-due frequency, report filed to the anchor | T-0111, T-0133 | planner |
+| [TD-104](../tracker/todo/TD-104.md) | core/fields palette gaps (choice with stable keys / Other / deprecation, date, integer, multiline, heading), CEL aggregates over repeating rows, publish-time validation of field references | T-0110, T-0113 | planner |
+| [TD-105](../tracker/todo/TD-105.md) | Template applicability by anchor attribute value (e.g. the test technique on the line picks the template) | T-0110, T-0111 | planner |
+| [TD-108](../tracker/todo/TD-108.md) | field_time: headcount mode, delay-code catalogue in the client pack, NPT vs coded delay, mob/demob allowance, equipment hours from the register, derived totals, roster crew pickers | E-04-05, E-04-04, E-06-03 | planner |
+| [TD-109](../tracker/todo/TD-109.md) | Equipment availability (onsite / in use) and required operator credential per equipment type; resource demand counts equipment units | E-03-07, T-0112, E-04-08 | planner |
+
+## missed (1)
+
+| ID | Title | Related tasks | Raised by |
+|---|---|---|---|
+| [TD-094](../tracker/todo/TD-094.md) | Per-RSW area handover sheet required by the ITP closeout (not the shift handover module) | T-0113, E-04-10 | planner |
 
 ## deferred (5)
 
@@ -49,7 +83,7 @@
 | [TD-047](../tracker/todo/TD-047.md) | Automate refresh of backend/requirements*.lock (uv pip compile output): Dependabot pip does not find *.lock files or re-run uv; options: scheduled uv --upgrade workflow opening a PR, or Renovate pip-compile manager | T-0028 | implementer |
 | [TD-074](../tracker/todo/TD-074.md) | Handover: offline drafting on tablets via the Dexie outbox | E-04-11 | planner |
 
-## later (19)
+## later (20)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -72,14 +106,17 @@
 | [TD-059](../tracker/todo/TD-059.md) | Deploy: runtime role must not own audit_ledger and gets only SELECT, INSERT; assert ledger_guard_problems at startup | T-0006 | implementer |
 | [TD-060](../tracker/todo/TD-060.md) | Migrations: freeze DDL helpers (rls_policy_sql, ledger_guard_sql) in each revision instead of importing live app code | T-0006 | implementer |
 | [TD-068](../tracker/todo/TD-068.md) | Importer for legacy inspection-system exports (template, usecase, itemcat, issuetype) | T-0113 | planner |
+| [TD-110](../tracker/todo/TD-110.md) | Recurring inspection due dates, earned quantity from partial inspections, create Items from an inspection (weld location) | E-06b-01, E-04-03, T-0103 | planner |
 
-## risk (3)
+## risk (5)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
 | [TD-013](../tracker/todo/TD-013.md) | review-gate patch-id ignores tracker/ — on planning PRs task content can change after approval without re-review | — | coordinator |
 | [TD-024](../tracker/todo/TD-024.md) | Backend logging: httpx/httpcore INFO lines log full outbound URLs (incl. query-string tokens) via the root JSON handler; set them to WARNING before any integration makes outbound calls | T-0021 | reviewer |
 | [TD-069](../tracker/todo/TD-069.md) | Legacy inspection exports contain real client data and must not be committed as fixtures | T-0113 | planner |
+| [TD-102](../tracker/todo/TD-102.md) | Eligibility API is frozen at M1 (T-0131) but must accept a requirement set (role baseline + client/site overlays + task-bound rules) | T-0131, T-0118 | planner |
+| [TD-111](../tracker/todo/TD-111.md) | All coastal input files (planning, comm matrix, registers, reports, templates) contain real client and personal data: extend TD-069 beyond the inspection exports | T-0113, T-0107 | planner |
 
 ## Closed
 
