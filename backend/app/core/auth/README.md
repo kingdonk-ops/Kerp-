@@ -48,15 +48,17 @@ token **and** the PIN rotates it. The refresh token without the PIN, or the PIN 
 refresh token, gets nothing. Interpretation recorded in TD-135.
 
 **Progressive lockout** (Redis, shared by every worker; replaces Inspection-ERP's in-memory
-`ratelimit.py`): an attempt is counted before the secret is checked; past the free attempts
-the next attempt is refused with `429` + `Retry-After` without checking the secret; a right
-answer clears the count. Subjects are hashed into the keys.
+`ratelimit.py`): an attempt is counted before the secret is checked; once the immediate tries
+are used up, each failure locks the subject and attempts during the lock are refused with
+`429` + `Retry-After` without checking the secret; a right answer clears the count. Subjects
+are hashed into the keys. If Redis evicts a `pin:<sid>` key the PIN gate fails open: run
+Redis with `maxmemory-policy noeviction` (TD-142 tracks a token-claim remedy).
 
-| Scope | Key | Free | Delay | Hard cap |
+| Scope | Key | Immediate tries | Then locked | Hard cap |
 |---|---|---|---|---|
-| PIN unlock | session | 3 | 30 s doubling to 15 min | 10th wrong PIN revokes the session |
-| Password login | tenant + e-mail | 5 | 30 s doubling to 15 min | none (no permanent lock-out) |
-| Magic-link request | tenant + e-mail | 3 / h | 1 min doubling to 15 min | none |
+| PIN unlock | session | 4 | 30 s doubling to 15 min | 10th wrong PIN revokes the session (counter lives as long as the session's refresh token, not per day) |
+| Password login | tenant + e-mail | 6 | 30 s doubling to 15 min | none (no permanent lock-out) |
+| Magic-link request | tenant + e-mail | 4 per hour | 1 min doubling to 15 min | none |
 
 Unknown addresses lock exactly like real ones. Link delivery is the `MagicLinkSender` seam:
 development logs the token, production logs "not delivered" until e-mail exists (TD-084).

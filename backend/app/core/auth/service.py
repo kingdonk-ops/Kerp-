@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import json
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
@@ -123,7 +123,9 @@ class AuthService:
         store = runtime.store
         self.login_lockout = ProgressiveLockout(store, LOGIN_POLICY, "login")
         self.magic_link_lockout = ProgressiveLockout(store, MAGIC_LINK_REQUEST_POLICY, "magic")
-        self.pin_lockout = ProgressiveLockout(store, PIN_POLICY, "pin")
+        # The PIN cap holds for the whole session: the counter outlives the refresh token.
+        pin_policy = replace(PIN_POLICY, window=self._pin_ttl())
+        self.pin_lockout = ProgressiveLockout(store, pin_policy, "pin")
 
     def login(
         self,
@@ -216,11 +218,11 @@ class AuthService:
             raise AuthenticationError("not a PIN-gated session")
         subject = str(session_id)
         attempt = self.pin_lockout.begin(subject)
-        if PIN_POLICY.exhausted(attempt):
+        if self.pin_lockout.policy.exhausted(attempt):
             self._revoke_session(session_id)
             raise AuthenticationError("PIN attempts exhausted")
         if not verify_password(pin, pin_hash):
-            if attempt == PIN_POLICY.max_attempts:
+            if attempt == self.pin_lockout.policy.max_attempts:
                 self._revoke_session(session_id)
             raise AuthenticationError("wrong PIN")
         self.pin_lockout.succeeded(subject)

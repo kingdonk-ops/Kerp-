@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 80 · **Closed:** 56
+**Open:** 81 · **Closed:** 56
 
 ## decision (1)
 
@@ -104,7 +104,7 @@
 | [TD-137](../tracker/todo/TD-137.md) | Field-worker sign-in UI: magic-link landing page, PIN set, PIN unlock screen with 429 Retry-After handling | T-0009 | implementer |
 | [TD-138](../tracker/todo/TD-138.md) | Per-client-IP throttling for login and magic-link requests (needs trusted-proxy config for the real client address) | T-0009 | implementer |
 
-## risk (6)
+## risk (7)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -114,6 +114,7 @@
 | [TD-102](../tracker/todo/TD-102.md) | Eligibility API is frozen at M1 (T-0131) but must accept a requirement set (role baseline + client/site overlays + task-bound rules) | T-0131, T-0118 | planner |
 | [TD-111](../tracker/todo/TD-111.md) | All coastal input files (planning, comm matrix, registers, reports, templates) contain real client and personal data: extend TD-069 beyond the inspection exports | T-0113, T-0107 | planner |
 | [TD-132](../tracker/todo/TD-132.md) | docker-compose dev stack never run end to end (no Docker on the T-0003 implementer machine): verify make test-pg once | T-0003 | implementer |
+| [TD-142](../tracker/todo/TD-142.md) | PIN gating fails open if Redis evicts the pin:<sid> key: add an amr=["pin"] token claim or require maxmemory-policy noeviction | T-0009 | implementer |
 
 ## Closed
 

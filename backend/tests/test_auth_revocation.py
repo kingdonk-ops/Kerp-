@@ -101,9 +101,22 @@ def test_memory_entries_expire() -> None:
 # --- failures fail closed ---------------------------------------------------------------
 
 
+class _BrokenPipeline:
+    """Queues commands like a pipeline; sending them fails like an unreachable server."""
+
+    def __getattr__(self, name: str) -> Callable[..., object]:
+        return lambda *args, **kwargs: self
+
+    def execute(self) -> list[object]:
+        raise redis.ConnectionError("down")
+
+
 class BrokenRedis(fakeredis.FakeRedis):
     def execute_command(self, *args: object, **options: object) -> object:
         raise redis.ConnectionError("down")
+
+    def pipeline(self, transaction: bool = True, shard_hint: object = None) -> object:  # type: ignore[override]
+        return _BrokenPipeline()
 
 
 @pytest.mark.parametrize(

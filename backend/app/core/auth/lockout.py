@@ -14,7 +14,8 @@ How an attempt runs (``ProgressiveLockout.begin``):
 3. The caller checks the secret. On success it calls ``succeeded``, which clears the
    counter and the lock (so a right answer leaves no trace).
 
-The delay after failure ``n`` is ``0`` for the first ``free_attempts`` and then doubles from
+The delay after failure ``n`` is ``0`` for the first ``free_attempts`` (so ``free_attempts + 1``
+attempts run back to back before the first lock) and then doubles from
 ``base_delay`` up to ``max_delay``. The counter forgets after ``window`` (from the first
 failure). Subjects are hashed into the key, so no e-mail address ends up in Redis.
 """
@@ -71,18 +72,26 @@ class LockoutPolicy:
         return self.max_attempts is not None and attempt > self.max_attempts
 
 
-# PIN unlock of a field-worker session: 3 free guesses, then 30 s doubling to 15 min, and
-# 10 guesses per session in total (then the session is revoked: a new magic link is needed).
-# 10 guesses out of 10**6 PINs: the chance of a lucky guess stays at 1e-5 per stolen device.
+# PIN unlock of a field-worker session: the first 4 guesses run back to back (no lock after
+# failures 1-3; failure 4 arms 30 s), then the lock doubles up to 15 min, and the 10th wrong
+# PIN revokes the session (a new magic link is needed). 10 guesses out of 10**6 PINs: the
+# chance of a lucky guess stays at 1e-5 per stolen device.
+#
+# The cap must hold for the whole session, not per day. Failures only accumulate between two
+# successful unlocks, and without a success the device's refresh token cannot rotate, so the
+# counter only has to outlive that token. ``AuthService`` therefore replaces ``window`` with
+# the refresh lifetime + ``PIN_TTL_MARGIN`` of the deployment; the default here covers the
+# longest refresh lifetime allowed (90 days) plus that margin.
 PIN_POLICY: Final = LockoutPolicy(
     free_attempts=3,
     base_delay=timedelta(seconds=30),
     max_delay=timedelta(minutes=15),
-    window=timedelta(hours=24),
+    window=timedelta(days=91),
     max_attempts=10,
 )
 
-# Password login per tenant + e-mail (TD-123): 5 free, then the same escalation.
+# Password login per tenant + e-mail (TD-123): 6 tries back to back (no lock after failures
+# 1-5), then the same escalation.
 LOGIN_POLICY: Final = LockoutPolicy(
     free_attempts=5,
     base_delay=timedelta(seconds=30),

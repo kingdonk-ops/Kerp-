@@ -170,10 +170,18 @@ class RedisRevocationStore:
 
     def count_failure(self, key: str, window: timedelta) -> int:
         counter = _failures_key(key)
-        # The window starts at the first failure (NX keeps a running window). INCR keeps
-        # the TTL, so a counter is never left without one, even if a later call fails.
-        self._call(lambda: self._client.set(counter, 0, nx=True, ex=_seconds(window)))
-        return int(self._call(lambda: self._client.incr(counter)))
+        # The window starts at the first failure (NX keeps a running window). Both commands
+        # run in one MULTI/EXEC transaction: the counter cannot expire between SET NX and
+        # INCR (which would let INCR create a key without a TTL), and INCR keeps the TTL.
+        seconds = _seconds(window)
+
+        def transaction() -> list[object]:
+            pipe = self._client.pipeline(transaction=True)
+            pipe.set(counter, 0, nx=True, ex=seconds)
+            pipe.incr(counter)
+            return pipe.execute()
+
+        return int(str(self._call(transaction)[-1]))
 
     def failure_count(self, key: str) -> int:
         value = _as_bytes(self._call(lambda: self._client.get(_failures_key(key))))

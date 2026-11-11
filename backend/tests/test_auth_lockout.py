@@ -13,6 +13,7 @@ from datetime import timedelta
 import fakeredis
 import pytest
 
+from app.core.auth.field import PIN_TTL_MARGIN
 from app.core.auth.lockout import (
     LOGIN_POLICY,
     MAGIC_LINK_REQUEST_POLICY,
@@ -65,9 +66,11 @@ def test_exhausted_only_past_the_hard_cap() -> None:
 
 
 def test_shipped_policies() -> None:
-    # PIN: 3 free guesses, then 30 s doubling to 15 min; 10 guesses in total per session.
+    # PIN: 4 guesses back to back, then 30 s doubling to 15 min; 10 in total per session.
     assert PIN_POLICY.free_attempts == 3
     assert PIN_POLICY.max_attempts == 10
+    # The cap is per session: the default window covers the longest refresh lifetime (90 d).
+    assert PIN_POLICY.window >= timedelta(days=90) + PIN_TTL_MARGIN
     assert PIN_POLICY.delay_after(4) == timedelta(seconds=30)
     assert PIN_POLICY.delay_after(9) == timedelta(minutes=15)
     # Password login: 5 free, then the same escalation, never permanent.
@@ -164,6 +167,36 @@ def test_counter_forgets_after_the_window() -> None:
     lockout.begin("s")
     clock.now += timedelta(hours=1).total_seconds() + 1
     assert lockout.begin("s") == 1
+
+
+class ExpiresBeforeIncr(fakeredis.FakeRedis):
+    """The counter expires right before a stand-alone INCR (the race of two round trips)."""
+
+    def incr(self, name: str, amount: int = 1) -> int:  # type: ignore[override]
+        self.delete(name)
+        return int(super().incr(name, amount))
+
+
+def test_redis_counter_always_has_a_ttl() -> None:
+    client = ExpiresBeforeIncr()
+    store = RedisRevocationStore(client)
+    counter = f"{KEY_PREFIX}lockout:magic:k:n"
+    for expected in (1, 2, 3):
+        assert store.count_failure("magic:k", timedelta(hours=1)) == expected
+        assert 0 < client.ttl(counter) <= 3600
+    # Expired between two failures: a fresh window starts, again with a TTL.
+    client.delete(counter)
+    assert store.count_failure("magic:k", timedelta(hours=1)) == 1
+    assert 0 < client.ttl(counter) <= 3600
+
+
+def test_redis_counter_keeps_its_window() -> None:
+    client = fakeredis.FakeRedis()
+    store = RedisRevocationStore(client)
+    store.count_failure("k", timedelta(hours=1))
+    client.expire(f"{KEY_PREFIX}lockout:k:n", 100)
+    store.count_failure("k", timedelta(hours=1))  # NX: the running window is kept
+    assert 0 < client.ttl(f"{KEY_PREFIX}lockout:k:n") <= 100
 
 
 def test_redis_keys_hash_the_subject_and_carry_ttls() -> None:

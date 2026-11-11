@@ -16,6 +16,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.core.auth.field import (
+    PIN_TTL_MARGIN,
     LoggingMagicLinkSender,
     UndeliverableMagicLinkSender,
     is_weak_pin,
@@ -24,6 +25,7 @@ from app.core.auth.field import (
 )
 from app.core.auth.revocation import InMemoryRevocationStore, RedisRevocationStore
 from app.core.auth.runtime import AuthRuntime
+from app.core.auth.service import AuthService
 from app.core.db import Database
 from app.openapi import openapi_schema
 from tests.audit_support import migrated_database
@@ -364,13 +366,44 @@ def test_right_pin_resets_the_count(h: Harness) -> None:
 def test_tenth_wrong_pin_revokes_the_session(h: Harness) -> None:
     tokens = h.field_session()
     session_id = h.runtime.tokens.verify(tokens["refresh_token"], "refresh").session_id
-    _wrong_pins(h, tokens["refresh_token"], 10)
+    _wrong_pins(h, tokens["refresh_token"], 9)
+    assert not h.runtime.store.is_revoked("any", session_id)
+    _wrong_pins(h, tokens["refresh_token"], 1)
+    # Revoked by the 10th wrong PIN itself, before any further request.
+    assert h.runtime.store.is_revoked("any", session_id)
     h.clock.now += 3600
     assert h.unlock(tokens["refresh_token"]).status_code == 401
-    assert h.runtime.store.is_revoked("any", session_id)
     assert h.client.get(ME, headers=_bearer(tokens["access_token"])).status_code == 401
     # A new magic link starts over.
     h.redeem(h.request_link())
+
+
+def test_right_pin_after_nine_wrong_ones_still_unlocks(h: Harness) -> None:
+    tokens = h.field_session()
+    session_id = h.runtime.tokens.verify(tokens["refresh_token"], "refresh").session_id
+    _wrong_pins(h, tokens["refresh_token"], 9)
+    h.clock.now += 15 * 60  # wait out the lock armed by the 9th failure (the 15-min cap)
+    assert h.unlock(tokens["refresh_token"]).status_code == 200
+    assert not h.runtime.store.is_revoked("any", session_id)
+
+
+def test_pin_cap_holds_for_the_session_not_per_day(h: Harness) -> None:
+    tokens = h.field_session()
+    session_id = h.runtime.tokens.verify(tokens["refresh_token"], "refresh").session_id
+    _wrong_pins(h, tokens["refresh_token"], 9)
+    h.clock.now += 25 * 3600  # a day later the count must not have reset
+    _wrong_pins(h, tokens["refresh_token"], 1)
+    assert h.runtime.store.is_revoked("any", session_id)
+
+
+def test_pin_counter_lives_as_long_as_the_refresh_token(h: Harness) -> None:
+    window = h.runtime.tokens.ttl["refresh"] + PIN_TTL_MARGIN
+    assert AuthService(h.runtime).pin_lockout.policy.window == window
+    tokens = h.field_session()
+    _wrong_pins(h, tokens["refresh_token"], 1)
+    h.clock.now += h.runtime.tokens.ttl["refresh"].total_seconds()
+    session_id = h.runtime.tokens.verify(tokens["refresh_token"], "refresh").session_id
+    assert AuthService(h.runtime).pin_lockout.failures(str(session_id)) == 1
 
 
 def test_pin_lockout_is_per_session(h: Harness) -> None:
