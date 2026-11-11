@@ -3,13 +3,12 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 77 · **Closed:** 55
+**Open:** 76 · **Closed:** 56
 
-## decision (2)
+## decision (1)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
-| [TD-034](../tracker/todo/TD-034.md) | Port/rewrite assessment of remaining Inspection-ERP core packages (jobs, sync, forms, workflow, events, files, schema_engine/items/mapping, reporting) | T-0015 | reviewer |
 | [TD-096](../tracker/todo/TD-096.md) | Approved coating ITR dropped the residual-dust rating row the ITP requires; Grating and Gridmesh ITR has no approved version: confirm with the client before shipping default templates | T-0113 | planner |
 
 ## spec-gap (33)
@@ -139,6 +138,7 @@
 | ✅ | [TD-030](../tracker/todo/TD-030.md) | CI: detect job is not in ci-gate.needs - if detect fails, backend/frontend/e2e/backend-image are skipped and ci-gate still passes; add detect to needs and fail on non-success | T-0028: detect is in ci-gate.needs; scripts/ci_gate.py fails the gate unless every needed job is success, or skipped only when its component is absent (detect output false) or it is the push-only publish job on a non-push event. Tested in scripts/tests/test_ci_gate.py. |
 | ✅ | [TD-031](../tracker/todo/TD-031.md) | CI hardening: split GHCR publish into a push-only job holding packages:write, pin docker/* actions to commit SHAs, persist-credentials:false; declare packaging as backend dev dep; assert .dockerignore starts with * | T-0028: GHCR publish moved to the push-only backend-publish job, the only job with packages:write; all actions in ci.yml (incl. docker/*) pinned to commit SHAs; every checkout sets persist-credentials:false; packaging declared as a backend dev dependency; test asserts .dockerignore starts with *. |
 | ✅ | [TD-033](../tracker/todo/TD-033.md) | Default soft-delete filtering: exclude deleted_at IS NOT NULL from ORM reads unless opted in | Done in T-0007: app/core/tenancy/scope.py adds a do_orm_execute with_loader_criteria filter on BaseRecordMixin that hides deleted_at IS NOT NULL rows from every ORM SELECT unless the statement sets execution_options(include_deleted=True). Raw SQL and Core table selects are not filtered. |
+| ✅ | [TD-034](../tracker/todo/TD-034.md) | Port/rewrite assessment of remaining Inspection-ERP core packages (jobs, sync, forms, workflow, events, files, schema_engine/items/mapping, reporting) | ADR 0007 (docs/decisions/0007-port-remaining-inspection-erp-core.md): jobs rewrite on SAQ (record shape as reference, table keeps RLS); sync port skeleton + rewrite apply for ADR 0005; files port helpers + rewrite as presigned; events do not port (transactional outbox); forms/workflow/schema_engine/items/mapping do not port; reporting port and adapt |
 | ✅ | [TD-036](../tracker/todo/TD-036.md) | Guard against bare Depends(get_db) outside app/core/db.py (endpoints must use DbSession) | Done in T-0011: backend/tests/test_lint_get_db.py walks every file under backend/app and fails if anything other than app/core/db.py names get_db (import, call, attribute or alias), so endpoints must use DbSession. |
 | ✅ | [TD-037](../tracker/todo/TD-037.md) | Drop the empty 'postgres' extra from backend/pyproject.toml once CI's install line stops referencing it | T-0028: empty postgres extra removed from backend/pyproject.toml and ci.yml installs .[dev]. |
 | ✅ | [TD-039](../tracker/todo/TD-039.md) | Bring back any PROPOSAL-port-from-aip extras dropped in spec consolidation (write-back, type inheritance, migration preview, test-fill, section library, report slots, auto_create_itp, competency assignment, programmes)? | Out of scope for Phase 1. Revisit auto_create_itp and asset write-back as Phase 3 candidates (user, 2026-11-09) |
