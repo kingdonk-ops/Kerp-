@@ -133,24 +133,35 @@ def _check_tree(ast: Tree[Token]) -> frozenset[str]:
 def _free_identifiers(ast: Tree[Token]) -> frozenset[str]:
     """Top-level variable names referenced by ``ast``, without macro-bound variables.
 
-    Bound names are collected per expression, not per macro scope: a name bound by any macro
-    is never reported, which can only make the check more permissive, never stricter.
+    A macro's variable is bound only inside that macro's own arguments (``l.all(x, x > 0)``
+    binds ``x`` in ``x > 0``, not in ``l`` nor anywhere outside the call), so a name that
+    leaks out of its macro is reported. ``.x`` always names the top-level ``x``. Iterative,
+    so deep nesting cannot hit the recursion limit.
     """
     from lark import Token, Tree
 
-    referenced: set[str] = set()
-    bound: set[str] = set()
-    for node in ast.iter_subtrees():
-        if node.data in ("ident", "dot_ident"):
-            referenced.update(str(c) for c in node.children if isinstance(c, Token))
-        elif node.data == "member_dot_arg":
-            names = {str(c) for c in node.children if isinstance(c, Token)}
-            arguments = [c for c in node.children if isinstance(c, Tree)]
-            if names & _BINDING_MACROS and len(arguments) > 1 and arguments[1].children:
-                variable = _unwrap(arguments[1].children[0])  # unwraps ident to its Token
-                if isinstance(variable, Token):
-                    bound.add(str(variable))
-    return frozenset(referenced - bound)
+    free: set[str] = set()
+    stack: list[tuple[Tree[Token], frozenset[str]]] = [(ast, frozenset())]
+    while stack:
+        node, bound = stack.pop()
+        tokens = [str(c) for c in node.children if isinstance(c, Token)]
+        subtrees = [c for c in node.children if isinstance(c, Tree)]
+        if node.data == "ident":
+            free.update(name for name in tokens if name not in bound)
+            continue
+        if node.data == "dot_ident":
+            free.update(tokens)
+            continue
+        if node.data == "member_dot_arg" and set(tokens) & _BINDING_MACROS and len(subtrees) > 1:
+            target, arguments = subtrees[0], subtrees[1].children
+            variable = _unwrap(arguments[0]) if arguments else None  # ident unwraps to a Token
+            if isinstance(variable, Token):
+                stack.append((target, bound))
+                inner = bound | {str(variable)}
+                stack.extend((a, inner) for a in arguments[1:] if isinstance(a, Tree))
+                continue
+        stack.extend((child, bound) for child in subtrees)
+    return frozenset(free)
 
 
 @lru_cache(maxsize=PROGRAM_CACHE_SIZE)

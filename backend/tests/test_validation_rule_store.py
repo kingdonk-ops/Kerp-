@@ -12,6 +12,7 @@ from pathlib import Path
 
 import pytest
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.audit.service import chain_entries, verify_chain
@@ -27,6 +28,7 @@ from app.modules.validation.models import (
     RULE_TABLE,
     Finding,
     Rule,
+    RuleSet,
 )
 from app.modules.validation.schemas import RuleSpec
 from app.modules.validation.service import (
@@ -41,6 +43,7 @@ from app.modules.validation.service import (
     save_rule,
 )
 from tests.audit_support import migrated_database
+from tests.db_support import ON_POSTGRES
 from tests.tenancy_support import CTX_A, CTX_B, CTX_C, CTX_T1
 
 BACKEND = Path(__file__).resolve().parents[1]
@@ -227,6 +230,33 @@ def test_run_checks_fails_closed(db: Database, expression: str, outcome: str) ->
     assert [f.outcome for f in result.findings] == [outcome]
 
 
+class TransitionBlockedError(Exception):
+    pass
+
+
+def test_findings_survive_when_the_caller_rolls_back_the_blocked_transition(
+    db: Database,
+) -> None:
+    set_id = make_set(db, CTX_A)
+    add(db, CTX_A, set_id, cel_rule("cal", "false", params={"message": "Calibration expired"}))
+    run_ids = []
+
+    def submit() -> None:  # the documented gate pattern: raise, so the caller rolls back
+        with db.unit_of_work(CTX_A) as s:
+            result = run_checks({}, "demo.submit", session=s, subject="inspection:9")
+            run_ids.append(result.run_id)
+            if result.blocked:
+                raise TransitionBlockedError(result.reason)
+
+    with pytest.raises(TransitionBlockedError, match="Calibration expired"):
+        submit()
+    with db.unit_of_work(CTX_A) as s:
+        rows = s.scalars(select(Finding)).all()
+    assert [(r.run_id, r.subject, r.rule_key, r.message) for r in rows] == [
+        (run_ids[0], "inspection:9", "cal", "Calibration expired")
+    ]
+
+
 def test_a_new_rule_takes_effect_without_a_deploy(db: Database) -> None:
     set_id = make_set(db, CTX_A)
     with db.unit_of_work(CTX_A) as s:
@@ -374,3 +404,20 @@ def test_the_service_needs_a_bound_session(db: Database) -> None:
         bind_tenancy(s, None)
         with pytest.raises(RuntimeError, match="bound to a tenant"):
             create_rule_set(s, key="demo.x", kind="check", layer="tenant")
+
+
+@pytest.mark.skipif(
+    not ON_POSTGRES,
+    reason="needs PostgreSQL NULLS NOT DISTINCT; runs in CI's PostgreSQL step (TD-052)",
+)
+def test_tenant_level_sets_are_unique_in_the_database(db: Database) -> None:
+    # Bypasses the service's duplicate check: only the constraint stops the second row.
+    def tenant_set() -> RuleSet:
+        return RuleSet(
+            tenant_id=CTX_T1.tenant_id, key="demo.dup", kind="check", layer="tenant", version=1
+        )
+
+    with db.unit_of_work(CTX_T1) as s:
+        s.add(tenant_set())
+    with pytest.raises(IntegrityError), db.unit_of_work(CTX_T1) as s:
+        s.add(tenant_set())

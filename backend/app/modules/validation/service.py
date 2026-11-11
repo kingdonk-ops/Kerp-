@@ -25,7 +25,7 @@ from sqlalchemy.orm import Session
 from app.core.audit import service as audit
 from app.core.cel import CelError, CelOk, JsonValue, evaluate
 from app.core.tenancy.context import TenancyContext
-from app.core.tenancy.rls import session_tenancy
+from app.core.tenancy.rls import bind_tenancy, session_tenancy
 from app.core.tenancy.scope import get_or_404
 from app.modules.validation.compiler import RuleCompileError, compile_rule
 from app.modules.validation.models import LAYERS, RULE_KINDS, Finding, Rule, RuleSet
@@ -220,7 +220,8 @@ def resolve_rule_set(session: Session, key: str, kind: str) -> RuleSet:
     ).all()
     if not candidates:
         raise RuleSetNotFoundError(f"no {kind} rule set {key!r}")
-    return min(candidates, key=lambda s: _LAYER_PRIORITY[s.layer])
+    # Ties (only possible without NULLS NOT DISTINCT, i.e. SQLite) break by id, deterministically.
+    return min(candidates, key=lambda s: (_LAYER_PRIORITY[s.layer], str(s.id)))
 
 
 def run_checks(
@@ -238,6 +239,11 @@ def run_checks(
     ``blocked`` when any of them has ``action == "block"``. ``subject`` names the record
     being checked (e.g. ``"inspection:<uuid>"``). An unknown set raises
     ``RuleSetNotFoundError``, so a misconfigured gate never passes silently.
+
+    The findings are committed in their **own** unit of work (same engine, same tenancy),
+    so they survive when the caller then refuses the transition and rolls back: a blocked
+    transition always leaves its findings (the record the T-0035 override builds on). The
+    rule set must be committed before it is run (the findings reference it).
     """
     tenancy = _context(session)
     if "params" in context:
@@ -250,6 +256,7 @@ def run_checks(
     ).all()
     run_id = uuid.uuid4()
     findings: list[CheckFinding] = []
+    rows: list[Finding] = []
     for rule in rules:
         result = evaluate(rule.expression, {**context, "params": rule.params})
         if isinstance(result, CelOk) and result.value is True:
@@ -263,7 +270,7 @@ def run_checks(
             message=_message(rule, result),
         )
         findings.append(finding)
-        session.add(
+        rows.append(
             Finding(
                 tenant_id=tenancy.tenant_id,
                 project_id=tenancy.project_id,
@@ -278,7 +285,7 @@ def run_checks(
                 **finding.model_dump(),
             )
         )
-    session.flush()
+    _persist_findings(session, tenancy, rows)
     return CheckResult(
         run_id=run_id,
         rule_set=found.key,
@@ -289,6 +296,20 @@ def run_checks(
 
 
 # --- helpers ------------------------------------------------------------------------------
+
+
+def _persist_findings(session: Session, tenancy: TenancyContext, rows: list[Finding]) -> None:
+    """Commit ``rows`` independently of the caller's transaction (see ``run_checks``).
+
+    On SQLite (local tests only) a caller that has already written in its open transaction
+    holds the database write lock, so call ``run_checks`` before writing.
+    """
+    if not rows:
+        return
+    with Session(bind=session.get_bind().engine) as log:
+        bind_tenancy(log, tenancy)
+        log.add_all(rows)
+        log.commit()
 
 
 def _guard_source(source: str) -> None:

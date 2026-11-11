@@ -40,6 +40,13 @@ if result.blocked:
   `result.findings` and written to `oe_validation_finding` with `run_id`, `subject`, the set's
   key and version, and the `rule_key` and rule version (ADR 0004 §3). Passing rules are not
   logged; `result.evaluated` counts the rules that ran.
+- Findings are committed in their **own** unit of work (same engine, same tenancy), not in the
+  caller's transaction, so they survive when the gate raises and the caller rolls back: a
+  blocked transition always leaves its findings (the record the T-0035 override needs). The
+  rule set must already be committed. On SQLite (local tests only) call `run_checks` before
+  writing in the caller's transaction, or the second writer waits for the database lock.
+- Ties between visible sets of one layer (possible only on SQLite, see uniqueness below)
+  break by set id, deterministically.
 - `result.blocked` is true when a finding has `action == "block"`; `result.reason` joins those
   findings' messages. A finding's message is the rule's `params.message` (rule data, written
   by the rule author), else `"<rule_key>: check failed"`. `warn` findings never block.
@@ -59,7 +66,9 @@ are frozen at M1 (T-0131).
 | `p6_eligibility` | P6 placeholder eligibility (§5.3) | `cel` | `task_code`, `task_name`, `task_type`, `wbs_path`, the grammar groups, `params` |
 
 `layer` is `system`, `tenant` or `project`; `project_id` is NULL on `system`/`tenant`
-(CHECK `layer_scope`). A project session creates `project` sets; a tenant-level session
+(CHECK `layer_scope`). `(tenant_id, project_id, layer, key)` is unique; on PostgreSQL the
+constraint is `NULLS NOT DISTINCT`, so tenant-level sets are unique too (on SQLite only the
+service's duplicate check guards them). A project session creates `project` sets; a tenant-level session
 `system`/`tenant` sets. Allowed `action`s: `check` → `block` | `warn`; `p6_eligibility` →
 `placeholder` | `no_placeholder`; other kinds any snake_case word. `severity` is `info`,
 `warning` or `error`. The context-variable lists are an implementer default awaiting
@@ -72,7 +81,8 @@ confirmation (spec-gap TD-139).
 - the engine must match the kind (`regex` only for `autolink` and `p6_grammar`);
 - CEL goes through `app.core.cel.compile_expression`: the same parser, 4096-byte cap and
   static checks as evaluation (safe subset, TD-041), and every top-level variable must be in
-  the kind's context schema. Field-level types are not checked (no server CEL type checker);
+  the kind's context schema. A macro variable counts as bound only inside its own macro
+  call (`l.all(x, x.ok) && x` is rejected). Field-level types are not checked (no server CEL type checker);
 - regex compiles with **RE2** (`google-re2`, imported lazily): linear time, so lookaround and
   backreferences are rejected; patterns are capped at 1024 characters;
 - `params` must be valid KERP CEL JSON.

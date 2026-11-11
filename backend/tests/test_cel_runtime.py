@@ -268,6 +268,8 @@ def test_compile_expression_accepts_declared_variables() -> None:
     assert compile_expression("fields.t >= params.min && has(fields.x)", declared) is None
     # Macro-bound variables are not free references.
     assert compile_expression("fields.l.all(i, i.ok) && [1].exists(z, z > 0)", declared) is None
+    assert compile_expression("fields.l.all(i, i.m.exists(j, j == i.k))", declared) is None
+    assert compile_expression("fields.l.map(i, i * 2.0).all(i, i > 0.0)", declared) is None
     assert compile_expression("anything > 1.0") is None  # no schema: syntax only
 
 
@@ -280,6 +282,12 @@ def test_compile_expression_accepts_declared_variables() -> None:
         ("record.x > 1.0", CelErrorCode.UNDECLARED_REFERENCE),
         ("true || record", CelErrorCode.UNDECLARED_REFERENCE),  # short-circuit is no excuse
         (".record", CelErrorCode.UNDECLARED_REFERENCE),
+        # A macro variable is bound only inside its own macro call.
+        ("fields.l.filter(x, x.y).size() > 0 && x", CelErrorCode.UNDECLARED_REFERENCE),
+        ("fields.l.all(record, record) && record.ok", CelErrorCode.UNDECLARED_REFERENCE),
+        ("record.all(r, r)", CelErrorCode.UNDECLARED_REFERENCE),  # target is outside the scope
+        ("fields.l.all(f, .f)", CelErrorCode.UNDECLARED_REFERENCE),  # .f is the top-level f
+        ("fields.l.exists(record.a, true)", CelErrorCode.UNDECLARED_REFERENCE),  # binds nothing
         ("x" * 4097, CelErrorCode.INVALID_ARGUMENT),
     ],
 )
