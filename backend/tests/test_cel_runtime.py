@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 from app.core import cel
-from app.core.cel import CelError, CelErrorCode, CelOk, evaluate
+from app.core.cel import CelError, CelErrorCode, CelOk, compile_expression, evaluate
 from app.core.cel.errors import classify_celpy_error
 from app.core.cel.runtime import _compile
 from app.core.cel.values import UnencodableValueError, encode_value
@@ -24,7 +24,14 @@ def test_importing_the_wrapper_does_not_import_celpy() -> None:
 
 
 def test_public_api() -> None:
-    assert set(cel.__all__) >= {"evaluate", "CelOk", "CelError", "CelErrorCode", "JsonValue"}
+    assert set(cel.__all__) >= {
+        "evaluate",
+        "compile_expression",
+        "CelOk",
+        "CelError",
+        "CelErrorCode",
+        "JsonValue",
+    }
 
 
 def test_compiled_programs_are_cached() -> None:
@@ -251,3 +258,37 @@ def test_classify_unknown_celpy_error() -> None:
         is CelErrorCode.EVAL_ERROR
     )
     assert classify_celpy_error(celpy.CELEvalError("odd"), frozenset()) is CelErrorCode.EVAL_ERROR
+
+
+# --- compile_expression: compile-on-save without evaluating (T-0018) ---------------------
+
+
+def test_compile_expression_accepts_declared_variables() -> None:
+    declared = frozenset({"fields", "params"})
+    assert compile_expression("fields.t >= params.min && has(fields.x)", declared) is None
+    # Macro-bound variables are not free references.
+    assert compile_expression("fields.l.all(i, i.ok) && [1].exists(z, z > 0)", declared) is None
+    assert compile_expression("anything > 1.0") is None  # no schema: syntax only
+
+
+@pytest.mark.parametrize(
+    ("expression", "code"),
+    [
+        ("fields.t >", CelErrorCode.PARSE_ERROR),
+        ("has(fields)", CelErrorCode.PARSE_ERROR),
+        ("true || 'a'", CelErrorCode.NO_MATCHING_OVERLOAD),
+        ("record.x > 1.0", CelErrorCode.UNDECLARED_REFERENCE),
+        ("true || record", CelErrorCode.UNDECLARED_REFERENCE),  # short-circuit is no excuse
+        (".record", CelErrorCode.UNDECLARED_REFERENCE),
+        ("x" * 4097, CelErrorCode.INVALID_ARGUMENT),
+    ],
+)
+def test_compile_expression_rejects(expression: str, code: CelErrorCode) -> None:
+    error = compile_expression(expression, frozenset({"fields"}))
+    assert isinstance(error, CelError)
+    assert error.code == code
+
+
+def test_compile_expression_names_the_undeclared_variable() -> None:
+    error = compile_expression("fields.a == record.b", frozenset({"fields"}))
+    assert error == CelError(CelErrorCode.UNDECLARED_REFERENCE, "undeclared reference to 'record'")
