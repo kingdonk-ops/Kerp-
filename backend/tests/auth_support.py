@@ -10,6 +10,7 @@ from typing import Any
 import fakeredis
 from fastapi import FastAPI
 
+from app.core.auth.field import MagicLink, MagicLinkSender
 from app.core.auth.keys import KeySet, generate_signing_key
 from app.core.auth.passwords import hash_password
 from app.core.auth.revocation import RedisRevocationStore
@@ -42,8 +43,22 @@ def make_settings(**overrides: Any) -> Settings:
     return Settings(**values)
 
 
+class CapturingSender:
+    """Magic-link delivery for tests: keeps every link instead of e-mailing it."""
+
+    def __init__(self) -> None:
+        self.sent: list[MagicLink] = []
+
+    def send(self, link: MagicLink) -> None:
+        self.sent.append(link)
+
+
 def auth_app(
-    settings: Settings, *, store: Any = None, keys: KeySet | None = None
+    settings: Settings,
+    *,
+    store: Any = None,
+    keys: KeySet | None = None,
+    magic_links: MagicLinkSender | None = None,
 ) -> tuple[FastAPI, AuthRuntime]:
     """``create_app`` with a runtime on a fake Redis (or the given store)."""
     app = create_app(settings)
@@ -51,6 +66,7 @@ def auth_app(
         settings,
         keys=keys or KeySet(generate_signing_key(settings.jwt_algorithm)),
         store=store if store is not None else fake_store(),
+        magic_links=magic_links,
     )
     install_auth_runtime(app, runtime)
     return app, runtime

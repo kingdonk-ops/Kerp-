@@ -1,4 +1,4 @@
-# app/core/auth — users, asymmetric JWTs, JWKS, revocation (T-0008)
+# app/core/auth — users, asymmetric JWTs, JWKS, revocation (T-0008), field-worker auth (T-0009)
 
 Diff §4 "Auth hardening". Per ADR 0001: scrypt hashing and the credential → tenant → RLS →
 user dependency shape are ported from Inspection-ERP `core/auth/`; the token layer is
@@ -14,7 +14,9 @@ rewritten (HS256 → RS256/EdDSA + JWKS + `jti` revocation in Redis).
 | `bearer.py` | `get_bearer`: verifies the `Authorization: Bearer` token once per request (no DB) |
 | `deps.py` | `CurrentPrincipal` (401 unless a valid token of an active user), `require_claims` |
 | `providers.py` | `AuthProvider` seam + `LocalPasswordProvider` (Entra ID SSO later: TD-043) |
-| `service.py` | `AuthService` login / refresh / logout; `create_user`, `set_password` |
+| `service.py` | `AuthService` login / refresh / logout / magic link / PIN unlock; `create_user`, `set_password` |
+| `field.py` | Magic-link tokens + delivery seam, PIN rules (T-0009) |
+| `lockout.py` | `ProgressiveLockout` + policies, Redis-backed (T-0009) |
 | `models.py` | `auth_user` table (tenant-level rows, RLS) — migration `0003` |
 | `router.py`, `schemas.py` | HTTP endpoints below |
 
@@ -23,15 +25,41 @@ rewritten (HS256 → RS256/EdDSA + JWKS + `jti` revocation in Redis).
 | Method + path | Auth | Result |
 |---|---|---|
 | `GET /.well-known/jwks.json` | none | `{"keys": [...]}` public JWKs (active + retired), `Cache-Control: public, max-age=300` |
-| `POST /api/v1/auth/login` | none | `{email, password, tenant_id?}` → `TokenResponse` (`no-store`) |
-| `POST /api/v1/auth/refresh` | none | `{refresh_token}` → new `TokenResponse` (rotation) |
+| `POST /api/v1/auth/login` | none | `{email, password, tenant_id?}` → `TokenResponse` (`no-store`); `429` when locked |
+| `POST /api/v1/auth/refresh` | none | `{refresh_token}` → new `TokenResponse` (rotation); `401` for PIN-gated sessions |
 | `POST /api/v1/auth/logout` | bearer | `204`; revokes the token and its whole login session |
 | `GET /api/v1/auth/me` | bearer | `{id, tenant_id, email, display_name}` |
+| `POST /api/v1/auth/magic-link` | none | `{email, tenant_id?}` → always `202`; sends a 15-min one-time link to an active user; `429` when throttled |
+| `POST /api/v1/auth/magic-link/redeem` | none | `{token, pin}` → `TokenResponse` of a new **PIN-gated** session |
+| `POST /api/v1/auth/pin/unlock` | none | `{refresh_token, pin}` → rotated `TokenResponse`; `429` when locked |
 
 Every rejection is `401 {"detail": "Not authenticated"}` with a `WWW-Authenticate: Bearer`
 challenge (`error="invalid_token"` when a token was presented). Unknown user, wrong
 password, inactive user and wrong tenant are indistinguishable, and an unknown user still
 costs one scrypt round. An unreachable revocation store is `503` (fail closed).
+
+## Field workers: magic link + PIN (T-0009)
+
+`field.py`, `lockout.py`. The PIN is a **local session unlock only**: it never authenticates
+on its own. A magic link starts a session on the device and sets that session's 6-digit PIN
+(scrypt hash in Redis under `pin:<sid>`; weak PINs such as `111111` / `123456` are refused).
+`/auth/refresh` refuses such a session; only `/auth/pin/unlock` with the device's refresh
+token **and** the PIN rotates it. The refresh token without the PIN, or the PIN without the
+refresh token, gets nothing. Interpretation recorded in TD-135.
+
+**Progressive lockout** (Redis, shared by every worker; replaces Inspection-ERP's in-memory
+`ratelimit.py`): an attempt is counted before the secret is checked; past the free attempts
+the next attempt is refused with `429` + `Retry-After` without checking the secret; a right
+answer clears the count. Subjects are hashed into the keys.
+
+| Scope | Key | Free | Delay | Hard cap |
+|---|---|---|---|---|
+| PIN unlock | session | 3 | 30 s doubling to 15 min | 10th wrong PIN revokes the session |
+| Password login | tenant + e-mail | 5 | 30 s doubling to 15 min | none (no permanent lock-out) |
+| Magic-link request | tenant + e-mail | 3 / h | 1 min doubling to 15 min | none |
+
+Unknown addresses lock exactly like real ones. Link delivery is the `MagicLinkSender` seam:
+development logs the token, production logs "not delivered" until e-mail exists (TD-084).
 
 ## Tokens
 
