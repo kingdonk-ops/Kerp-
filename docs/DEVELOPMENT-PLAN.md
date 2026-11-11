@@ -72,4 +72,4 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
 
 ## Open decisions (see `TODO.md`)
 TD-003 (SSO vs local JWT), TD-004 (hosting target), TD-072 (ADR 0004 rule-set defaults per project), TD-073 (handover first-shift trigger),
-TD-013 (review-gate ignores tracker), TD-039 (dropped AIP-proposal extras). TD-002/005/007/008/009/012 are resolved by this merge; TD-001 by ADR 0001 (`docs/decisions/`). TD-002 is carried into code by ADR 0002 (`docs/decisions/0002-port-one-engine.md`).
+TD-013 (review-gate ignores tracker), TD-039 (dropped AIP-proposal extras). TD-002/005/007/008/009/012 are resolved by this merge; TD-001 by ADR 0001 (`docs/decisions/`). TD-002 is carried into code by ADR 0002 (`docs/decisions/0002-port-one-engine.md`). TD-034 (remaining Inspection-ERP core packages) is resolved by ADR 0007.
