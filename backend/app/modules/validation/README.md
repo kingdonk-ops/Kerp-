@@ -63,7 +63,7 @@ are frozen at M1 (T-0131).
 `system`/`tenant` sets. Allowed `action`s: `check` → `block` | `warn`; `p6_eligibility` →
 `placeholder` | `no_placeholder`; other kinds any snake_case word. `severity` is `info`,
 `warning` or `error`. The context-variable lists are an implementer default awaiting
-confirmation (spec-gap TODO raised with T-0018).
+confirmation (spec-gap TD-139).
 
 ### Compile on save (ADR 0004 §6)
 
