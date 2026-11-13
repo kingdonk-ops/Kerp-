@@ -253,6 +253,17 @@ def test_presigned_put_signs_type_and_length_on_the_public_endpoint(s3: S3Storag
     assert timedelta(seconds=100) < put.expires_at - datetime.now(UTC) <= timedelta(seconds=120)
 
 
+def test_the_configured_region_reaches_the_boto3_clients() -> None:
+    assert Settings(environment="test").s3_region == "ap-southeast-2"  # TD-171, diff §4.4
+    default = build_s3_storage(_settings())
+    assert default.client.meta.region_name == "ap-southeast-2"
+    s3 = build_s3_storage(_settings(s3_region="eu-central-1"))
+    assert s3.client.meta.region_name == "eu-central-1"
+    assert s3.presign_client.meta.region_name == "eu-central-1"
+    url = s3.presign_put("t/p/a", content_type="image/png", size=1, expires_in=60).url
+    assert "%2Feu-central-1%2Fs3%2F" in url  # the signing scope
+
+
 def test_presigned_get_forces_the_served_type_and_disposition(s3: S3Storage) -> None:
     get = s3.presign_get("t/p/m/h", filename="x.html", content_type="text/html", expires_in=60)
     query = parse_qs(urlsplit(get.url).query)

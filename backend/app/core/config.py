@@ -64,7 +64,9 @@ class Settings(BaseSettings):
     storage_bucket: str = "kerp-vault"
     s3_endpoint_url: str | None = None
     s3_public_endpoint_url: str | None = None
-    s3_region: str = "us-east-1"
+    # Per deployment (TD-171 decision 13a, diff §4.4): ap-southeast-2 (Sydney) is the default
+    # for Australian deployments; set KERP_S3_REGION elsewhere. MinIO ignores it.
+    s3_region: str = "ap-southeast-2"
     s3_access_key_id: str | None = Field(default=None, repr=False)
     s3_secret_access_key: SecretStr | None = Field(default=None, repr=False)
     # Uploads: size limit (single-request copy caps it at 5 GiB) and presigned URL lifetimes.

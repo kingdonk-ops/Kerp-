@@ -47,7 +47,9 @@ provisioning and CORS). No delete endpoint or content-object GC yet (TD-209).
 ## Configuration (`KERP_` env)
 
 `STORAGE_BUCKET` (`kerp-vault`), `S3_ENDPOINT_URL` (MinIO; unset for AWS),
-`S3_PUBLIC_ENDPOINT_URL` (what browsers reach, if different), `S3_REGION`,
+`S3_PUBLIC_ENDPOINT_URL` (what browsers reach, if different), `S3_REGION` (per deployment,
+never hard-coded: default `ap-southeast-2` for Australian deployments, TD-171 / diff §4.4;
+MinIO ignores it),
 `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` (unset: the AWS credential chain),
 `UPLOAD_MAX_BYTES` (100 MiB), `UPLOAD_URL_SECONDS` (900), `DOWNLOAD_URL_SECONDS` (300).
 
