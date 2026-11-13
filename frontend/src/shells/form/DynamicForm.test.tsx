@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { i18n } from "../../i18n";
@@ -153,6 +153,40 @@ describe("DynamicForm", () => {
     fireEvent.change(screen.getByLabelText(/To string/), { target: { value: "y" } });
     submit();
     expect(onSubmit).toHaveBeenCalledWith({ constructor: "x", toString: "y" });
+  });
+
+  it("marks a field required (asterisk + aria-required) only while its required_if is active", () => {
+    const template: FormTemplate = {
+      fields: [
+        { field_key: "result", label: "Result", data_type: "text" },
+        {
+          field_key: "reason",
+          label: "Reason",
+          data_type: "text",
+          required_if: "has(fields.result) && fields.result == 'REJECT'",
+        },
+      ],
+    };
+    render(<DynamicForm template={template} onSubmit={vi.fn()} />);
+    const mark = i18n.t("shells.form.requiredMark");
+    const reasonLabel = () => screen.getByText(/^Reason/, { selector: "label" });
+
+    expect(screen.getByLabelText(/Reason/)).not.toHaveAttribute("aria-required");
+    expect(within(reasonLabel()).queryByTitle(mark)).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Result"), { target: { value: "REJECT" } });
+    expect(screen.getByLabelText(/Reason/)).toHaveAttribute("aria-required", "true");
+    expect(within(reasonLabel()).getByTitle(mark)).toHaveTextContent("*");
+
+    fireEvent.change(screen.getByLabelText("Result"), { target: { value: "ACCEPT" } });
+    expect(screen.getByLabelText(/Reason/)).not.toHaveAttribute("aria-required");
+    expect(within(reasonLabel()).queryByTitle(mark)).not.toBeInTheDocument();
+  });
+
+  it("keeps the static required mark and aria-required", () => {
+    render(<DynamicForm template={TEMPLATE} onSubmit={vi.fn()} />);
+    expect(screen.getByLabelText(/Visual result/)).toHaveAttribute("aria-required", "true");
+    expect(screen.getByLabelText("Remarks")).not.toHaveAttribute("aria-required");
   });
 
   it("uses a custom submit label and disables the form while busy", () => {

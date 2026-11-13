@@ -10,6 +10,8 @@ export interface FormEvaluation {
   /** Visible, non-empty values only: what is submitted and what `fields` holds in CEL. */
   values: Record<string, JsonValue>;
   errors: Readonly<Record<string, FieldError>>;
+  /** Keys of the visible fields that are required now: `required`, or an active `required_if`. */
+  required: ReadonlySet<string>;
   valid: boolean;
 }
 
@@ -92,11 +94,13 @@ export function evaluateForm(
   const sanitized = pick(values, visible);
   const context = contextFor(sanitized);
   const errors: [string, FieldError][] = [];
+  const requiredKeys = new Set<string>();
   for (const field of template.fields) {
     const key = field.field_key;
     if (!visible.has(key)) continue;
     const required =
       field.required === true || (field.required_if !== undefined && !isFalse(run(field.required_if, context)));
+    if (required) requiredKeys.add(key);
     if (!Object.hasOwn(sanitized, key)) {
       if (required) errors.push([key, { kind: "required" }]);
       continue;
@@ -108,7 +112,13 @@ export function evaluateForm(
     else if (!result.value) errors.push([key, { kind: "invalid", message: field.validation.error_message }]);
   }
 
-  return { visible, values: sanitized, errors: Object.fromEntries(errors), valid: errors.length === 0 };
+  return {
+    visible,
+    values: sanitized,
+    errors: Object.fromEntries(errors),
+    required: requiredKeys,
+    valid: errors.length === 0,
+  };
 }
 
 /** required_if fails closed: only an explicit `false` makes the field optional. */

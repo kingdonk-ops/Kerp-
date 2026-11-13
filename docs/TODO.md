@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 136 · **Closed:** 88
+**Open:** 138 · **Closed:** 89
 
 ## decision (4)
 
@@ -92,13 +92,12 @@
 | [TD-212](../tracker/todo/TD-212.md) | Uploads: run the orphan sweep on a schedule for every project (needs the scope list of TD-155) | T-0016 | implementer |
 | [TD-217](../tracker/todo/TD-217.md) | Inspection scheduling after Pilot-0: calendar view, general recurrence (beyond scaffolds), light work-order grouping (TD-165 remainder) | T-0152 | planner |
 
-## later (54)
+## later (55)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
 | [TD-016](../tracker/todo/TD-016.md) | Backend tests: move TestClient transport from httpx to httpx2 (Starlette 1.x deprecation warning) | T-0001 | implementer |
 | [TD-019](../tracker/todo/TD-019.md) | Frontend: PWA manifest + service worker (app-shell caching) for offline-first field use | T-0002 | implementer |
-| [TD-020](../tracker/todo/TD-020.md) | Frontend: add ESLint (typescript-eslint, react-hooks) + lint gate in CLAUDE.md section 4 and CI | T-0002 | implementer |
 | [TD-023](../tracker/todo/TD-023.md) | Distributed tracing / metrics (OpenTelemetry, Prometheus endpoint) for API and ARQ worker | T-0021 | implementer |
 | [TD-025](../tracker/todo/TD-025.md) | Backend errors: request-context middleware renders unhandled 500s itself, so add_exception_handler(Exception) never runs; document or make the renderer pluggable before an error-format task; move _restore_logging autouse fixture to tests/conftest.py | T-0021 | reviewer |
 | [TD-035](../tracker/todo/TD-035.md) | Optimistic locking on BaseRecordMixin.revision (version_id_col or explicit base_revision check) | T-0005 | reviewer |
@@ -150,6 +149,8 @@
 | [TD-215](../tracker/todo/TD-215.md) | Optional chain-of-custody hash for offline records: SHA-256(prev_hash + payload + monotonic_ms) per device clock session | T-0148 | planner |
 | [TD-226](../tracker/todo/TD-226.md) | Key the per-client login lockout on the IPv6 /64, not the full address (clients can rotate within their prefix) | T-0068 | reviewer |
 | [TD-227](../tracker/todo/TD-227.md) | Task board totals count dropped tasks: leave status dropped out of the Overall and per-phase denominators in scripts/tracker.py render | T-0029 | planner |
+| [TD-233](../tracker/todo/TD-233.md) | Form engine: record visibility non-convergence + server parity under the TD-177 work (PR #42 review suggestion) | T-0031 | implementer |
+| [TD-234](../tracker/todo/TD-234.md) | Frontend: add a formatter (Prettier or ESLint stylistic) so lint --fix output and hand edits share one layout | T-0031 | implementer |
 
 ## bug (1)
 
@@ -157,7 +158,7 @@
 |---|---|---|---|
 | [TD-159](../tracker/todo/TD-159.md) | Site filter from the bound project is applied to all site-scoped rows: a PER-07 on A who is PER-01 on B loses B's site-scoped rows (over-restrictive) | T-0010 | reviewer |
 
-## risk (14)
+## risk (15)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -175,6 +176,7 @@
 | [TD-216](../tracker/todo/TD-216.md) | Client co-sign residual risk: a provisional wet signature is only an inspector-witnessed claim until the client confirms it; a stolen client device key is stopped only by revoking the device (T-0043) | T-0174, T-0173 | planner |
 | [TD-222](../tracker/todo/TD-222.md) | Rate-limit unauthenticated /api/v1/auth/* at the proxy: each login/magic-link with a fresh e-mail costs one scrypt (16 MB) before any lockout applies | — | reviewer |
 | [TD-225](../tracker/todo/TD-225.md) | Login account backstop can still be held locked at ~1 request per lock after 51 distributed failures | T-0068 | reviewer |
+| [TD-232](../tracker/todo/TD-232.md) | Frontend lint toolchain: npm audit reports moderate minimatch ReDoS (GHSA-g3hv-75wg-m249) via eslint 10 / typescript-eslint 8.72.2 | T-0031 | implementer |
 
 ## Closed
 
@@ -195,6 +197,7 @@
 | ✅ | [TD-015](../tracker/todo/TD-015.md) | Phase 2 welder/NDE records reference the contacts directory (Phase 3): confirm interim nullable-linkage + backfill-FK default vs. landing a minimal contacts directory before Phase 2 | Confirmed default: nullable contact references in Phase 2; add the FK constraints when contacts (E-03-01) lands (user, 2026-11-09) |
 | ✅ | [TD-017](../tracker/todo/TD-017.md) | Backend: add a dependency lock file (pinned versions) before T-0004 Dockerfile needs reproducible builds | Hashed runtime + build lock files (backend/requirements.lock, requirements-build.lock) with sync tests, added in T-0004 |
 | ✅ | [TD-018](../tracker/todo/TD-018.md) | Frontend: wire npm run gen:api (OpenAPI -> frontend/src/api/) once the backend exposes an OpenAPI schema | Done in T-0011: npm run gen:api runs python -m app.openapi (backend) and openapi-typescript; frontend/src/api/openapi.json and schema.ts are committed. A CI drift check is TD-126. |
+| ✅ | [TD-020](../tracker/todo/TD-020.md) | Frontend: add ESLint (typescript-eslint, react-hooks) + lint gate in CLAUDE.md section 4 and CI | T-0031: ESLint 10 flat config (typescript-eslint strictTypeChecked + stylisticTypeChecked, react-hooks), npm run lint --max-warnings=0 in CI frontend job and CLAUDE.md section 4 |
 | ✅ | [TD-022](../tracker/todo/TD-022.md) | Sign off security header values and JSON log schema (T-0021 defaults) | T-0021 defaults accepted; no HSTS preload; /docs, /redoc, /openapi.json hidden in production (T-0030); log shipping on AWS decided with deploy; admin-side settings spec in TD-046 (user, 2026-11-09) |
 | ✅ | [TD-026](../tracker/todo/TD-026.md) | Extend TID253 heavy-import ban list as heavy deps land (DXF/XER parsers, PDF compile libs) | Standing check added to the kerp-reviewer checklist: every new heavy dependency is added to banned-module-level-imports in the same PR (user, 2026-11-09) |
 | ✅ | [TD-027](../tracker/todo/TD-027.md) | Worker queue: CLAUDE.md/plan say ARQ, consolidation spec says SAQ replaces ARQ | SAQ over Redis (interactive + batch queues), per the consolidated spec; CLAUDE.md §6 wording updated (user, 2026-11-09) |

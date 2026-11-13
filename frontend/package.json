@@ -15,7 +15,8 @@
     "preview": "vite preview",
     "gen:api": "npm run gen:api:schema && npm run gen:api:types",
     "gen:api:schema": "cd ../backend && python -m app.openapi ../frontend/src/api/openapi.json",
-    "gen:api:types": "openapi-typescript src/api/openapi.json --output src/api/schema.ts"
+    "gen:api:types": "openapi-typescript src/api/openapi.json --output src/api/schema.ts",
+    "lint": "eslint . --max-warnings=0"
   },
   "dependencies": {
     "@marcbachmann/cel-js": "^8.0.0",
@@ -29,6 +30,7 @@
     "react-router": "^7.18.5"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@tailwindcss/vite": "^4.3.5",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/jest-dom": "^6.9.1",
@@ -37,11 +39,15 @@
     "@types/react": "^18.3.31",
     "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react": "^6.2.1",
+    "eslint": "^10.14.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
     "fake-indexeddb": "^6.2.8",
+    "globals": "^17.14.0",
     "jsdom": "^28.1.0",
     "openapi-typescript": "^7.13.0",
     "tailwindcss": "^4.3.5",
     "typescript": "~5.9.3",
+    "typescript-eslint": "^8.72.2",
     "vite": "^8.3.6",
     "vitest": "^5.1.0"
   }

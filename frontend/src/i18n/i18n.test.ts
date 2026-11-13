@@ -22,8 +22,9 @@ describe("i18n", () => {
     expect(keys.length).toBeGreaterThan(0);
     for (const key of keys) {
       expect(i18n.exists(key), key).toBe(true);
-      // Keys are discovered at runtime, so bypass the compile-time key union here.
-      const value = String(i18n.t(key as never));
+      // Keys are discovered at runtime (outside the compile-time key union); a missing key
+      // falls back to the key itself, which the next assertion rejects.
+      const value = i18n.t(key, { defaultValue: key });
       expect(value, key).not.toBe(key);
       expect(value.trim(), key).not.toBe("");
     }

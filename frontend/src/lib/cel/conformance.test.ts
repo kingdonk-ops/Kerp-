@@ -103,7 +103,7 @@ describe("CEL conformance fixtures (client runtime)", () => {
     }
     // A documented gap on this runtime is pinned to its current (divergent) result, so a
     // library change is noticed; it is never skipped. See tests/contract/README.md.
-    const expectation = gap !== undefined && gap.runtime === RUNTIME ? gap.actual : fixture.expect;
+    const expectation = gap?.runtime === RUNTIME ? gap.actual : fixture.expect;
     const result = evaluate(fixture.expression, fixture.context);
     expect(outcome(result), JSON.stringify(result)).toEqual(expectedOutcome(expectation));
   });

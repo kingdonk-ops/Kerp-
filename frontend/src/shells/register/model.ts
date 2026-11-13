@@ -75,8 +75,32 @@ export function toCsv<Row>(rows: readonly Row[], columns: readonly RegisterColum
   return lines.map((cells) => `${cells.join(",")}\r\n`).join("");
 }
 
+/**
+ * One storage-key segment: URI-encoded, plus `.` (left alone by `encodeURIComponent`) so a
+ * segment can never contain the separator and distinct ids never share a key.
+ */
+function keySegment(part: string): string {
+  return encodeURIComponent(part).replaceAll(".", "%2E");
+}
+
 export function savedViewsStorageKey(userId: string, registerId: string): string {
-  return `kerp.views.${userId}.${registerId}`;
+  return `kerp.views.${keySegment(userId)}.${keySegment(registerId)}`;
+}
+
+/**
+ * The hidden-column set actually applied: at least one column always stays visible, so a
+ * stored view (or `defaultHidden` on every column) can never empty the table. When every
+ * column would be hidden, the first one is shown.
+ */
+export function effectiveHiddenColumns(
+  columns: readonly { id: string }[],
+  hidden: ReadonlySet<string>,
+): ReadonlySet<string> {
+  const first = columns[0];
+  if (first === undefined || !columns.every((column) => hidden.has(column.id))) return hidden;
+  const next = new Set(hidden);
+  next.delete(first.id);
+  return next;
 }
 
 function isStringRecord(value: unknown): value is Record<string, string> {
@@ -113,7 +137,9 @@ export function localSavedViewStore(storage: KeyValueStorage, userId: string, re
       return [];
     }
   };
-  const write = (views: SavedView[]) => storage.setItem(key, JSON.stringify(views));
+  const write = (views: SavedView[]) => {
+    storage.setItem(key, JSON.stringify(views));
+  };
 
   return {
     key,

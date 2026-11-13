@@ -182,6 +182,25 @@ describe("evaluateForm — validation", () => {
     expect(evaluateForm(template, { result: "ACCEPT", flag: true }).errors).toEqual({});
   });
 
+  it("exposes the effective required set (static required + active required_if, visible only)", () => {
+    const template: FormTemplate = {
+      fields: [
+        { field_key: "result", label: "Result", data_type: "text", required: true },
+        {
+          field_key: "reason",
+          label: "Reason",
+          data_type: "text",
+          required_if: "has(fields.result) && fields.result == 'REJECT'",
+        },
+        { field_key: "hidden", label: "Hidden", data_type: "text", required: true, visible_if: "false" },
+        { field_key: "broken", label: "Broken", data_type: "text", required_if: "fields.nope == 1" },
+      ],
+    };
+    // An erroring required_if fails closed (required); hidden fields are never required.
+    expect([...evaluateForm(template, { result: "ACCEPT" }).required]).toEqual(["result", "broken"]);
+    expect([...evaluateForm(template, { result: "REJECT" }).required]).toEqual(["result", "reason", "broken"]);
+  });
+
   it("fails closed on required_if: an erroring condition makes the field required", () => {
     const template: FormTemplate = {
       fields: [{ field_key: "x", label: "X", data_type: "text", required_if: "fields.nope == 1" }],

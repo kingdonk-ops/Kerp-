@@ -1,5 +1,5 @@
 import { useQuery, type QueryKey } from "@tanstack/react-query";
-import { useId, useRef, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useId, useRef, type KeyboardEvent, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router";
 
@@ -50,14 +50,28 @@ export function DetailPage({ title, subtitle, gate, tabs, audit, actions }: Deta
   const [params, setParams] = useSearchParams();
   const tabRefs = useRef(new Map<string, HTMLButtonElement>());
 
+  const reservedClash = tabs.some((tab) => tab.id === AUDIT_TAB_ID);
+  useEffect(() => {
+    if (reservedClash && import.meta.env.DEV) {
+      console.error(
+        `DetailPage: tab id "${AUDIT_TAB_ID}" is reserved for the shell's audit log; rename the module tab.`,
+      );
+    }
+  }, [reservedClash]);
+
   const allTabs: readonly DetailTab[] =
     audit === undefined
       ? tabs
-      : [...tabs, { id: AUDIT_TAB_ID, label: t("shells.detail.audit.tab"), render: () => <AuditLog source={audit} /> }];
+      : [
+          // The shell owns the reserved id: a clashing module tab is dropped (no duplicate keys/ids).
+          ...tabs.filter((tab) => tab.id !== AUDIT_TAB_ID),
+          { id: AUDIT_TAB_ID, label: t("shells.detail.audit.tab"), render: () => <AuditLog source={audit} /> },
+        ];
   const requested = params.get(TAB_PARAM);
   const active = allTabs.find((tab) => tab.id === requested) ?? allTabs[0];
+  const panelId = `${baseId}-panel`;
 
-  const select = (id: string) =>
+  const select = (id: string) => {
     setParams(
       (current) => {
         const next = new URLSearchParams(current);
@@ -66,12 +80,30 @@ export function DetailPage({ title, subtitle, gate, tabs, audit, actions }: Deta
       },
       { replace: true },
     );
+  };
+
+  /** WAI-ARIA APG tabs: Left/Right wrap, Home/End jump; selection follows focus. */
+  const targetIndex = (key: string, index: number): number | null => {
+    const count = allTabs.length;
+    switch (key) {
+      case "ArrowRight":
+        return (index + 1) % count;
+      case "ArrowLeft":
+        return (index - 1 + count) % count;
+      case "Home":
+        return 0;
+      case "End":
+        return count - 1;
+      default:
+        return null;
+    }
+  };
 
   const onKeyDown = (event: KeyboardEvent, index: number) => {
-    const step = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
-    if (step === 0) return;
+    const next = targetIndex(event.key, index);
+    if (next === null) return;
     event.preventDefault();
-    const target = allTabs[(index + step + allTabs.length) % allTabs.length];
+    const target = allTabs[next];
     if (target === undefined) return;
     select(target.id);
     tabRefs.current.get(target.id)?.focus();
@@ -103,11 +135,12 @@ export function DetailPage({ title, subtitle, gate, tabs, audit, actions }: Deta
               role="tab"
               id={`${baseId}-tab-${tab.id}`}
               aria-selected={selected}
-              aria-controls={`${baseId}-panel`}
+              // Only the selected tab's panel is rendered, so only it may point at one.
+              aria-controls={selected ? panelId : undefined}
               tabIndex={selected ? 0 : -1}
               className={selected ? "border-b-2 border-brand px-3 py-2 font-semibold" : "px-3 py-2 text-muted"}
-              onClick={() => select(tab.id)}
-              onKeyDown={(event) => onKeyDown(event, index)}
+              onClick={() => { select(tab.id); }}
+              onKeyDown={(event) => { onKeyDown(event, index); }}
             >
               {tab.label}
             </button>
@@ -116,7 +149,7 @@ export function DetailPage({ title, subtitle, gate, tabs, audit, actions }: Deta
       </div>
 
       {active !== undefined && (
-        <div role="tabpanel" id={`${baseId}-panel`} aria-labelledby={`${baseId}-tab-${active.id}`} tabIndex={0}>
+        <div role="tabpanel" id={panelId} aria-labelledby={`${baseId}-tab-${active.id}`} tabIndex={0}>
           {active.render()}
         </div>
       )}

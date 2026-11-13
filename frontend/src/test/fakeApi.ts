@@ -29,8 +29,8 @@ export function json(body: unknown, status = 200): Response {
 
 export function tokens(n: number) {
   return {
-    access_token: `access-${n}`,
-    refresh_token: `refresh-${n}`,
+    access_token: `access-${String(n)}`,
+    refresh_token: `refresh-${String(n)}`,
     token_type: "bearer" as const,
     expires_in: 900,
     refresh_expires_in: 1_209_600,

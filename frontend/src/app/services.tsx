@@ -24,7 +24,7 @@ function browserStorage(kind: "localStorage" | "sessionStorage"): KeyValueStorag
 export function createAppServices(): AppServices {
   const tokens = new TokenStore(browserStorage("sessionStorage"));
   const env = import.meta.env as Record<string, string | undefined>;
-  const baseUrl = env["VITE_API_BASE_URL"] ?? window.location.origin;
+  const baseUrl = env.VITE_API_BASE_URL ?? window.location.origin;
   return {
     api: createApiClient({ baseUrl, tokens }),
     tokens,

@@ -67,11 +67,13 @@ export function DynamicForm({
           const error = Object.hasOwn(evaluation.errors, field.field_key) ? evaluation.errors[field.field_key] : undefined;
           const shownError = error !== undefined && (submitted || touched.has(field.field_key)) ? error : undefined;
           const errorId = `${id}-error`;
+          // Static `required` or an active `required_if` (fail closed), computed by the engine.
+          const required = evaluation.required.has(field.field_key);
           return (
             <div key={field.field_key} className="space-y-1">
               <label htmlFor={id} className="block text-sm font-medium">
                 {field.label}
-                {field.required === true && (
+                {required && (
                   <span className="ml-1 text-danger" aria-hidden="true" title={t("shells.form.requiredMark")}>
                     *
                   </span>
@@ -81,9 +83,10 @@ export function DynamicForm({
                 field={field}
                 id={id}
                 value={Object.hasOwn(values, field.field_key) ? values[field.field_key] : undefined}
+                required={required}
                 invalid={shownError !== undefined}
                 describedBy={shownError !== undefined ? errorId : undefined}
-                onChange={(value) => setValue(field.field_key, value)}
+                onChange={(value) => { setValue(field.field_key, value); }}
               />
               {shownError !== undefined && (
                 <p id={errorId} className="text-sm text-danger">
@@ -108,29 +111,30 @@ interface FieldControlProps {
   field: FormFieldDef;
   id: string;
   value: JsonValue | undefined;
+  required: boolean;
   invalid: boolean;
   describedBy: string | undefined;
   onChange: (value: JsonValue) => void;
 }
 
-function FieldControl({ field, id, value, invalid, describedBy, onChange }: FieldControlProps) {
+function FieldControl({ field, id, value, required, invalid, describedBy, onChange }: FieldControlProps) {
   const common = {
     id,
     name: field.field_key,
     "aria-invalid": invalid || undefined,
     "aria-describedby": describedBy,
-    "aria-required": field.required === true || undefined,
+    "aria-required": required || undefined,
   };
   const text = typeof value === "string" || typeof value === "number" ? String(value) : "";
 
   switch (field.data_type) {
     case "boolean":
       return (
-        <input {...common} type="checkbox" checked={value === true} onChange={(e) => onChange(e.target.checked)} />
+        <input {...common} type="checkbox" checked={value === true} onChange={(e) => { onChange(e.target.checked); }} />
       );
     case "select":
       return (
-        <select {...common} className={INPUT} value={text} onChange={(e) => onChange(e.target.value)}>
+        <select {...common} className={INPUT} value={text} onChange={(e) => { onChange(e.target.value); }}>
           <option value="" />
           {(field.options ?? []).map((option) => (
             <option key={option.value} value={option.value}>
@@ -148,7 +152,7 @@ function FieldControl({ field, id, value, invalid, describedBy, onChange }: Fiel
           className={INPUT}
           value={text}
           // Plain JSON numbers are CEL doubles (src/lib/cel/README.md); empty clears the value.
-          onChange={(e) => onChange(e.target.value === "" ? null : Number(e.target.value))}
+          onChange={(e) => { onChange(e.target.value === "" ? null : Number(e.target.value)); }}
         />
       );
     case "date":
@@ -159,7 +163,7 @@ function FieldControl({ field, id, value, invalid, describedBy, onChange }: Fiel
           type={field.data_type}
           className={INPUT}
           value={text}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(e) => { onChange(e.target.value); }}
         />
       );
   }
