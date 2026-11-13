@@ -3,15 +3,16 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 132 · **Closed:** 88
+**Open:** 133 · **Closed:** 88
 
-## decision (3)
+## decision (4)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
 | [TD-096](../tracker/todo/TD-096.md) | Approved coating ITR dropped the residual-dust rating row the ITP requires; Grating and Gridmesh ITR has no approved version: confirm with the client before shipping default templates | T-0113 | planner |
 | [TD-213](../tracker/todo/TD-213.md) | Object key layout: confirm {tenant}/{project}/{module}/{sha256} (no extension) instead of the master spec's {hash}.ext, plus transient staging/ and quarantine/ prefixes | T-0016 | implementer |
 | [TD-223](../tracker/todo/TD-223.md) | Who may open PRs to dev? If any account other than KERP_ALLOWED_REVIEWERS (or forks) can, require a human approval as well as review-gate | T-0067 | reviewer |
+| [TD-224](../tracker/todo/TD-224.md) | Magic-link request lockout is still per tenant+email: anyone can keep a known field worker from getting a link (4/hour, then doubling delay); decide per-client keying vs mailbox-flood protection | T-0068 | reviewer |
 
 ## spec-gap (35)
 
@@ -256,7 +257,7 @@
 | ✅ | [TD-184](../tracker/todo/TD-184.md) | Who may create a project and how the creator gets a membership: POST /projects is gated on the admin capability in any project until T-0014's tenant administrator | 1a + 3a: projects are created by Project Admins (create_projects grant, appointed by a System admin); the creator gets PER-09 automatically; memberships on soft-deleted projects are ignored. Spec diff §4.1; tasks T-0014, T-0039 (user, 2026-11-13) |
 | ✅ | [TD-185](../tracker/todo/TD-185.md) | Project status values (ACTIVE/ON_HOLD/CLOSED chosen) and currency/locale defaults (AUD/en-AU) are not in the spec | 7a: project status ACTIVE/ON_HOLD/CLOSED and AUD/en-AU confirmed; defaults (status, timezone, currency, locale) move to tenant (deployment) settings. Spec master §4.1, diff §4.4; task T-0044 (user, 2026-11-13) |
 | ✅ | [TD-187](../tracker/todo/TD-187.md) | jobs worker: a cancellation/timeout while _start is returning leaves the row 'running' forever (flaky test_a_cancelled_or_timed_out_job_is_marked_failed) | run_job shields the _start thread; a cancel during start waits for it, then fails a started row with 'Job timed out or was cancelled' (shielded) and re-raises (fix/jobs-cancel-during-start) |
-| ✅ | [TD-191](../tracker/todo/TD-191.md) | Login/magic-link lockout keyed by tenant+email lets anyone keep a known user at a 15-minute delay; decide per-email+per-IP keying and fix the begin() check/count race (single Lua script) | Key the login lockout on tenant + e-mail + client IP with a looser per-account backstop (50/24 h); trusted client address via uvicorn FORWARDED_ALLOW_IPS; atomic begin() — implemented by T-0068 (user, 2026-11-13, review D2) |
+| ✅ | [TD-191](../tracker/todo/TD-191.md) | Login/magic-link lockout keyed by tenant+email lets anyone keep a known user at a 15-minute delay; decide per-email+per-IP keying and fix the begin() check/count race (single Lua script) | Password login: key the lockout on tenant + e-mail + client IP with a looser per-account backstop (50/24 h), trusted client address via uvicorn FORWARDED_ALLOW_IPS, atomic begin() — implemented by T-0068 (user, 2026-11-13, review D2). Magic-link request lockout stays per tenant + e-mail on purpose (it is also the mailbox-flood cap); its DoS is tracked by TD-224. |
 | ⚫ | [TD-192](../tracker/todo/TD-192.md) | Ask GitHub Support to purge old commit 819cf31 (contained a client name) from the repository's cached objects | Ignored by the user; no purge request. (user, 2026-11-13) |
 | ✅ | [TD-202](../tracker/todo/TD-202.md) | Lobby details: a project code only finds the project and files an access request (never grants access); the lobby is also reachable from the project picker for users who already have projects | Q1a: a project code only finds that one project and lets the user file an access request decided by the project's PER-09 holders; it never grants access by itself. Users who already have projects open the lobby from the picker. Spec diff §4.1; T-0040, T-0041 (user, 2026-11-13) |
 | ✅ | [TD-203](../tracker/todo/TD-203.md) | SPA refresh-token transport: keep the JSON body (sessionStorage) or move to an httpOnly SameSite cookie | Q6a: the web SPA gets the refresh token as an httpOnly Secure SameSite cookie (CSRF-protected /auth/refresh); the Capacitor Android build keeps the JSON-body transport. Spec diff §4.2; T-0037 (user, 2026-11-13) |
