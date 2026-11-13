@@ -8,6 +8,54 @@ Anchors, header binding and template/register versioning follow
 and validity dates follow [ADR 0004](../../decisions/0004-project-rule-sets-with-defaults.md)
 (both accepted with amendments, 2026-11-10). "RSW" below means the project's work-anchor level.
 
+## ITP, Request for Inspection and ITR — purpose of each (user clarification, 2026-11-13)
+
+| Document | Role | Answers | How often |
+|---|---|---|---|
+| **ITP** — Inspection & Test Plan | **The plan.** Lists every inspection/test activity, its reference specification, acceptance criteria, the records required, and who is involved at each step through **Hold, Witness, Review or Surveillance** points (`H`/`W`/`R`/`S`). | *What* must be checked | Approved **once**, before work starts |
+| **RFI** — Request for Inspection | **The trigger.** Notifies the client or third-party inspector that a specific ITP activity is ready, so they can attend `H`/`W` points. | *When* it is ready | Raised **many times**, once per inspection event |
+| **ITR** — Inspection & Test Record | **The evidence.** Records what was actually inspected, results and measurements, accept/reject, and signatures. Feeds the final handover dossier (MDR). | *Proof* it was done | One per inspected activity per anchor |
+
+In short: the ITP says what must be checked, the Request for Inspection says when it is ready, and
+the ITR proves it was done.
+
+**All three functions are required, but not as three separate paper documents.** KERP builds them
+as one linked chain:
+
+1. **ITP = master template.** Each ITP line item defines the activity, criteria, intervention
+   points (`H`/`W`/`R`/`S`/`M`) and the ITR form (template revision) to use. Authored in `qms`;
+   instantiated per anchor (node or Item) as `kind = itp` records.
+2. **Request for Inspection = a workflow step on an ITP line item** for a specific location or
+   component. Raising it moves the line to `INSPECTION_REQUESTED`, auto-notifies the right
+   parties, logs date and time, and enforces the contractual notice period. Per TD-045 it is
+   backed by its own `inspection_request` record (booking, calendar, reschedule history, client
+   delay attribution — §`inspection_requests`); one request may cover several anchors.
+3. **ITR = the form filled in on site against that same request** (`kind = inspection`), with
+   photos, readings and e-signatures. When it is completed and accepted, the ITP line closes
+   automatically (`INSPECTED_PASSED`).
+
+What the chain must deliver:
+- **Traceability** — every ITR links back to its ITP line and its Request for Inspection.
+- **No duplicate data entry** — the ITR header is bound from the ITP line, request and anchor
+  context (header binding by role, below), never retyped.
+- **Hold points block progress until signed** — enforced via `run_checks` (§`construction_control`).
+- **Live progress** — dashboards show the percentage of ITP line items closed, per anchor/system.
+
+**Field-user view.** Field users see a single inspection with one status lifecycle
+(Requested → Scheduled → Inspected → Accepted/Rejected), even though the request and the ITR are
+linked records underneath. Mapping: Requested/Scheduled = `inspection_request` `requested` /
+`confirmed` with the ITP line in `INSPECTION_REQUESTED`; Inspected = ITR submitted; Accepted =
+`INSPECTED_PASSED`; Rejected = `INSPECTED_FAILED`.
+
+**RFI number and terminology (user decision, 2026-11-13, amends TD-045).** In KERP, **RFI
+means Request for Inspection**, as clients and site use it. A Request for Information is called a
+**TQ (Technical Query)** and lives in the TQ module (`docs/spec/modules/documents-and-mdr.md`).
+Every `inspection_request` carries an **RFI no.** (TD-045 field list), printed on the notification
+and on the ITR, because many clients require a separate RFI number for contractual tracking even
+where no separate request form is issued. The record and state keep their confirmed code names
+`inspection_request` / `INSPECTION_REQUESTED`. The RFI numbering scheme and per-discipline layout
+remain open on TD-045.
+
 ## One field-type registry (`core/fields`)
 Shared palette of field types used by every form, ITP and asset-schema field:
 `numeric`, `text`, unit-bound **`measurement`** (value + unit), `photo`, `signature`,
@@ -16,8 +64,7 @@ Shared palette of field types used by every form, ITP and asset-schema field:
 
 ## Unified inspection record — `oe_inspections_inspection`
 Single store across all kinds: **`kind IN (inspection, itp)`**. TD-045 (decided 2026-11-10)
-renames the old `rfi` kind and `RFI_ISSUED` state because RFI means Request for Information; the
-Request for Inspection becomes its own `inspection_request` record (§`inspection_requests`).
+renames the old `rfi` kind and `RFI_ISSUED` state; the Request for Inspection (RFI) becomes its own `inspection_request` record (§`inspection_requests`).
 The names used here are **confirmed by the user (TD-045, 2026-11-10)**: no `rfi` kind, and the
 call-out state is `INSPECTION_REQUESTED`. Anchors to **any node whose level has the `inspection_anchor` role, or an Item**
 (ADR 0003 §6; e.g. Line in `cui-line`, RSW and Item in `remediation-*`), including a node with no
@@ -115,7 +162,7 @@ Workflow `draft → requested → confirmed → witnessed | waived | no_show | f
 contractual notice, calendar bookings, broadcasts, and **automatic client delay attribution**
 on `no_show`.
 Decided (TD-045, 2026-11-10; full spec pending there): the Request for Inspection is its own
-`inspection_request` record in scheduling, cross-linked to the Request for Information module;
+`inspection_request` record in scheduling, cross-linked to the TQ (Technical Query) module;
 "rescheduled" is a transition back to `requested` that keeps history. Multi-anchor requests use
 `oe_inspections_request_anchor` (above).
 
