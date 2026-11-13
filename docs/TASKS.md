@@ -3,11 +3,11 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 32/145 tasks done (22%) · **ready now:** 18 · **epics awaiting breakdown:** 47
+**Overall:** 33/145 tasks done (23%) · **ready now:** 17 · **epics awaiting breakdown:** 47
 
 | Phase | Tasks done | Progress |
 |---|---|---|
-| 0 · Platform foundations | 32/61 | `█████░░░░░` 52% |
+| 0 · Platform foundations | 33/61 | `█████░░░░░` 54% |
 | 1 · Asset & Quality backbone | 0/75 (+1 epics) | `░░░░░░░░░░` 0% |
 | 2 · Welding quality | 0/9 | `░░░░░░░░░░` 0% |
 | 3 · Logistics | 0/0 (+7 epics) | `░░░░░░░░░░` 0% |
@@ -67,7 +67,7 @@
 | ▶ | [T-0032](../tracker/tasks/T-0032.md) | CI hardening 2: weekly uv lock refresh PR, SHA-pinned promote/review-gate actions, digest-pinned service images, publish the smoke-tested image by digest | platform | S | T-0028 |  |
 | ▶ | [T-0033](../tracker/tasks/T-0033.md) | Migrations: inline frozen RLS/ledger DDL per revision + test that the latest revision matches the live helpers | platform | S | T-0006, T-0007 |  |
 | ✅ | [T-0029](../tracker/tasks/T-0029.md) | Pipeline tooling: tracker-aware review-gate patch-id + `tracker.py set --note` date fix | platform | S | — | #62 |
-| ▶ | [T-0030](../tracker/tasks/T-0030.md) | Backend runtime hardening: quiet httpx/httpcore logs, API docs hidden in production, ASCII-safe JSON logs, client disconnect as 499, refuse debug in production | platform | M | T-0021 |  |
+| ✅ | [T-0030](../tracker/tasks/T-0030.md) | Backend runtime hardening: quiet httpx/httpcore logs, API docs hidden in production, ASCII-safe JSON logs, client disconnect as 499, refuse debug in production | platform | M | T-0021 | #68 |
 | ✅ | [T-0031](../tracker/tasks/T-0031.md) | Frontend hardening: ESLint gate (typescript-eslint, react-hooks) + UI shell fixes (hidden-all-columns guard, encoded storage keys, required_if a11y, tab keyboard/aria, reserved audit tab id) | platform | M | T-0002, T-0025 | #63 |
 | ✅ | [T-0060](../tracker/tasks/T-0060.md) | Request size bounds + jobs hardening: app-wide body limit, spatial_bounds cap, jobs payload cap, list-safe job result, jobs scope tests, real SAQ-worker RLS binding test | platform | M | T-0012, T-0015 | #67 |
 | ⚫ | [T-0061](../tracker/tasks/T-0061.md) | Auth: reject tokens issued in the same second as a password change (sub-second iat vs password_changed_at) | identity | S | T-0008 |  |

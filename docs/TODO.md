@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 155 · **Closed:** 90
+**Open:** 155 · **Closed:** 91
 
 ## decision (7)
 
@@ -69,7 +69,7 @@
 | [TD-131](../tracker/todo/TD-131.md) | Add a root .env.example for the dev stack (the implementer agent's permission rules block writing .env* files) | T-0003 | implementer |
 | [TD-208](../tracker/todo/TD-208.md) | Uploads infra: provision the kerp-vault bucket (CORS for browser PUT/GET, lifecycle on staging/), wire KERP_S3_* in compose, add MinIO to CI for the gated round-trip test | T-0016 | implementer |
 
-## deferred (29)
+## deferred (30)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -102,6 +102,7 @@
 | [TD-242](../tracker/todo/TD-242.md) | saved_views: team visibility needs the teams module (T-0013) - pass the caller's team ids into Viewer and validate team_id | T-0020 | implementer |
 | [TD-243](../tracker/todo/TD-243.md) | saved_views: expose portal views through the client portal layout | T-0020 | implementer |
 | [TD-248](../tracker/todo/TD-248.md) | Startup check that KERP_DEFAULT_TENANT_ID names an existing tenant row (needs the tenant table from T-0023) | T-0037 | implementer |
+| [TD-250](../tracker/todo/TD-250.md) | Request-context middleware: starlette ClientDisconnect (raised by request.body() after http.disconnect) is still logged as an unhandled 500; map it to 499/disconnected like CancelledError | T-0030 | implementer |
 
 ## later (61)
 
@@ -175,11 +176,10 @@
 |---|---|---|---|
 | [TD-159](../tracker/todo/TD-159.md) | Site filter from the bound project is applied to all site-scoped rows: a PER-07 on A who is PER-01 on B loses B's site-scoped rows (over-restrictive) | T-0010 | reviewer |
 
-## risk (15)
+## risk (14)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
-| [TD-024](../tracker/todo/TD-024.md) | Backend logging: httpx/httpcore INFO lines log full outbound URLs (incl. query-string tokens) via the root JSON handler; set them to WARNING before any integration makes outbound calls | T-0021 | reviewer |
 | [TD-069](../tracker/todo/TD-069.md) | Legacy inspection exports contain real client data and must not be committed as fixtures | T-0113 | planner |
 | [TD-102](../tracker/todo/TD-102.md) | Eligibility API is frozen at M1 (T-0131) but must accept a requirement set (role baseline + client/site overlays + task-bound rules) | T-0131, T-0118 | planner |
 | [TD-111](../tracker/todo/TD-111.md) | All coastal input files (planning, comm matrix, registers, reports, templates) contain real client and personal data: extend TD-069 beyond the inspection exports | T-0113, T-0107 | planner |
@@ -217,6 +217,7 @@
 | ✅ | [TD-018](../tracker/todo/TD-018.md) | Frontend: wire npm run gen:api (OpenAPI -> frontend/src/api/) once the backend exposes an OpenAPI schema | Done in T-0011: npm run gen:api runs python -m app.openapi (backend) and openapi-typescript; frontend/src/api/openapi.json and schema.ts are committed. A CI drift check is TD-126. |
 | ✅ | [TD-020](../tracker/todo/TD-020.md) | Frontend: add ESLint (typescript-eslint, react-hooks) + lint gate in CLAUDE.md section 4 and CI | T-0031: ESLint 10 flat config (typescript-eslint strictTypeChecked + stylisticTypeChecked, react-hooks), npm run lint --max-warnings=0 in CI frontend job and CLAUDE.md section 4 |
 | ✅ | [TD-022](../tracker/todo/TD-022.md) | Sign off security header values and JSON log schema (T-0021 defaults) | T-0021 defaults accepted; no HSTS preload; /docs, /redoc, /openapi.json hidden in production (T-0030); log shipping on AWS decided with deploy; admin-side settings spec in TD-046 (user, 2026-11-09) |
+| ✅ | [TD-024](../tracker/todo/TD-024.md) | Backend logging: httpx/httpcore INFO lines log full outbound URLs (incl. query-string tokens) via the root JSON handler; set them to WARNING before any integration makes outbound calls | T-0030: configure_logging caps httpx/httpcore at WARNING; test proves an outbound URL with a query-string token is not logged |
 | ✅ | [TD-026](../tracker/todo/TD-026.md) | Extend TID253 heavy-import ban list as heavy deps land (DXF/XER parsers, PDF compile libs) | Standing check added to the kerp-reviewer checklist: every new heavy dependency is added to banned-module-level-imports in the same PR (user, 2026-11-09) |
 | ✅ | [TD-027](../tracker/todo/TD-027.md) | Worker queue: CLAUDE.md/plan say ARQ, consolidation spec says SAQ replaces ARQ | SAQ over Redis (interactive + batch queues), per the consolidated spec; CLAUDE.md §6 wording updated (user, 2026-11-09) |
 | ✅ | [TD-028](../tracker/todo/TD-028.md) | Pin backend base image by digest and automate refresh of base image + requirements locks (Dependabot/Renovate) | T-0028: base image pinned by multi-arch index digest in both FROM lines; .github/dependabot.yml (Dependabot, no app install) refreshes the base image digest and the action SHAs. Lock-file refresh split out to TD-047. |

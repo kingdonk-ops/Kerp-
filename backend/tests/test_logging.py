@@ -6,6 +6,7 @@ import logging
 import sys
 from collections.abc import Iterator
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
@@ -15,7 +16,7 @@ from app.core.logging import JsonFormatter, configure_logging
 from app.core.request_context import ACCESS_LOGGER_NAME, REQUEST_ID_HEADER, request_id_var
 from app.main import create_app
 
-_TOUCHED = ("", "uvicorn", "uvicorn.error", "uvicorn.access")
+_TOUCHED = ("", "uvicorn", "uvicorn.error", "uvicorn.access", "httpx", "httpcore")
 
 
 @pytest.fixture(autouse=True)
@@ -120,6 +121,13 @@ def test_formatter_renders_stack_info() -> None:
     assert "synthetic" in str(_format(record)["stack_info"])
 
 
+def test_formatter_output_is_ascii_only() -> None:
+    """Non-ASCII text is escaped, so a non-UTF-8 console cannot fail on it (T-0030)."""
+    line = JsonFormatter().format(_record(msg="Prüfung %s", args=("溶接 ✓",)))
+    assert line.isascii()
+    assert json.loads(line)["message"] == "Prüfung 溶接 ✓"
+
+
 def test_formatter_output_is_single_line() -> None:
     line = JsonFormatter().format(_record(msg="multi\nline", args=()))
     assert "\n" not in line
@@ -163,6 +171,49 @@ def test_configure_logging_routes_uvicorn_through_root_and_silences_its_access_l
     assert error.propagate is True
     # uvicorn's own access log prints the raw query string; ours replaces it.
     assert logging.getLogger("uvicorn.access").disabled is True
+
+
+def test_configure_logging_survives_a_non_utf8_console() -> None:
+    """A cp1252/ASCII console must not raise on non-ASCII log text (T-0030)."""
+    raw = io.BytesIO()
+    console = io.TextIOWrapper(raw, encoding="ascii", errors="strict", write_through=True)
+    configure_logging(Settings(environment="test"), stream=console)
+    errors: list[logging.LogRecord] = []
+    handler = _our_handlers()[0]
+    handler.handleError = errors.append  # type: ignore[method-assign]
+
+    logging.getLogger("kerp.synthetic").warning("Schweißnaht %s", "検査")
+
+    assert errors == []
+    assert json.loads(raw.getvalue().decode("ascii"))["message"] == "Schweißnaht 検査"
+
+
+@pytest.mark.parametrize("name", ["httpx", "httpcore"])
+def test_configure_logging_quiets_http_client_loggers(name: str) -> None:
+    configure_logging(Settings(environment="test", log_level="DEBUG"), stream=io.StringIO())
+    assert logging.getLogger(name).level == logging.WARNING
+
+
+def test_outbound_request_url_with_token_is_not_logged() -> None:
+    """httpx logs every request URL at INFO; query strings can carry tokens (TD-024)."""
+    stream = io.StringIO()
+    configure_logging(Settings(environment="test", log_level="DEBUG"), stream=stream)
+    transport = httpx.MockTransport(lambda request: httpx.Response(200))
+    with httpx.Client(transport=transport) as http:
+        http.get("https://partner.invalid/api?access_token=synthetic-secret-token")
+    logging.getLogger("kerp.synthetic").info("marker")
+
+    output = stream.getvalue()
+    assert "marker" in output  # the handler is live at INFO/DEBUG
+    assert "synthetic-secret-token" not in output
+    assert "partner.invalid" not in output
+
+
+def test_http_client_warnings_still_reach_the_log() -> None:
+    stream = io.StringIO()
+    configure_logging(Settings(environment="test"), stream=stream)
+    logging.getLogger("httpx").warning("synthetic httpx warning")
+    assert "synthetic httpx warning" in stream.getvalue()
 
 
 def test_create_app_configures_logging() -> None:

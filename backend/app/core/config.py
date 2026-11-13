@@ -7,7 +7,7 @@ from importlib.metadata import version as package_version
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PACKAGE_NAME = "kerp-backend"
@@ -49,6 +49,9 @@ class Settings(BaseSettings):
     # so the default CSP denies everything. ``hsts_enabled=None`` means "only in production".
     content_security_policy: str = "default-src 'none'; frame-ancestors 'none'"
     hsts_enabled: bool | None = None
+    # API docs (T-0030, TD-022): /docs, /redoc, the OAuth2 redirect and /openapi.json are not
+    # served in production. ``api_docs_enabled=None`` means "everywhere except production".
+    api_docs_enabled: bool | None = None
 
     # Request bounds (T-0060): no endpoint accepts a larger body (413). File bytes go to object
     # storage by presigned URL, never through the API, so this does not cap uploads.
@@ -119,6 +122,20 @@ class Settings(BaseSettings):
         if "in_app" not in value:
             raise ValueError("notification_channels must include 'in_app'")
         return value
+
+    @model_validator(mode="after")
+    def _no_debug_in_production(self) -> "Settings":
+        # Debug mode shows tracebacks to callers; refuse to start with it in production (T-0030).
+        if self.debug and self.environment == "production":
+            raise ValueError("KERP_DEBUG=true is not allowed with KERP_ENVIRONMENT=production")
+        return self
+
+    @property
+    def api_docs_active(self) -> bool:
+        """Whether the API docs and OpenAPI schema are served (explicit setting, else non-prod)."""
+        if self.api_docs_enabled is None:
+            return self.environment != "production"
+        return self.api_docs_enabled
 
     @property
     def hsts_active(self) -> bool:

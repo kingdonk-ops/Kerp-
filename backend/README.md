@@ -36,7 +36,7 @@ hardcoded config, no `.env` file is read).
 |---|---|---|
 | `KERP_APP_NAME` | `KERP` | Service name (OpenAPI title) |
 | `KERP_ENVIRONMENT` | `production` | `development` / `test` / `production`. Defaults to production so a forgotten variable fails safe (T-0070); `make`, compose, CI and the Develop commands below set it explicitly. Only `production` behaves differently; `development` and `test` are equivalent |
-| `KERP_DEBUG` | `false` | FastAPI debug mode |
+| `KERP_DEBUG` | `false` | FastAPI debug mode. Refused at startup with `KERP_ENVIRONMENT=production` (T-0030) |
 | `KERP_VERSION` | installed package version | Reported by `/health` |
 | `KERP_DATABASE_URL` | unset | SQLAlchemy URL of the runtime role (e.g. `postgresql+psycopg://…`, `sqlite:///…`) |
 | `KERP_MIGRATION_DATABASE_URL` | unset (= `KERP_DATABASE_URL`) | Schema-owner URL Alembic runs as |
@@ -48,10 +48,12 @@ hardcoded config, no `.env` file is read).
 | `KERP_LOG_LEVEL` | `INFO` | Root log level (`DEBUG`…`CRITICAL`, case-insensitive) |
 | `KERP_CONTENT_SECURITY_POLICY` | `default-src 'none'; frame-ancestors 'none'` | CSP for API responses |
 | `KERP_HSTS_ENABLED` | unset (= on only in `production`) | Force `Strict-Transport-Security` on/off |
+| `KERP_API_DOCS_ENABLED` | unset (= off only in `production`) | Force `/docs`, `/redoc`, the OAuth2 redirect and `/openapi.json` on/off |
 
 ## Observability and security headers
 
-Wired in `create_app()`; values are provisional pending sign-off (see the T-0021 spec-gap TODO TD-022).
+Wired in `create_app()`. The T-0021 values below were signed off in TD-022 (user, 2026-11-09):
+no HSTS preload, and the API docs are hidden in production (T-0030).
 
 - **Request id** (`app/core/request_context.py`, pure ASGI): an incoming `X-Request-ID`
   is honoured if it is 1–128 chars of `[A-Za-z0-9._-]`, otherwise a uuid4 is generated.
@@ -61,14 +63,24 @@ Wired in `create_app()`; values are provisional pending sign-off (see the T-0021
   Logger `kerp.access` writes one line per request: `method`, `path` (never the query string),
   `status`, `duration_ms`. Request headers (Authorization, cookies) are never logged.
   uvicorn's own access log is disabled (it prints query strings); its other logs go through the JSON handler.
+  `httpx` and `httpcore` are capped at `WARNING`: their INFO lines carry full outbound URLs, whose
+  query strings can hold tokens (TD-024). Lines are ASCII-only JSON (non-ASCII is `\uXXXX`-escaped),
+  so a non-UTF-8 console cannot fail to write them.
+- **Client disconnects**: a request cancelled because the client went away
+  (`asyncio.CancelledError`) is logged by `kerp.access` with status `499` and `disconnected: true`,
+  not as a 500, and the cancellation propagates.
 - **Unhandled errors** before the response starts are logged (`kerp.error`, with traceback) and
   answered with a generic `500 {"detail": "Internal Server Error"}` carrying the request id and
   security headers. With `KERP_DEBUG=true` they fall through to Starlette's traceback page instead.
 - **Security headers** (`app/core/security_headers.py`) on every response, unless the route set
   them itself: `Content-Security-Policy`, `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`,
   `Referrer-Policy: no-referrer`, and `Strict-Transport-Security: max-age=31536000; includeSubDomains`
-  when HSTS is active. `/docs`, `/redoc` and the OAuth2 redirect get a docs CSP that allows the
-  Swagger UI / ReDoc CDN assets.
+  when HSTS is active (no `preload`). `/docs`, `/redoc` and the OAuth2 redirect get a docs CSP that
+  allows the Swagger UI / ReDoc CDN assets.
+- **API docs**: `/docs`, `/redoc`, `/docs/oauth2-redirect` and `/openapi.json` are served in
+  `development` / `test` and answer 404 in `production` unless `KERP_API_DOCS_ENABLED=true`.
+  `python -m app.openapi` (the frontend's `npm run gen:api`) builds the schema in-process, so it
+  works whatever the environment.
 
 ## Heavy libraries are imported lazily
 
@@ -165,7 +177,7 @@ docker run --rm -p 8000:8000 -e KERP_DEFAULT_TENANT_ID=<tenant uuid> \
   -e KERP_REDIS_URL=redis://… -e KERP_JWT_PRIVATE_KEY_FILE=/run/secrets/jwt.pem kerp-backend
 ```
 
-The image defaults to `KERP_ENVIRONMENT=production` (HSTS on); it listens on port 8000
+The image defaults to `KERP_ENVIRONMENT=production` (HSTS on, API docs off); it listens on port 8000
 (`uvicorn app.main:create_app --factory`) and has a `HEALTHCHECK` against `/health` using the
 standard library only. CI's `backend-image` job builds and smoke-tests the image on every run
 with a read-only token. On pushes to `dev`/`main`, the separate `backend-publish` job is the only
