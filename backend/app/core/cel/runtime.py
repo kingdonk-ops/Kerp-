@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import TYPE_CHECKING
@@ -42,6 +42,8 @@ type CelResult = CelOk | CelError
 class _Compiled:
     program: celpy.Runner
     called_functions: frozenset[str]
+    # Top-level variables the expression references (macro-bound variables excluded).
+    free_identifiers: frozenset[str] = frozenset()
 
 
 @lru_cache(maxsize=1)
@@ -60,6 +62,8 @@ class _StaticTypeError(Exception):
 
 
 _PREDICATE_MACROS = frozenset({"all", "exists", "exists_one", "filter"})
+# Macros whose first argument binds a variable (``l.all(x, x > 0)`` binds ``x``).
+_BINDING_MACROS = _PREDICATE_MACROS | {"map"}
 # celpy-only extension macros; not CEL and not available on the client.
 _NON_STANDARD_MACROS = frozenset({"min", "reduce"})
 
@@ -126,6 +130,40 @@ def _check_tree(ast: Tree[Token]) -> frozenset[str]:
     return frozenset(called)
 
 
+def _free_identifiers(ast: Tree[Token]) -> frozenset[str]:
+    """Top-level variable names referenced by ``ast``, without macro-bound variables.
+
+    A macro's variable is bound only inside that macro's own arguments (``l.all(x, x > 0)``
+    binds ``x`` in ``x > 0``, not in ``l`` nor anywhere outside the call), so a name that
+    leaks out of its macro is reported. ``.x`` always names the top-level ``x``. Iterative,
+    so deep nesting cannot hit the recursion limit.
+    """
+    from lark import Token, Tree
+
+    free: set[str] = set()
+    stack: list[tuple[Tree[Token], frozenset[str]]] = [(ast, frozenset())]
+    while stack:
+        node, bound = stack.pop()
+        tokens = [str(c) for c in node.children if isinstance(c, Token)]
+        subtrees = [c for c in node.children if isinstance(c, Tree)]
+        if node.data == "ident":
+            free.update(name for name in tokens if name not in bound)
+            continue
+        if node.data == "dot_ident":
+            free.update(tokens)
+            continue
+        if node.data == "member_dot_arg" and set(tokens) & _BINDING_MACROS and len(subtrees) > 1:
+            target, arguments = subtrees[0], subtrees[1].children
+            variable = _unwrap(arguments[0]) if arguments else None  # ident unwraps to a Token
+            if isinstance(variable, Token):
+                stack.append((target, bound))
+                inner = bound | {str(variable)}
+                stack.extend((a, inner) for a in arguments[1:] if isinstance(a, Tree))
+                continue
+        stack.extend((child, bound) for child in subtrees)
+    return frozenset(free)
+
+
 @lru_cache(maxsize=PROGRAM_CACHE_SIZE)
 def _compile(expression: str) -> _Compiled:
     """Parse + plan once per expression text.
@@ -135,7 +173,46 @@ def _compile(expression: str) -> _Compiled:
     environment = _environment()
     ast = environment.compile(expression)
     called = _check_tree(ast)
-    return _Compiled(environment.program(ast, functions=strict_functions()), called)
+    program = environment.program(ast, functions=strict_functions())
+    return _Compiled(program, called, _free_identifiers(ast))
+
+
+def _compiled_or_error(expression: str) -> _Compiled | CelError:
+    from celpy.celparser import CELParseError
+
+    if len(expression.encode("utf-8")) > MAX_EXPRESSION_BYTES:
+        return CelError(
+            CelErrorCode.INVALID_ARGUMENT,
+            f"expression longer than {MAX_EXPRESSION_BYTES} bytes",
+        )
+    try:
+        return _compile(expression)
+    except (CELParseError, _MacroArgumentError) as exc:
+        return CelError(CelErrorCode.PARSE_ERROR, short_message(str(exc)))
+    except _StaticTypeError as exc:
+        return CelError(CelErrorCode.NO_MATCHING_OVERLOAD, str(exc))
+
+
+def compile_expression(
+    expression: str, variables: Collection[str] | None = None
+) -> CelError | None:
+    """Compile ``expression`` without evaluating it (compile-on-save); ``None`` when valid.
+
+    Applies the same parse, length and static checks as ``evaluate``. With ``variables`` (the
+    top-level names of a context schema) every free variable must be one of them, otherwise
+    ``UNDECLARED_REFERENCE``, even where evaluation would short-circuit past it. Only the
+    top-level names are checked: there is no server-side CEL type checker (TD-041).
+    """
+    compiled = _compiled_or_error(expression)
+    if isinstance(compiled, CelError):
+        return compiled
+    if variables is not None:
+        unknown = sorted(compiled.free_identifiers - set(variables))
+        if unknown:
+            return CelError(
+                CelErrorCode.UNDECLARED_REFERENCE, f"undeclared reference to '{unknown[0]}'"
+            )
+    return None
 
 
 def evaluate(expression: str, context: Mapping[str, JsonValue]) -> CelResult:
@@ -144,21 +221,12 @@ def evaluate(expression: str, context: Mapping[str, JsonValue]) -> CelResult:
     CEL failures are returned as ``CelError``; a malformed ``context`` is a caller bug and
     raises ``ValueError``/``TypeError``.
     """
-    from celpy.celparser import CELParseError
     from celpy.evaluation import CELEvalError
 
     activation = decode_context(context)
-    if len(expression.encode("utf-8")) > MAX_EXPRESSION_BYTES:
-        return CelError(
-            CelErrorCode.INVALID_ARGUMENT,
-            f"expression longer than {MAX_EXPRESSION_BYTES} bytes",
-        )
-    try:
-        compiled = _compile(expression)
-    except (CELParseError, _MacroArgumentError) as exc:
-        return CelError(CelErrorCode.PARSE_ERROR, short_message(str(exc)))
-    except _StaticTypeError as exc:
-        return CelError(CelErrorCode.NO_MATCHING_OVERLOAD, str(exc))
+    compiled = _compiled_or_error(expression)
+    if isinstance(compiled, CelError):
+        return compiled
     try:
         result = compiled.program.evaluate(activation)
     except Exception as exc:  # celpy surfaces CELEvalError and, rarely, bare exceptions

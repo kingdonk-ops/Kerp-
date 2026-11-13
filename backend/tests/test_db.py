@@ -301,9 +301,9 @@ def test_get_db_without_database_fails_loudly() -> None:
         assert client.get("/_probe").status_code == 500
 
 
-def test_import_all_models_with_no_models_yet() -> None:
-    # No domain module ships models yet; the call must still succeed (Alembic depends on it).
-    assert import_all_models() == []
+def test_import_all_models_imports_the_shipped_modules() -> None:
+    # Alembic depends on it: every shipped module's models end up on Base.metadata.
+    assert "app.modules.validation.models" in import_all_models()
 
 
 def _write(path: Path, content: str = "") -> None:

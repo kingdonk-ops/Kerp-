@@ -27,6 +27,10 @@ match result:
   A malformed context raises `ValueError`/`TypeError` (caller bug); CEL failures are returned.
 - **Error codes** (`CelErrorCode`, `errors.py`): one taxonomy shared with the client; celpy's
   `CELEvalError` is classified by its underlying exception class.
+- **Compile without evaluating** (`compile_expression(expression, variables)`, T-0018):
+  `None` when valid, else the `CelError` that evaluation would give for parse/length/static
+  problems; with `variables`, any other free top-level variable is `UNDECLARED_REFERENCE`
+  (macro-bound names excluded). Used by the rule store's compile-on-save.
 - **Caching**: compiled programs are cached per expression text (`lru_cache`, 1024 entries).
 - **Lazy import**: `celpy` (and `lark`) are imported only inside functions (T-0022);
   importing `app.core.cel` does not load them.
