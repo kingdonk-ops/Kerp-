@@ -5,6 +5,8 @@ from importlib.metadata import version as package_version
 import pytest
 from pydantic import ValidationError
 
+from app.core.auth.keys import AuthConfigError
+from app.core.auth.runtime import build_auth_runtime
 from app.core.config import Settings, get_settings
 
 _KERP_VARS = (
@@ -27,7 +29,7 @@ def clean_env(monkeypatch: pytest.MonkeyPatch) -> pytest.MonkeyPatch:
 def test_defaults_without_env(clean_env: pytest.MonkeyPatch) -> None:
     s = Settings()
     assert s.app_name == "KERP"
-    assert s.environment == "development"
+    assert s.environment == "production"  # fail safe (T-0070)
     assert s.debug is False
     assert s.database_url is None
     assert s.redis_url is None
@@ -56,10 +58,10 @@ def test_values_are_read_from_kerp_prefixed_env(clean_env: pytest.MonkeyPatch) -
 
 
 def test_unprefixed_env_is_ignored(clean_env: pytest.MonkeyPatch) -> None:
-    clean_env.setenv("ENVIRONMENT", "production")
+    clean_env.setenv("ENVIRONMENT", "development")  # unprefixed: must not leave the safe default
     clean_env.setenv("APP_NAME", "not-kerp")
     s = Settings()
-    assert s.environment == "development"
+    assert s.environment == "production"
     assert s.app_name == "KERP"
 
 
@@ -88,3 +90,11 @@ def test_get_settings_is_cached(clean_env: pytest.MonkeyPatch) -> None:
 def test_get_settings_reads_env(clean_env: pytest.MonkeyPatch) -> None:
     clean_env.setenv("KERP_VERSION", "4.5.6")
     assert get_settings().version == "4.5.6"
+
+
+def test_the_default_refuses_to_issue_tokens_without_a_key(clean_env: pytest.MonkeyPatch) -> None:
+    """T-0070: forgetting KERP_ENVIRONMENT must not give ephemeral keys or logged links."""
+    for name in ("KERP_JWT_PRIVATE_KEY", "KERP_JWT_PRIVATE_KEY_FILE"):
+        clean_env.delenv(name, raising=False)
+    with pytest.raises(AuthConfigError, match="must be set in production"):
+        build_auth_runtime(Settings(redis_url="redis://cache.invalid:6379/0"))

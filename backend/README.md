@@ -34,7 +34,7 @@ hardcoded config, no `.env` file is read).
 | Variable | Default | Meaning |
 |---|---|---|
 | `KERP_APP_NAME` | `KERP` | Service name (OpenAPI title) |
-| `KERP_ENVIRONMENT` | `development` | `development` / `test` / `production` |
+| `KERP_ENVIRONMENT` | `production` | `development` / `test` / `production`. Defaults to production so a forgotten variable fails safe (T-0070); `make`, compose and CI set it explicitly |
 | `KERP_DEBUG` | `false` | FastAPI debug mode |
 | `KERP_VERSION` | installed package version | Reported by `/health` |
 | `KERP_DATABASE_URL` | unset | SQLAlchemy URL of the runtime role (e.g. `postgresql+psycopg://…`, `sqlite:///…`) |
@@ -218,7 +218,7 @@ make down           # stop (keeps data); `make reset` also drops the volumes
 |---|---|
 | `docker-compose.yml` | `postgres` (`postgis/postgis:16-3.4`, same image, user, password and database as CI), `redis` (`redis:7-alpine`, as CI), `minio` (S3-compatible storage; console on `:9001`). Ports bind to `127.0.0.1` only |
 | `infra/postgres/initdb/20-kerp-app.sql` | Creates `ltree` + `postgis` and the login role `kerp_app` (`NOSUPERUSER NOBYPASSRLS`), gives it the database and owns `public` for it. CI's backend job runs **the same file** (`psql -f`); compose mounts it into `/docker-entrypoint-initdb.d/`, so it runs once on an empty volume (`make reset` to re-run) |
-| `Makefile` | Exports dev-only defaults matching CI: `KERP_DATABASE_URL` (as `kerp_app`), `KERP_TEST_OWNER_URL` (superuser `kerp`), `KERP_REDIS_URL`. Override in an optional, git-ignored `.env` (plain `KEY=VALUE`) or on the command line. No JWT key is set: outside production an ephemeral one is generated |
+| `Makefile` | Exports dev-only defaults matching CI: `KERP_ENVIRONMENT=development` (the backend's own default is `production`, T-0070), `KERP_DATABASE_URL` (as `kerp_app`), `KERP_TEST_OWNER_URL` (superuser `kerp`), `KERP_REDIS_URL`. Override in an optional, git-ignored `.env` (plain `KEY=VALUE`) or on the command line. No JWT key is set: outside production an ephemeral one is generated |
 | `KERP_FAIL_ON_SKIP=1` | Set by `make test-pg` (hook in `tests/skip_guard.py`): a run that skips anything exits non-zero, so a missing stack cannot look green |
 
 `tests/test_dev_infra.py` (part of the normal suite, no Docker needed) fails if the compose

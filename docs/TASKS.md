@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 21/145 tasks done (14%) · **ready now:** 32 · **epics awaiting breakdown:** 47
+**Overall:** 21/145 tasks done (14%) · **ready now:** 31 · **epics awaiting breakdown:** 47
 
 | Phase | Tasks done | Progress |
 |---|---|---|
@@ -79,7 +79,7 @@
 | ▶ | [T-0067](../tracker/tasks/T-0067.md) | Review gate runs from base; SHA-pin write-token workflow actions | platform | S | — |  |
 | ▶ | [T-0068](../tracker/tasks/T-0068.md) | Login lockout per client IP with a per-account backstop; drop test-only lockout API | identity | M | — |  |
 | ▶ | [T-0069](../tracker/tasks/T-0069.md) | Drop unused tenancy helpers require_tenant_id / require_project_id | platform | S | — |  |
-| ▶ | [T-0070](../tracker/tasks/T-0070.md) | Default KERP_ENVIRONMENT to production; development opts in | platform | S | — |  |
+| 🟦 | [T-0070](../tracker/tasks/T-0070.md) | Default KERP_ENVIRONMENT to production; development opts in | platform | S | — |  |
 | ▶ | [T-0071](../tracker/tasks/T-0071.md) | Load the caller's memberships once per request | projects | S | — |  |
 | ⬜ | [T-0072](../tracker/tasks/T-0072.md) | Duplicated tab keeps its session: cross-tab refresh lock and token hand-off | frontend | M | T-0037 |  |
 
