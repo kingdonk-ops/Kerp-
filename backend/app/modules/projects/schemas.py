@@ -1,6 +1,6 @@
 """Request and response shapes of the projects API, with the settings validation (T-0012).
 
-* ``site_timezone``: an IANA zone name known to ``zoneinfo`` (e.g. ``Australia/Perth``).
+* ``site_timezone``: an IANA zone name from the ``tzdata`` package (e.g. ``Australia/Perth``).
 * ``currency_code``: an active ISO 4217 code. ``locale``: a BCP 47 tag ``ll[-Ssss][-RR|-nnn]``.
 * ``spatial_bounds``: a GeoJSON (RFC 7946, WGS84) ``Polygon``, 2D positions, closed rings.
 """
@@ -11,8 +11,8 @@ import re
 import uuid
 from datetime import datetime
 from functools import cache
+from importlib.resources import files
 from typing import Annotated, Any, Final, Literal, Self
-from zoneinfo import available_timezones
 
 from pydantic import (
     AfterValidator,
@@ -43,9 +43,19 @@ MAX_RINGS: Final = 100
 MAX_RING_POSITIONS: Final = 10_000
 
 
+# In the tzdata zone list but not a real location; browsers' Intl rejects it.
+_NOT_SITE_ZONES: Final = frozenset({"Factory"})
+
+
 @cache
 def _zones() -> frozenset[str]:
-    return frozenset(available_timezones())
+    """IANA zone names from the ``tzdata`` package, not from the host's ``TZPATH``.
+
+    ``zoneinfo.available_timezones()`` lists every file under the host's zoneinfo directory,
+    including ``localtime`` and ``posixrules``, whose meaning depends on the host.
+    """
+    names = (files("tzdata") / "zones").read_text(encoding="utf-8").split()
+    return frozenset(names) - _NOT_SITE_ZONES
 
 
 def _iana(value: str) -> str:
@@ -74,7 +84,8 @@ Code = Annotated[
 ]
 Name = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)]
 Status = Literal["ACTIVE", "ON_HOLD", "CLOSED"]
-Coordinate = Annotated[float, Field(allow_inf_nan=False)]
+# Strict: a JSON number (integers allowed), never a boolean or a numeric string (RFC 7946).
+Coordinate = Annotated[float, Field(strict=True, allow_inf_nan=False)]
 
 
 class PolygonGeoJSON(BaseModel):

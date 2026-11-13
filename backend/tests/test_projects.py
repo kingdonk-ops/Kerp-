@@ -90,7 +90,19 @@ def test_iana_timezones_are_accepted(zone: str) -> None:
     assert _create(site_timezone=zone).site_timezone == zone
 
 
-@pytest.mark.parametrize("zone", ["Mars/Olympus_Mons", "+08:00", "AWST", "", "../etc/passwd"])
+@pytest.mark.parametrize(
+    "zone",
+    [
+        "Mars/Olympus_Mons",
+        "+08:00",
+        "AWST",
+        "",
+        "../etc/passwd",
+        "localtime",
+        "Factory",
+        "posixrules",
+    ],
+)
 def test_unknown_timezones_are_rejected(zone: str) -> None:
     with pytest.raises(ValidationError, match="IANA"):
         _create(site_timezone=zone)
@@ -154,6 +166,17 @@ def _ring(*points: tuple[float, float]) -> dict[str, Any]:
             "at most 2",
         ),
         ({**BOUNDS, "crs": {"type": "name"}}, "crs"),
+        (
+            {"type": "Polygon", "coordinates": [[[True, False], [1, 0], [1, 1], [True, False]]]},
+            "float",
+        ),
+        (
+            {
+                "type": "Polygon",
+                "coordinates": [[["116.5", "-32"], [1, 0], [1, 1], ["116.5", "-32"]]],
+            },
+            "float",
+        ),
     ],
 )
 def test_invalid_polygons_are_rejected(bounds: dict[str, Any], message: str) -> None:
