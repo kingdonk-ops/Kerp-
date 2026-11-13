@@ -1,9 +1,9 @@
 # ADR 0008 — Tenant-level teams and team-derived project access
 
 - **Status:** accepted (approved by the product owner on 2026-11-13, with storage keyed by
-  project, user, source type and source id). One planner refinement is **not yet confirmed by
-  the product owner**: persona and site are also part of the main unique constraint (see
-  "Deviation" below). The coordinator is confirming it separately.
+  project, user, source type and source id). The refinement that persona and site are also
+  part of the main unique constraint (several roles per project for direct grants; see
+  "Refinement" below) was confirmed by the product owner on 2026-11-13.
 - **Date:** 2026-11-13
 - **Resolves:** TD-228 (overridden), TD-229, TD-230 / TD-244 (team side), TD-251 (link roles;
   new persona PER-16 Project Viewer)
@@ -97,15 +97,14 @@ membership table** (approved storage shape, product owner 2026-11-13):
     UUID with no FK, because the link belongs to the teams module.
   - CHECK `(source_type = 'direct') = (source_id IS NULL)`: a direct row has no source id, and a
     `team_link` row carries the team link id. Every existing row becomes `direct`.
-  - **Deviation (planner, pending product-owner confirmation).** The approved key is (project,
+  - **Refinement (confirmed by the product owner, 2026-11-13: multiple roles per project are allowed for direct grants).** The approved key is (project,
     user, source_type, source_id). The main unique constraint adds persona and site:
     `(tenant_id, member_project_id, user_id, source_type, source_id, persona, site_node_id)`
     with `NULLS NOT DISTINCT`, which PostgreSQL 16 supports and the existing constraint already
     uses. There are two reasons. A user may hold several personas on one project directly
     (T-0010 behaviour, e.g. PER-02 + PER-09). And the sync re-roles by soft-deleting the old
     persona row and inserting a new one, which a four-column key covering soft-deleted rows would
-    reject. If the product owner rejects the deviation, direct rows need another way to hold
-    several personas, and this section changes.
+    reject.
   - **The approved key holds exactly for team rows.** A partial unique index
     `(tenant_id, member_project_id, user_id, source_id) WHERE source_type = 'team_link' AND
     deleted_at IS NULL` means a link can never hold two live personas for one user. The sync
