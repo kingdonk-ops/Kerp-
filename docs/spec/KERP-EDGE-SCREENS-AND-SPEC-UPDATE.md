@@ -576,11 +576,26 @@ CREATE POLICY project_isolation_policy ON functional_tags
   visible only when its project is in the session's allowed list (or the session is a tenant
   administrator). A client-portal user bound to project A cannot list project B.
 - **Tenant administrator = System admin (user, 2026-11-13; TD-120).** The "tenant administrator"
-  above is a user holding the `system_admin` grant (`KERP-CONSOLIDATION-AND-DIFF.md` §4.1). The
-  exemption covers only the tenant-level rows that describe projects (projects, memberships,
-  admin grants, access requests); project-scoped records still need a membership. Lobby listing
-  and project-code lookup use a narrow read (id, code, name of lobby-visible or code-matched
-  projects) and do not widen the `projects` policy.
+  above is a user holding the `system_admin` grant (`KERP-CONSOLIDATION-AND-DIFF.md` §4.1).
+  - **How the flag reaches the session.** At authentication the server loads the caller's
+    `system_admin` grant from the admin-grants table (in the same short tenant-level unit of work
+    that derives `app.allowed_project_ids` from memberships) and binds it as the session setting
+    `app.is_system_admin` (`true` or unset). It is never read from token claims, request
+    parameters or headers.
+  - **Projects and memberships** use the membership-based policy: a row is visible when its
+    project is in `app.allowed_project_ids` or `app.is_system_admin` is true. Project-scoped
+    records still need a membership, also for a System admin.
+  - **Admin grants** are tenant-level rows with no project, so they have their own policy: a user
+    reads their own grant rows (`user_id = app.current_user_id`, a new session setting bound from
+    the verified token's `sub` alongside the tenant); a session with
+    `app.is_system_admin` reads and writes all of them. Only a System admin session may insert,
+    update or delete grants. The auth-time lookup runs in a narrow system path (security-definer
+    function returning only the caller's own grants), so deciding `app.is_system_admin` does not
+    depend on the flag itself.
+  - **Access requests** (T-0040) are visible to the requester, to the PER-09 holders of the
+    request's project, and to `app.is_system_admin` sessions; nobody else.
+  - **Lobby listing and project-code lookup** use a narrow read (id, code, name of lobby-visible
+    or code-matched projects) and do not widen the `projects` policy.
 
 ### Session Initialization Handshake
 Every API request and background job sets the runtime project identifier within the database transaction:

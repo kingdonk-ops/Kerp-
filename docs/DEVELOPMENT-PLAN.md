@@ -61,8 +61,10 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
     tenant), T-0038 (hybrid PIN), T-0039–T-0042 (Project Admins, lobby, access requests,
     picker), T-0043 + T-0048 (device registry, revoke/wipe), T-0044 (deployment settings,
     offline window), T-0045–T-0047 (NFR harness, glove/high-contrast tokens, localised template
-    strings); plus Entra ID SSO (TD-043) and the AWS production deploy in `ap-southeast-2`
-    (TD-004, TD-171).
+    strings); plus the AWS production deploy in `ap-southeast-2` (TD-004, TD-171).
+  - **Daily re-login dependency:** sessions end 12 h after sign-in, so the pilot inspectors
+    sign in every day. Entra ID SSO (TD-043) or magic-link e-mail delivery (TD-084) must be
+    live in the pilot deployment (checked by T-0146).
   - **Phase 1 subset:** T-0101, T-0103 (hierarchy + Items), T-0107 (equipment import), T-0110
     (field registry + CEL), T-0111 (inspection record), T-0116/T-0117 (defects, TD-167), T-0119
     (signing), T-0126/T-0127 (offline sync), T-0133 (field checkout), T-0141–T-0145 (Android

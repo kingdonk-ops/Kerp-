@@ -3,15 +3,14 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 116 · **Closed:** 75
+**Open:** 116 · **Closed:** 77
 
-## decision (3)
+## decision (2)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
 | [TD-096](../tracker/todo/TD-096.md) | Approved coating ITR dropped the residual-dust rating row the ITP requires; Grating and Gridmesh ITR has no approved version: confirm with the client before shipping default templates | T-0113 | planner |
-| [TD-202](../tracker/todo/TD-202.md) | Lobby details: a project code only finds the project and files an access request (never grants access); the lobby is also reachable from the project picker for users who already have projects | T-0040, T-0041 | planner |
-| [TD-203](../tracker/todo/TD-203.md) | SPA refresh-token transport: keep the JSON body (sessionStorage) or move to an httpOnly SameSite cookie | T-0037 | planner |
+| [TD-206](../tracker/todo/TD-206.md) | Confirm planner default: once the offline window expires without server contact, queued data is kept but new edits are blocked until an online sign-in | T-0143, T-0044 | planner |
 
 ## spec-gap (37)
 
@@ -90,7 +89,7 @@
 | [TD-181](../tracker/todo/TD-181.md) | DetailPage: audit log and gate-status endpoints | T-0025 | implementer |
 | [TD-182](../tracker/todo/TD-182.md) | RegisterPage: server-side filtering, sorting and paging | T-0025 | implementer |
 
-## later (39)
+## later (40)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -133,6 +132,7 @@
 | [TD-189](../tracker/todo/TD-189.md) | Set a psycopg connect_timeout on the worker's DB engine so _settle/_start are bounded when the DB is unreachable | T-0015 | reviewer |
 | [TD-190](../tracker/todo/TD-190.md) | Client-side co-branding (client logo on client-facing pages/reports): decide later | T-0136 | user |
 | [TD-204](../tracker/todo/TD-204.md) | After Pilot-0: biometric unlock, certificate pinning (Capacitor) and per-device sync-health views | T-0043 | planner |
+| [TD-207](../tracker/todo/TD-207.md) | Local PIN unlock for the web PWA build (no platform keystore): e.g. a non-extractable WebCrypto key wrapping the IndexedDB data key | T-0143 | planner |
 
 ## bug (1)
 
@@ -217,7 +217,7 @@
 | ✅ | [TD-118](../tracker/todo/TD-118.md) | Qualification-type catalogue (TD-101): who is the 'super admin', and may a project-scoped PER-09 edit a tenant-wide (global) catalogue? | No super admin: the tenant administrator edits the tenant-wide qualification catalogue; PER-09 Project Administrator may add project-level types (user, 2026-11-10) |
 | ✅ | [TD-119](../tracker/todo/TD-119.md) | CLAUDE.md section 6 anchor bullet still says 'work anchors to an RSW': apply the ADR 0003 amended wording (human edit; agents may not change CLAUDE.md) | CLAUDE.md section 6 anchor bullet updated to the ADR 0003 wording with 'at most one per root-to-leaf path' (TD-113) (user, 2026-11-10) |
 | ✅ | [TD-120](../tracker/todo/TD-120.md) | Login tenant resolution: how a user picks the tenant at sign-in (multi-tenant accounts, MOD-01 cross-tenant collaboration) | 3a: tenant_id + RLS kept but hidden (one tenant per deployment); System admins appoint Project Admins (create_projects grant) who create projects and get PER-09 on them; PER-09 assigns users to its projects; admin roles never confer hold release or sign-off; one URL, top-bar project picker (one project -> in, several -> last used), lobby of visible-in-lobby projects with access requests decided by the project's admins, other projects by invite or project code. Spec diff §4.1, edge §5/§6, master §1.1/MOD-01; tasks T-0014, T-0023, T-0026, T-0037, T-0039..T-0042 (user, 2026-11-13) |
-| ✅ | [TD-121](../tracker/todo/TD-121.md) | Refresh-token lifetime, absolute session lifetime and SPA refresh-token transport are unspecified | 4c: access 15 min, refresh 12 h from sign-in (rotation never extends it, KERP_REFRESH_TOKEN_HOURS=12), daily re-login; offline local PIN unlock does not depend on a valid refresh token, so the 7-14 day offline window still works. Spec diff §4.2; task T-0037. Cookie transport left open as TD-203 (user, 2026-11-13) |
+| ✅ | [TD-121](../tracker/todo/TD-121.md) | Refresh-token lifetime, absolute session lifetime and SPA refresh-token transport are unspecified | 4c: access 15 min, refresh 12 h from sign-in (rotation never extends it, KERP_REFRESH_TOKEN_HOURS=12), daily re-login; offline local PIN unlock does not depend on a valid refresh token, so the 7-14 day offline window still works. Spec diff §4.2; task T-0037. SPA cookie transport decided in TD-203 (user, 2026-11-13) |
 | ✅ | [TD-135](../tracker/todo/TD-135.md) | Field-worker PIN semantics: confirm server-checked PIN per session that gates every refresh, and the lockout/magic-link numbers | 8a: hybrid PIN per enrolled device: local unlock against a keystore key (offline, no token needed); server asks for the PIN only on renewal after idle (KERP_PIN_IDLE_MINUTES, default 30); lockout numbers and server-side per-device counter kept. Spec diff §4.2; rework in T-0038 (server) and T-0143 (client) (user, 2026-11-13) |
 | ✅ | [TD-139](../tracker/todo/TD-139.md) | Confirm per-kind rule context schemas and action vocabularies (validation compiler) | 9a: rule context schemas, p6_grammar groups and action vocabularies confirmed as built and recorded in ADR 0004 Addendum F; frozen by T-0131 (user, 2026-11-13) |
 | ✅ | [TD-141](../tracker/todo/TD-141.md) | Rule store: explicit per-rule version column, findings log only non-passing rules | per-rule version column; findings log only failed/errored rules. (user, 2026-11-13) |
@@ -235,3 +235,5 @@
 | ✅ | [TD-184](../tracker/todo/TD-184.md) | Who may create a project and how the creator gets a membership: POST /projects is gated on the admin capability in any project until T-0014's tenant administrator | 1a + 3a: projects are created by Project Admins (create_projects grant, appointed by a System admin); the creator gets PER-09 automatically; memberships on soft-deleted projects are ignored. Spec diff §4.1; tasks T-0014, T-0039 (user, 2026-11-13) |
 | ✅ | [TD-185](../tracker/todo/TD-185.md) | Project status values (ACTIVE/ON_HOLD/CLOSED chosen) and currency/locale defaults (AUD/en-AU) are not in the spec | 7a: project status ACTIVE/ON_HOLD/CLOSED and AUD/en-AU confirmed; defaults (status, timezone, currency, locale) move to tenant (deployment) settings. Spec master §4.1, diff §4.4; task T-0044 (user, 2026-11-13) |
 | ✅ | [TD-187](../tracker/todo/TD-187.md) | jobs worker: a cancellation/timeout while _start is returning leaves the row 'running' forever (flaky test_a_cancelled_or_timed_out_job_is_marked_failed) | run_job shields the _start thread; a cancel during start waits for it, then fails a started row with 'Job timed out or was cancelled' (shielded) and re-raises (fix/jobs-cancel-during-start) |
+| ✅ | [TD-202](../tracker/todo/TD-202.md) | Lobby details: a project code only finds the project and files an access request (never grants access); the lobby is also reachable from the project picker for users who already have projects | Q1a: a project code only finds that one project and lets the user file an access request decided by the project's PER-09 holders; it never grants access by itself. Users who already have projects open the lobby from the picker. Spec diff §4.1; T-0040, T-0041 (user, 2026-11-13) |
+| ✅ | [TD-203](../tracker/todo/TD-203.md) | SPA refresh-token transport: keep the JSON body (sessionStorage) or move to an httpOnly SameSite cookie | Q6a: the web SPA gets the refresh token as an httpOnly Secure SameSite cookie (CSRF-protected /auth/refresh); the Capacitor Android build keeps the JSON-body transport. Spec diff §4.2; T-0037 (user, 2026-11-13) |

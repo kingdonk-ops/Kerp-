@@ -165,8 +165,8 @@ Wins over any earlier text on tenant selection, tenant administrators and projec
   the assignment is written to the audit ledger with `sod_warning: true` (TD-151).
 - **One URL, no subdomains.** Every project is reached under the same origin; the active project
   is chosen in the app, never by host name.
-- **Landing after sign-in.** One project → straight into it. Several → the project last used by
-  this user on this client (falls back to the first by name if it is no longer allowed), with a
+- **Landing after sign-in.** One project → straight into it. Several → the project last used
+  per user on this client (falls back to the first by name if it is no longer allowed), with a
   **project picker in the top bar** to switch; portfolio personas keep the All-Projects scope
   (§6). No project → the **lobby**. Users with projects reach the lobby from the picker
   ("Find a project").
@@ -178,32 +178,40 @@ Wins over any earlier text on tenant selection, tenant administrators and projec
   decider go to the audit ledger. Projects not visible in the lobby are reached only by an
   **invite** (a PER-09 assigns the user) or by **project code**: entering an exact project code
   finds that one project and lets the user file an access request; a code never grants access
-  by itself (TD-202). The lobby and code lookup read through a narrow path (code, name, id of
+  by itself; users who already have projects can open the lobby from the picker (user,
+  2026-11-13; TD-202). The lobby and code lookup read through a narrow path (code, name, id of
   matching projects only); the membership-based `projects` policy is not widened.
 
 ### 4.2 Sessions (user, 2026-11-13; TD-121, TD-135, TD-170)
 
-- **Access token** 15 minutes (unchanged). **Refresh token** lifetime **12 hours from sign-in**
-  (`KERP_REFRESH_TOKEN_HOURS=12`): rotation issues a new single-use token but never extends the
-  session past sign-in + 12 h. Users sign in again daily. Refresh-token transport stays in the
-  JSON body (T-0008); a cookie transport for the SPA is open (TD-203).
+- **Access token** 15 minutes (unchanged). **Refresh token** lifetime **12 hours**
+  (`KERP_REFRESH_TOKEN_HOURS=12`, user decision). Counted from sign-in: rotation issues a new
+  single-use token but never extends the session past sign-in + 12 h (user, 2026-11-13). Users sign in again
+  daily; for field workers that needs Entra ID SSO (TD-043) or magic-link e-mail delivery
+  (TD-084) in place before Pilot-0.
+- **Refresh-token transport (user, 2026-11-13; TD-203).** The web SPA receives and sends the
+  refresh token only as an `httpOnly`, `Secure`, `SameSite` cookie scoped to the auth endpoints;
+  it never sees it in JavaScript or storage, and `/auth/refresh` is protected against CSRF
+  (`SameSite=Strict` plus an Origin check). The Capacitor Android build keeps the JSON-body
+  transport, with the token in the keystore-backed store.
 - **Field PIN, hybrid (TD-135, decision 8a).** The PIN belongs to the enrolled device (§4.3),
   not to a server session:
   - **Local unlock.** The app unlocks on the device with the 6-digit PIN against a key held in
-    the platform keystore. It needs no network and **does not depend on a valid access or
+    the platform keystore (Capacitor Android build; web PWA local unlock: TD-207). It needs no network and **does not depend on a valid access or
     refresh token**: an expired or revoked-by-expiry session does not stop a worker opening the
     app, reading downloaded work and queueing changes offline.
   - **Renewal after idle.** Online, the server asks for the PIN only when a session is renewed
-    after it was idle longer than `KERP_PIN_IDLE_MINUTES` (default 30). Ordinary rotation inside
+    after it was idle longer than `KERP_PIN_IDLE_MINUTES` (default 30 (user, 2026-11-13)). Ordinary rotation inside
     the idle limit needs no PIN. A PIN alone never starts a session.
-  - **Lockout** numbers unchanged from T-0009 (4 immediate tries, then 30 s doubling to 15 min;
-    the 10th wrong PIN ends PIN unlock until an online sign-in), with the attempt counter kept on
-    the server per device. Failures made offline are counted locally with the same numbers and
-    reported on the next contact. PIN failures never delete local data (only a remote wipe does).
+  - **Lockout** numbers unchanged from T-0009 (4 immediate tries, then 30 s doubling to 15 min),
+    with the attempt counter kept on the server per device (user decision). The 10th wrong PIN
+    ends PIN unlock until an online sign-in, without revoking the session or device; failures
+    made offline are counted locally with the same numbers and reported on the next contact;
+    PIN failures never delete local data, only a remote wipe does (user, 2026-11-13).
 - **Offline window (TD-170).** A tenant setting (§4.4), default **7 days**, maximum **14**. While
   inside the window the device works offline with local unlock. Once the window passes without a
   successful server contact, the app keeps all queued data but allows no new edits until the user
-  signs in online. Sync and the outbox are built for 14 days of queued work.
+  signs in online (planner default, TD-206). Sync and the outbox are built for 14 days of queued work.
 - **Daily re-login vs offline.** The 12-hour session limit applies only to server calls. Offline
   work continues on local unlock for the whole offline window; on reconnect the user signs in
   (password, SSO, or magic link) and the outbox drains under the new session. Queued mutations
@@ -215,7 +223,10 @@ Wins over any earlier text on tenant selection, tenant administrators and projec
   sign-in: a client-generated `device_id` (UUID), platform, OS and app version, enrolled and
   last-seen/last-sync times, status `active | revoked`. Sessions are bound to the device.
 - **Remote revoke and wipe.** A System admin, a PER-09 holder of a project the device's user
-  belongs to, or the user may revoke a device. Revoke kills every session of the device at once;
+  belongs to, or the user may revoke a device (user, 2026-11-13). A wipe clears the whole device, so a PER-09
+  of one project can wipe unsynced work of the user's other projects: the revoke dialog warns
+  about that when the device's user has other projects, and every revoke is audited with the
+  actor and their role. Revoke kills every session of the device at once;
   on its next contact the server answers `401` with `code: DEVICE_REVOKED` and the client wipes
   its local store (records, outbox, media, keys) and confirms the wipe. Unsynced work on a
   revoked device is lost; the admin UI shows the last-sync time before confirming.
@@ -284,7 +295,7 @@ Module screens register their nav items in these groups. Individual items may mo
 | **Admin** | users, personas, system (deployment settings, admin grants, devices), access requests |
 
 The top-bar **Project Switcher** is the project picker of §4.1: it lists the user's projects
-(from memberships), remembers the last project per user, offers All-Projects to portfolio
+(from memberships), remembers the last project per user on this client, offers All-Projects to portfolio
 personas, and links to the lobby ("Find a project").
 
 ### 6.2 Field client storage (user, 2026-11-13; TD-161, decision 16a + d)
