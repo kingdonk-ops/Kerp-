@@ -3,9 +3,9 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 125 · **Closed:** 57
+**Open:** 128 · **Closed:** 57
 
-## decision (7)
+## decision (8)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -16,14 +16,15 @@
 | [TD-172](../tracker/todo/TD-172.md) | Per-business-unit theming (logo/palette) vs one tenant per deploy (TD-007); German translations at launch (clean-room NFR-16) | T-0136 | clean-room-gap-analysis |
 | [TD-173](../tracker/todo/TD-173.md) | Pilot-0 (8 inspectors, one project, Android only, no P6 / Phase 2) ahead of the M2 cut line resolved in TD-009 | — | clean-room-gap-analysis |
 | [TD-183](../tracker/todo/TD-183.md) | Localisation of form template content (labels, option labels, error messages) | T-0025 | implementer |
+| [TD-184](../tracker/todo/TD-184.md) | Who may create a project and how the creator gets a membership: POST /projects is gated on the admin capability in any project until T-0014's tenant administrator | T-0012 | implementer |
 
-## spec-gap (46)
+## spec-gap (47)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
 | [TD-021](../tracker/todo/TD-021.md) | Outbox envelope: align frontend db field created_at_utc with master spec 1.3 timestamp_utc (decide in T-0126/T-0127 before the table is used; Dexie still at version 1) | T-0002 | reviewer |
 | [TD-044](../tracker/todo/TD-044.md) | Spec the PWA-first client strategy: web-only PWA apps (supervisor, storeman, field report) vs the Android/tablet app, and re-check the frontend tech stack | T-0127 | user |
-| [TD-045](../tracker/todo/TD-045.md) | Spec the Request for Inspection (inspection notification / booking) record; RFI means Request for Information | T-0115, T-0111 | user |
+| [TD-045](../tracker/todo/TD-045.md) | Spec the Request for Inspection (RFI) record; Request for Information is a TQ (Technical Query) | T-0115, T-0111 | user |
 | [TD-046](../tracker/todo/TD-046.md) | Admin side: where security and observability settings (headers/CSP, HSTS, API docs exposure, log retention) are shown or configured | T-0021 | user |
 | [TD-062](../tracker/todo/TD-062.md) | Form template check layouts (list / form / grid) and check-level settings are not specified | T-0110 | planner |
 | [TD-063](../tracker/todo/TD-063.md) | Hold / witness / review points should be first-class signed ITP steps, not signature cells | T-0113, T-0114, T-0119 | planner |
@@ -67,6 +68,7 @@
 | [TD-167](../tracker/todo/TD-167.md) | Defect close-out loop: open -> action assigned (owner, due) -> rectified -> verified closed by a re-inspection (closed_by_inspection link); extends TD-066 | T-0117 | clean-room-gap-analysis |
 | [TD-168](../tracker/todo/TD-168.md) | Push notification channel (FCM via the Capacitor build) for assignment and return; T-0019 is in-app only and email is TD-084 | T-0019 | clean-room-gap-analysis |
 | [TD-174](../tracker/todo/TD-174.md) | NFR budgets: 300-question form opens < 1.5 s, 1,000-record delta sync < 30 s on 4G, glove targets >= 48 dp and outdoor high-contrast tokens | T-0024 | clean-room-gap-analysis |
+| [TD-185](../tracker/todo/TD-185.md) | Project status values (ACTIVE/ON_HOLD/CLOSED chosen) and currency/locale defaults (AUD/en-AU) are not in the spec | T-0012 | implementer |
 
 ## missed (4)
 
@@ -103,7 +105,7 @@
 | [TD-181](../tracker/todo/TD-181.md) | DetailPage: audit log and gate-status endpoints | T-0025 | implementer |
 | [TD-182](../tracker/todo/TD-182.md) | RegisterPage: server-side filtering, sorting and paging | T-0025 | implementer |
 
-## later (35)
+## later (36)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -142,6 +144,7 @@
 | [TD-160](../tracker/todo/TD-160.md) | Test that revoking (soft-deleting) a project membership removes that project from the resolved scope; extend TD-150 to bulk ORM update/delete | T-0010 | reviewer |
 | [TD-175](../tracker/todo/TD-175.md) | Record retention rules + legal hold per project | — | clean-room-gap-analysis |
 | [TD-177](../tracker/todo/TD-177.md) | Form renderer: adopt the T-0110 shared field-type registry + dual-runtime parity | T-0025 | implementer |
+| [TD-186](../tracker/todo/TD-186.md) | spatial_bounds: GiST index and ST_IsValid check (self-intersecting polygons are accepted today); project code stays taken after soft delete | T-0012 | implementer |
 
 ## bug (1)
 

@@ -21,6 +21,7 @@ dependencies = [
     "redis>=5.2",  # jti / session revocation store (app/core/auth); SAQ caps it below 8
     "saq[redis]>=0.26,<0.27",  # job queue over Redis: interactive + batch queues (app/modules/jobs)
     "sqlalchemy>=2.0.36",
+    "tzdata>=2024.1",  # IANA zone list for project site timezones (app/modules/projects)
     "uvicorn>=0.30",
 ]
 
