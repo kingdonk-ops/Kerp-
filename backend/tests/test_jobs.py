@@ -71,6 +71,10 @@ async def refuse(job: JobContext) -> None:
     raise service.JobError("Bad file: " + "x" * 2000)
 
 
+async def not_json(job: JobContext) -> dict[str, Any]:
+    return {"id": uuid.uuid4()}  # a UUID is not JSON: storing it fails at flush
+
+
 async def slow(job: JobContext) -> None:
     await asyncio.sleep(60)
 
@@ -83,6 +87,7 @@ def make_registry() -> JobRegistry:
     registry.add(JobKind("demo.boom", "batch", boom))
     registry.add(JobKind("demo.refuse", "interactive", refuse))
     registry.add(JobKind("demo.slow", "batch", slow))
+    registry.add(JobKind("demo.not_json", "batch", not_json))
     return registry
 
 
@@ -226,6 +231,61 @@ def test_a_rolled_back_transaction_leaves_no_job_and_enqueues_nothing(
     assert [r.job_id for r in dispatched] == [later]
 
 
+def test_rollback_then_commit_in_the_same_session_dispatches_nothing(
+    db: Database, dispatched: list[JobRef]
+) -> None:
+    with db.unit_of_work(CTX_A) as s:
+        service.create_job(s, REGISTRY.get("demo.ocr"))
+        s.rollback()
+        s.commit()
+        kept = service.create_job(s, REGISTRY.get("demo.mdr")).id  # after the rollback
+    assert [r.job_id for r in dispatched] == [kept]
+
+
+def test_a_rolled_back_savepoint_drops_only_its_own_jobs(
+    db: Database, dispatched: list[JobRef]
+) -> None:
+    with db.unit_of_work(CTX_A) as s:
+        outer = service.create_job(s, REGISTRY.get("demo.ocr")).id
+        savepoint = s.begin_nested()
+        service.create_job(s, REGISTRY.get("demo.mdr"))
+        savepoint.rollback()
+    assert [r.job_id for r in dispatched] == [outer]
+    with db.unit_of_work(CTX_A) as s:
+        assert [j.id for j in s.scalars(select(Job))] == [outer]
+
+
+def test_jobs_of_a_released_savepoint_follow_the_outer_transaction(
+    db: Database, dispatched: list[JobRef]
+) -> None:
+    with db.unit_of_work(CTX_A) as s:
+        released = s.begin_nested()
+        kept = service.create_job(s, REGISTRY.get("demo.ocr")).id
+        released.commit()
+        s.rollback()  # the outer rollback discards the released savepoint's job too
+        s.commit()
+        released = s.begin_nested()
+        kept = service.create_job(s, REGISTRY.get("demo.ocr")).id
+        released.commit()
+    assert [r.job_id for r in dispatched] == [kept]
+
+
+def test_a_failing_dispatcher_does_not_fail_the_commit(
+    db: Database, caplog: pytest.LogCaptureFixture
+) -> None:
+    def broken(refs: list[JobRef]) -> None:
+        raise RuntimeError("loop closed")
+
+    service.set_dispatcher(broken)
+    try:
+        with caplog.at_level(logging.ERROR, "kerp.jobs"):
+            job_id = create(db, CTX_A)
+    finally:
+        service.set_dispatcher(None)
+    assert load(db, CTX_A, job_id).status == "queued"
+    assert "job dispatch failed" in caplog.text
+
+
 def test_create_job_needs_a_bound_session(db: Database) -> None:
     with pytest.raises(RuntimeError, match="bound"), contextmanager(db.session)() as s:
         service.create_job(s, REGISTRY.get("demo.ocr"))
@@ -339,6 +399,22 @@ def test_a_cancelled_or_timed_out_job_is_marked_failed(
     asyncio.run(scenario())
     job = load(db, CTX_A, job_id)
     assert (job.status, job.error) == ("failed", "Job timed out or was cancelled")
+
+
+def test_a_result_that_cannot_be_stored_fails_the_job_with_a_sanitised_error(
+    db: Database, dispatched: list[JobRef], caplog: pytest.LogCaptureFixture
+) -> None:
+    job_id = create(db, CTX_A, "demo.not_json")
+    with caplog.at_level(logging.ERROR, "kerp.jobs"):
+        run(db, dispatched[0])
+    job = load(db, CTX_A, job_id)
+    assert (job.status, job.error, job.result) == (
+        "failed",
+        "Internal error (StatementError)",
+        None,
+    )
+    record = next(r for r in caplog.records if r.__dict__.get("job_id") == str(job_id))
+    assert record.exc_info is not None
 
 
 def test_sanitise_error_bounds_and_strips_control_characters() -> None:
@@ -475,6 +551,17 @@ def test_post_refuses_unknown_and_internal_kinds(
     caller.as_(CTX_A)
     response = client.post(JOBS, json={"kind": kind})
     assert response.status_code == 422
+    assert dispatched == []
+
+
+@pytest.mark.parametrize("field", ["tenant_id", "project_id"])
+def test_post_rejects_a_scope_in_the_body(
+    http: tuple[TestClient, Caller], dispatched: list[JobRef], field: str
+) -> None:
+    client, caller = http
+    caller.as_(CTX_A)
+    body = {"kind": "demo.ocr", field: str(CTX_C.tenant_id)}
+    assert client.post(JOBS, json=body).status_code == 422  # scope comes from the JWT only
     assert dispatched == []
 
 

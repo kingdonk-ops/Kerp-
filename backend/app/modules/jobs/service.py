@@ -17,7 +17,7 @@ from datetime import datetime, timedelta
 from typing import Any, Final
 
 from sqlalchemy import event, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, SessionTransaction
 
 from app.core.db import Database, utcnow
 from app.core.request_context import get_request_id
@@ -119,7 +119,12 @@ def create_job(
     )
     session.add(job)
     session.flush()
-    session.info.setdefault(PENDING_KEY, []).append(_ref(job, job_kind.timeout_s))
+    # Staged with the innermost transaction, so rolling back a SAVEPOINT drops only its jobs.
+    transaction = session.get_nested_transaction() or session.get_transaction()
+    pending: list[tuple[SessionTransaction | None, JobRef]] = session.info.setdefault(
+        PENDING_KEY, []
+    )
+    pending.append((transaction, _ref(job, job_kind.timeout_s)))
     return job
 
 
@@ -130,18 +135,37 @@ def _ref(job: Job, timeout_s: int) -> JobRef:
 
 @event.listens_for(Session, "after_commit")
 def _dispatch_after_commit(session: Session) -> None:
-    refs: list[JobRef] = session.info.pop(PENDING_KEY, [])
+    if session.in_nested_transaction():  # a SAVEPOINT was released; the outer may still roll back
+        return
+    pending: list[tuple[SessionTransaction | None, JobRef]] = session.info.pop(PENDING_KEY, [])
+    refs = [ref for _, ref in pending]
     if not refs:
         return
     if _dispatcher is None:
         logger.warning("no job dispatcher installed; %d job(s) wait for the sweep", len(refs))
         return
-    _dispatcher(refs)
+    try:
+        _dispatcher(refs)
+    except Exception:  # the commit stands; the rows stay queued for the sweep
+        logger.exception("job dispatch failed; %d job(s) wait for the sweep", len(refs))
 
 
-@event.listens_for(Session, "after_rollback")
-def _forget_after_rollback(session: Session) -> None:
-    session.info.pop(PENDING_KEY, None)
+def _within(transaction: SessionTransaction | None, ancestor: SessionTransaction) -> bool:
+    while transaction is not None:
+        if transaction is ancestor:
+            return True
+        transaction = transaction.parent
+    return False
+
+
+@event.listens_for(Session, "after_soft_rollback")
+def _forget_after_rollback(session: Session, previous_transaction: SessionTransaction) -> None:
+    """Drop the jobs staged in the rolled-back (sub)transaction and its children only."""
+    pending: list[tuple[SessionTransaction | None, JobRef]] | None = session.info.get(
+        PENDING_KEY
+    )
+    if pending:
+        pending[:] = [(t, r) for t, r in pending if not _within(t, previous_transaction)]
 
 
 def get_job(session: Session, job_id: uuid.UUID) -> Job:

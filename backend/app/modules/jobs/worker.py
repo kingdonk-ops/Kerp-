@@ -84,7 +84,15 @@ async def run_job(
             if isinstance(exc, asyncio.CancelledError):
                 raise
             return
-        await asyncio.to_thread(_finish, db, tenancy, row_id, result, None)
+        try:
+            await asyncio.to_thread(_finish, db, tenancy, row_id, result, None)
+        except Exception as exc:  # e.g. a result that is not JSON, or a database error
+            logger.exception(
+                "storing the job result failed",
+                extra={"job_id": job_id, "kind": kind, "request_id": request_id},
+            )
+            error = service.sanitise_error(exc)
+            await asyncio.to_thread(_finish, db, tenancy, row_id, None, error)
     finally:
         request_id_var.reset(token)
 
