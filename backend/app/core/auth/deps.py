@@ -5,7 +5,7 @@ tenant comes exclusively from the verified credential, never from request parame
 and the request session is bound to it before any query runs. Here that happens in
 ``get_db`` (via ``get_tenancy_context`` and ``bearer.get_bearer``), so by the time
 ``get_current_user`` loads the user, RLS and the ORM scope already confine the session to
-the token's tenant. Project scope and roles/personas are T-0010.
+the token's tenant. Personas, capability guards and the multi-project scope: ``access.py``.
 """
 
 from __future__ import annotations
