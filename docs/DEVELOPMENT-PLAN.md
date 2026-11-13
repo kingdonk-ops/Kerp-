@@ -34,7 +34,7 @@ pluggable parser adapter). Money is a **read-only external mirror** only.
 
 | Phase | Scope | Depth | Exit criterion |
 |---|---|---|---|
-| **0** Platform substrate & security core | scaffold, DB + BaseRecordMixin, **project-scoped RLS** (+4 bypass tests), **RS256/EdDSA JWT + JWKS**, field-worker magic-link+PIN, 15-persona RBAC, module loader, **SAQ** jobs, presigned uploads, **CEL runtime substrate**, `run_checks` shell, hash-chain audit, frontend shell (8-group IA) + reusable shells; access model (System admin → Project Admins, lobby, project picker), 12 h sessions, hybrid PIN, device registry, deployment settings (2026-11-13) | **48 tasks** | tenant/project created, user authed & scoped, module toggled, rule set run — CI green |
+| **0** Platform substrate & security core | scaffold, DB + BaseRecordMixin, **project-scoped RLS** (+4 bypass tests), **RS256/EdDSA JWT + JWKS**, field-worker magic-link+PIN, 15-persona RBAC, module loader, **SAQ** jobs, presigned uploads, **CEL runtime substrate**, `run_checks` shell, hash-chain audit, frontend shell (8-group IA) + reusable shells; access model (System admin → Project Admins, lobby, project picker), 12 h sessions, hybrid PIN, device registry, deployment settings (2026-11-13) | **56 tasks** | tenant/project created, user authed & scoped, module toggled, rule set run — CI green |
 | **1** Asset backbone, one-engine & quality core | **ltree** hierarchy, **JSONB** field registry (EAV deleted), Items + CML stubs, P6 import/export (idempotent + unmatched-row linking), **one-engine** forms+CEL, **unified inspection record** + **eligibility**, **equipment calibration** register + hard gate, qms/construction_control/inspection_requests, NCR/punch, signing, completion-gate + P6 rule sets, offline sync core (Dexie), UI, **M1 freeze gate (T-0131)**; Capacitor Android build + SQLCipher store, FCM push, Pilot-0 gate (2026-11-13); Pilot-0 slice: sync scope + download, review/return, client co-sign, capture screen, scan-to-locate, photo annotation, video/audio/barcode fields + reference images, inspection PDF, dashboard tiles | **75 tasks** | P6→hierarchy; inspections gated by CEL; expired tool blocked; completion blocked by open NCR; backbone contract frozen |
 | **2** Welding quality & traceability | WPS, welder quals/continuity, welds as Items, NDE, heat/MTR trace, R-WPS rules | **9 tasks** | a weld can't be accepted outside qualification/NDE rules |
 | **3** Logistics & supply chain | **contacts**, **procurement (front)**, materials/MRIR+heat, inventory, **cutting (FFD + rectpack)**, Gate Delivery edge screen, equipment/fleet | 7 epics | delivery → gate receipt + OS&D; cutting plan → inventory |
@@ -112,6 +112,16 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
 - **M2 — MVP cut line (next milestone after Pilot-0):** Phase 0 + 1 + 2 + **Documents-Lite**
   (VFS tree, presigned uploads, batch inspection PDF export) + **P6 schedule round-trip**
   (~85–95 tasks).
+
+## Plan changes
+
+- **2026-11-13 — Phase 0 hardening merges (user request):** small hardening tasks from the
+  `docs/pr-suggestions.md` triage are consolidated so they ship as fewer PRs. The absorbed tasks
+  are `dropped` (bodies kept for history) and their acceptance criteria live on in the survivor:
+  T-0030 (absorbed T-0064: logging/config safety), T-0060 (absorbed T-0065: real SAQ-worker RLS
+  binding test), T-0031 (absorbed T-0062: UI shell fixes, after the ESLint pass), T-0029
+  (absorbed T-0066: `tracker.py set --note` date fix), T-0037 (absorbed T-0061: same-second
+  password-change token rejection). T-0032, T-0033, T-0063, T-0039 and T-0044 stay separate.
 
 ## Key engineering decisions (baked into the spec — see consolidation diff)
 
