@@ -58,6 +58,20 @@ class Settings(BaseSettings):
     jobs_interactive_concurrency: int = Field(default=4, ge=1, le=64)
     jobs_batch_concurrency: int = Field(default=1, ge=1, le=16)
 
+    # Object storage (T-0016, TD-004): S3 in production, MinIO in dev/test. Without keys the
+    # AWS default credential chain applies (IAM role). ``s3_public_endpoint_url`` is the
+    # endpoint browsers reach with presigned URLs, if it differs from ``s3_endpoint_url``.
+    storage_bucket: str = "kerp-vault"
+    s3_endpoint_url: str | None = None
+    s3_public_endpoint_url: str | None = None
+    s3_region: str = "us-east-1"
+    s3_access_key_id: str | None = Field(default=None, repr=False)
+    s3_secret_access_key: SecretStr | None = Field(default=None, repr=False)
+    # Uploads: size limit (single-request copy caps it at 5 GiB) and presigned URL lifetimes.
+    upload_max_bytes: int = Field(default=100 * 1024 * 1024, ge=1, le=5 * 1024**3)
+    upload_url_seconds: int = Field(default=900, ge=60, le=3600)
+    download_url_seconds: int = Field(default=300, ge=30, le=3600)
+
     # Auth tokens (T-0008, diff §4). Asymmetric JWTs, public keys served as JWKS.
     # ``jwt_private_key`` is a PEM (RSA for RS256, Ed25519 for EdDSA); ``jwt_private_key_file``
     # points at one instead. Unset outside production: an ephemeral key is generated per
