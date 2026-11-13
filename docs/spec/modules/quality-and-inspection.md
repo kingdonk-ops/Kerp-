@@ -211,39 +211,84 @@ planner defaults unless marked otherwise.
   (`review_round` 1, 2, …). The return reason and round are in the record history and on the PDF.
 - **Who reviews (user, 2026-11-13, R3a).** PER-06 or PER-07 on the project may approve or
   return; a PER-07 only inspections anchored inside their site node(s) ("Site Node Only"), a PER-06
-  the whole project; never the inspector who performed and submitted it. For review this holds
-  whatever `allow_self_approval` says (TD-070 and T-0140 keep the setting for other approvals).
-  Approve and return are online actions in the web app (planner default).
+  the whole project. Approve and return are online actions in the web app (planner default).
+- **Self-approval (user, 2026-11-13; replaces the R3a "never" wording).** By default nobody
+  approves an inspection they performed. The existing project setting `allow_self_approval`
+  (TD-070, T-0140; off by default) is extended with a per-template override (`inherit | allow |
+  deny`, either way). When it is effectively on, a **PER-06** may approve their own inspection; a
+  PER-07 never can. A self-approval is written to the audit ledger with the setting and override
+  that allowed it, and shows a "self-approved" badge on the review screen and the PDF.
 - **Notifications.** Submit notifies the project's reviewers; return and approve notify the
   inspector.
 
-## Client co-sign on the inspector's device (Pilot-0; user, 2026-11-13, R1a; TD-213)
+## Client co-sign (Pilot-0; user, 2026-11-13, R1a and co-sign redesign; TD-213)
 
-The client representative signs on the inspector's device with **their own KERP account (PER-15)
-and PIN** (user decision). How it works is planner default unless marked otherwise:
-- **Signing PIN.** A PER-15 sets a 6-digit signing PIN on their account online (web), separate
-  from any device PIN. The server stores only a slow salted hash (Argon2id).
-- **Hand-over.** On the inspector's device the inspector chooses "Hand to client". The app locks
-  the inspector's work behind the inspector's PIN and opens a co-sign screen that shows only the
-  inspection being signed, read-only. The client signs in with username (or e-mail) and signing
-  PIN; the client never gets the inspector's session, other records or navigation.
-- **Verification.** Online: the server checks the PIN and returns a single-use co-sign token for
-  that inspection, valid 5 minutes. Offline: the device checks the PIN against a signer verifier
-  (Argon2id hash + parameters) delivered in the pull scope for PER-15 members of the project whose
-  granted subtree covers a picked anchor, kept only in the encrypted store and deleted by `wipe()`
-  and when the pick is purged. Five wrong PINs on a device block co-sign for that signer on that
-  device until an online sign-in; failures are reported to the server on the next contact.
-- **Ledger entry.** The client signature is its own sign-off ledger entry (T-0119): signer user id
-  and name, persona PER-15, the time evidence of diff §6.4.1 (as for submit), geolocation, the
-  inspector's `device_id`, verification mode `online | offline`, and the drawn signature image.
-  On sync the server re-checks that the signer was an active PER-15 member of the project, with
-  the anchor inside their granted subtree, at `occurred_at`; otherwise that mutation fails and the
-  inspector is notified. A template may set `requires_client_signature`; then submit checks
-  `CLIENT_SIGNATURE_MISSING`.
-- **Hand-back.** After signing (or cancelling) the app clears everything the client entered except
-  the signature mutation, shows a hand-back screen and returns to the inspector only after the
-  inspector's PIN (T-0143 local unlock). The PDF prints the client signature next to the
-  inspector's and reviewer's.
+The client representative co-signs with **their own KERP account (PER-15)** (user decision R1a).
+After review round 3 of PR #51 the user replaced the offline PIN check (2026-11-13): **no client
+PIN hash or other client secret is ever sent to or stored on an inspector's device.** There are
+three ways to co-sign (user decision); details marked (planner default) are planner choices.
+
+- **(i) Online, own account and PIN.** On the inspector's device ("Hand to client") the client
+  signs in with username (or e-mail) and signing PIN; the server verifies it and returns a
+  single-use co-sign token for that inspection, valid 5 minutes (planner default). The signing
+  PIN is a 6-digit PIN the PER-15 sets online, stored only as an Argon2id hash in its own identity
+  table (`oe_identity_signing_pin`, `BaseRecordMixin` + tenant RLS; not a column on the core user
+  table — planner default). Rate limiting and lockout are **server-side per signer**: 5 wrong PINs
+  lock co-sign for that signer for 15 minutes, 10 until the signer resets the PIN online (planner
+  defaults). `verification_mode = online_pin`.
+- **(ii) QR proof from the client's own app — the preferred offline path.**
+  - **Key.** Each client device the PER-15 uses (KERP Android app or PWA) enrols a signing key
+    pair to their account (`oe_identity_signing_key`: user, `device_id` from the device registry,
+    public key, algorithm, status, enrolled/revoked times; `BaseRecordMixin` + tenant RLS). The
+    private key never leaves that device: Android Keystore, or a non-extractable WebCrypto key in
+    the PWA. Algorithm **ECDSA P-256 (ES256)** (planner default: supported by Android 11+ Keystore
+    and WebCrypto). Revoking the device (T-0043) revokes its keys.
+  - **Challenge.** The inspector's tablet shows a challenge QR: inspection id, record version,
+    record hash (SHA-256 of the canonical record content at that version), ITP step or line id
+    (if any), a summary (anchor code, template name, proposed result) and a fresh 128-bit nonce.
+    The client app scans it. If the client device holds the record it checks the hash against its
+    own copy and shows its own copy; otherwise it shows the challenge summary and the client
+    reads the record on the tablet (two-way QR exchange).
+  - **Assertion.** The client approves in their app, logged in as PER-15 (local unlock is enough;
+    works offline). The app signs an assertion: `{v: 1, inspection_id, record_version,
+    record_hash, step_id, signer_user_id, key_id, decision: "approve", nonce, time}` where `time`
+    is the §6.4.1 evidence (`device_wall_time`, `monotonic_ms`, `clock_session_id`, anchor if any).
+    Encoding (planner default): canonical JSON, ES256 signature, compressed and base45-encoded in
+    one QR of at most 1,200 bytes (QR version ≤ 25, error correction M).
+  - **Verify.** The tablet scans the assertion QR and verifies it offline: signature against the
+    public keys of enrolled client devices delivered in the pull scope (public keys only), nonce
+    equal to its challenge and unused, record hash equal to the local record, signer an active
+    PER-15 of the project with the anchor in their granted subtree. The assertion is queued as a
+    co-sign mutation. The server re-verifies everything at sync (key active at `occurred_at`, not
+    revoked before it; nonce never used). `verification_mode = client_device_signed`: a full
+    co-signature.
+- **(iii) Wet signature on the inspector's tablet.** The client draws a signature and types their
+  name; the inspector picks the client's PER-15 account from the project list (planner default).
+  - It is stored as **provisional** (`verification_mode = provisional_wet`) and shows a
+    "provisional client signature" badge on the review screen and the PDF.
+  - The named PER-15 is notified (in-app now, push later) and confirms or rejects it in the
+    client web app/PWA, signed in to their own account. Confirm writes a confirmed co-signature
+    (`verification_mode = client_confirmed`) linked to the provisional one. Reject needs a reason
+    and returns the inspection (`RETURNED`) with that reason. The wet image stays as evidence and
+    is never deleted.
+  - While a co-sign is provisional, an inspection whose template has `requires_client_signature`
+    cannot be approved (`CLIENT_SIGNATURE_PROVISIONAL`).
+  - Reminder to the client after 24 hours and to the project's PER-06 after 72 hours; a
+    provisional signature never expires on its own (planner defaults).
+- **Ledger entry.** Every co-signature is its own sign-off ledger entry (T-0119): signer user id
+  and name, persona PER-15, `verification_mode` (`online_pin | client_device_signed |
+  provisional_wet | client_confirmed`), the time evidence of diff §6.4.1, geolocation, the
+  inspector's `device_id` (and the client `key_id` for mode ii), the record version and hash it
+  covers, and the drawn image for mode iii. A co-signature covers one record version; editing the
+  answers after it (for example after a return) needs a new co-signature. A template may set
+  `requires_client_signature`; then submit checks `CLIENT_SIGNATURE_MISSING`.
+- **Hand-over and hand-back.** "Hand to client" locks the inspector's work behind the inspector's
+  PIN and shows only the inspection being signed, read-only. Afterwards the app clears everything
+  the client entered except the co-sign mutation and returns to the inspector only after the
+  inspector's PIN (T-0143 local unlock). The PDF prints each co-signature with its mode.
+- **Residual risk** (TD-216): a provisional wet signature is only an
+  inspector-witnessed claim until the client confirms it; a stolen client device key is stopped by
+  revoking the device (T-0043), and assertions signed before the revocation stay valid.
 
 ## Planning fields (Pilot-0, planner spec 2026-11-13; TD-165)
 

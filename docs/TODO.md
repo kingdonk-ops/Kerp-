@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 123 · **Closed:** 87
+**Open:** 124 · **Closed:** 87
 
 ## decision (2)
 
@@ -147,7 +147,7 @@
 |---|---|---|---|
 | [TD-159](../tracker/todo/TD-159.md) | Site filter from the bound project is applied to all site-scoped rows: a PER-07 on A who is PER-01 on B loses B's site-scoped rows (over-restrictive) | T-0010 | reviewer |
 
-## risk (11)
+## risk (12)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -162,6 +162,7 @@
 | [TD-154](../tracker/todo/TD-154.md) | Migrations 0002-0005 call the live rls_policy_sql, so changing it rewrites history | T-0010 | implementer |
 | [TD-158](../tracker/todo/TD-158.md) | require_hold_release passes a PER-07 for any site; endpoints must also check can_release_hold against the hold's site (add a load-and-check helper) | T-0010 | reviewer |
 | [TD-176](../tracker/todo/TD-176.md) | No availability target or HA design for the production API (clean-room asks 99.5 %; offline client tolerates outages) | — | clean-room-gap-analysis |
+| [TD-216](../tracker/todo/TD-216.md) | Client co-sign residual risk: a provisional wet signature is only an inspector-witnessed claim until the client confirms it; a stolen client device key is stopped only by revoking the device (T-0043) | T-0174, T-0173 | planner |
 
 ## Closed
 

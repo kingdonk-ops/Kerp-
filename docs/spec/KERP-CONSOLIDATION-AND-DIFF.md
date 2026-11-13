@@ -371,7 +371,8 @@ otherwise; they refine master spec §4.3 and ADR 0005 and keep the sync contract
   picks (records, answers, answer comments, attachment metadata, linked open defects) and the
   project reference data the client needs offline: level definitions, terminology, item types and
   field definitions, the template revisions (with their reference images) pinned by the picks or
-  allowed on picked anchors, client signer verifiers (quality-and-inspection.md §Client co-sign), the
+  allowed on picked anchors, the **public** signing keys of enrolled client devices (quality-and-inspection.md §Client
+  co-sign; never PIN hashes or other secrets), the
   equipment register with calibration state, the project's rule sets and member display names.
   Records outside the scope are never sent. A newly added pick is back-filled in full on the next
   pull, whatever `since_version` is.
@@ -438,8 +439,11 @@ submit, client co-sign, comments, NCR/punch raised in the field), not only submi
   T-0006 audit ledger gets **no new columns** (planner default): audit entries for offline actions
   carry the same five values inside their hashed payload, so no core-table ADR is needed; the
   sign-off ledger of T-0119 is a module table that is not built yet.
-- **Time anchor.** `GET /api/v1/time` (lightweight; returns server time and the signed anchor
-  token). Whenever it has connectivity (login, pre-shift, each sync) the client stores an anchor
+- **Time anchor.** `GET /api/v1/time?clock_session_id=&monotonic_ms=` (lightweight; needs a
+  signed-in session, any persona — planner default) returns server time and an anchor token: an
+  HMAC over server time, the client's `clock_session_id` **and** the `monotonic_ms` it sent, so a
+  carried anchor cannot be paired with another monotonic origin (planner default). Whenever it has
+  connectivity (login, pre-shift, each sync) the client stores an anchor
   `(server_time, monotonic_ms, clock_session_id, token)` and uses it offline for actions in the
   same clock session.
 - **Skew check before going offline.** When the user takes a download/checkout (§6.4 picks), the
