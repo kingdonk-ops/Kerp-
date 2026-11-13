@@ -210,3 +210,32 @@ def test_makefile_recipes_use_tabs() -> None:
 def test_make_and_ci_opt_out_of_the_production_default(ci_backend: dict[str, Any]) -> None:
     assert _make_defaults().get("KERP_ENVIRONMENT") in {"development", "test"}
     assert ci_backend["env"]["KERP_ENVIRONMENT"] in {"development", "test"}
+
+
+# --- production image smoke test (T-0037: production needs the deployment tenant) ------------
+
+
+def _smoke_script() -> str:
+    steps = _yaml(CI)["jobs"]["backend-image"]["steps"]
+    smoke = [s for s in steps if str(s.get("name", "")).startswith("Smoke test")]
+    assert len(smoke) == 1, "expected one backend-image step named 'Smoke test…'"
+    return " ".join(str(smoke[0]["run"]).replace("\\\n", " ").split())
+
+
+def test_image_smoke_test_runs_production_with_the_tenant() -> None:
+    script = _smoke_script()
+    started = re.search(r"docker run -d --name kerp-smoke (.*?) kerp-backend:ci", script)
+    assert started, "smoke test must start the kerp-smoke container"
+    args = started.group(1)
+    # Production is the image default: the smoke test must not opt out of it.
+    assert "KERP_ENVIRONMENT" not in args
+    tenant = re.search(r"-e KERP_DEFAULT_TENANT_ID=(\S+)", args)
+    assert tenant, "production startup requires KERP_DEFAULT_TENANT_ID (T-0037)"
+    uuid_re = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+    assert re.fullmatch(uuid_re, tenant.group(1))
+
+
+def test_image_smoke_test_checks_startup_fails_without_the_tenant() -> None:
+    script = _smoke_script()
+    assert re.search(r"docker run --rm --name kerp-no-tenant kerp-backend:ci", script)
+    assert "KERP_DEFAULT_TENANT_ID must be set" in script

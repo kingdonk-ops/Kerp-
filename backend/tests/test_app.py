@@ -43,7 +43,7 @@ def test_health_returns_status_and_version(client: TestClient, settings: Setting
 
 
 def test_health_version_follows_settings() -> None:
-    app = create_app(Settings(version="2.0.0-synthetic"))
+    app = create_app(Settings(environment="test", version="2.0.0-synthetic"))
     with TestClient(app) as c:
         assert c.get("/health").json()["version"] == "2.0.0-synthetic"
 

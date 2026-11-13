@@ -64,7 +64,7 @@ def build_auth_runtime(
         issuer=settings.jwt_issuer,
         audience=settings.jwt_audience,
         access_ttl=timedelta(minutes=settings.access_token_minutes),
-        refresh_ttl=timedelta(days=settings.refresh_token_days),
+        refresh_ttl=timedelta(hours=settings.refresh_token_hours),
     )
     return AuthRuntime(
         settings=settings,
@@ -73,6 +73,12 @@ def build_auth_runtime(
         store=store,
         magic_links=magic_links or sender_from_settings(settings),
     )
+
+
+def check_startup_config(settings: Settings) -> None:
+    """Fail fast at startup on auth configuration production cannot run without."""
+    if settings.environment == "production" and settings.default_tenant_id is None:
+        raise AuthConfigError("KERP_DEFAULT_TENANT_ID must be set in production (diff §4.1)")
 
 
 def _store_from_settings(settings: Settings) -> RevocationStore:

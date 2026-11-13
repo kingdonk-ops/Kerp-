@@ -296,7 +296,7 @@ def app_and_users(
 
 
 def _bearer(client: TestClient, email: str) -> dict[str, str]:
-    body = {"email": email, "password": PASSWORD, "tenant_id": str(AUTH_T1)}
+    body = {"email": email, "password": PASSWORD}
     token = client.post("/api/v1/auth/login", json=body).json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
 

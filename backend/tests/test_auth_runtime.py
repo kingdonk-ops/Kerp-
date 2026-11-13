@@ -1,5 +1,7 @@
 """Auth runtime assembly from settings and its place in the app (T-0008)."""
 
+import uuid
+from datetime import timedelta
 from pathlib import Path
 
 import pytest
@@ -13,9 +15,10 @@ from app.core.auth.runtime import (
     build_auth_runtime,
     close_auth_runtime,
 )
+from app.core.config import Settings
 from app.core.db import Base
 from app.main import create_app
-from tests.auth_support import auth_app, make_settings
+from tests.auth_support import T1, auth_app, make_settings
 
 
 def test_defaults_follow_the_spec() -> None:
@@ -64,6 +67,33 @@ def test_production_with_key_and_redis_builds() -> None:
     )
     assert isinstance(runtime.store, RedisRevocationStore)
     runtime.close()
+
+
+def test_refresh_lifetime_is_12_hours_and_bounded(monkeypatch: pytest.MonkeyPatch) -> None:
+    settings = make_settings()
+    assert settings.refresh_token_hours == 12
+    assert build_auth_runtime(settings).tokens.ttl["refresh"] == timedelta(hours=12)
+    monkeypatch.setenv("KERP_REFRESH_TOKEN_HOURS", "8")
+    assert Settings(environment="test").refresh_token_hours == 8
+    with pytest.raises(ValueError, match="24"):
+        make_settings(refresh_token_hours=25)
+
+
+def test_production_startup_fails_without_the_deployment_tenant() -> None:
+    app = create_app(make_settings(environment="production", default_tenant_id=None))
+    with pytest.raises(AuthConfigError, match="KERP_DEFAULT_TENANT_ID"), TestClient(app):
+        pass  # pragma: no cover - startup raises first
+
+
+@pytest.mark.parametrize(
+    ("environment", "tenant"), [("production", T1), ("development", None), ("test", None)]
+)
+def test_startup_with_a_tenant_or_outside_production(
+    environment: str, tenant: uuid.UUID | None
+) -> None:
+    app = create_app(make_settings(environment=environment, default_tenant_id=tenant))
+    with TestClient(app) as client:
+        assert client.get("/health").status_code == 200
 
 
 def test_runtime_is_built_lazily_once_per_app() -> None:

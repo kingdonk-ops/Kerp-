@@ -20,24 +20,24 @@ export interface ApiClientOptions {
 
 /**
  * Builds the app's API client. Every request carries the access token; a `401` triggers
- * one refresh-token rotation (shared by concurrent requests) and one retry. A refresh the
- * server rejects (400/401/422) clears the session, which signs the user out; transient
- * failures (network, 429, 5xx) keep it.
+ * one refresh-token rotation (shared by concurrent requests) and one retry. The refresh
+ * token is the `httpOnly` cookie the browser sends to the auth endpoints itself. A refresh
+ * the server rejects (400/401/422, e.g. 12 hours after sign-in) clears the session, which
+ * signs the user out; transient failures (network, 429, 5xx) keep it.
  */
 export function createApiClient({ baseUrl, tokens, fetch }: ApiClientOptions): ApiClient {
   const baseFetch: FetchFn = fetch ?? ((input) => globalThis.fetch(input));
+  // The refresh cookie is same-origin only (SameSite=Strict + the server's Origin check).
+  const credentials: RequestCredentials = "same-origin";
   // Unauthenticated client for the refresh call itself (never retried).
-  const raw = createClient<paths>({ baseUrl, fetch: baseFetch });
+  const raw = createClient<paths>({ baseUrl, fetch: baseFetch, credentials });
   let pending: Promise<boolean> | null = null;
 
   const refreshOnce = (): Promise<boolean> => {
     pending ??= (async () => {
-      const refreshToken = tokens.refresh;
-      if (refreshToken === null) return false;
+      if (!tokens.hasSession) return false;
       try {
-        const { data, response } = await raw.POST("/api/v1/auth/refresh", {
-          body: { refresh_token: refreshToken },
-        });
+        const { data, response } = await raw.POST("/api/v1/auth/refresh");
         if (data) {
           tokens.set(data);
           return true;
@@ -76,5 +76,5 @@ export function createApiClient({ baseUrl, tokens, fetch }: ApiClientOptions): A
     return baseFetch(withAuth(retry));
   };
 
-  return createClient<paths>({ baseUrl, fetch: authFetch });
+  return createClient<paths>({ baseUrl, fetch: authFetch, credentials });
 }

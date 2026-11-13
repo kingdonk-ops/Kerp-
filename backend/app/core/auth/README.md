@@ -26,13 +26,40 @@ rewritten (HS256 → RS256/EdDSA + JWKS + `jti` revocation in Redis).
 | Method + path | Auth | Result |
 |---|---|---|
 | `GET /.well-known/jwks.json` | none | `{"keys": [...]}` public JWKs (active + retired), `Cache-Control: public, max-age=300` |
-| `POST /api/v1/auth/login` | none | `{email, password, tenant_id?}` → `TokenResponse` (`no-store`); `429` when locked |
-| `POST /api/v1/auth/refresh` | none | `{refresh_token}` → new `TokenResponse` (rotation); `401` for PIN-gated sessions |
-| `POST /api/v1/auth/logout` | bearer | `204`; revokes the token and its whole login session |
+| `POST /api/v1/auth/login` | none | `{email, password}` → `TokenResponse` (`no-store`) + refresh cookie; a `tenant_id` field is `422`; `429` when locked |
+| `POST /api/v1/auth/refresh` | refresh cookie + Origin | new `TokenResponse` + cookie (rotation); `401` for PIN-gated or ended sessions; `403` cross-origin |
+| `POST /api/v1/auth/logout` | bearer | `204`; revokes the token and its whole login session; clears the refresh cookie |
 | `GET /api/v1/auth/me` | bearer | `{id, tenant_id, email, display_name}` |
-| `POST /api/v1/auth/magic-link` | none | `{email, tenant_id?}` → always `202`; sends a 15-min one-time link to an active user; `429` when throttled |
-| `POST /api/v1/auth/magic-link/redeem` | none | `{token, pin}` → `TokenResponse` of a new **PIN-gated** session |
-| `POST /api/v1/auth/pin/unlock` | none | `{refresh_token, pin}` → rotated `TokenResponse`; `429` when locked |
+| `POST /api/v1/auth/magic-link` | none | `{email}` → always `202`; sends a 15-min one-time link to an active user; `429` when throttled |
+| `POST /api/v1/auth/magic-link/redeem` | none | `{token, pin}` → `TokenResponse` + cookie of a new **PIN-gated** session |
+| `POST /api/v1/auth/pin/unlock` | refresh cookie + Origin | `{pin}` → rotated `TokenResponse` + cookie; `429` when locked; `403` cross-origin |
+
+`TokenResponse` is `{access_token, token_type, expires_in, refresh_expires_in}`: no response
+body ever carries the refresh token (below).
+
+**One hidden tenant (T-0037, diff §4.1, TD-120).** A deployment serves one tenant,
+`KERP_DEFAULT_TENANT_ID`; login and magic-link requests carry no tenant field and nothing
+names the tenant to the user. Production refuses to start without it (app startup). That the
+id names an existing tenant row is checked once first-run provisioning creates the tenant
+table (T-0023, TD-248).
+
+## Refresh cookie (web SPA, T-0037)
+
+Diff §4.2, TD-203. The refresh token travels only as the cookie
+`kerp_refresh`: `HttpOnly`, `Secure`, `SameSite=Strict`, `Path=/api/v1/auth`, `Max-Age` =
+seconds left in the session. Script on the page never sees it, and it is sent on no other API
+request. Login, magic-link redeem, refresh and PIN unlock set it; logout clears it.
+
+**CSRF:** besides `SameSite=Strict`, `/auth/refresh` and `/auth/pin/unlock` check the
+`Origin` header before they look at the cookie: it must equal the allowed web origin,
+`KERP_WEB_ORIGIN` (e.g. `https://kerp.example.com`), or, when that is unset, the API's own
+origin (SPA and API under one URL, diff §4.1). A missing or other `Origin` is `403`. The
+other endpoints need no check: login and redeem take credentials the attacker does not have,
+logout needs the bearer token. The JSON-body transport for the Capacitor Android build, behind
+a native-origin allow-list, comes with T-0043.
+
+The SPA (`frontend/src/auth/tokenStore.ts`) keeps the access token in memory and only a
+"signed in" marker in `sessionStorage`; it removes the refresh token earlier builds stored there.
 
 Every rejection is `401 {"detail": "Not authenticated"}` with a `WWW-Authenticate: Bearer`
 challenge (`error="invalid_token"` when a token was presented). Unknown user, wrong
@@ -59,7 +86,7 @@ Redis with `maxmemory-policy noeviction` (TD-142 tracks a token-claim remedy).
 
 | Scope | Key | Immediate tries | Then locked | Hard cap |
 |---|---|---|---|---|
-| PIN unlock | session | 4 | 30 s doubling to 15 min | 10th wrong PIN revokes the session (counter lives as long as the session's refresh token, not per day) |
+| PIN unlock | session | 4 | 30 s doubling to 15 min | 10th wrong PIN revokes the session (counter window = refresh lifetime + 1 day, so it outlives the 12 h session; until T-0038 moves the PIN to the device) |
 | Password login | tenant + e-mail + client IP | 6 | 30 s doubling to 15 min | none (no permanent lock-out) |
 | Password login backstop | tenant + e-mail, any client | 51 per 24 h | 30 s doubling to 15 min | none |
 | Magic-link request | tenant + e-mail | 4 per hour | 1 min doubling to 15 min | none |
@@ -88,12 +115,20 @@ Claims: `iss`, `aud`, `sub` (user), `tid` (tenant), `sid` (login session), `jti`
 the key up by `kid` and accepts only that key's algorithm (no `none`, no HS/RS confusion).
 
 - **Access**: 15 minutes (`KERP_ACCESS_TOKEN_MINUTES`, capped at 15).
-- **Refresh**: `KERP_REFRESH_TOKEN_DAYS` (default 14, TD-121). Single use: a refresh
-  consumes it atomically in Redis and issues a new pair in the same `sid`. Replaying a used
-  refresh token revokes the whole session (reuse detection).
+- **Refresh**: `KERP_REFRESH_TOKEN_HOURS` (default 12, TD-121), counted from sign-in.
+  Single use: a refresh consumes it atomically in Redis and issues a new pair in the same
+  `sid` whose `exp` is the session's end, so rotation never extends a session; at sign-in
+  + 12 h the refresh is `401` (exact, no clock leeway) and the user signs in again. Access
+  tokens never outlive the session either. Replaying a used refresh token revokes the whole
+  session (reuse detection).
 - **Logout** revokes the access `jti` and the `sid`; every token of that login dies.
-- **Password change** (`set_password`) invalidates tokens issued before it; deactivating a
-  user locks them out on their next request.
+- **Password change** (`set_password`) sets `password_changed_at` (microseconds). A token is
+  valid only if its `iat` is not before it. `iat` and `exp` are fractional NumericDates with
+  microsecond precision, so the rule is exact (T-0061): a token issued before the change is
+  rejected and one issued after it (e.g. the login straight after `set_password`) is
+  accepted, even within the same second. Tokens from before T-0037 (whole-second `iat`) issued
+  in the second of a change are rejected. Deactivating a user locks them out on their next
+  request.
 
 ## Request flow (tenant from the JWT only)
 
@@ -138,8 +173,9 @@ session's bound project (or no bound project) → `404`; a member without the au
 | `KERP_JWT_RETIRED_PUBLIC_KEYS` | `[]` | JSON list of public PEMs still accepted and published |
 | `KERP_JWT_ISSUER` / `KERP_JWT_AUDIENCE` | `kerp` / `kerp-api` | `iss` / `aud` |
 | `KERP_ACCESS_TOKEN_MINUTES` | `15` | 1–15 |
-| `KERP_REFRESH_TOKEN_DAYS` | `14` | 1–90 |
-| `KERP_DEFAULT_TENANT_ID` | unset | Tenant of a login without `tenant_id` (TD-120) |
+| `KERP_REFRESH_TOKEN_HOURS` | `12` | 1–24; session length from sign-in |
+| `KERP_DEFAULT_TENANT_ID` | unset | The deployment's one tenant (TD-120); required in production |
+| `KERP_WEB_ORIGIN` | unset | Web SPA origin allowed on the cookie endpoints; unset = the API's own origin as the request sees it (behind a TLS-terminating proxy set this, or trust the proxy with `FORWARDED_ALLOW_IPS`) |
 | `KERP_REDIS_URL` | unset | Revocation store |
 
 Outside production, a missing key means an **ephemeral** key per process and a missing

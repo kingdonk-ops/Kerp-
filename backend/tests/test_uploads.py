@@ -565,7 +565,7 @@ class Api:
         _grant(db, self.users[BOB], self.home.project_id, Persona.CLIENT_REPRESENTATIVE)
 
     def headers(self, email: str) -> dict[str, str]:
-        body = {"email": email, "password": PASSWORD, "tenant_id": str(T1)}
+        body = {"email": email, "password": PASSWORD}
         response = self.client.post("/api/v1/auth/login", json=body)
         assert response.status_code == 200, response.text
         return {"Authorization": f"Bearer {response.json()['access_token']}"}

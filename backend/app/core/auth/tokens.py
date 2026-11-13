@@ -9,7 +9,9 @@ Rewrite of Inspection-ERP's HS256 token layer (ADR 0001). Every token carries:
   whole session (every access and refresh token of one login) can be revoked at once.
 * ``jti``: unique per token, the key of the revocation list.
 * ``type``: ``access`` (15 minutes) or ``refresh`` (rotating, one use each).
-* ``iat`` / ``nbf`` / ``exp``.
+* ``iat`` / ``nbf`` / ``exp``. ``iat`` and ``exp`` are fractional NumericDates (RFC 7519
+  §2) with microsecond precision, so a token is ordered exactly against a password change
+  (T-0061) and a rotated token keeps its session's exact end (``not_after``, diff §4.2).
 
 The header carries the ``kid`` that selects the verification key; only the algorithm of
 that key is accepted, so ``alg: none`` and algorithm-confusion tokens fail.
@@ -88,8 +90,13 @@ class TokenService:
         user_id: uuid.UUID,
         tenant_id: uuid.UUID,
         session_id: uuid.UUID,
+        not_after: datetime | None = None,
     ) -> IssuedToken:
-        now = self._clock().replace(microsecond=0)
+        """``not_after`` caps the expiry (the session's end: rotation never extends it)."""
+        now = self.now()
+        expires_at = now + self.ttl[token_type]
+        if not_after is not None:
+            expires_at = min(expires_at, not_after)
         claims = TokenClaims(
             type=token_type,
             user_id=user_id,
@@ -97,7 +104,7 @@ class TokenService:
             session_id=session_id,
             jti=uuid.uuid4().hex,
             issued_at=now,
-            expires_at=now + self.ttl[token_type],
+            expires_at=expires_at,
         )
         payload: dict[str, Any] = {
             "iss": self.issuer,
@@ -107,9 +114,11 @@ class TokenService:
             "sid": str(session_id),
             "jti": claims.jti,
             "type": token_type,
-            "iat": int(now.timestamp()),
+            # Fractional: a float round-trips the microseconds exactly (JSON repr is exact
+            # and a double resolves well below 1 µs at today's epoch).
+            "iat": now.timestamp(),
             "nbf": int(now.timestamp()),
-            "exp": int(claims.expires_at.timestamp()),
+            "exp": expires_at.timestamp(),
         }
         signing = self.keys.signing
         token = jwt.encode(
@@ -119,6 +128,9 @@ class TokenService:
             headers={"kid": signing.kid, "typ": _HEADER_TYP[token_type]},
         )
         return IssuedToken(token, claims)
+
+    def now(self) -> datetime:
+        return self._clock()
 
     def verify(self, token: str, expected_type: TokenType) -> TokenClaims:
         """Verify signature, issuer, audience, lifetime and type. Revocation is separate."""
@@ -144,8 +156,8 @@ class TokenService:
                 tenant_id=uuid.UUID(payload["tid"]),
                 session_id=uuid.UUID(payload["sid"]),
                 jti=_text(payload["jti"]),
-                issued_at=datetime.fromtimestamp(payload["iat"], UTC),
-                expires_at=datetime.fromtimestamp(payload["exp"], UTC),
+                issued_at=datetime.fromtimestamp(_number(payload["iat"]), UTC),
+                expires_at=datetime.fromtimestamp(_number(payload["exp"]), UTC),
             )
         except InvalidTokenError:
             raise
@@ -156,4 +168,10 @@ class TokenService:
 def _text(value: object) -> str:
     if not isinstance(value, str) or not value:
         raise InvalidTokenError("jti must be a non-empty string")
+    return value
+
+
+def _number(value: object) -> float:
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        raise InvalidTokenError("iat and exp must be numbers")
     return value

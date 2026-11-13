@@ -1,5 +1,6 @@
 """Security headers on every API response (T-0021)."""
 
+import uuid
 from collections.abc import Iterator
 
 import httpx
@@ -17,6 +18,8 @@ BASELINE = {
     "referrer-policy": "no-referrer",
 }
 API_CSP = "default-src 'none'; frame-ancestors 'none'"
+# A production app needs its deployment tenant to start (T-0037).
+TENANT = uuid.UUID("00000000-0000-4000-8000-0000000000f1")
 
 
 def _get(settings: Settings, path: str = "/health") -> httpx.Response:
@@ -96,12 +99,13 @@ def test_no_hsts_outside_production_by_default(environment: str) -> None:
 
 def test_hsts_in_production_by_default() -> None:
     assert HSTS_VALUE == "max-age=31536000; includeSubDomains"
-    headers = _get(Settings(environment="production")).headers
+    headers = _get(Settings(environment="production", default_tenant_id=TENANT)).headers
     assert headers["strict-transport-security"] == HSTS_VALUE
 
 
 def test_hsts_can_be_forced_off_in_production() -> None:
-    headers = _get(Settings(environment="production", hsts_enabled=False)).headers
+    settings = Settings(environment="production", hsts_enabled=False, default_tenant_id=TENANT)
+    headers = _get(settings).headers
     assert "strict-transport-security" not in headers
 
 

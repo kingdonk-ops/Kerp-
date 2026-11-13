@@ -39,6 +39,8 @@ RUN /opt/buildenv/bin/hatchling build --target wheel --directory /wheels \
 # --- runtime ------------------------------------------------------------------------------
 FROM python:3.12-slim-bookworm@sha256:935c3c5b12357a7e10caa9c1e6ca5692344d97cf229832ef584be2cec9fc03df AS runtime
 
+# Production (the default) refuses to start without KERP_DEFAULT_TENANT_ID; auth also needs a
+# JWT signing key and KERP_REDIS_URL. See README.md "Container image".
 ENV PATH=/opt/venv/bin:$PATH \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \

@@ -65,6 +65,28 @@ def test_refresh_token_lifetime_and_type(service: TokenService) -> None:
     assert claims.expires_at - claims.issued_at == timedelta(days=14)
 
 
+@pytest.mark.parametrize("microsecond", [0, 1, 123_456, 500_000, 999_999])
+def test_issued_at_keeps_its_microseconds(keys: KeySet, microsecond: int) -> None:
+    # T-0061: ordering against a password change needs the exact issue time.
+    moment = datetime.now(UTC).replace(microsecond=microsecond) - timedelta(seconds=1)
+    service = _service(keys, clock=lambda: moment)
+    issued = service.issue("access", **IDS)
+    payload = jwt.decode(issued.token, options={"verify_signature": False})
+    assert isinstance(payload["iat"], float)
+    claims = service.verify(issued.token, "access")
+    assert claims.issued_at == moment
+    assert claims == issued.claims
+
+
+def test_not_after_caps_the_expiry(service: TokenService) -> None:
+    end = datetime.now(UTC) + timedelta(minutes=5, microseconds=7)
+    capped = service.verify(service.issue("refresh", **IDS, not_after=end).token, "refresh")
+    assert capped.expires_at == end
+    later = datetime.now(UTC) + timedelta(days=30)
+    uncapped = service.verify(service.issue("refresh", **IDS, not_after=later).token, "refresh")
+    assert uncapped.expires_at - uncapped.issued_at == timedelta(days=14)
+
+
 def test_every_token_has_a_unique_jti(service: TokenService) -> None:
     jtis = {service.issue("access", **IDS).claims.jti for _ in range(20)}
     assert len(jtis) == 20
@@ -196,6 +218,9 @@ def _base_payload() -> dict[str, object]:
         {"sid": None},
         {"sub": 12},
         {"type": None},
+        {"iat": True},
+        {"iat": "1700000000"},
+        {"exp": "4102444800"},
     ],
 )
 def test_malformed_custom_claims_are_rejected(
