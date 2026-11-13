@@ -243,7 +243,8 @@ Wins over any earlier text on tenant selection, tenant administrators and projec
 
 - **Tenant (deployment) settings**, edited by System admins: offline window (days, default 7,
   1–14), and the defaults for new projects: status `ACTIVE`, site timezone `Australia/Perth`,
-  currency `AUD`, locale `en-AU`. Project status values are `ACTIVE`, `ON_HOLD`, `CLOSED`.
+  currency `AUD`, locale `en-AU`. Also `max_checkout_clock_skew_s` (default 5; user, 2026-11-13):
+  the largest device clock skew allowed when taking work offline (§6.4.1). Project status values are `ACTIVE`, `ON_HOLD`, `CLOSED`.
 - **Region is a per-deployment setting**, not code: AWS `ap-southeast-2` (Sydney) for Australian
   deployments; `eu-central-1` (Frankfurt) only if an EU deployment is ever needed. S3, SES and
   any other regional AWS client read the deployment's region; nothing hard-codes a region.
@@ -402,6 +403,66 @@ otherwise; they refine master spec §4.3 and ADR 0005 and keep the sync contract
   orders a queued submit after the uploads it depends on and keeps the submit button disabled,
   with the pending count, until they finish. A failed submit is a per-mutation result, never a
   failed batch.
+
+#### 6.4.1 Time of offline actions (user, 2026-11-13)
+
+The user's design. It applies to **every offline-capable timed action** (answers, sign-offs,
+submit, client co-sign, comments, NCR/punch raised in the field), not only submit. Items marked
+"(planner default)" are planner choices; everything else is the user's decision.
+
+- **Capture on the device, per action:** `device_wall_time` (UTC ISO 8601), `monotonic_ms` and
+  `clock_session_id` (a UUID minted when the monotonic origin starts). Each push batch also
+  carries `device_sync_wall_time`, `device_sync_monotonic_ms` and the current `clock_session_id`;
+  the server stamps `server_sync_time` on receipt.
+- **Reconstruction on the server:**
+  - **Same clock session** as the push: `occurred_at = server_sync_time − (device_sync_monotonic_ms
+    − action monotonic_ms)`, `time_confidence = MONOTONIC_RECONSTRUCTED`.
+  - **Same clock session as a stored time anchor** (below), but not the push:
+    `occurred_at = anchor.server_time + (action monotonic_ms − anchor.monotonic_ms)`,
+    `MONOTONIC_RECONSTRUCTED`. The action carries its anchor; the server accepts only an anchor it
+    issued (the `/api/v1/time` response carries a server-signed token, planner default).
+  - **Different session:** `clock_skew_ms = server_sync_time − device_sync_wall_time`,
+    `occurred_at = device_wall_time + clock_skew_ms`, `SKEW_ADJUSTED`; when |`clock_skew_ms`| is
+    above **2 minutes** across a reboot (threshold: planner default) it is `UNVERIFIED_REBOOT`
+    instead.
+  - **Online actions:** `occurred_at` = server time, `VERIFIED_ONLINE`.
+  - `occurred_at` drives sorting, SLAs, ITP sign-offs, overdue, dashboard tiles and the PDF. The
+    offline-window check (§4.2) uses `occurred_at`.
+- **Stored evidence, never overwritten.** Each record with an offline-capable timed action stores
+  `occurred_at` (timestamptz), `recorded_device_at` (timestamptz, the raw device wall time),
+  `synced_at` (timestamptz, `server_sync_time`), `clock_skew_ms` (bigint) and `time_confidence`
+  (`VERIFIED_ONLINE | MONOTONIC_RECONSTRUCTED | SKEW_ADJUSTED | UNVERIFIED_REBOOT`). Column
+  placement (planner default): the five columns on every sign-off ledger entry (T-0119 table:
+  inspector submit signature, reviewer approval, client co-sign), on the inspection record for its
+  submit (prefixed `submit_`), and on answer and answer-comment rows. Additive migrations. The
+  T-0006 audit ledger gets **no new columns** (planner default): audit entries for offline actions
+  carry the same five values inside their hashed payload, so no core-table ADR is needed; the
+  sign-off ledger of T-0119 is a module table that is not built yet.
+- **Time anchor.** `GET /api/v1/time` (lightweight; returns server time and the signed anchor
+  token). Whenever it has connectivity (login, pre-shift, each sync) the client stores an anchor
+  `(server_time, monotonic_ms, clock_session_id, token)` and uses it offline for actions in the
+  same clock session.
+- **Skew check before going offline.** When the user takes a download/checkout (§6.4 picks), the
+  client compares the device wall time with `/api/v1/time` (round-trip midpoint, planner default).
+  If |skew| is above the deployment setting `max_checkout_clock_skew_s` (§4.4; default **5 s**),
+  the checkout is blocked and the user is asked to turn on automatic date and time (NTP). The pick
+  request carries the measured skew and the server refuses it too (`CLOCK_SKEW_TOO_LARGE`, 409;
+  planner default).
+- **Warning badge.** Records with `UNVERIFIED_REBOOT` show a high-contrast warning badge in the
+  web UI (review screen, inspection detail) so a QA/QC reviewer can check them against shift logs.
+  The PDF prints `time_confidence` next to each time.
+- **Platform notes (planner).**
+  - **Web/PWA:** `performance.now()` restarts on every page load or app restart, not only on
+    device boot, so `clock_session_id` is per JavaScript realm and a reload starts a new session
+    (skew path). The PWA persists its anchor and re-anchors on reload whenever it is online.
+  - **Android (Capacitor):** monotonic time comes from `SystemClock.elapsedRealtime()` through a
+    small native plugin (planner default), because it keeps counting through deep sleep while
+    `performance.now()` may pause in some WebViews. A new `clock_session_id` is minted after a
+    device boot (detected when `elapsedRealtime` is below the last stored value or the boot count
+    changed).
+  - **iOS:** out of scope (Android only).
+- **Optional chain-of-custody hash** of offline records (SHA-256 of previous hash + payload +
+  `monotonic_ms`): the user called it optional; tracked as a `later` TODO (TD-215), no task.
 
 ---
 

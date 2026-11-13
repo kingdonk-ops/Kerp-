@@ -188,18 +188,15 @@ planner defaults unless marked otherwise.
   (`KERP-CONSOLIDATION-AND-DIFF.md` §6.4). A submit made offline is a queued mutation; if a check
   fails at sync, that mutation fails with the findings, the record keeps its earlier state and the
   inspector is notified. In `SUBMITTED` the answers are read-only.
-- **Signature time and authority of an offline submit (planner default).** The submit ledger
-  entry carries both `signed_at` (device UTC time when the inspector signed) and `received_at`
-  (server UTC time when the submit reached the server); `signed_at` is the sign-off time shown on
-  the record and the PDF, `received_at` sits next to it, and a `signed_at` later than
-  `received_at` by more than 5 minutes, or earlier than the lower bound, is kept but flagged
-  `clock_suspect` on the record and the PDF (never rejected, so signed work is not lost). The lower
-  bound is the checkout time of the device's pick, read through the `sync` service; for a record
-  created offline it is the record's client create time. The submit's geolocation is
+- **Time and authority of an offline submit.** The submit signature and the inspection's submit
+  carry the time evidence of `KERP-CONSOLIDATION-AND-DIFF.md` §6.4.1 (user, 2026-11-13):
+  `occurred_at`, `recorded_device_at`, `synced_at`, `clock_skew_ms` and `time_confidence`.
+  `occurred_at` is the sign-off time shown on the record and the PDF; raw evidence is never
+  overwritten; `UNVERIFIED_REBOOT` shows a warning badge for the reviewer. The submit's geolocation is
   the signature's geolocation that master spec §4.2 requires for `INSPECTED_PASSED`. An offline
   submit is authorised by the local PIN unlock of the hybrid model
   (`KERP-CONSOLIDATION-AND-DIFF.md` §4.2), not by a live session: the mutation carries the user
-  and `device_id`, and the server accepts it only if it was signed inside the offline window and
+  and `device_id`, and the server accepts it only if it was signed (by `occurred_at`) inside the offline window and
   the user and device match the pushing session (T-0126 note) and the device is not revoked.
 - **Approve.** A reviewer approves with `run_checks(context, "inspection.approve")`. The record
   moves to `INSPECTED_PASSED` (proposed `pass`) or `INSPECTED_FAILED` (proposed `fail`, which then
@@ -237,10 +234,10 @@ and PIN** (user decision). How it works is planner default unless marked otherwi
   and when the pick is purged. Five wrong PINs on a device block co-sign for that signer on that
   device until an online sign-in; failures are reported to the server on the next contact.
 - **Ledger entry.** The client signature is its own sign-off ledger entry (T-0119): signer user id
-  and name, persona PER-15, `signed_at` and `received_at` (as for submit), geolocation, the
+  and name, persona PER-15, the time evidence of diff §6.4.1 (as for submit), geolocation, the
   inspector's `device_id`, verification mode `online | offline`, and the drawn signature image.
   On sync the server re-checks that the signer was an active PER-15 member of the project, with
-  the anchor inside their granted subtree, at `signed_at`; otherwise that mutation fails and the
+  the anchor inside their granted subtree, at `occurred_at`; otherwise that mutation fails and the
   inspector is notified. A template may set `requires_client_signature`; then submit checks
   `CLIENT_SIGNATURE_MISSING`.
 - **Hand-back.** After signing (or cancelling) the app clears everything the client entered except

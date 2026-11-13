@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 122 · **Closed:** 87
+**Open:** 123 · **Closed:** 87
 
 ## decision (2)
 
@@ -85,7 +85,7 @@
 | [TD-182](../tracker/todo/TD-182.md) | RegisterPage: server-side filtering, sorting and paging | T-0025 | implementer |
 | [TD-211](../tracker/todo/TD-211.md) | Inspection scheduling after Pilot-0: calendar view, general recurrence (beyond scaffolds), light work-order grouping (TD-165 remainder) | T-0152 | planner |
 
-## later (50)
+## later (51)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -139,6 +139,7 @@
 | [TD-204](../tracker/todo/TD-204.md) | After Pilot-0: biometric unlock, certificate pinning (Capacitor) and per-device sync-health views | T-0043 | planner |
 | [TD-207](../tracker/todo/TD-207.md) | Local PIN unlock for the web PWA build (no platform keystore): e.g. a non-extractable WebCrypto key wrapping the IndexedDB data key | T-0143 | planner |
 | [TD-210](../tracker/todo/TD-210.md) | Native Android app: normal login system and offline-window expiry behaviour (replaces the TD-206 interim rule) | T-0143 | user |
+| [TD-215](../tracker/todo/TD-215.md) | Optional chain-of-custody hash for offline records: SHA-256(prev_hash + payload + monotonic_ms) per device clock session | T-0148 | planner |
 
 ## bug (1)
 
