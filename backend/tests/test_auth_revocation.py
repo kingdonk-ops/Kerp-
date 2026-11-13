@@ -110,6 +110,9 @@ class _BrokenPipeline:
     def execute(self) -> list[object]:
         raise redis.ConnectionError("down")
 
+    def watch(self, *names: object) -> None:  # WATCH is sent at once, not queued
+        raise redis.ConnectionError("down")
+
 
 class BrokenRedis(fakeredis.FakeRedis):
     def execute_command(self, *args: object, **options: object) -> object:

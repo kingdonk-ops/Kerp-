@@ -6,6 +6,7 @@ the same contract.
 """
 
 import hashlib
+import threading
 import uuid
 from collections.abc import Callable
 from datetime import timedelta
@@ -15,6 +16,7 @@ import pytest
 
 from app.core.auth.field import PIN_TTL_MARGIN
 from app.core.auth.lockout import (
+    LOGIN_ACCOUNT_POLICY,
     LOGIN_POLICY,
     MAGIC_LINK_REQUEST_POLICY,
     PIN_POLICY,
@@ -77,6 +79,11 @@ def test_shipped_policies() -> None:
     assert LOGIN_POLICY.free_attempts == 5
     assert LOGIN_POLICY.max_attempts is None
     assert LOGIN_POLICY.delay_after(6) == timedelta(seconds=30)
+    # The per-account backstop (T-0068): far looser, never final.
+    assert LOGIN_ACCOUNT_POLICY.free_attempts == 50
+    assert LOGIN_ACCOUNT_POLICY.max_attempts is None
+    assert LOGIN_ACCOUNT_POLICY.delay_after(50) == timedelta(0)
+    assert LOGIN_ACCOUNT_POLICY.delay_after(51) == timedelta(seconds=30)
     assert MAGIC_LINK_REQUEST_POLICY.max_attempts is None
 
 
@@ -116,14 +123,16 @@ def test_attempts_are_numbered_and_lock_after_the_free_ones(store: RevocationSto
     assert 0 < locked.value.retry_after <= 30
 
 
-def test_locked_attempts_are_not_counted(store: RevocationStore) -> None:
-    lockout = ProgressiveLockout(store, POLICY, "pin")
+def test_locked_attempts_are_not_counted() -> None:
+    clock = FakeClock()
+    lockout = ProgressiveLockout(InMemoryRevocationStore(clock=clock), POLICY, "pin")
     for _ in range(3):
         lockout.begin("s")
     for _ in range(5):
-        with pytest.raises(LockedOutError):
+        with pytest.raises(LockedOutError) as locked:
             lockout.begin("s")
-    assert lockout.failures("s") == 3
+    clock.now += locked.value.retry_after
+    assert lockout.begin("s") == 4  # the five refused attempts were not counted
 
 
 def test_success_resets_the_counter_and_the_lock(store: RevocationStore) -> None:
@@ -131,8 +140,7 @@ def test_success_resets_the_counter_and_the_lock(store: RevocationStore) -> None
     for _ in range(3):
         lockout.begin("s")
     lockout.succeeded("s")
-    assert lockout.failures("s") == 0
-    assert lockout.begin("s") == 1
+    assert lockout.begin("s") == 1  # the lock is lifted and the count starts again
 
 
 def test_subjects_and_scopes_are_independent(store: RevocationStore) -> None:
@@ -169,34 +177,104 @@ def test_counter_forgets_after_the_window() -> None:
     assert lockout.begin("s") == 1
 
 
-class ExpiresBeforeIncr(fakeredis.FakeRedis):
-    """The counter expires right before a stand-alone INCR (the race of two round trips)."""
-
-    def incr(self, name: str, amount: int = 1) -> int:  # type: ignore[override]
-        self.delete(name)
-        return int(super().incr(name, amount))
+def _no_delay(attempt: int) -> timedelta:
+    return timedelta(0)
 
 
-def test_redis_counter_always_has_a_ttl() -> None:
-    client = ExpiresBeforeIncr()
+def test_redis_counter_window_starts_at_the_first_failure() -> None:
+    client = fakeredis.FakeRedis()
     store = RedisRevocationStore(client)
     counter = f"{KEY_PREFIX}lockout:magic:k:n"
     for expected in (1, 2, 3):
-        assert store.count_failure("magic:k", timedelta(hours=1)) == expected
+        assert store.begin_attempt("magic:k", timedelta(hours=1), _no_delay) == (expected, 0)
         assert 0 < client.ttl(counter) <= 3600
     # Expired between two failures: a fresh window starts, again with a TTL.
     client.delete(counter)
-    assert store.count_failure("magic:k", timedelta(hours=1)) == 1
+    assert store.begin_attempt("magic:k", timedelta(hours=1), _no_delay) == (1, 0)
     assert 0 < client.ttl(counter) <= 3600
 
 
 def test_redis_counter_keeps_its_window() -> None:
     client = fakeredis.FakeRedis()
     store = RedisRevocationStore(client)
-    store.count_failure("k", timedelta(hours=1))
+    store.begin_attempt("k", timedelta(hours=1), _no_delay)
     client.expire(f"{KEY_PREFIX}lockout:k:n", 100)
-    store.count_failure("k", timedelta(hours=1))  # NX: the running window is kept
+    store.begin_attempt("k", timedelta(hours=1), _no_delay)  # the running window is kept
     assert 0 < client.ttl(f"{KEY_PREFIX}lockout:k:n") <= 100
+
+
+def test_redis_lock_is_written_with_its_delay() -> None:
+    client = fakeredis.FakeRedis()
+    store = RedisRevocationStore(client)
+    lockout = ProgressiveLockout(store, POLICY, "pin")
+    for _ in range(3):  # the third failure arms a 30 s lock
+        lockout.begin("s")
+    lock = next(k for k in client.keys(f"{KEY_PREFIX}lockout:pin:*:lock"))
+    assert 0 < client.ttl(lock) <= 30
+
+
+class InterleavedRedis(fakeredis.FakeRedis):
+    """Another worker's attempt lands between this one's WATCH and EXEC (once)."""
+
+    def __init__(self, *args: object, **kwargs: object) -> None:
+        super().__init__(*args, **kwargs)  # type: ignore[arg-type]
+        self.interleave: Callable[[], object] | None = None
+
+    def pipeline(self, transaction: bool = True, shard_hint: object = None):  # type: ignore[no-untyped-def]
+        pipe = super().pipeline(transaction, shard_hint)  # type: ignore[arg-type]
+        outer = self
+        original_multi = pipe.multi
+
+        def multi() -> None:
+            if outer.interleave is not None:
+                run, outer.interleave = outer.interleave, None
+                run()
+            original_multi()
+
+        pipe.multi = multi
+        return pipe
+
+
+def test_redis_attempt_retries_when_another_attempt_interleaves() -> None:
+    """TD-191: a concurrent attempt that arms the lock between our read and our write must
+    not be overwritten or bypassed; the transaction retries and then sees the lock."""
+    client = InterleavedRedis()
+    store = RedisRevocationStore(client)
+    lockout = ProgressiveLockout(store, POLICY, "pin")
+    lockout.begin("s")
+    lockout.begin("s")
+    # While our 3rd attempt is between WATCH and MULTI, another worker takes attempt 3 and
+    # arms the 30 s lock. Ours must then be refused, not counted as a second "3".
+    rival = ProgressiveLockout(RedisRevocationStore(client), POLICY, "pin")
+    client.interleave = lambda: rival.begin("s")
+    with pytest.raises(LockedOutError):
+        lockout.begin("s")
+    counter = next(k for k in client.keys(f"{KEY_PREFIX}lockout:pin:*:n"))
+    assert int(client.get(counter)) == 3
+
+
+def test_a_burst_cannot_pass_the_lock(store: RevocationStore) -> None:
+    """TD-191: of many simultaneous attempts, exactly the free ones plus the one that arms
+    the lock run; every other one is refused."""
+    lockout = ProgressiveLockout(store, POLICY, "pin")
+    barrier = threading.Barrier(16)
+    outcomes: list[str] = []
+
+    def attempt() -> None:
+        barrier.wait()
+        try:
+            lockout.begin("s")
+            outcomes.append("ran")
+        except LockedOutError:
+            outcomes.append("locked")
+
+    threads = [threading.Thread(target=attempt) for _ in range(16)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert outcomes.count("ran") == POLICY.free_attempts + 1
+    assert outcomes.count("locked") == 16 - POLICY.free_attempts - 1
 
 
 def test_redis_keys_hash_the_subject_and_carry_ttls() -> None:
@@ -267,10 +345,7 @@ TTL = timedelta(minutes=15)
         lambda s: s.take_magic_link("d"),
         lambda s: s.set_pin(uuid.uuid4(), "h", TTL),
         lambda s: s.get_pin(uuid.uuid4()),
-        lambda s: s.lock_remaining("k"),
-        lambda s: s.count_failure("k", TTL),
-        lambda s: s.failure_count("k"),
-        lambda s: s.set_lock("k", TTL),
+        lambda s: s.begin_attempt("k", TTL, _no_delay),
         lambda s: s.clear_failures("k"),
     ],
 )

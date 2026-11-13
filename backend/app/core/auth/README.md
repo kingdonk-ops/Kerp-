@@ -51,15 +51,25 @@ refresh token, gets nothing. Interpretation recorded in TD-135.
 **Progressive lockout** (Redis, shared by every worker; replaces Inspection-ERP's in-memory
 `ratelimit.py`): an attempt is counted before the secret is checked; once the immediate tries
 are used up, each failure locks the subject and attempts during the lock are refused with
-`429` + `Retry-After` without checking the secret; a right answer clears the count. Subjects
+`429` + `Retry-After` without checking the secret; a right answer clears the count. Check,
+count and lock are one atomic store operation (`begin_attempt`: WATCH/MULTI on Redis), so a
+burst cannot slip past a lock another request is arming (TD-191). Subjects
 are hashed into the keys. If Redis evicts a `pin:<sid>` key the PIN gate fails open: run
 Redis with `maxmemory-policy noeviction` (TD-142 tracks a token-claim remedy).
 
 | Scope | Key | Immediate tries | Then locked | Hard cap |
 |---|---|---|---|---|
 | PIN unlock | session | 4 | 30 s doubling to 15 min | 10th wrong PIN revokes the session (counter lives as long as the session's refresh token, not per day) |
-| Password login | tenant + e-mail | 6 | 30 s doubling to 15 min | none (no permanent lock-out) |
+| Password login | tenant + e-mail + client IP | 6 | 30 s doubling to 15 min | none (no permanent lock-out) |
+| Password login backstop | tenant + e-mail, any client | 51 per 24 h | 30 s doubling to 15 min | none |
 | Magic-link request | tenant + e-mail | 4 per hour | 1 min doubling to 15 min | none |
+
+Password login is keyed by client (T-0068, TD-191): someone else's failures lock only their
+own client, so they cannot keep a known user out; the per-account backstop caps guessing from
+many addresses. The client is `request.client.host`. Behind a reverse proxy, set uvicorn's
+`FORWARDED_ALLOW_IPS` to the proxy's address so the real client comes from
+`X-Forwarded-For`; without it every user appears as the proxy and the lock is per account
+again (as before T-0068, never worse).
 
 Unknown addresses lock exactly like real ones. Link delivery is the `MagicLinkSender` seam:
 development logs the token, production logs "not delivered" until e-mail exists (TD-084).

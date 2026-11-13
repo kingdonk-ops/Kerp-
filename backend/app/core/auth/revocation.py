@@ -66,13 +66,9 @@ class RevocationStore(Protocol):
 
     def get_pin(self, session_id: uuid.UUID) -> str | None: ...
 
-    def lock_remaining(self, key: str) -> int: ...
-
-    def count_failure(self, key: str, window: timedelta) -> int: ...
-
-    def failure_count(self, key: str) -> int: ...
-
-    def set_lock(self, key: str, ttl: timedelta) -> None: ...
+    def begin_attempt(
+        self, key: str, window: timedelta, delay_after: Callable[[int], timedelta]
+    ) -> tuple[int, int]: ...
 
     def clear_failures(self, key: str) -> None: ...
 
@@ -163,32 +159,48 @@ class RedisRevocationStore:
         value = _as_bytes(self._call(lambda: self._client.get(_pin_key(session_id))))
         return value.decode() if value is not None else None
 
-    def lock_remaining(self, key: str) -> int:
-        remaining = self._call(lambda: self._client.ttl(_lock_key(key)))
-        # -2: no lock. Locks are always written with a TTL, so -1 does not occur.
-        return max(int(str(remaining)), 0)  # str(): redis-py 7 types ttl() as Awaitable | Any
+    def begin_attempt(
+        self, key: str, window: timedelta, delay_after: Callable[[int], timedelta]
+    ) -> tuple[int, int]:
+        """Atomically: refuse while locked, else count the attempt and arm its lock.
 
-    def count_failure(self, key: str, window: timedelta) -> int:
-        counter = _failures_key(key)
-        # The window starts at the first failure (NX keeps a running window). Both commands
-        # run in one MULTI/EXEC transaction: the counter cannot expire between SET NX and
-        # INCR (which would let INCR create a key without a TTL), and INCR keeps the TTL.
-        seconds = _seconds(window)
+        Returns ``(0, seconds_left)`` while locked, else ``(attempt, 0)``. Check, count and
+        lock run as one optimistic transaction (WATCH on the counter and the lock, MULTI/EXEC,
+        retried on conflict), so a burst cannot slip past a lock another request is arming
+        (TD-191). The counter's window starts at the first failure and is never extended;
+        every write carries an explicit TTL, so neither key can outlive its window.
+        """
+        counter, lock = _failures_key(key), _lock_key(key)
 
-        def transaction() -> list[object]:
+        def transaction() -> tuple[int, int]:
             pipe = self._client.pipeline(transaction=True)
-            pipe.set(counter, 0, nx=True, ex=seconds)
-            pipe.incr(counter)
-            return pipe.execute()
+            try:
+                while True:
+                    try:
+                        pipe.watch(counter, lock)  # type: ignore[no-untyped-call]  # stub gap
+                        # -2: no lock. Locks are always written with a TTL (-1 cannot occur).
+                        remaining = int(str(pipe.ttl(lock)))
+                        if remaining > 0:
+                            return 0, remaining
+                        current = _as_bytes(pipe.get(counter))
+                        left_ms = int(str(pipe.pttl(counter))) if current is not None else -2
+                        attempt = int(current) + 1 if current is not None and left_ms > 0 else 1
+                        delay = delay_after(attempt)
+                        pipe.multi()
+                        if attempt == 1:
+                            pipe.set(counter, attempt, ex=_seconds(window))
+                        else:
+                            pipe.set(counter, attempt, px=left_ms)
+                        if delay > timedelta(0):
+                            pipe.set(lock, b"1", ex=_seconds(delay))
+                        pipe.execute()
+                        return attempt, 0
+                    except redis.WatchError:
+                        continue  # another attempt landed in between: look again
+            finally:
+                pipe.reset()  # also UNWATCHes
 
-        return int(str(self._call(transaction)[-1]))
-
-    def failure_count(self, key: str) -> int:
-        value = _as_bytes(self._call(lambda: self._client.get(_failures_key(key))))
-        return int(value) if value is not None else 0
-
-    def set_lock(self, key: str, ttl: timedelta) -> None:
-        self._call(lambda: self._client.set(_lock_key(key), b"1", ex=_seconds(ttl)))
+        return self._call(transaction)
 
     def clear_failures(self, key: str) -> None:
         self._call(lambda: self._client.delete(_failures_key(key), _lock_key(key)))
@@ -268,30 +280,23 @@ class InMemoryRevocationStore:
             value = self._get(_pin_key(session_id))
         return value.decode() if value is not None else None
 
-    def lock_remaining(self, key: str) -> int:
+    def begin_attempt(
+        self, key: str, window: timedelta, delay_after: Callable[[int], timedelta]
+    ) -> tuple[int, int]:
+        counter, lock = _failures_key(key), _lock_key(key)
         with self._lock:
-            if self._get(_lock_key(key)) is None:
-                return 0
-            return max(1, math.ceil(self._entries[_lock_key(key)][0] - self._clock()))
-
-    def count_failure(self, key: str, window: timedelta) -> int:
-        counter = _failures_key(key)
-        with self._lock:
+            if self._get(lock) is not None:
+                return 0, max(1, math.ceil(self._entries[lock][0] - self._clock()))
             current = self._get(counter)
             if current is None:
-                expires, count = self._clock() + _seconds(window), 1
+                expires, attempt = self._clock() + _seconds(window), 1
             else:
-                expires, count = self._entries[counter][0], int(current) + 1
-            self._entries[counter] = (expires, str(count).encode())
-            return count
-
-    def failure_count(self, key: str) -> int:
-        with self._lock:
-            value = self._get(_failures_key(key))
-        return int(value) if value is not None else 0
-
-    def set_lock(self, key: str, ttl: timedelta) -> None:
-        self._set(_lock_key(key), ttl)
+                expires, attempt = self._entries[counter][0], int(current) + 1
+            self._entries[counter] = (expires, str(attempt).encode())
+            delay = delay_after(attempt)
+            if delay > timedelta(0):
+                self._entries[lock] = (self._clock() + _seconds(delay), b"1")
+            return attempt, 0
 
     def clear_failures(self, key: str) -> None:
         with self._lock:

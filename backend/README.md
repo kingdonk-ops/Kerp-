@@ -136,6 +136,9 @@ docker build -t kerp-backend backend
 docker run --rm -p 8000:8000 -e KERP_ENVIRONMENT=development kerp-backend
 ```
 
+Behind a reverse proxy, also set `FORWARDED_ALLOW_IPS=<proxy address>` (read by uvicorn) so the
+login lockout sees the real client address (`app/core/auth/README.md`, T-0068).
+
 The image defaults to `KERP_ENVIRONMENT=production` (HSTS on); it listens on port 8000
 (`uvicorn app.main:create_app --factory`) and has a `HEALTHCHECK` against `/health` using the
 standard library only. CI's `backend-image` job builds and smoke-tests the image on every run
