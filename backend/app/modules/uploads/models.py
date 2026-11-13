@@ -3,10 +3,14 @@
 One row per upload, always project-scoped, under the standard project RLS (migration
 ``0009``). The bytes live in object storage, never in the database:
 
-* ``staging/{tenant}/{project}/{file_id}``: where the client's presigned ``PUT`` lands.
-* ``{tenant}/{project}/{module}/{sha256}``: the content-addressed object, written by the
-  verification job only after the SHA-256 matched and the scan was clean, so an object
-  under a hash key always has that hash.
+* ``staging/{tenant}/{project}/{file_id}``: where the client's presigned ``PUT`` lands. The
+  URL stays valid after ``complete``, so the client can still change these bytes.
+* ``quarantine/{tenant}/{project}/{file_id}``: the verification job's first step copies
+  staging here (no URL is ever issued for it) and deletes staging. Size, magic bytes,
+  SHA-256 and the scan all run on this copy, and it is the copy that gets published.
+* ``{tenant}/{project}/{module}/{sha256}``: the content-addressed object, copied from the
+  quarantine copy that passed every check, and never overwritten once it exists. The
+  client cannot write to either key, so these bytes are the ones that were verified.
 
 Status: ``pending`` (URL issued) -> ``verifying`` (``complete`` passed size and magic
 bytes; job queued) -> ``available`` | ``rejected``. A ``pending`` row never completed
@@ -27,11 +31,16 @@ from app.core.db import GUID, Base, BaseRecordMixin
 TABLE: Final = "oe_uploads_file"
 STATUSES: Final = ("pending", "verifying", "available", "rejected", "expired")
 STAGING_PREFIX: Final = "staging"
+QUARANTINE_PREFIX: Final = "quarantine"
 MAX_REASON: Final = 200
 
 
 def staging_prefix(tenant_id: uuid.UUID, project_id: uuid.UUID) -> str:
     return f"{STAGING_PREFIX}/{tenant_id}/{project_id}/"
+
+
+def quarantine_prefix(tenant_id: uuid.UUID, project_id: uuid.UUID) -> str:
+    return f"{QUARANTINE_PREFIX}/{tenant_id}/{project_id}/"
 
 
 class UploadedFile(Base, BaseRecordMixin):
@@ -61,6 +70,11 @@ class UploadedFile(Base, BaseRecordMixin):
     def staging_key(self) -> str:
         assert self.project_id is not None
         return f"{staging_prefix(self.tenant_id, self.project_id)}{self.id}"
+
+    @property
+    def quarantine_key(self) -> str:
+        assert self.project_id is not None
+        return f"{quarantine_prefix(self.tenant_id, self.project_id)}{self.id}"
 
     @property
     def content_key(self) -> str:

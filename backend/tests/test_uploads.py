@@ -145,6 +145,7 @@ def test_uploads_module_is_loaded_and_registers_its_jobs() -> None:
     assert manifest.toggleable is False
     assert set(manifest.depends_on) == {"jobs", "projects"}
     assert JOB_REGISTRY.get(service.VERIFY_KIND).queue == "interactive"
+    assert JOB_REGISTRY.get(service.VERIFY_LARGE_KIND).queue == "batch"
     assert JOB_REGISTRY.get(service.SWEEP_KIND).queue == "batch"
     assert not JOB_REGISTRY.get(service.VERIFY_KIND).api
 
@@ -251,6 +252,110 @@ def test_an_infected_file_is_rejected(
     file = _load(db, home, file_id)
     assert (file.status, file.scan_result) == ("rejected", "infected")
     assert list(storage.list("")) == []
+
+
+# --- check-then-publish races (review round 1) -----------------------------------------------
+
+NOT_PNG = b"MZ" + bytes(len(PNG) - 2)  # same size as PNG, not an image
+
+
+def test_a_re_put_after_complete_is_not_published(
+    db: Database, home: TenancyContext, storage: LocalStorage, dispatched: list[JobRef]
+) -> None:
+    # The client declares the hash of B, uploads a valid PNG A for ``complete``, then
+    # re-PUTs B while the presigned URL is still valid, before the job runs.
+    file_id = _presign(db, home, storage, sha256=_sha(NOT_PNG))
+    key = _load(db, home, file_id).staging_key
+    storage.write(key, PNG)
+    assert _complete(db, home, storage, file_id).status == "verifying"
+    storage.write(key, NOT_PNG)
+    assert _verify(db, home, storage, file_id)["reason"] == "type_mismatch"
+    file = _load(db, home, file_id)
+    assert (file.status, file.storage_key) == ("rejected", None)
+    assert list(storage.list("")) == []  # nothing published, staging and quarantine gone
+
+
+class RacingStorage(LocalStorage):
+    """Re-PUTs ``staging`` with ``evil`` right before every copy (the reviewer's PoC)."""
+
+    def __init__(self, root: Path) -> None:
+        super().__init__(root)
+        self.race: tuple[str, bytes] | None = None
+
+    def copy(self, source: str, destination: str) -> None:
+        if self.race is not None:
+            self.write(*self.race)
+        super().copy(source, destination)
+
+
+def test_a_racing_write_cannot_change_a_verified_content_object(
+    db: Database, home: TenancyContext, tmp_path: Path, dispatched: list[JobRef]
+) -> None:
+    storage = RacingStorage(tmp_path / "racing")
+    victim = _presign(db, home, storage)
+    storage.write(_load(db, home, victim).staging_key, PNG)
+    _complete(db, home, storage, victim)
+    _verify(db, home, storage, victim)
+    content = _load(db, home, victim).storage_key
+    assert content is not None
+    assert storage.read(content) == PNG
+
+    # A member holding a copy of the same document uploads it, and races a re-PUT of
+    # different bytes into staging just before each copy.
+    attacker = _presign(db, home, storage)
+    staging = _load(db, home, attacker).staging_key
+    storage.write(staging, PNG)
+    _complete(db, home, storage, attacker)
+    storage.race = (staging, b"\x89PNG\r\n\x1a\n" + bytes(len(PNG) - 8))
+    result = _verify(db, home, storage, attacker)
+    storage.race = None
+    assert result["status"] == "rejected"
+    assert storage.read(content) == PNG
+    assert _sha(storage.read(content)) == _load(db, home, victim).sha256
+
+
+def test_publishing_never_overwrites_an_existing_content_object(
+    db: Database, home: TenancyContext, storage: LocalStorage, dispatched: list[JobRef]
+) -> None:
+    first = _presign(db, home, storage)
+    storage.write(_load(db, home, first).staging_key, PNG)
+    _complete(db, home, storage, first)
+    _verify(db, home, storage, first)
+    content = _load(db, home, first).storage_key
+    assert content is not None
+    copies: list[tuple[str, str]] = []
+    original = storage.copy
+
+    def recording_copy(source: str, destination: str) -> None:
+        copies.append((source, destination))
+        original(source, destination)
+
+    storage.copy = recording_copy  # type: ignore[method-assign]
+    second = _presign(db, home, storage)
+    storage.write(_load(db, home, second).staging_key, PNG)
+    _complete(db, home, storage, second)
+    assert _verify(db, home, storage, second)["status"] == "available"
+    assert all(destination != content for _, destination in copies)
+    assert _load(db, home, second).storage_key == content
+
+
+def test_a_failed_verify_deletes_the_quarantine_copy(
+    db: Database, home: TenancyContext, storage: LocalStorage, dispatched: list[JobRef]
+) -> None:
+    class Broken:
+        def scan(self, storage: Storage, key: str) -> str:
+            raise OSError("scanner down")
+
+    file_id = _presign(db, home, storage)
+    storage.write(_load(db, home, file_id).staging_key, PNG)
+    _complete(db, home, storage, file_id)
+    set_scanner(Broken())
+    try:
+        with pytest.raises(OSError, match="scanner down"):
+            _verify(db, home, storage, file_id)
+    finally:
+        set_scanner(None)
+    assert list(storage.list("quarantine/")) == []
 
 
 def test_an_object_gone_before_verification_is_rejected(
@@ -361,6 +466,8 @@ def test_the_sweep_expires_abandoned_uploads_and_deletes_orphans(
     _complete(db, home, storage, verifying)
     stray = f"staging/{T1}/{home.project_id}/{uuid.uuid4()}"  # no row at all
     storage.write(stray, b"x")
+    leftover = f"quarantine/{T1}/{home.project_id}/{uuid.uuid4()}"  # a worker died mid-verify
+    storage.write(leftover, b"x")
     other = _project(db, "OTHER")
     elsewhere = f"staging/{T1}/{other.project_id}/{uuid.uuid4()}"
     storage.write(elsewhere, b"x")
@@ -371,15 +478,30 @@ def test_the_sweep_expires_abandoned_uploads_and_deletes_orphans(
     later = utcnow() + timedelta(hours=2)
     assert service.sweep_orphans(db, home, storage=storage, now=later) == {
         "expired": 1,
-        "deleted": 2,
+        "deleted": 3,
     }
     assert _load(db, home, abandoned).status == "expired"
     assert _load(db, home, verifying).status == "verifying"
     assert storage.head(_load(db, home, verifying).staging_key) is not None
     assert storage.head(stray) is None
+    assert storage.head(leftover) is None
     assert storage.head(elsewhere) is not None  # another project's sweep owns it
     with pytest.raises(service.UploadStateError, match="expired"):
         _complete(db, home, storage, abandoned)
+
+
+def test_large_files_verify_on_the_batch_queue(
+    db: Database,
+    home: TenancyContext,
+    storage: LocalStorage,
+    dispatched: list[JobRef],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(service, "LARGE_FILE_BYTES", len(PNG) - 1)
+    file_id = _presign(db, home, storage)
+    storage.write(_load(db, home, file_id).staging_key, PNG)
+    _complete(db, home, storage, file_id)
+    assert [r.queue for r in dispatched] == ["batch"]
 
 
 def test_schedule_sweep_queues_a_batch_job(
@@ -502,6 +624,9 @@ def test_the_api_checks_membership_and_capability(api: Api, storage: LocalStorag
     # Carol is no member: the project does not exist for her.
     assert api.client.post(api.files(), json=_body(), headers=carol).status_code == 404
     assert api.client.get(url, headers=carol).status_code == 404
+    # Another member who may upload still cannot complete Alice's upload.
+    _grant(api.db, api.users[CAROL], api.home.project_id, Persona.FIELD_WORKER)  # type: ignore[arg-type]
+    assert api.client.post(f"{url}/complete", headers=carol).status_code == 403
     # A file is only reachable through its own project, even for a member of both.
     _grant(api.db, api.users[ALICE], api.other.project_id, Persona.FIELD_WORKER)  # type: ignore[arg-type]
     other_url = f"{api.files(api.other)}/{created['id']}"

@@ -6,7 +6,7 @@ needed capability is 403. The request session is then bound to that project (unt
 binds requests generally), so every read and write is under the project's RLS scope.
 
 * ``POST   /projects/{p}/files``                 create (``C``): presigned ``PUT`` to staging
-* ``POST   /projects/{p}/files/{id}/complete``   create (``C``): size + magic check, queue verify
+* ``POST   /projects/{p}/files/{id}/complete``   uploader (``C``): size + magic, queue verify
 * ``GET    /projects/{p}/files/{id}``            view (``V``): status, poll until ``available``
 * ``GET    /projects/{p}/files/{id}/download``   view (``V``): presigned ``GET``
 """
@@ -92,6 +92,8 @@ def complete_upload(
     _bind_project(principal, session, project_id, Capability.CREATE)
     try:
         file = service.complete_upload(session, get_storage(), file_id, actor_id=principal.user_id)
+    except service.NotUploaderError as exc:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Forbidden") from exc
     except service.UploadStateError as exc:
         raise _conflict(exc) from exc
     return FileRead.model_validate(file)

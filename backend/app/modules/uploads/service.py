@@ -21,7 +21,7 @@ from app.core.tenancy.context import TenancyContext
 from app.core.tenancy.rls import session_tenancy
 from app.core.tenancy.scope import OutOfScopeError, get_or_404
 from app.modules.jobs.service import JOB_REGISTRY, create_job
-from app.modules.uploads.models import UploadedFile, staging_prefix
+from app.modules.uploads.models import UploadedFile, quarantine_prefix, staging_prefix
 from app.modules.uploads.scan import Scanner
 from app.modules.uploads.schemas import UploadCreate
 from app.modules.uploads.storage import (
@@ -39,7 +39,9 @@ if TYPE_CHECKING:
 __all__ = [
     "SWEEP_KIND",
     "VERIFY_KIND",
+    "VERIFY_LARGE_KIND",
     "FileTooLargeError",
+    "NotUploaderError",
     "UploadStateError",
     "complete_upload",
     "download_request",
@@ -51,6 +53,9 @@ __all__ = [
 ]
 
 VERIFY_KIND: Final = "uploads.verify"
+VERIFY_LARGE_KIND: Final = "uploads.verify_large"
+# Above this size the hash and scan take long enough to belong on the batch queue.
+LARGE_FILE_BYTES: Final = 50 * 1024 * 1024
 SWEEP_KIND: Final = "uploads.sweep_orphans"
 DEFAULT_SWEEP_GRACE: Final = timedelta(hours=1)
 
@@ -60,6 +65,10 @@ Reason = Literal["size_mismatch", "type_mismatch", "sha256_mismatch", "missing_o
 
 class FileTooLargeError(ValueError):
     """The declared size is over ``upload_max_bytes`` (the API answers 413)."""
+
+
+class NotUploaderError(PermissionError):
+    """Only the user who started an upload completes it (the API answers 403)."""
 
 
 class UploadStateError(RuntimeError):
@@ -139,6 +148,8 @@ def complete_upload(
     ``UploadStateError`` and the file stays ``pending`` so the client can retry the ``PUT``.
     """
     file = get_file(session, file_id)
+    if file.created_by is not None and file.created_by != actor_id:
+        raise NotUploaderError("only the uploader can complete an upload")
     if file.status != "pending":
         raise UploadStateError(f"the file is {file.status}")
     info = storage.head(file.staging_key)
@@ -153,8 +164,9 @@ def complete_upload(
         _reject(file, "type_mismatch")
     else:
         file.status = "verifying"
+        kind = VERIFY_LARGE_KIND if file.size_bytes > LARGE_FILE_BYTES else VERIFY_KIND
         job: Job = create_job(
-            session, _job_kind(VERIFY_KIND), {"file_id": str(file.id)}, actor_id=actor_id
+            session, _job_kind(kind), {"file_id": str(file.id)}, actor_id=actor_id
         )
         file.job_id = job.id
     session.flush()
@@ -181,31 +193,52 @@ def download_request(
 # --- job side ---------------------------------------------------------------------------------
 
 
+def _check(
+    storage: Storage, key: str, expected: tuple[int, str, str], scanner: Scanner
+) -> tuple[Reason | None, str | None]:
+    """Check the object at ``key``: size, magic bytes, SHA-256, scan -> (reason, verdict)."""
+    size, content_type, sha256 = expected
+    info = storage.head(key)
+    if info is None:
+        return "missing_object", None
+    if info.size != size:
+        return "size_mismatch", None
+    if not matches_magic(content_type, storage.read(key, length=MAGIC_SNIFF_BYTES)):
+        return "type_mismatch", None
+    if sha256_of(storage, key) != sha256:
+        return "sha256_mismatch", None
+    verdict = "clean" if scanner.scan(storage, key) == "clean" else "infected"
+    return (None if verdict == "clean" else "infected"), verdict
+
+
 def verify_upload(
     db: Database, tenancy: TenancyContext, file_id: uuid.UUID, *, storage: Storage, scanner: Scanner
 ) -> dict[str, Any]:
-    """Recompute the SHA-256, scan, then publish to the content key or reject.
+    """Quarantine, check and publish the uploaded bytes, or reject them.
 
-    Runs in the worker (``uploads.verify``). Idempotent: a file no longer ``verifying`` is
-    left as it is. The staging object is deleted in every outcome.
+    Runs in the worker (``uploads.verify``). The client's presigned ``PUT`` stays valid
+    after ``complete``, so staging is first copied to the file's quarantine key (no URL is
+    ever issued for it) and deleted; every check then runs on that copy, and that same copy
+    is published. An existing content key is never overwritten: it already holds those
+    bytes. Idempotent: a file no longer ``verifying`` is left as it is. Staging and
+    quarantine objects are deleted in every outcome, an error included.
     """
     with db.unit_of_work(tenancy) as session:
         file = get_file(session, file_id)
         if file.status != "verifying":
             return {"file_id": str(file_id), "status": file.status}
-        staging, content, expected = file.staging_key, file.content_key, file.sha256
-    reason: Reason | None = None
-    verdict: str | None = None
-    if storage.head(staging) is None:
-        reason = "missing_object"
-    elif sha256_of(storage, staging) != expected:
-        reason = "sha256_mismatch"
-    else:
-        verdict = "clean" if scanner.scan(storage, staging) == "clean" else "infected"
-        if verdict == "clean":
-            storage.copy(staging, content)
-        else:
-            reason = "infected"
+        staging, quarantine, content = file.staging_key, file.quarantine_key, file.content_key
+        expected = (file.size_bytes, file.content_type, file.sha256)
+    try:
+        if storage.head(staging) is not None:
+            storage.copy(staging, quarantine)
+        storage.delete(staging)
+        reason, verdict = _check(storage, quarantine, expected, scanner)
+        if reason is None and storage.head(content) is None:
+            storage.copy(quarantine, content)
+    finally:
+        storage.delete(quarantine)
+        storage.delete(staging)
     with db.unit_of_work(tenancy) as session:
         file = get_file(session, file_id)
         if file.status == "verifying":
@@ -215,7 +248,6 @@ def verify_upload(
             else:
                 file.status, file.storage_key, file.verified_at = "available", content, utcnow()
         status = file.status
-    storage.delete(staging)
     result: dict[str, Any] = {"file_id": str(file_id), "status": status}
     if reason is not None:
         result["reason"] = reason
@@ -230,10 +262,11 @@ def sweep_orphans(
     now: datetime | None = None,
     grace: timedelta = DEFAULT_SWEEP_GRACE,
 ) -> dict[str, int]:
-    """Expire ``pending`` files past their URL expiry + ``grace``; delete orphaned staging objects.
+    """Expire ``pending`` files past their URL expiry + ``grace``; delete orphaned objects.
 
-    A staging object is an orphan when no ``pending``/``verifying`` file owns it and it is
-    older than ``grace``. Runs per project (``uploads.sweep_orphans``), so RLS stays on.
+    A staging or quarantine object is an orphan when no ``pending``/``verifying`` file owns
+    it and it is older than ``grace`` (a re-``PUT`` after verification, a worker that died
+    mid-verify). Runs per project (``uploads.sweep_orphans``), so RLS stays on.
     """
     if tenancy.project_id is None:
         raise RuntimeError("the orphan sweep runs per project")
@@ -257,10 +290,11 @@ def sweep_orphans(
             )
         }
     deleted = 0
-    for obj in storage.list(staging_prefix(tenancy.tenant_id, tenancy.project_id)):
-        if obj.key.rsplit("/", 1)[-1] not in live and obj.last_modified < cutoff:
-            storage.delete(obj.key)
-            deleted += 1
+    for prefix in (staging_prefix, quarantine_prefix):
+        for obj in storage.list(prefix(tenancy.tenant_id, tenancy.project_id)):
+            if obj.key.rsplit("/", 1)[-1] not in live and obj.last_modified < cutoff:
+                storage.delete(obj.key)
+                deleted += 1
     return {"expired": len(stale), "deleted": deleted}
 
 

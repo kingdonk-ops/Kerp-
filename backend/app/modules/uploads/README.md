@@ -11,7 +11,7 @@ the bytes; it signs, checks and records. Helpers adapted from Inspection-ERP
 | `scan.py` | `Scanner` seam; `StubScanner` says every object is clean (real AV scanner: TD-206) |
 | `models.py` | `oe_uploads_file` (`BaseRecordMixin`, project RLS, migration `0009`) |
 | `service.py` | `presign_upload`, `complete_upload`, `get_file`, `download_request`, `verify_upload`, `sweep_orphans`, `schedule_sweep` |
-| `jobs.py` | `uploads.verify` (interactive), `uploads.sweep_orphans` (batch) |
+| `jobs.py` | `uploads.verify` (interactive), `uploads.verify_large` and `uploads.sweep_orphans` (batch) |
 | `router.py`, `schemas.py` | `/api/v1/uploads/projects/{project_id}/files...` |
 
 ## Flow
@@ -21,14 +21,23 @@ the bytes; it signs, checks and records. Helpers adapted from Inspection-ERP
    type and length are **signed**, so storage refuses any other size; `upload_max_bytes`
    is checked first (413). Only types in the magic-byte allowlist can be declared.
 2. The client `PUT`s the bytes with the returned headers.
-3. `POST .../files/{id}/complete` (`C`): `HEAD` the object (409 if absent, the row stays
-   `pending`), compare the size, sniff the first 512 bytes against the declared type. A
-   mismatch makes the file `rejected` (`size_mismatch` / `type_mismatch`) and deletes the
-   object; otherwise the file is `verifying` and `uploads.verify` is queued after commit.
-4. `uploads.verify` streams the object through SHA-256 (no transaction held open), scans
-   it, copies it to the content key `{tenant}/{project}/{module}/{sha256}` and marks it
-   `available`; or `rejected` (`sha256_mismatch`, `missing_object`, `infected`). The
-   staging object is always deleted. Only verified bytes ever sit under a hash key.
+3. `POST .../files/{id}/complete` (`C`, and only the uploader, else 403): `HEAD` the
+   object (409 if absent, the row stays `pending`), compare the size, sniff the first 512
+   bytes against the declared type. This is early feedback only. A mismatch makes the file
+   `rejected` (`size_mismatch` / `type_mismatch`) and deletes the object; otherwise the
+   file is `verifying` and `uploads.verify` is queued after commit (`uploads.verify_large`
+   on the batch queue above 50 MiB).
+4. The presigned `PUT` is still valid after `complete`, so the job never trusts staging:
+   it first copies staging to `quarantine/{tenant}/{project}/{file_id}` (no URL is ever
+   issued for that key) and deletes staging. Size, magic bytes, SHA-256 (streamed, no
+   transaction held open) and the scan all run on the quarantine copy, and that same copy
+   is copied to the content key `{tenant}/{project}/{module}/{sha256}`. An existing content
+   key is never overwritten (it already holds those bytes). The file becomes `available`,
+   or `rejected` (`size_mismatch`, `type_mismatch`, `sha256_mismatch`, `missing_object`,
+   `infected`). Staging and quarantine are deleted in every outcome, errors included. A
+   re-`PUT` racing the job therefore either lands before the quarantine copy (and is
+   checked in full) or after it (and is an orphan for the sweep); it never reaches a
+   content key.
 5. `GET .../files/{id}` (`V`) polls; `GET .../files/{id}/download` (`V`) returns a
    presigned `GET` that forces the served type and `Content-Disposition` (H-10: HTML,
    SVG and anything unknown are `application/octet-stream` attachments).
@@ -38,8 +47,8 @@ the bytes; it signs, checks and records. Helpers adapted from Inspection-ERP
 ## Orphan sweep
 
 `sweep_orphans(db, tenancy, storage=...)` runs per project (`uploads.sweep_orphans`): a
-`pending` file whose URL expired more than an hour ago becomes `expired`, and a staging
-object no `pending`/`verifying` file owns is deleted once older than an hour.
+`pending` file whose URL expired more than an hour ago becomes `expired`, and a staging or
+quarantine object no `pending`/`verifying` file owns is deleted once older than an hour.
 `schedule_sweep(session)` queues it; a periodic schedule needs the scope list TD-155 asks
 for (TD-207). A bucket lifecycle rule on `staging/` is the backstop (TD-208, with bucket
 provisioning and CORS). No delete endpoint or content-object GC yet (TD-209).

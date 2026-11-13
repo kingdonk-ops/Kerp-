@@ -16,9 +16,14 @@ from app.modules.uploads.scan import get_scanner
 from app.modules.uploads.storage import get_storage
 
 
+@register_job(service.VERIFY_LARGE_KIND, queue="batch")
 @register_job(service.VERIFY_KIND, queue="interactive")
 async def verify(job: JobContext) -> dict[str, Any]:
-    """SHA-256 + scan of one completed upload; the user is waiting for it."""
+    """Quarantine, check and publish one completed upload.
+
+    Interactive for ordinary files (the user is waiting); batch above
+    ``service.LARGE_FILE_BYTES`` so a long hash never delays interactive jobs.
+    """
     try:
         file_id = uuid.UUID(str(job.payload["file_id"]))
     except (KeyError, ValueError):

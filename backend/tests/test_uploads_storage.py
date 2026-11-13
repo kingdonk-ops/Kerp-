@@ -364,7 +364,7 @@ S3_ENDPOINT = os.environ.get("KERP_TEST_S3_ENDPOINT", "")
 
 @pytest.mark.skipif(
     not S3_ENDPOINT,
-    reason="needs MinIO/S3 (KERP_TEST_S3_ENDPOINT + KERP_S3_* credentials); not in CI (TD-052)",
+    reason="needs MinIO/S3 (KERP_TEST_S3_ENDPOINT + KERP_S3_* credentials); not in CI until TD-208",
 )
 def test_presigned_round_trip_against_minio() -> None:
     import urllib.request
