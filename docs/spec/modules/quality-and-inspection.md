@@ -62,8 +62,8 @@ Shared palette of field types used by every form, ITP and asset-schema field:
 **`instrument reference`** (binds a calibrated tool, gated by calibration), `calculated`
 (CEL expression). No per-module field designers.
 
-**Photo answers and annotation (Pilot-0, planner spec 2026-11-13; TD-166, Q5a).** A `photo`
-answer is a list of captured photos, each
+**Photo answers and annotation (Pilot-0, planner spec 2026-11-13; TD-166, Q5a).** Rules below
+are planner defaults unless marked otherwise. A `photo` answer is a list of captured photos, each
 `{attachment_id, sha256, captured_at, geo, annotation}`:
 - `captured_at` is the device UTC time of capture; the server also stores when it received the
   photo. `geo` is `{lat, lon, accuracy_m}` from the device location when the user allowed it,
@@ -162,11 +162,23 @@ planner defaults unless marked otherwise.
   (`KERP-CONSOLIDATION-AND-DIFF.md` §6.4). A submit made offline is a queued mutation; if a check
   fails at sync, that mutation fails with the findings, the record keeps its earlier state and the
   inspector is notified. In `SUBMITTED` the answers are read-only.
+- **Signature time and authority of an offline submit (planner default).** The submit ledger
+  entry carries both `signed_at` (device UTC time when the inspector signed) and `received_at`
+  (server UTC time when the submit reached the server); `signed_at` is the sign-off time shown on
+  the record and the PDF, `received_at` sits next to it, and a `signed_at` later than
+  `received_at` by more than 5 minutes, or earlier than the inspection was downloaded, is kept but
+  flagged `clock_suspect` on the record and the PDF (never rejected, so signed work is not lost). The submit's geolocation is
+  the signature's geolocation that master spec §4.2 requires for `INSPECTED_PASSED`. An offline
+  submit is authorised by the local PIN unlock of the hybrid model
+  (`KERP-CONSOLIDATION-AND-DIFF.md` §4.2), not by a live session: the mutation carries the user
+  and `device_id`, and the server accepts it only if it was signed inside the offline window and
+  the user and device match the pushing session (T-0126 note) and the device is not revoked.
 - **Approve.** A reviewer approves with `run_checks(context, "inspection.approve")`. The record
   moves to `INSPECTED_PASSED` (proposed `pass`) or `INSPECTED_FAILED` (proposed `fail`, which then
   raises the Cat A punch or NCR as before). The reviewer cannot change the result; to disagree they
   return the inspection. The approval is a sign-off ledger entry (reviewer, persona, UTC time;
-  geolocation optional for office users).
+  geolocation optional for office users, because the geolocation master spec §4.2 requires on
+  `INSPECTED_PASSED` is the one on the inspector's submit signature).
 - **Return.** A reviewer returns with a mandatory, non-blank reason and optionally comments on
   single answers (§Comments on answers). The record moves to `RETURNED`, its answers become
   editable again and the inspector is notified (in-app, and push on Android, T-0144). The earlier
@@ -174,12 +186,15 @@ planner defaults unless marked otherwise.
   (`review_round` 1, 2, …). The return reason and round are in the record history and on the PDF.
 - **Who reviews.** A user with quality hold authority (`A`) on the project — PER-06 or PER-07 in
   the persona matrix — who is not the performer unless `allow_self_approval` is on (TD-070,
-  T-0140). Approve and return are online actions in the web app (planner defaults).
+  T-0140). PER-07's scope is "Site Node Only": a PER-07 approves or returns only inspections
+  anchored inside their site node(s); PER-06 covers the whole project. Approve and return are
+  online actions in the web app (planner defaults).
 - **Notifications.** Submit notifies the project's reviewers; return and approve notify the
   inspector.
 
 ## Planning fields (Pilot-0, planner spec 2026-11-13; TD-165)
 
+Rules below are planner defaults unless marked otherwise.
 An inspection carries `assignee_user_id` (nullable; a project member who may perform
 inspections), `planned_start` (date, nullable) and `planned_duration_days` (integer ≥ 1, default 1).
 `due_date` = `planned_start` + `planned_duration_days` − 1, stored and recomputed on change. An
@@ -191,6 +206,7 @@ view, general recurrence and work-order grouping are not in Pilot-0 (deferred, s
 
 ## Comments on answers (Pilot-0, planner spec 2026-11-13; TD-165)
 
+Rules below are planner defaults unless marked otherwise.
 `oe_inspections_answer_comment` (`BaseRecordMixin` + project RLS): `inspection_id`,
 `question_key`, `repeat_index` (null for a question outside a repeating group), `review_round`,
 `body` (non-blank), author and time, `resolved_at` / `resolved_by`. A comment addresses one
@@ -201,6 +217,9 @@ The inspector or a reviewer may mark a comment resolved. Comments sync to the de
 the inspection (planner defaults).
 
 ## Inspection report (PDF) and batch export (Pilot-0, planner spec 2026-11-13; TD-169)
+
+Rules below are planner defaults unless marked otherwise (TD-169 asked only for a server PDF per
+inspection and a bulk export).
 
 - **Per inspection.** `POST /api/v1/inspections/{id}/report` enqueues a SAQ `batch` job and
   returns its job id (T-0015 polling); the job renders the PDF with PyMuPDF (imported lazily,
@@ -216,6 +235,10 @@ the inspection (planner defaults).
   capture time and location, linked NCR and punch references. Signatures: inspector and reviewer
   with name, persona, UTC and site-local time, geolocation and the ledger content hash. Review
   history: rounds and return reasons. Footer: record id, page x of y, generation time.
+- **Fixed labels.** Section headings, the "Not approved" watermark, "page x of y" and the other
+  fixed labels come from a backend message catalogue keyed like the frontend `t()` keys and are
+  rendered in the template's `default_language`, falling back to `en`; only English ships for now
+  (TD-172). Template text uses the template's own localised strings (edge §2.2).
 - **Batch export.** `POST /api/v1/inspections/reports/batch` with a list of ids or a filter
   (status, `inspection_date` range, anchor subtree) of at most 500 inspections enqueues one SAQ
   `batch` job. It produces a ZIP with one PDF per inspection, named
@@ -224,12 +247,16 @@ the inspection (planner defaults).
 
 ## Pilot-0 dashboard tiles (planner spec 2026-11-13; TD-173)
 
+Rules below are planner defaults unless marked otherwise (TD-173 named only the three tiles).
+
 Three tiles on Overview → dashboards (diff §6.1) for the current project, computed on request
 from the owning modules' services (no rollup tables until E-06-05; planner default) and online
 only, with the time they were computed:
-- **Progress:** inspection counts by field-user status (not started = `PENDING` /
-  `INSPECTION_REQUESTED`, returned, submitted, accepted, rejected) and the share reviewed
-  ((accepted + rejected + `LOCKED_FOR_TURNOVER`) / all); filter "all" or "assigned to me".
+- **Progress:** inspection counts in one bucket per status: not started (`PENDING`,
+  `INSPECTION_REQUESTED`), returned (`RETURNED`), submitted (`SUBMITTED`), accepted
+  (`INSPECTED_PASSED`), rejected (`INSPECTED_FAILED`), re-inspection due (`RE_INSPECT`) and locked
+  (`LOCKED_FOR_TURNOVER`); every status falls in exactly one bucket. Share reviewed = (accepted +
+  rejected + locked) / all. Filter "all" or "assigned to me".
 - **Overdue:** count of overdue inspections (§Planning fields) and the ten most overdue with
   assignee and due date.
 - **Open defects:** open NCRs and open punch items by category A/B/C, through the `ncr` and

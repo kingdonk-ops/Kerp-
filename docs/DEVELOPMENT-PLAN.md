@@ -85,6 +85,9 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
       export);
     - dashboard tiles: T-0160 (progress, overdue, open defects);
     - end-to-end: T-0161 (Pilot-0 journey).
+  - **Also in the gate through dependencies** (T-0146 depends on them transitively): T-0136
+    (terminology layer, via the PDF T-0158), T-0140 (inspection date, self-approval, via T-0150)
+    and T-0104 (P6 `.xer` import, via T-0133 → T-0147; to be decided in TD-214).
   - **Not in the pilot:** inspection calendar, general recurrence and work orders (TD-211); video,
     audio, barcode/QR answer fields and reference images (TD-212).
   - **Open before the gate:** client co-sign on the inspector's device (TD-213); capture screen,

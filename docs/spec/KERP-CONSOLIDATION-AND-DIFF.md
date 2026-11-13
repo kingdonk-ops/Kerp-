@@ -344,9 +344,25 @@ otherwise; they refine master spec §4.3 and ADR 0005 and keep the sync contract
   scope `inspection` (one inspection record) or `node` (an anchor subtree: its Items, their scan
   identifiers and their open inspections, for ad-hoc work). Removing a pick releases the checkout.
   At most **500 inspections** per device and project (planner default; NFR sizing in §6.2).
+  `node` is a new checkout scope next to ADR 0005's inspection job / RSW batch (ADR 0005
+  Addendum A).
+- **One checkout per record (ADR 0005 §2).** Picking an inspection that another user or device
+  already holds fails with **409 naming the holder** (user and device name) (planner default). A
+  `node` pick is **partial** (planner default): it checks out every inspection under the node
+  that nobody else holds, and the response lists the held ones with their holders; the Items,
+  scan identifiers and reference data of the subtree are still downloaded read-only. A record
+  held by someone else is never sent to another device as editable.
+- **Lease length.** A pick's lease lasts the deployment's offline window (§4.2/§4.4: default 7
+  days, at most 14) and is renewed on every successful sync of that device (planner default).
+  Lease expiry does **not** produce a `remove` delta and does not purge the device: the pick stays
+  local, and data synced after expiry is accepted as in p6 spec §8.5 (accepted if nobody else
+  checked the record out, otherwise conflict log + review, never dropped). Once another user
+  picks the expired record, the first device sees it as "checked out by <holder>" on its next
+  pull (planner default).
 - **Candidates with state and size.** `GET /api/v1/sync/download-candidates?project_id=` lists the
   inspections assigned to the user first, then unassigned ones (planner default), each with status,
-  anchor display path, due date, whether it is already downloaded to this device, and an estimated
+  anchor display path, due date, whether it is already downloaded to this device,
+  `checked_out_by` (user and device of another holder, else null; planner default) and an estimated
   size in bytes: the record JSON plus the stored sizes of its attachments (T-0016). Nothing is
   downloaded automatically (planner default).
 - **Pull scope.** `pull-deltas` is scoped per **device and project**:

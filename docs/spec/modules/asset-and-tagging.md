@@ -92,6 +92,7 @@ root-to-leaf path as `asset_id`; replaces the old `rsw_id`), `status`, `inspecta
   `active_corrosion_rate_mm_yr`, `last_measured_thickness_mm`, `last_inspection_date`.
 
 ### Scan identifiers and scan-to-locate (Pilot-0, planner spec 2026-11-13; TD-163, Q5a)
+Rules below are planner defaults unless marked otherwise.
 An Item may carry scan identifiers in `oe_asset_item_identifier` (`BaseRecordMixin` + project
 RLS): `item_id`, `kind` (`barcode` | `qr` | `nfc`), `value`, `is_active`. Values are trimmed; an
 NFC value is the tag UID as upper-case hex without separators. An active `(project_id, kind,
