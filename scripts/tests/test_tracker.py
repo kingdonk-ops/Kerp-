@@ -260,17 +260,149 @@ def repo(tmp_path):
     return tmp_path, run
 
 
-def test_patch_id_ignores_tracker_changes(repo, monkeypatch):
+TASK_MD = """---
+id: T-0001
+title: "Task"
+status: in_review
+owner: kerp-implementer
+pr: 7
+updated: 2026-11-01
+---
+
+## Goal
+Do the thing.
+
+## Acceptance criteria
+- [ ] It works
+
+## Notes
+- 2026-11-01 (planner): initial note
+"""
+
+
+def _commit(path, run, rel, text, msg):
+    f = path / rel
+    f.parent.mkdir(parents=True, exist_ok=True)
+    f.write_text(text)
+    run("add", ".")
+    run("commit", "-qm", msg)
+
+
+def test_patch_id_ignores_generated_boards(repo, monkeypatch):
     path, run = repo
     monkeypatch.chdir(path)
     before = gate.compute_patch_id("dev")
-    (path / "tracker").mkdir()
-    (path / "tracker" / "T-0001.md").write_text("status: done\n")
-    (path / "docs").mkdir()
-    (path / "docs" / "TASKS.md").write_text("board\n")
-    run("add", ".")
-    run("commit", "-qm", "tracker")
+    _commit(path, run, "docs/TASKS.md", "board\n", "boards")
+    _commit(path, run, "docs/TODO.md", "board\n", "boards")
+    _commit(path, run, "docs/pr-suggestions.md", "digest\n", "digest")
     assert gate.compute_patch_id("dev") == before
     (path / "a.py").write_text("x = 3\n")
     run("commit", "-qam", "code")
     assert gate.compute_patch_id("dev") != before
+
+
+@pytest.fixture
+def task_repo(repo, monkeypatch):
+    path, run = repo
+    monkeypatch.chdir(path)
+    _commit(path, run, "tracker/tasks/T-0001.md", TASK_MD, "task")
+    return path, run, gate.compute_patch_id("dev")
+
+
+@pytest.mark.parametrize(
+    "edit",
+    [
+        lambda s: s.replace("status: in_review", "status: done"),
+        lambda s: s.replace("owner: kerp-implementer", "owner: someone-else"),
+        lambda s: s.replace("pr: 7", "pr: 8"),
+        lambda s: s.replace("updated: 2026-11-01", "updated: 2026-11-13"),
+        lambda s: s.replace("updated: 2026-11-01\n", "updated: 2026-11-13\npr: 9\n").replace("pr: 7\n", ""),
+        lambda s: s.rstrip("\n") + "\n\n- 2026-11-13: review round 2 passed\n",
+        lambda s: s + "- 2026-11-13 (coordinator): merged\n",
+        lambda s: s.replace("- 2026-11-01 (planner): initial note\n", ""),
+        lambda s: s.replace("- 2026-11-01 (planner): initial note", "- 2026-11-01 (planner): reworded note"),
+    ],
+    ids=["status", "owner", "pr", "updated", "added-pr-field", "set-note", "dated-note", "drop-note", "edit-note"],
+)
+def test_patch_id_bookkeeping_only_tracker_change_keeps_id(task_repo, edit):
+    path, run, before = task_repo
+    _commit(path, run, "tracker/tasks/T-0001.md", edit(TASK_MD), "bookkeeping")
+    assert gate.compute_patch_id("dev") == before
+
+
+@pytest.mark.parametrize(
+    "edit",
+    [
+        lambda s: s.replace("Do the thing.", "Do another thing."),
+        lambda s: s.replace("- [ ] It works", "- [ ] It works\n- [ ] It is fast"),
+        lambda s: s.replace('title: "Task"', 'title: "Other task"'),
+        lambda s: s.replace("## Notes\n", "## Notes\n- undated note\n"),
+    ],
+    ids=["goal", "acceptance", "title", "undated-note"],
+)
+def test_patch_id_tracker_content_change_gives_new_id(task_repo, edit):
+    path, run, before = task_repo
+    _commit(path, run, "tracker/tasks/T-0001.md", edit(TASK_MD), "content")
+    assert gate.compute_patch_id("dev") != before
+
+
+def test_patch_id_new_or_deleted_tracker_file_is_content(task_repo):
+    path, run, before = task_repo
+    _commit(path, run, "tracker/todo/TD-001.md", "---\nid: TD-001\nstatus: open\n---\n\nFollow up.\n", "todo")
+    after_new = gate.compute_patch_id("dev")
+    assert after_new != before
+    run("rm", "-q", "tracker/tasks/T-0001.md")
+    run("commit", "-qm", "delete")
+    assert gate.compute_patch_id("dev") not in (before, after_new)
+
+
+def test_patch_id_tracker_only_pr(tmp_path, monkeypatch):
+    def run(*a):
+        return subprocess.run(["git", *a], cwd=tmp_path, check=True, capture_output=True, text=True).stdout
+
+    run("init", "-q", "-b", "dev")
+    run("config", "user.email", "t@t")
+    run("config", "user.name", "t")
+    _commit(tmp_path, run, "tracker/tasks/T-0001.md", TASK_MD, "base")
+    run("checkout", "-qb", "plan")
+    monkeypatch.chdir(tmp_path)
+    _commit(tmp_path, run, "tracker/tasks/T-0001.md", TASK_MD.replace("Do the thing.", "Do more."), "plan")
+    content_id = gate.compute_patch_id("dev")
+    assert content_id != "none"
+    _commit(tmp_path, run, "tracker/tasks/T-0001.md",
+            TASK_MD.replace("Do the thing.", "Do more.").replace("status: in_review", "status: done"), "status")
+    _commit(tmp_path, run, "docs/TASKS.md", "board\n", "boards")
+    assert gate.compute_patch_id("dev") == content_id
+
+
+def test_normalise_tracker_text_drops_only_bookkeeping():
+    norm = gate.normalise_tracker_text(TASK_MD)
+    assert "status:" not in norm and "owner:" not in norm and "updated:" not in norm
+    assert "\npr:" not in norm and "2026-11-01" not in norm
+    assert 'title: "Task"' in norm and "Do the thing." in norm and "- [ ] It works" in norm
+    # body lines that merely look like front-matter keys are content
+    body = "---\nid: T-1\n---\n\nstatus: this is prose\n"
+    assert "status: this is prose" in gate.normalise_tracker_text(body)
+
+
+# ------------------------------------------------------------------ set --note
+@pytest.mark.parametrize(
+    "note, expected",
+    [
+        ("plain note", "- 2026-11-13: plain note"),
+        ("2026-11-11: already dated", "- 2026-11-11: already dated"),
+        ("2026-11-11 (planner): dated with source", "- 2026-11-11 (planner): dated with source"),
+        ("  2026-11-11: leading space", "- 2026-11-11: leading space"),
+        ("20261111 not iso", "- 2026-11-13: 20261111 not iso"),
+    ],
+)
+def test_note_line_does_not_double_the_date(note, expected):
+    assert tracker.note_line(note, "2026-11-13") == expected
+
+
+def test_no_doubled_date_prefixes_in_tracker():
+    import re
+
+    doubled = re.compile(r"^- \d{4}-\d{2}-\d{2}[^:\n]*:\s*\d{4}-\d{2}-\d{2}\b", re.MULTILINE)
+    hits = [p.name for p in (SCRIPTS.parent / "tracker").rglob("*.md") if doubled.search(p.read_text(encoding="utf-8"))]
+    assert hits == []

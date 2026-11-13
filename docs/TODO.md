@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 138 · **Closed:** 89
+**Open:** 138 · **Closed:** 90
 
 ## decision (4)
 
@@ -162,7 +162,6 @@
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
-| [TD-013](../tracker/todo/TD-013.md) | review-gate patch-id ignores tracker/ — on planning PRs task content can change after approval without re-review | — | coordinator |
 | [TD-024](../tracker/todo/TD-024.md) | Backend logging: httpx/httpcore INFO lines log full outbound URLs (incl. query-string tokens) via the root JSON handler; set them to WARNING before any integration makes outbound calls | T-0021 | reviewer |
 | [TD-069](../tracker/todo/TD-069.md) | Legacy inspection exports contain real client data and must not be committed as fixtures | T-0113 | planner |
 | [TD-102](../tracker/todo/TD-102.md) | Eligibility API is frozen at M1 (T-0131) but must accept a requirement set (role baseline + client/site overlays + task-bound rules) | T-0131, T-0118 | planner |
@@ -176,6 +175,7 @@
 | [TD-216](../tracker/todo/TD-216.md) | Client co-sign residual risk: a provisional wet signature is only an inspector-witnessed claim until the client confirms it; a stolen client device key is stopped only by revoking the device (T-0043) | T-0174, T-0173 | planner |
 | [TD-222](../tracker/todo/TD-222.md) | Rate-limit unauthenticated /api/v1/auth/* at the proxy: each login/magic-link with a fresh e-mail costs one scrypt (16 MB) before any lockout applies | — | reviewer |
 | [TD-225](../tracker/todo/TD-225.md) | Login account backstop can still be held locked at ~1 request per lock after 51 distributed failures | T-0068 | reviewer |
+| [TD-228](../tracker/todo/TD-228.md) | review-gate patch-id ignores dated note lines entirely - a scope decision recorded as a dated Note can be added or reworded after approval without re-review | T-0029 | implementer |
 | [TD-232](../tracker/todo/TD-232.md) | Frontend lint toolchain: npm audit reports moderate minimatch ReDoS (GHSA-g3hv-75wg-m249) via eslint 10 / typescript-eslint 8.72.2 | T-0031 | implementer |
 
 ## Closed
@@ -193,6 +193,7 @@
 | ✅ | [TD-009](../tracker/todo/TD-009.md) | Scope: ~94 modules. Define an MVP cut line (suggest: end of Phase 2 + documents) for a first pilot | M2 cut line = Phase 0+1+2 + Documents-Lite + P6 round-trip (~85–95 tasks), diff §7. |
 | ⚫ | [TD-010](../tracker/todo/TD-010.md) | Architecture suite (Inspection-ERP PR #22) is still open/unmerged — imported from its branch as reference only | PR #22 is not a spec input; moved to docs/archive |
 | ✅ | [TD-012](../tracker/todo/TD-012.md) | audit log (T-0013) has thin spec coverage — only DEVELOPMENT-PLAN principles 3/10/11 | Audit fully specified: append-only hash-chained ledger + REVOKE UPDATE/DELETE (diff §4). |
+| ✅ | [TD-013](../tracker/todo/TD-013.md) | review-gate patch-id ignores tracker/ — on planning PRs task content can change after approval without re-review | T-0029: review-gate patch-id includes normalised tracker/** content (front-matter status/pr/owner/updated, dated note lines and blank lines dropped; generated boards excluded) |
 | ✅ | [TD-014](../tracker/todo/TD-014.md) | Relationship between inspection record kind='rfi' (T-0111) and the inspection_requests module (T-0115) is undefined — both model 'Request for Inspection' | RFI means Request for Information (its own module). Request for Inspection is an inspection notification/booking record in scheduling, stored with the RFI system; full spec pending in TD-045, T-0115 blocked on it (user, 2026-11-09) |
 | ✅ | [TD-015](../tracker/todo/TD-015.md) | Phase 2 welder/NDE records reference the contacts directory (Phase 3): confirm interim nullable-linkage + backfill-FK default vs. landing a minimal contacts directory before Phase 2 | Confirmed default: nullable contact references in Phase 2; add the FK constraints when contacts (E-03-01) lands (user, 2026-11-09) |
 | ✅ | [TD-017](../tracker/todo/TD-017.md) | Backend: add a dependency lock file (pinned versions) before T-0004 Dockerfile needs reproducible builds | Hashed runtime + build lock files (backend/requirements.lock, requirements-build.lock) with sync tests, added in T-0004 |

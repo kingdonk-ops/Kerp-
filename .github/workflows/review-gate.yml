@@ -1,7 +1,7 @@
 name: Review gate
 
 # A PR into dev needs an independent-review approval marker that matches the
-# PR's current code (patch-id). See scripts/review_gate.py.
+# PR's current code + normalised tracker content (patch-id). See scripts/review_gate.py.
 on:
   pull_request:
     branches: [dev]

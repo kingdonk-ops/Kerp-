@@ -48,7 +48,7 @@ python scripts/tracker.py render
 python scripts/pr_suggestions.py rebuild   # refresh docs/pr-suggestions.md digest of surfaced notes/TODOs/suggestions
 git commit -am "chore(tracker): <id> done + pr-suggestions" && git push --force-with-lease
 ```
-Tracker-only commits keep the approval valid (patch-id excludes `tracker/**`, the boards and `docs/pr-suggestions.md`). Any **code** change after approval → back to step 4.
+Bookkeeping commits keep the approval valid: patch-id is `git patch-id --stable` of the code diff (all paths except `tracker/**` and the generated `docs/TASKS.md`, `docs/TODO.md`, `docs/pr-suggestions.md`) plus the **normalised** `tracker/**` diff (front-matter `status`/`pr`/`owner`/`updated`, dated note lines `- YYYY-MM-DD…` and blank lines dropped) — computed only by `python scripts/review_gate.py --patch-id origin/dev`. So `set --status/--pr/--owner/--note`, `render` and `pr_suggestions.py rebuild` don't invalidate it. Any **code** change or tracker **content** change (goal, acceptance criteria, title, deps, undated text, new/deleted TODO or task files) after approval → back to step 4.
 Wait for checks (`gh api $R/commits/<sha>/check-runs -q '.check_runs[]|[.name,.status,.conclusion]|@tsv'`) — `ci-gate` and `review-gate` must be `success`. Then:
 ```bash
 gh api -X PUT $R/pulls/<n>/merge -f merge_method=squash -f commit_title="<id>: <title> (#<n>)"
