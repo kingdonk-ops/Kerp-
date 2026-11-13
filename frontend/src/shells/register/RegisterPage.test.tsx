@@ -148,6 +148,45 @@ describe("RegisterPage", () => {
     expect(within(picker).getAllByRole("option")).toHaveLength(1);
   });
 
+  it.each([
+    ["user", "user-2", "tags"],
+    ["register", "user-1", "valves"],
+  ])("drops views, selection and filters when the %s changes", (_what, nextUser, nextRegister) => {
+    const storage = memoryStorage();
+    const first = localSavedViewStore(storage, "user-1", "tags");
+    first.save({ name: "U1 secret view", query: "vlv", hiddenColumns: [], columnFilters: {} });
+    const props = { title: "Synthetic tags", columns: COLUMNS, rows: ROWS, rowKey: (row: Tag) => row.id };
+    const { rerender } = render(<RegisterPage<Tag> {...props} savedViews={first} />);
+
+    const picker = () => screen.getByLabelText(i18n.t("shells.register.savedViews.label"));
+    fireEvent.change(picker(), { target: { value: first.list()[0]!.id } });
+    expect(bodyRows()).toHaveLength(1);
+
+    const second = localSavedViewStore(storage, nextUser, nextRegister);
+    rerender(<RegisterPage<Tag> {...props} savedViews={second} />);
+
+    expect(within(picker()).getAllByRole("option")).toHaveLength(1);
+    expect(screen.queryByText("U1 secret view")).not.toBeInTheDocument();
+    expect(screen.getByLabelText(i18n.t("shells.register.quickFilter"))).toHaveValue("");
+    expect(screen.getByLabelText(i18n.t("shells.register.savedViews.name"))).toHaveValue("");
+    expect(bodyRows()).toHaveLength(3);
+
+    // Saving now goes to the new store only.
+    fireEvent.change(screen.getByLabelText(i18n.t("shells.register.savedViews.name")), { target: { value: "Mine" } });
+    fireEvent.click(screen.getByRole("button", { name: i18n.t("shells.register.savedViews.save") }));
+    expect(second.list().map((view) => view.name)).toEqual(["Mine"]);
+    expect(first.list().map((view) => view.name)).toEqual(["U1 secret view"]);
+  });
+
+  it("keeps state when an equal store is recreated on rerender", () => {
+    const storage = memoryStorage();
+    const props = { title: "Synthetic tags", columns: COLUMNS, rows: ROWS, rowKey: (row: Tag) => row.id };
+    const { rerender } = render(<RegisterPage<Tag> {...props} savedViews={localSavedViewStore(storage, "u", "tags")} />);
+    fireEvent.change(screen.getByLabelText(i18n.t("shells.register.quickFilter")), { target: { value: "pipe" } });
+    rerender(<RegisterPage<Tag> {...props} savedViews={localSavedViewStore(storage, "u", "tags")} />);
+    expect(screen.getByLabelText(i18n.t("shells.register.quickFilter"))).toHaveValue("pipe");
+  });
+
   it("does not save a view without a name", () => {
     const store = localSavedViewStore(memoryStorage(), "user-1", "tags");
     renderRegister({ savedViews: store });

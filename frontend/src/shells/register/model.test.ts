@@ -74,6 +74,12 @@ describe("toCsv", () => {
     expect(csv.split("\r\n").slice(1, 5)).toEqual(["'=1+1,-3", "'@SUM(A1),0", "'+x,1", "'-y,2"]);
   });
 
+  it("neutralises cells starting with tab or carriage return (quoting the CR cell)", () => {
+    const columns: RegisterColumn<{ s: string }>[] = [{ id: "s", header: "S", value: (r) => r.s }];
+    expect(toCsv([{ s: "\t=1" }], columns)).toBe("S\r\n'\t=1\r\n");
+    expect(toCsv([{ s: "\r=1" }], columns)).toBe("S\r\n\"'\r=1\"\r\n");
+  });
+
   it("renders booleans and empty values", () => {
     const columns: RegisterColumn<{ b: boolean | undefined }>[] = [{ id: "b", header: "B", value: (r) => r.b }];
     expect(toCsv([{ b: true }, { b: undefined }], columns)).toBe("B\r\ntrue\r\n\r\n");
@@ -84,6 +90,7 @@ describe("localSavedViewStore", () => {
   it("saves, lists, replaces by name and removes views per user and register", () => {
     const storage = memoryStorage();
     const store = localSavedViewStore(storage, "user-1", "deliveries");
+    expect(store.key).toBe(savedViewsStorageKey("user-1", "deliveries"));
 
     expect(store.list()).toEqual([]);
     const first = store.save({ name: "Steel", query: "steel", hiddenColumns: ["note"], columnFilters: {} });

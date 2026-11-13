@@ -63,7 +63,8 @@ export function DynamicForm({
         .filter((field) => evaluation.visible.has(field.field_key))
         .map((field) => {
           const id = `${formId}-${field.field_key}`;
-          const error = evaluation.errors[field.field_key];
+          // Own-property reads: field keys such as `constructor` must not hit Object.prototype.
+          const error = Object.hasOwn(evaluation.errors, field.field_key) ? evaluation.errors[field.field_key] : undefined;
           const shownError = error !== undefined && (submitted || touched.has(field.field_key)) ? error : undefined;
           const errorId = `${id}-error`;
           return (
@@ -79,7 +80,7 @@ export function DynamicForm({
               <FieldControl
                 field={field}
                 id={id}
-                value={values[field.field_key]}
+                value={Object.hasOwn(values, field.field_key) ? values[field.field_key] : undefined}
                 invalid={shownError !== undefined}
                 describedBy={shownError !== undefined ? errorId : undefined}
                 onChange={(value) => setValue(field.field_key, value)}

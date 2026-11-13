@@ -87,6 +87,20 @@ describe("evaluateForm — visible_if", () => {
     expect(result.values).toEqual({ stable: "s" });
   });
 
+  it("hides a field that oscillates even when the last pass would show it", () => {
+    // Three fields -> four passes, ending on the "visible" phase of `flip`.
+    const template: FormTemplate = {
+      fields: [
+        { field_key: "stable", label: "Stable", data_type: "text" },
+        { field_key: "other", label: "Other", data_type: "text" },
+        { field_key: "flip", label: "Flip", data_type: "text", visible_if: "!has(fields.flip)" },
+      ],
+    };
+    const result = evaluateForm(template, { stable: "s", other: "o", flip: "f" });
+    expect([...result.visible]).toEqual(["stable", "other"]);
+    expect(result.values).toEqual({ stable: "s", other: "o" });
+  });
+
   it("exposes extra context variables next to `fields`", () => {
     const template: FormTemplate = {
       fields: [
@@ -221,5 +235,65 @@ describe("evaluateForm — validation", () => {
     };
     const result = evaluateForm(template, { x: "real" }, { context: { fields: { x: "spoofed" } } });
     expect(result.visible.has("x")).toBe(true);
+  });
+});
+
+describe("evaluateForm — hostile keys and malformed data", () => {
+  it.each(["constructor", "toString", "__proto__", "hasOwnProperty"])(
+    "treats a required `%s` field without a value as missing",
+    (key) => {
+      const template: FormTemplate = {
+        fields: [
+          { field_key: key, label: key, data_type: "text", required: true },
+          { field_key: "other", label: "Other", data_type: "text", visible_if: "true" },
+        ],
+      };
+      const result = evaluateForm(template, {});
+      expect(result.valid).toBe(false);
+      expect(Object.hasOwn(result.errors, key)).toBe(true);
+      expect(result.errors[key]).toEqual({ kind: "required" });
+      expect(Object.hasOwn(result.values, key)).toBe(false);
+      expect(Object.keys(result.values)).toEqual([]);
+    },
+  );
+
+  it("keeps a `__proto__` field value as an own property", () => {
+    const template: FormTemplate = { fields: [{ field_key: "__proto__", label: "P", data_type: "text" }] };
+    const values = Object.fromEntries([["__proto__", "x"]]);
+    const result = evaluateForm(template, values);
+    expect(Object.keys(result.values)).toEqual(["__proto__"]);
+    expect(Object.getPrototypeOf(result.values)).toBe(Object.prototype);
+  });
+
+  const RULES: FormTemplate = {
+    fields: [
+      { field_key: "shown", label: "Shown", data_type: "text", visible_if: "true" },
+      { field_key: "cond", label: "Cond", data_type: "text", required_if: "false" },
+      {
+        field_key: "checked",
+        label: "Checked",
+        data_type: "text",
+        validation: { cel_expression: "true", error_message: "unused" },
+      },
+    ],
+  };
+
+  it("fails closed instead of throwing on a malformed value", () => {
+    const result = evaluateForm(RULES, { checked: { $int: "abc" } });
+    expect(result.visible.has("shown")).toBe(false);
+    expect(result.errors).toEqual({
+      cond: { kind: "required" },
+      checked: { kind: "rule_error", code: "INVALID_ARGUMENT" },
+    });
+  });
+
+  it("fails closed instead of throwing on a malformed extra context", () => {
+    const context = { asset: { attributes: { $int: "abc" } } };
+    const result = evaluateForm(RULES, { checked: "ok" }, { context });
+    expect(result.visible.has("shown")).toBe(false);
+    expect(result.errors).toEqual({
+      cond: { kind: "required" },
+      checked: { kind: "rule_error", code: "INVALID_ARGUMENT" },
+    });
   });
 });

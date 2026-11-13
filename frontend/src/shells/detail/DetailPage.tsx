@@ -148,7 +148,7 @@ function AuditLog({ source }: { source: AuditSource }) {
         <li key={entry.id} className="rounded border border-line bg-panel px-3 py-2 text-sm">
           <div className="flex flex-wrap items-center gap-2">
             <time dateTime={entry.at} className="text-muted">
-              {format.format(new Date(entry.at))}
+              {formatTimestamp(format, entry.at)}
             </time>
             <span className="font-medium">{entry.actor}</span>
             <code>{entry.action}</code>
@@ -161,4 +161,10 @@ function AuditLog({ source }: { source: AuditSource }) {
       ))}
     </ol>
   );
+}
+
+/** Server timestamps are data: an unparsable one is shown as-is instead of throwing. */
+function formatTimestamp(format: Intl.DateTimeFormat, at: string): string {
+  const date = new Date(at);
+  return Number.isNaN(date.getTime()) ? at : format.format(date);
 }

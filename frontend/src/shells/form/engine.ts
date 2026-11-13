@@ -27,13 +27,32 @@ function passes(result: CelResult): boolean {
   return result.ok && result.value === true;
 }
 
+/**
+ * Own, non-empty values of `keys`. Own-property reads only, so keys such as `constructor` or
+ * `__proto__` never pick up `Object.prototype` members; `fromEntries` defines own properties.
+ */
 function pick(values: FormValues, keys: ReadonlySet<string>): Record<string, JsonValue> {
-  const picked: Record<string, JsonValue> = {};
+  const picked: [string, JsonValue][] = [];
   for (const key of keys) {
+    if (!Object.hasOwn(values, key)) continue;
     const value = values[key];
-    if (value !== undefined && !isEmptyValue(value)) picked[key] = value;
+    if (value !== undefined && !isEmptyValue(value)) picked.push([key, value]);
   }
-  return picked;
+  return Object.fromEntries(picked);
+}
+
+/**
+ * Evaluate without throwing: `src/lib/cel` throws on a malformed context (e.g. a bad `$int`
+ * in a value or in server-provided `context`). That becomes a rule failure, so it fails closed.
+ */
+function safeRunner(run: RuleEvaluator): RuleEvaluator {
+  return (expression, context) => {
+    try {
+      return run(expression, context);
+    } catch (error) {
+      return { ok: false, code: "INVALID_ARGUMENT", message: error instanceof Error ? error.message : String(error) };
+    }
+  };
 }
 
 function sameSet(a: ReadonlySet<string>, b: ReadonlySet<string>): boolean {
@@ -45,7 +64,7 @@ export function evaluateForm(
   values: FormValues,
   options: EvaluateFormOptions = {},
 ): FormEvaluation {
-  const run = options.evaluator ?? evaluate;
+  const run = safeRunner(options.evaluator ?? evaluate);
   const extra = options.context ?? {};
   const contextFor = (fields: Record<string, JsonValue>) => ({ ...extra, fields });
 
@@ -72,24 +91,24 @@ export function evaluateForm(
 
   const sanitized = pick(values, visible);
   const context = contextFor(sanitized);
-  const errors: Record<string, FieldError> = {};
+  const errors: [string, FieldError][] = [];
   for (const field of template.fields) {
     const key = field.field_key;
     if (!visible.has(key)) continue;
     const required =
       field.required === true || (field.required_if !== undefined && !isFalse(run(field.required_if, context)));
-    if (!(key in sanitized)) {
-      if (required) errors[key] = { kind: "required" };
+    if (!Object.hasOwn(sanitized, key)) {
+      if (required) errors.push([key, { kind: "required" }]);
       continue;
     }
     if (field.validation === undefined) continue;
     const result = run(field.validation.cel_expression, context);
-    if (!result.ok) errors[key] = { kind: "rule_error", code: result.code };
-    else if (typeof result.value !== "boolean") errors[key] = { kind: "rule_error", code: "NON_BOOL_RESULT" };
-    else if (!result.value) errors[key] = { kind: "invalid", message: field.validation.error_message };
+    if (!result.ok) errors.push([key, { kind: "rule_error", code: result.code }]);
+    else if (typeof result.value !== "boolean") errors.push([key, { kind: "rule_error", code: "NON_BOOL_RESULT" }]);
+    else if (!result.value) errors.push([key, { kind: "invalid", message: field.validation.error_message }]);
   }
 
-  return { visible, values: sanitized, errors, valid: Object.keys(errors).length === 0 };
+  return { visible, values: sanitized, errors: Object.fromEntries(errors), valid: errors.length === 0 };
 }
 
 /** required_if fails closed: only an explicit `false` makes the field optional. */

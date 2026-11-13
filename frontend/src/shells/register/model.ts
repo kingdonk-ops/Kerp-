@@ -27,6 +27,8 @@ export type SavedViewDraft = Omit<SavedView, "id">;
 
 /** Where a register's saved views live. Local for now; server-side views are TD-179. */
 export interface SavedViewStore {
+  /** Stable identity (user + register); stores with equal keys hold the same views. */
+  readonly key: string;
   list(): SavedView[];
   /** Creates the view, or replaces the existing view with the same name. */
   save(draft: SavedViewDraft): SavedView;
@@ -114,6 +116,7 @@ export function localSavedViewStore(storage: KeyValueStorage, userId: string, re
   const write = (views: SavedView[]) => storage.setItem(key, JSON.stringify(views));
 
   return {
+    key,
     list: read,
     save(draft) {
       const views = read();

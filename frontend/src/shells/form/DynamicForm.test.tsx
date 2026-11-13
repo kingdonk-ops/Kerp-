@@ -131,6 +131,30 @@ describe("DynamicForm", () => {
     expect(length).toHaveAccessibleDescription(i18n.t("shells.form.errors.required"));
   });
 
+  it("handles prototype-named field keys as ordinary fields", () => {
+    const onSubmit = vi.fn();
+    const template: FormTemplate = {
+      fields: [
+        { field_key: "constructor", label: "Constructor", data_type: "text" },
+        { field_key: "toString", label: "To string", data_type: "text", required: true },
+      ],
+    };
+    render(<DynamicForm template={template} onSubmit={onSubmit} />);
+    const ctor = screen.getByLabelText("Constructor");
+    expect(ctor).toHaveValue("");
+
+    fireEvent.change(ctor, { target: { value: "x" } });
+    expect(ctor).not.toHaveAttribute("aria-invalid");
+    submit();
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(ctor).not.toHaveAttribute("aria-invalid");
+    expect(screen.getByLabelText(/To string/)).toHaveAccessibleDescription(i18n.t("shells.form.errors.required"));
+
+    fireEvent.change(screen.getByLabelText(/To string/), { target: { value: "y" } });
+    submit();
+    expect(onSubmit).toHaveBeenCalledWith({ constructor: "x", toString: "y" });
+  });
+
   it("uses a custom submit label and disables the form while busy", () => {
     render(<DynamicForm template={TEMPLATE} onSubmit={vi.fn()} submitLabel="Record result" busy />);
     expect(screen.getByRole("button", { name: "Record result" })).toBeDisabled();

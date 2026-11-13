@@ -29,6 +29,11 @@ tab labels; the shells translate their own chrome through `t()` (`shells.*` keys
 - **Saved views**: shown only when a `SavedViewStore` is passed. `localSavedViewStore`
   keeps them in the preferences storage under `kerp.views.<userId>.<registerId>`; saving
   under an existing name replaces it. Server-side views: TD-179.
+- **Store identity**: `SavedViewStore.key` identifies user + register. When it changes (another
+  sign-in, the same mounted page reused for another register) the register state — views,
+  selection, filters, columns — is remounted, so nothing leaks across. A store recreated
+  inline with the same key keeps the state. Without a store, give the page a React `key`
+  when reusing it for another register.
 
 ## DetailPage (`detail/`)
 
@@ -68,6 +73,10 @@ tab labels; the shells translate their own chrome through `t()` (`shells.*` keys
     `fields.x` a `NO_SUCH_KEY`, so guard optional references with `has(fields.x)`.
   - `validation` → `invalid` (template `error_message`) on `false`; `rule_error` (generic
     message) on an error or non-bool. Empty optional fields skip validation.
+- **Robustness**: a malformed value or `context` (e.g. a bad `{"$int": ...}`) makes the CEL
+  runtime throw; each rule evaluation catches that as `INVALID_ARGUMENT`, which fails closed
+  like any other rule error. Values and errors use own-property reads only, so field keys
+  such as `constructor` or `__proto__` behave like any other key.
 - **Errors** show once a field is touched or after a submit attempt; `onSubmit` receives the
   sanitised values only when the form is valid.
 - Template labels / messages are authored content, shown as-is (localisation: TD-183).

@@ -34,8 +34,9 @@ export function GateBanner({ gate }: { gate: GateStatus }) {
       </p>
       {gate.reasons !== undefined && gate.reasons.length > 0 && (
         <ul className="mt-1 list-disc pl-5 text-sm">
-          {gate.reasons.map((reason) => (
-            <li key={reason}>{reason}</li>
+          {gate.reasons.map((reason, index) => (
+            // Reasons may repeat; the list is static per render.
+            <li key={index}>{reason}</li>
           ))}
         </ul>
       )}

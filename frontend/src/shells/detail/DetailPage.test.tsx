@@ -108,6 +108,12 @@ describe("DetailPage audit tab", () => {
     expect(load).toHaveBeenCalledTimes(1);
   });
 
+  it("shows an unparsable timestamp as-is instead of failing", async () => {
+    const broken: AuditEntry = { id: "x", at: "not-a-date", actor: "Synthetic Inspector", action: "noted", source: "user" };
+    renderDetail({ audit: { key: ["audit", "bad-date"], load: () => Promise.resolve([broken]) } }, "/r?tab=audit");
+    expect(await screen.findByText("not-a-date")).toHaveAttribute("datetime", "not-a-date");
+  });
+
   it("shows an empty state", async () => {
     renderDetail({ audit: { key: ["audit", "empty"], load: () => Promise.resolve([]) } }, "/r?tab=audit");
     expect(await screen.findByText(i18n.t("shells.detail.audit.empty"))).toBeInTheDocument();
@@ -143,6 +149,14 @@ describe("GateBanner", () => {
     );
     const reasons = within(screen.getByRole("alert")).getAllByRole("listitem");
     expect(reasons.map((item) => item.textContent)).toEqual(["2 open Cat A punches", "1 uninspected weld"]);
+  });
+
+  it("renders repeated reasons without duplicate-key warnings", () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    render(<GateBanner gate={{ state: "hold", label: "Hold", reasons: ["Same reason", "Same reason"] }} />);
+    expect(within(screen.getByRole("alert")).getAllByRole("listitem")).toHaveLength(2);
+    expect(error).not.toHaveBeenCalled();
+    error.mockRestore();
   });
 
   it("is shown at the top of the DetailPage when a gate is given", () => {

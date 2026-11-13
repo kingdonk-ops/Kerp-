@@ -34,8 +34,17 @@ export interface RegisterPageProps<Row> {
 const CONTROL = "rounded border border-line bg-panel px-2 py-1";
 const BUTTON = "rounded border border-line bg-panel px-3 py-1 disabled:opacity-50";
 
-/** Shared list screen: quick + column filters, column visibility, CSV export, saved views. */
-export function RegisterPage<Row>({
+/**
+ * Shared list screen: quick + column filters, column visibility, CSV export, saved views.
+ * When the saved-view store's identity (`SavedViewStore.key`: user + register) changes, the
+ * register state is remounted so views, filters and the selection never leak across users or
+ * registers. Without a store, reuse for another register needs a React `key` from the caller.
+ */
+export function RegisterPage<Row>(props: RegisterPageProps<Row>) {
+  return <RegisterView<Row> key={props.savedViews?.key ?? ""} {...props} />;
+}
+
+function RegisterView<Row>({
   title,
   columns,
   rows,
