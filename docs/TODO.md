@@ -3,14 +3,15 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 126 · **Closed:** 79
+**Open:** 131 · **Closed:** 79
 
-## decision (2)
+## decision (3)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
 | [TD-096](../tracker/todo/TD-096.md) | Approved coating ITR dropped the residual-dust rating row the ITP requires; Grating and Gridmesh ITR has no approved version: confirm with the client before shipping default templates | T-0113 | planner |
 | [TD-191](../tracker/todo/TD-191.md) | Login/magic-link lockout keyed by tenant+email lets anyone keep a known user at a 15-minute delay; decide per-email+per-IP keying and fix the begin() check/count race (single Lua script) | T-0009 | reviewer |
+| [TD-213](../tracker/todo/TD-213.md) | Object key layout: confirm {tenant}/{project}/{module}/{sha256} (no extension) instead of the master spec's {hash}.ext, plus transient staging/ and quarantine/ prefixes | T-0016 | implementer |
 
 ## spec-gap (37)
 
@@ -54,7 +55,7 @@
 | [TD-167](../tracker/todo/TD-167.md) | Defect close-out loop: open -> action assigned (owner, due) -> rectified -> verified closed by a re-inspection (closed_by_inspection link); extends TD-066 | T-0117 | clean-room-gap-analysis |
 | [TD-205](../tracker/todo/TD-205.md) | NFR budgets need a reference device and a 4G network profile before they become a hard gate for Pilot-0 | T-0045, T-0146 | planner |
 
-## missed (4)
+## missed (5)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -62,8 +63,9 @@
 | [TD-125](../tracker/todo/TD-125.md) | Booking modules must call work_anchor_for and return 422 when the path has no work anchor (progress, time lines against a work anchor, completion gate) | T-0101, T-0116, T-0124, E-04-03, E-04-05 | reviewer |
 | [TD-131](../tracker/todo/TD-131.md) | Add a root .env.example for the dev stack (the implementer agent's permission rules block writing .env* files) | T-0003 | implementer |
 | [TD-169](../tracker/todo/TD-169.md) | M2 Documents-Lite 'batch inspection PDF export' (consolidation diff §7) has no task | — | clean-room-gap-analysis |
+| [TD-208](../tracker/todo/TD-208.md) | Uploads infra: provision the kerp-vault bucket (CORS for browser PUT/GET, lifecycle on staging/), wire KERP_S3_* in compose, add MinIO to CI for the gated round-trip test | T-0016 | implementer |
 
-## deferred (21)
+## deferred (23)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -88,8 +90,10 @@
 | [TD-180](../tracker/todo/TD-180.md) | RegisterPage: PDF export and server-side export of the full result set | T-0025 | implementer |
 | [TD-181](../tracker/todo/TD-181.md) | DetailPage: audit log and gate-status endpoints | T-0025 | implementer |
 | [TD-182](../tracker/todo/TD-182.md) | RegisterPage: server-side filtering, sorting and paging | T-0025 | implementer |
+| [TD-209](../tracker/todo/TD-209.md) | Uploads: file deletion and content-object GC; recover files stuck in 'verifying' after a failed verify job | T-0016 | implementer |
+| [TD-212](../tracker/todo/TD-212.md) | Uploads: run the orphan sweep on a schedule for every project (needs the scope list of TD-155) | T-0016 | implementer |
 
-## later (50)
+## later (51)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -143,6 +147,7 @@
 | [TD-204](../tracker/todo/TD-204.md) | After Pilot-0: biometric unlock, certificate pinning (Capacitor) and per-device sync-health views | T-0043 | planner |
 | [TD-207](../tracker/todo/TD-207.md) | Local PIN unlock for the web PWA build (no platform keystore): e.g. a non-extractable WebCrypto key wrapping the IndexedDB data key | T-0143 | planner |
 | [TD-210](../tracker/todo/TD-210.md) | Native Android app: normal login system and offline-window expiry behaviour (replaces the TD-206 interim rule) | T-0143 | user |
+| [TD-211](../tracker/todo/TD-211.md) | Uploads: replace the always-clean StubScanner with a real malware scanner (e.g. ClamAV/clamd in the worker) | T-0016 | implementer |
 
 ## bug (1)
 
