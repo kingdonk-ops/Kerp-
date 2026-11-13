@@ -34,8 +34,8 @@ pluggable parser adapter). Money is a **read-only external mirror** only.
 
 | Phase | Scope | Depth | Exit criterion |
 |---|---|---|---|
-| **0** Platform substrate & security core | scaffold, DB + BaseRecordMixin, **project-scoped RLS** (+4 bypass tests), **RS256/EdDSA JWT + JWKS**, field-worker magic-link+PIN, 15-persona RBAC, module loader, **SAQ** jobs, presigned uploads, **CEL runtime substrate**, `run_checks` shell, hash-chain audit, frontend shell (8-group IA) + reusable shells | **27 tasks** | tenant/project created, user authed & scoped, module toggled, rule set run — CI green |
-| **1** Asset backbone, one-engine & quality core | **ltree** hierarchy, **JSONB** field registry (EAV deleted), Items + CML stubs, P6 import/export (idempotent + unmatched-row linking), **one-engine** forms+CEL, **unified inspection record** + **eligibility**, **equipment calibration** register + hard gate, qms/construction_control/inspection_requests, NCR/punch, signing, completion-gate + P6 rule sets, offline sync core (Dexie), UI, **M1 freeze gate (T-0131)** | **30 tasks** | P6→hierarchy; inspections gated by CEL; expired tool blocked; completion blocked by open NCR; backbone contract frozen |
+| **0** Platform substrate & security core | scaffold, DB + BaseRecordMixin, **project-scoped RLS** (+4 bypass tests), **RS256/EdDSA JWT + JWKS**, field-worker magic-link+PIN, 15-persona RBAC, module loader, **SAQ** jobs, presigned uploads, **CEL runtime substrate**, `run_checks` shell, hash-chain audit, frontend shell (8-group IA) + reusable shells; access model (System admin → Project Admins, lobby, project picker), 12 h sessions, hybrid PIN, device registry, deployment settings (2026-11-13) | **48 tasks** | tenant/project created, user authed & scoped, module toggled, rule set run — CI green |
+| **1** Asset backbone, one-engine & quality core | **ltree** hierarchy, **JSONB** field registry (EAV deleted), Items + CML stubs, P6 import/export (idempotent + unmatched-row linking), **one-engine** forms+CEL, **unified inspection record** + **eligibility**, **equipment calibration** register + hard gate, qms/construction_control/inspection_requests, NCR/punch, signing, completion-gate + P6 rule sets, offline sync core (Dexie), UI, **M1 freeze gate (T-0131)**; Capacitor Android build + SQLCipher store, FCM push, Pilot-0 gate (2026-11-13) | **44 tasks** | P6→hierarchy; inspections gated by CEL; expired tool blocked; completion blocked by open NCR; backbone contract frozen |
 | **2** Welding quality & traceability | WPS, welder quals/continuity, welds as Items, NDE, heat/MTR trace, R-WPS rules | **9 tasks** | a weld can't be accepted outside qualification/NDE rules |
 | **3** Logistics & supply chain | **contacts**, **procurement (front)**, materials/MRIR+heat, inventory, **cutting (FFD + rectpack)**, Gate Delivery edge screen, equipment/fleet | 7 epics | delivery → gate receipt + OS&D; cutting plan → inventory |
 | **4** Execution & LPS | schedule, Look-Ahead board, earned-qty progress, Daily Workface Log + CBS burn, field time, estimating/EVM, tasks, **resource rollup (moved here)**, safety/PTW, supervision/closeout, **shift/swing handover register** | 11 epics | progress as earned qty (gated), actuals → P6, PPC computed |
@@ -53,8 +53,30 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
 - **M1 — Phase 1 Freeze Gate (`T-0131`):** contract test freezing `oe_asset_node`,
   `oe_asset_item`, the mixins and `run_checks` signatures; CEL JS/Python parity; seam
   hashes. Post-freeze changes require a formal ADR in `docs/decisions/`.
-- **M2 — MVP cut line:** Phase 0 + 1 + 2 + **Documents-Lite** (VFS tree, presigned uploads,
-  batch inspection PDF export) + **P6 schedule round-trip** (~85–95 tasks).
+- **Pilot-0 — first pilot (user, 2026-11-13; TD-173):** 8 inspectors, one project, **Android
+  only**. Usable when an inspector can download work, inspect offline, sign and sync, and a
+  reviewer can approve or return the inspection and get a PDF. No P6 import/export and no
+  Phase 2. Gate: **T-0146** (NFR budgets become hard CI gates, checklist below complete).
+  - **Phase 0** as planned, including the 2026-11-13 additions: T-0037 (12 h sessions, hidden
+    tenant), T-0038 (hybrid PIN), T-0039–T-0042 (Project Admins, lobby, access requests,
+    picker), T-0043 + T-0048 (device registry, revoke/wipe), T-0044 (deployment settings,
+    offline window), T-0045–T-0047 (NFR harness, glove/high-contrast tokens, localised template
+    strings); plus the AWS production deploy in `ap-southeast-2` (TD-004, TD-171).
+  - **Daily re-login dependency:** sessions end 12 h after sign-in, so the pilot inspectors
+    sign in every day. Entra ID SSO (TD-043) or magic-link e-mail delivery (TD-084) must be
+    live in the pilot deployment (checked by T-0146).
+  - **Phase 1 subset:** T-0101, T-0103 (hierarchy + Items), T-0107 (equipment import), T-0110
+    (field registry + CEL), T-0111 (inspection record), T-0116/T-0117 (defects, TD-167), T-0119
+    (signing), T-0126/T-0127 (offline sync), T-0133 (field checkout), T-0141–T-0145 (Android
+    build, SQLCipher store, device session + offline unlock, FCM push, sync budget).
+  - **Still without tasks** (cut before the gate): sync pull scope and download selection
+    (TD-162), scan-to-locate (TD-163), review/return (TD-165), photo annotation (TD-166),
+    inspection PDF export (TD-169), three dashboard tiles.
+  - **Deferred for the pilot:** P6 import/export (T-0104–T-0106, T-0125, T-0129), Phase 2,
+    Phases 3–7. The client signs on the inspector's device with a PIN instead of the portal.
+- **M2 — MVP cut line (next milestone after Pilot-0):** Phase 0 + 1 + 2 + **Documents-Lite**
+  (VFS tree, presigned uploads, batch inspection PDF export) + **P6 schedule round-trip**
+  (~85–95 tasks).
 
 ## Key engineering decisions (baked into the spec — see consolidation diff)
 
@@ -68,7 +90,11 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
 | Cutting | in-house **FFD** (1D) + **rectpack** (2D); `libnest2d`/`nest2D` banned (GPL) |
 | Security | **project-scoped RLS** + 4 bypass tests; **RS256/EdDSA + JWKS**; hash-chain audit; pyHanko PAdES at turnover |
 | Calibration | lifecycle + SAQ OCR + supersede-lock + hard CEL gate (expired tool blocked) |
-| Frontend | 8-group IA on 4 pillars; RegisterPage/DetailPage/Dynamic Form Renderer first; **Dexie** offline outbox |
+| Frontend | 8-group IA on 4 pillars (nav mapping diff §6.1); RegisterPage/DetailPage/Dynamic Form Renderer first; **Dexie** offline outbox for web PWA apps |
+| Access (2026-11-13) | One hidden tenant per deployment; System admins appoint Project Admins (`create_projects`); creator gets PER-09; lobby + access requests; project picker; one URL; admin roles never confer hold/sign-off (diff §4.1) |
+| Sessions & devices (2026-11-13) | 15 min access, 12 h refresh from sign-in (daily re-login); hybrid device PIN, offline unlock independent of the server session; offline window 7 days default, 14 max; device registry + remote revoke/wipe (diff §4.2–§4.4) |
+| Field client (2026-11-13) | Capacitor Android 11+, SQLCipher SQLite + file-system media, managed Play/MDM; one client storage contract and a client-agnostic sync contract (diff §6.2); NFR budgets warn now, hard gate before Pilot-0 (diff §6.3) |
+| Region (2026-11-13) | Per-deployment setting: AWS `ap-southeast-2` for Australian deployments (diff §4.4) |
 
 ## Open decisions (see `TODO.md`)
 TD-003 (SSO vs local JWT), TD-004 (hosting target), TD-072 (ADR 0004 rule-set defaults per project), TD-073 (handover first-shift trigger),
