@@ -3,17 +3,15 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 129 · **Closed:** 57
+**Open:** 128 · **Closed:** 59
 
-## decision (8)
+## decision (6)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
 | [TD-096](../tracker/todo/TD-096.md) | Approved coating ITR dropped the residual-dust rating row the ITP requires; Grating and Gridmesh ITR has no approved version: confirm with the client before shipping default templates | T-0113 | planner |
-| [TD-141](../tracker/todo/TD-141.md) | Rule store: explicit per-rule version column, findings log only non-passing rules | T-0018 | implementer |
 | [TD-170](../tracker/todo/TD-170.md) | Offline window: 14 days (clean-room FR-02) vs up to 7 days (master §6); tenant setting and default | T-0126 | clean-room-gap-analysis |
 | [TD-171](../tracker/todo/TD-171.md) | Production AWS region / data residency: EU (clean-room NFR-10, GDPR) vs Australia; TD-004 settled AWS but not the region | — | clean-room-gap-analysis |
-| [TD-172](../tracker/todo/TD-172.md) | Per-business-unit theming (logo/palette) vs one tenant per deploy (TD-007); German translations at launch (clean-room NFR-16) | T-0136 | clean-room-gap-analysis |
 | [TD-173](../tracker/todo/TD-173.md) | Pilot-0 (8 inspectors, one project, Android only, no P6 / Phase 2) ahead of the M2 cut line resolved in TD-009 | — | clean-room-gap-analysis |
 | [TD-183](../tracker/todo/TD-183.md) | Localisation of form template content (labels, option labels, error messages) | T-0025 | implementer |
 | [TD-184](../tracker/todo/TD-184.md) | Who may create a project and how the creator gets a membership: POST /projects is gated on the admin capability in any project until T-0014's tenant administrator | T-0012 | implementer |
@@ -105,7 +103,7 @@
 | [TD-181](../tracker/todo/TD-181.md) | DetailPage: audit log and gate-status endpoints | T-0025 | implementer |
 | [TD-182](../tracker/todo/TD-182.md) | RegisterPage: server-side filtering, sorting and paging | T-0025 | implementer |
 
-## later (37)
+## later (38)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -146,6 +144,7 @@
 | [TD-177](../tracker/todo/TD-177.md) | Form renderer: adopt the T-0110 shared field-type registry + dual-runtime parity | T-0025 | implementer |
 | [TD-186](../tracker/todo/TD-186.md) | spatial_bounds: GiST index and ST_IsValid check (self-intersecting polygons are accepted today); project code stays taken after soft delete | T-0012 | implementer |
 | [TD-189](../tracker/todo/TD-189.md) | Set a psycopg connect_timeout on the worker's DB engine so _settle/_start are bounded when the DB is unreachable | T-0015 | reviewer |
+| [TD-190](../tracker/todo/TD-190.md) | Client-side co-branding (client logo on client-facing pages/reports): decide later | T-0136 | user |
 
 ## bug (1)
 
@@ -229,4 +228,6 @@
 | ✅ | [TD-116](../tracker/todo/TD-116.md) | ADR 0004 Amendment B: two-person unlock of a locked rule names approval_routes (E-06-07, Phase 6) - who is the second approver until then? | Interim default approved: until approval_routes (E-06-07) exists, a second, different PER-13 or PER-01 user approves an unlock of a locked rule (user, 2026-11-10) |
 | ✅ | [TD-118](../tracker/todo/TD-118.md) | Qualification-type catalogue (TD-101): who is the 'super admin', and may a project-scoped PER-09 edit a tenant-wide (global) catalogue? | No super admin: the tenant administrator edits the tenant-wide qualification catalogue; PER-09 Project Administrator may add project-level types (user, 2026-11-10) |
 | ✅ | [TD-119](../tracker/todo/TD-119.md) | CLAUDE.md section 6 anchor bullet still says 'work anchors to an RSW': apply the ADR 0003 amended wording (human edit; agents may not change CLAUDE.md) | CLAUDE.md section 6 anchor bullet updated to the ADR 0003 wording with 'at most one per root-to-leaf path' (TD-113) (user, 2026-11-10) |
+| ✅ | [TD-141](../tracker/todo/TD-141.md) | Rule store: explicit per-rule version column, findings log only non-passing rules | per-rule version column; findings log only failed/errored rules. (user, 2026-11-13) |
+| ✅ | [TD-172](../tracker/todo/TD-172.md) | Per-business-unit theming (logo/palette) vs one tenant per deploy (TD-007); German translations at launch (clean-room NFR-16) | English only for now; no per-BU theming or branding (main site logo/colours). Client logo co-branding: TD-190 (later). (user, 2026-11-13) |
 | ✅ | [TD-187](../tracker/todo/TD-187.md) | jobs worker: a cancellation/timeout while _start is returning leaves the row 'running' forever (flaky test_a_cancelled_or_timed_out_job_is_marked_failed) | run_job shields the _start thread; a cancel during start waits for it, then fails a started row with 'Job timed out or was cancelled' (shielded) and re-raises (fix/jobs-cancel-during-start) |
