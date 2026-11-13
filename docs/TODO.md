@@ -3,9 +3,9 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 138 · **Closed:** 90
+**Open:** 142 · **Closed:** 90
 
-## decision (4)
+## decision (6)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -13,8 +13,10 @@
 | [TD-213](../tracker/todo/TD-213.md) | Object key layout: confirm {tenant}/{project}/{module}/{sha256} (no extension) instead of the master spec's {hash}.ext, plus transient staging/ and quarantine/ prefixes | T-0016 | implementer |
 | [TD-223](../tracker/todo/TD-223.md) | Who may open PRs to dev? If any account other than KERP_ALLOWED_REVIEWERS (or forks) can, require a human approval as well as review-gate | T-0067 | reviewer |
 | [TD-224](../tracker/todo/TD-224.md) | Magic-link request lockout is still per tenant+email: anyone can keep a known field worker from getting a link (4/hour, then doubling delay); decide per-client keying vs mailbox-flood protection | T-0068 | reviewer |
+| [TD-228](../tracker/todo/TD-228.md) | Teams scope and management: project-level teams only, managed by PER-09 (no tenant-level or cross-project teams) | T-0013 | planner |
+| [TD-229](../tracker/todo/TD-229.md) | Teams module vs planner crews and roster teams (TD-073/TD-083) and the handover 'project team' | T-0013 | planner |
 
-## spec-gap (35)
+## spec-gap (36)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -53,6 +55,7 @@
 | [TD-205](../tracker/todo/TD-205.md) | NFR budgets need a reference device and a 4G network profile before they become a hard gate for Pilot-0 | T-0045, T-0146 | planner |
 | [TD-220](../tracker/todo/TD-220.md) | Client QR co-sign (mode ii): judge 'key active at occurred_at' by the tablet's reconstructed scan time, not the client device clock | T-0163 | reviewer |
 | [TD-221](../tracker/todo/TD-221.md) | Client wet signature (mode iii): outcome when the client rejects after the inspection is already approved (INSPECTED_PASSED/INSPECTED_FAILED) or LOCKED_FOR_TURNOVER | T-0174 | reviewer |
+| [TD-230](../tracker/todo/TD-230.md) | Saved view visibility 'team' names no team: oe_saved_view (register-views 3) has no team reference | T-0013 | planner |
 
 ## missed (4)
 
@@ -63,7 +66,7 @@
 | [TD-131](../tracker/todo/TD-131.md) | Add a root .env.example for the dev stack (the implementer agent's permission rules block writing .env* files) | T-0003 | implementer |
 | [TD-208](../tracker/todo/TD-208.md) | Uploads infra: provision the kerp-vault bucket (CORS for browser PUT/GET, lifecycle on staging/), wire KERP_S3_* in compose, add MinIO to CI for the gated round-trip test | T-0016 | implementer |
 
-## deferred (24)
+## deferred (25)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -91,6 +94,7 @@
 | [TD-209](../tracker/todo/TD-209.md) | Uploads: file deletion and content-object GC; recover files stuck in 'verifying' after a failed verify job | T-0016 | implementer |
 | [TD-212](../tracker/todo/TD-212.md) | Uploads: run the orphan sweep on a schedule for every project (needs the scope list of TD-155) | T-0016 | implementer |
 | [TD-217](../tracker/todo/TD-217.md) | Inspection scheduling after Pilot-0: calendar view, general recurrence (beyond scaffolds), light work-order grouping (TD-165 remainder) | T-0152 | planner |
+| [TD-231](../tracker/todo/TD-231.md) | Teams admin screen in the Backbone nav group (list, create, rename, delete, add/remove members) | T-0013 | planner |
 
 ## later (55)
 

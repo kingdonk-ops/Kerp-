@@ -36,7 +36,7 @@
 | ✅ | [T-0010](../tracker/tasks/T-0010.md) | Three-tier RBAC/ABAC: capability tiers × 15 personas × project/site scope (Asset-Site filter) + explicit multi-project read scope | identity | M | T-0008 | #39 |
 | ✅ | [T-0011](../tracker/tasks/T-0011.md) | Module loader + manifest contract + per-project enable/disable | platform | M | T-0005 | #32 |
 | ✅ | [T-0012](../tracker/tasks/T-0012.md) | projects module: CRUD + settings (IANA timezone, spatial_bounds, currency/locale) | projects | M | T-0010, T-0011 | #43 |
-| ▶ | [T-0013](../tracker/tasks/T-0013.md) | teams module: teams, membership, entity visibility | teams | S | T-0012 |  |
+| ▶ | [T-0013](../tracker/tasks/T-0013.md) | teams module: project teams, team membership, team-visibility service contract | teams | M | T-0010, T-0011, T-0012 |  |
 | ▶ | [T-0014](../tracker/tasks/T-0014.md) | admin module: user + project-membership administration API (PER-09 on its projects), admin grants table, membership-based RLS on projects and tenant-level tables | admin | M | T-0010, T-0011, T-0012 |  |
 | ⬜ | [T-0039](../tracker/tasks/T-0039.md) | System admin appoints Project Admins: system_admin/create_projects grant API, project creation gated on create_projects, creator gets PER-09 | admin | S | T-0014 |  |
 | ⬜ | [T-0044](../tracker/tasks/T-0044.md) | Deployment (tenant) settings: offline window (default 7, max 14 days) and new-project defaults (status, timezone, currency, locale) | admin | S | T-0039 |  |
