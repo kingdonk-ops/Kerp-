@@ -178,7 +178,7 @@ Wins over any earlier text on tenant selection, tenant administrators and projec
   decider go to the audit ledger. Projects not visible in the lobby are reached only by an
   **invite** (a PER-09 assigns the user) or by **project code**: entering an exact project code
   finds that one project and lets the user file an access request; a code never grants access
-  by itself (TD-191). The lobby and code lookup read through a narrow path (code, name, id of
+  by itself (TD-202). The lobby and code lookup read through a narrow path (code, name, id of
   matching projects only); the membership-based `projects` policy is not widened.
 
 ### 4.2 Sessions (user, 2026-11-13; TD-121, TD-135, TD-170)
@@ -186,7 +186,7 @@ Wins over any earlier text on tenant selection, tenant administrators and projec
 - **Access token** 15 minutes (unchanged). **Refresh token** lifetime **12 hours from sign-in**
   (`KERP_REFRESH_TOKEN_HOURS=12`): rotation issues a new single-use token but never extends the
   session past sign-in + 12 h. Users sign in again daily. Refresh-token transport stays in the
-  JSON body (T-0008); a cookie transport for the SPA is open (TD-192).
+  JSON body (T-0008); a cookie transport for the SPA is open (TD-203).
 - **Field PIN, hybrid (TD-135, decision 8a).** The PIN belongs to the enrolled device (§4.3),
   not to a server session:
   - **Local unlock.** The app unlocks on the device with the 6-digit PIN against a key held in
@@ -221,7 +221,7 @@ Wins over any earlier text on tenant selection, tenant administrators and projec
   revoked device is lost; the admin UI shows the last-sync time before confirming.
 - **Audit.** Ledger entries made through a device carry its `device_id`.
 - **After the pilot:** biometric unlock, certificate pinning and per-device sync-health views
-  (TD-193).
+  (TD-204).
 
 ### 4.4 Deployment settings and region (user, 2026-11-13; TD-170, TD-171, TD-185)
 
@@ -315,7 +315,7 @@ personas, and links to the lobby ("Find a project").
 | Outdoor | A **high-contrast** theme (design tokens) for field screens; WCAG 2.1 AA everywhere | CI: axe contrast checks |
 
 Automated performance tests **warn in CI now** and become a **hard gate before Pilot-0** (§7).
-The reference device and network profile are confirmed before the gate flips (TD-194).
+The reference device and network profile are confirmed before the gate flips (TD-205).
 
 ---
 
