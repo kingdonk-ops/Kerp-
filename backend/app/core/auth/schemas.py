@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import uuid
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field
+
+from app.core.auth.field import PIN_LENGTH, PIN_PATTERN, is_weak_pin
 
 
 class LoginRequest(BaseModel):
@@ -22,6 +24,44 @@ class RefreshRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     refresh_token: str = Field(min_length=1, max_length=4096)
+
+
+class MagicLinkRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    email: str = Field(min_length=3, max_length=320)
+    tenant_id: uuid.UUID | None = None
+
+
+def _strong_pin(pin: str) -> str:
+    if is_weak_pin(pin):
+        raise ValueError("PIN is too easy to guess")
+    return pin
+
+
+Pin = Annotated[
+    str,
+    Field(pattern=PIN_PATTERN, description=f"{PIN_LENGTH}-digit PIN of this device's session"),
+]
+
+
+class MagicLinkRedeemRequest(BaseModel):
+    """Spend a magic link and set the PIN that will unlock the new session on this device."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    token: str = Field(min_length=16, max_length=256)
+    pin: Annotated[Pin, AfterValidator(_strong_pin)]
+
+
+class PinUnlockRequest(BaseModel):
+    """The device's refresh token and the PIN. Both are required: a PIN alone is never a
+    credential."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    refresh_token: str = Field(min_length=1, max_length=4096)
+    pin: Pin
 
 
 class TokenResponse(BaseModel):

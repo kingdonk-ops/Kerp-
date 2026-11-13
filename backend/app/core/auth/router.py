@@ -1,20 +1,24 @@
-"""Auth endpoints: login, refresh, logout, me, and the JWKS document (T-0008)."""
+"""Auth endpoints: login, refresh, logout, me, JWKS (T-0008); magic link + PIN (T-0009)."""
 
 from __future__ import annotations
 
-from typing import Annotated, Final
+from typing import Annotated, Any, Final
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 
 from app.core.auth.bearer import AUTH_UNAVAILABLE
 from app.core.auth.deps import CurrentPrincipal, get_auth_service, unauthorized
+from app.core.auth.lockout import LockedOutError
 from app.core.auth.providers import PasswordCredentials
 from app.core.auth.revocation import RevocationUnavailableError
 from app.core.auth.runtime import AuthRuntime, get_auth_runtime
 from app.core.auth.schemas import (
     JsonWebKeySet,
     LoginRequest,
+    MagicLinkRedeemRequest,
+    MagicLinkRequest,
     MeResponse,
+    PinUnlockRequest,
     RefreshRequest,
     TokenResponse,
 )
@@ -24,6 +28,7 @@ from app.core.db import DbSession
 PREFIX: Final = "/api/v1/auth"
 JWKS_PATH: Final = "/.well-known/jwks.json"
 JWKS_MAX_AGE: Final = 300
+TOO_MANY_ATTEMPTS: Final = "Too many attempts"
 
 router = APIRouter(tags=["auth"])
 
@@ -56,7 +61,22 @@ def jwks(
     return JsonWebKeySet.model_validate(runtime.keys.jwks())
 
 
-@router.post(f"{PREFIX}/login", response_model=TokenResponse)
+def _locked(exc: LockedOutError) -> HTTPException:
+    return HTTPException(
+        status.HTTP_429_TOO_MANY_REQUESTS,
+        TOO_MANY_ATTEMPTS,
+        headers={"Retry-After": str(exc.retry_after)},
+    )
+
+
+_LOCKED_RESPONSE: Final[dict[int | str, dict[str, Any]]] = {
+    status.HTTP_429_TOO_MANY_REQUESTS: {
+        "description": "Locked after repeated failures; retry after `Retry-After` seconds"
+    }
+}
+
+
+@router.post(f"{PREFIX}/login", response_model=TokenResponse, responses=_LOCKED_RESPONSE)
 def login(
     body: LoginRequest, session: DbSession, service: AuthServiceDep, response: Response
 ) -> TokenResponse:
@@ -66,6 +86,63 @@ def login(
         pair = service.login(session, tenant_id=body.tenant_id, credentials=credentials)
     except AuthenticationError as exc:
         raise unauthorized() from exc
+    except LockedOutError as exc:
+        raise _locked(exc) from exc
+    except RevocationUnavailableError as exc:
+        raise _unavailable() from exc
+    return _token_response(pair, response)
+
+
+@router.post(
+    f"{PREFIX}/magic-link",
+    status_code=status.HTTP_202_ACCEPTED,
+    responses=_LOCKED_RESPONSE,
+)
+def request_magic_link(body: MagicLinkRequest, session: DbSession, service: AuthServiceDep) -> None:
+    """Send a one-time sign-in link (15 min) to a field worker's e-mail.
+
+    Always ``202`` (unknown, inactive and other-tenant addresses included), so the answer
+    reveals no accounts.
+    """
+    try:
+        service.request_magic_link(session, tenant_id=body.tenant_id, email=body.email)
+    except LockedOutError as exc:
+        raise _locked(exc) from exc
+    except RevocationUnavailableError as exc:
+        raise _unavailable() from exc
+
+
+@router.post(f"{PREFIX}/magic-link/redeem", response_model=TokenResponse)
+def redeem_magic_link(
+    body: MagicLinkRedeemRequest, session: DbSession, service: AuthServiceDep, response: Response
+) -> TokenResponse:
+    """Spend a magic link: start a session on this device, gated by the PIN set here.
+
+    The session's refresh token then works only through `/auth/pin/unlock`.
+    """
+    try:
+        pair = service.redeem_magic_link(session, token=body.token, pin=body.pin)
+    except AuthenticationError as exc:
+        raise unauthorized(invalid_token=True) from exc
+    except RevocationUnavailableError as exc:
+        raise _unavailable() from exc
+    return _token_response(pair, response)
+
+
+@router.post(f"{PREFIX}/pin/unlock", response_model=TokenResponse, responses=_LOCKED_RESPONSE)
+def pin_unlock(
+    body: PinUnlockRequest, session: DbSession, service: AuthServiceDep, response: Response
+) -> TokenResponse:
+    """Unlock a PIN-gated session: the device's refresh token + the PIN rotate the tokens.
+
+    Wrong PINs lock the session progressively; the 10th wrong PIN revokes it.
+    """
+    try:
+        pair = service.unlock(session, refresh_token=body.refresh_token, pin=body.pin)
+    except AuthenticationError as exc:
+        raise unauthorized(invalid_token=True) from exc
+    except LockedOutError as exc:
+        raise _locked(exc) from exc
     except RevocationUnavailableError as exc:
         raise _unavailable() from exc
     return _token_response(pair, response)

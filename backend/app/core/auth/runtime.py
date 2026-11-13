@@ -1,4 +1,4 @@
-"""The per-app auth runtime: key set, token service and revocation store (T-0008).
+"""The per-app auth runtime: keys, tokens, revocation store, magic-link delivery.
 
 Built lazily from the app's settings on first use and cached on ``app.state.auth``, so
 an app that never authenticates (``/health``) needs no key or Redis. Tests install their
@@ -15,6 +15,7 @@ from typing import Final
 
 from fastapi import FastAPI, Request
 
+from app.core.auth.field import MagicLinkSender, sender_from_settings
 from app.core.auth.keys import AuthConfigError, KeySet, keyset_from_settings
 from app.core.auth.revocation import (
     InMemoryRevocationStore,
@@ -35,6 +36,7 @@ class AuthRuntime:
     keys: KeySet
     tokens: TokenService
     store: RevocationStore
+    magic_links: MagicLinkSender
 
     def close(self) -> None:
         self.store.close()
@@ -45,6 +47,7 @@ def build_auth_runtime(
     *,
     keys: KeySet | None = None,
     store: RevocationStore | None = None,
+    magic_links: MagicLinkSender | None = None,
 ) -> AuthRuntime:
     """Assemble the runtime. Raises ``AuthConfigError`` on unusable production config."""
     if keys is None:
@@ -63,7 +66,13 @@ def build_auth_runtime(
         access_ttl=timedelta(minutes=settings.access_token_minutes),
         refresh_ttl=timedelta(days=settings.refresh_token_days),
     )
-    return AuthRuntime(settings=settings, keys=keys, tokens=tokens, store=store)
+    return AuthRuntime(
+        settings=settings,
+        keys=keys,
+        tokens=tokens,
+        store=store,
+        magic_links=magic_links or sender_from_settings(settings),
+    )
 
 
 def _store_from_settings(settings: Settings) -> RevocationStore:

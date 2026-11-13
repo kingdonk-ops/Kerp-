@@ -78,6 +78,154 @@
               }
             }
           },
+          "429": {
+            "description": "Locked after repeated failures; retry after `Retry-After` seconds"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/magic-link": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Request Magic Link",
+        "description": "Send a one-time sign-in link (15 min) to a field worker's e-mail.\n\nAlways ``202`` (unknown, inactive and other-tenant addresses included), so the answer\nreveals no accounts.",
+        "operationId": "request_magic_link_api_v1_auth_magic_link_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MagicLinkRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "429": {
+            "description": "Locked after repeated failures; retry after `Retry-After` seconds"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/magic-link/redeem": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Redeem Magic Link",
+        "description": "Spend a magic link: start a session on this device, gated by the PIN set here.\n\nThe session's refresh token then works only through `/auth/pin/unlock`.",
+        "operationId": "redeem_magic_link_api_v1_auth_magic_link_redeem_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MagicLinkRedeemRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/pin/unlock": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Pin Unlock",
+        "description": "Unlock a PIN-gated session: the device's refresh token + the PIN rotate the tokens.\n\nWrong PINs lock the session progressively; the 10th wrong PIN revokes it.",
+        "operationId": "pin_unlock_api_v1_auth_pin_unlock_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PinUnlockRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Locked after repeated failures; retry after `Retry-After` seconds"
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -446,6 +594,58 @@
         ],
         "title": "LoginRequest"
       },
+      "MagicLinkRedeemRequest": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "maxLength": 256,
+            "minLength": 16,
+            "title": "Token"
+          },
+          "pin": {
+            "type": "string",
+            "pattern": "^[0-9]{6}$",
+            "title": "Pin",
+            "description": "6-digit PIN of this device's session"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "token",
+          "pin"
+        ],
+        "title": "MagicLinkRedeemRequest",
+        "description": "Spend a magic link and set the PIN that will unlock the new session on this device."
+      },
+      "MagicLinkRequest": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "maxLength": 320,
+            "minLength": 3,
+            "title": "Email"
+          },
+          "tenant_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tenant Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "email"
+        ],
+        "title": "MagicLinkRequest"
+      },
       "MeResponse": {
         "properties": {
           "id": {
@@ -527,6 +727,30 @@
         ],
         "title": "ModuleToggle",
         "description": "Body of ``PUT /api/v1/modules/{name}``."
+      },
+      "PinUnlockRequest": {
+        "properties": {
+          "refresh_token": {
+            "type": "string",
+            "maxLength": 4096,
+            "minLength": 1,
+            "title": "Refresh Token"
+          },
+          "pin": {
+            "type": "string",
+            "pattern": "^[0-9]{6}$",
+            "title": "Pin",
+            "description": "6-digit PIN of this device's session"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "refresh_token",
+          "pin"
+        ],
+        "title": "PinUnlockRequest",
+        "description": "The device's refresh token and the PIN. Both are required: a PIN alone is never a\ncredential."
       },
       "RefreshRequest": {
         "properties": {

@@ -64,6 +64,73 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/magic-link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Request Magic Link
+         * @description Send a one-time sign-in link (15 min) to a field worker's e-mail.
+         *
+         *     Always ``202`` (unknown, inactive and other-tenant addresses included), so the answer
+         *     reveals no accounts.
+         */
+        post: operations["request_magic_link_api_v1_auth_magic_link_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/magic-link/redeem": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Redeem Magic Link
+         * @description Spend a magic link: start a session on this device, gated by the PIN set here.
+         *
+         *     The session's refresh token then works only through `/auth/pin/unlock`.
+         */
+        post: operations["redeem_magic_link_api_v1_auth_magic_link_redeem_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/pin/unlock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Pin Unlock
+         * @description Unlock a PIN-gated session: the device's refresh token + the PIN rotate the tokens.
+         *
+         *     Wrong PINs lock the session progressively; the 10th wrong PIN revokes it.
+         */
+        post: operations["pin_unlock_api_v1_auth_pin_unlock_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/refresh": {
         parameters: {
             query?: never;
@@ -228,6 +295,26 @@ export interface components {
             /** Tenant Id */
             tenant_id?: string | null;
         };
+        /**
+         * MagicLinkRedeemRequest
+         * @description Spend a magic link and set the PIN that will unlock the new session on this device.
+         */
+        MagicLinkRedeemRequest: {
+            /** Token */
+            token: string;
+            /**
+             * Pin
+             * @description 6-digit PIN of this device's session
+             */
+            pin: string;
+        };
+        /** MagicLinkRequest */
+        MagicLinkRequest: {
+            /** Email */
+            email: string;
+            /** Tenant Id */
+            tenant_id?: string | null;
+        };
         /** MeResponse */
         MeResponse: {
             /**
@@ -268,6 +355,20 @@ export interface components {
         ModuleToggle: {
             /** Enabled */
             enabled: boolean;
+        };
+        /**
+         * PinUnlockRequest
+         * @description The device's refresh token and the PIN. Both are required: a PIN alone is never a
+         *     credential.
+         */
+        PinUnlockRequest: {
+            /** Refresh Token */
+            refresh_token: string;
+            /**
+             * Pin
+             * @description 6-digit PIN of this device's session
+             */
+            pin: string;
         };
         /** RefreshRequest */
         RefreshRequest: {
@@ -389,6 +490,126 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Locked after repeated failures; retry after `Retry-After` seconds */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    request_magic_link_api_v1_auth_magic_link_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MagicLinkRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Locked after repeated failures; retry after `Retry-After` seconds */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    redeem_magic_link_api_v1_auth_magic_link_redeem_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MagicLinkRedeemRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TokenResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    pin_unlock_api_v1_auth_pin_unlock_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PinUnlockRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TokenResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Locked after repeated failures; retry after `Retry-After` seconds */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
