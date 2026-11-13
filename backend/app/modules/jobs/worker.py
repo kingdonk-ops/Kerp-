@@ -84,7 +84,7 @@ async def run_job(
             handler = registry.get(kind).handler
             with use_tenancy(tenancy):
                 result = await handler(
-                    JobContext(row_id, kind, tenancy, payload, request_id, update)
+                    JobContext(row_id, kind, tenancy, payload, request_id, update, db)
                 )
         except (Exception, asyncio.CancelledError) as exc:
             logger.exception(
