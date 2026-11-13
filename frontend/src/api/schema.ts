@@ -340,6 +340,63 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/saved-views/projects/{project_id}/views": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Views */
+        get: operations["list_views_api_v1_saved_views_projects__project_id__views_get"];
+        put?: never;
+        /** Create View */
+        post: operations["create_view_api_v1_saved_views_projects__project_id__views_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/saved-views/projects/{project_id}/views/default": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Default View
+         * @description The caller's default view of the register, else the project default, else ``null``.
+         */
+        get: operations["default_view_api_v1_saved_views_projects__project_id__views_default_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/saved-views/projects/{project_id}/views/{view_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read View */
+        get: operations["read_view_api_v1_saved_views_projects__project_id__views__view_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete View */
+        delete: operations["delete_view_api_v1_saved_views_projects__project_id__views__view_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update View */
+        patch: operations["update_view_api_v1_saved_views_projects__project_id__views__view_id__patch"];
+        trace?: never;
+    };
     "/api/v1/uploads/projects/{project_id}/files": {
         parameters: {
             query?: never;
@@ -415,6 +472,16 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** Aggregate */
+        Aggregate: {
+            /** Column */
+            column: string;
+            /**
+             * Fn
+             * @enum {string}
+             */
+            fn: "sum" | "avg" | "min" | "max" | "count" | "count-distinct";
+        };
         /** DeliveryRead */
         DeliveryRead: {
             /** Channel */
@@ -472,6 +539,87 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+        };
+        /**
+         * FilterCondition
+         * @description One condition ``{column, op, value}``; the value shape depends on the op.
+         */
+        FilterCondition: {
+            /** Column */
+            column: string;
+            /**
+             * Op
+             * @enum {string}
+             */
+            op: "eq" | "neq" | "in" | "not_in" | "contains" | "starts_with" | "is_empty" | "between" | "gt" | "lt" | "within_next" | "overdue" | "me" | "my_teams" | "subtree_of";
+            /** Value */
+            value?: unknown;
+        };
+        /**
+         * FilterGroup
+         * @description ``{op: and|or, conditions: [...]}``; conditions are conditions or nested groups.
+         */
+        "FilterGroup-Input": {
+            /**
+             * Op
+             * @enum {string}
+             */
+            op: "and" | "or";
+            /** Conditions */
+            conditions: (components["schemas"]["FilterGroup-Input"] | components["schemas"]["FilterCondition"])[];
+        };
+        /**
+         * FilterGroup
+         * @description ``{op: and|or, conditions: [...]}``; conditions are conditions or nested groups.
+         */
+        "FilterGroup-Output": {
+            /**
+             * Op
+             * @enum {string}
+             */
+            op: "and" | "or";
+            /** Conditions */
+            conditions: (components["schemas"]["FilterGroup-Output"] | components["schemas"]["FilterCondition"])[];
+        };
+        /**
+         * FormatRule
+         * @description ``condition`` (CEL over the row, e.g. ``Scoped == "No"``) -> ``style``.
+         */
+        FormatRule: {
+            /** Condition */
+            condition: string;
+            style: components["schemas"]["FormatStyle"];
+        };
+        /**
+         * FormatStyle
+         * @description Presentation tokens only (the client maps them to theme colours), never raw CSS.
+         */
+        FormatStyle: {
+            /**
+             * Tone
+             * @enum {string}
+             */
+            tone: "grey" | "blue" | "green" | "amber" | "red";
+            /**
+             * Bold
+             * @default false
+             */
+            bold: boolean;
+        };
+        /**
+         * GroupBy
+         * @description Group rows by ``columns`` (outermost first), with aggregates and a totals row.
+         */
+        GroupBy: {
+            /** Columns */
+            columns: string[];
+            /** Aggregates */
+            aggregates?: components["schemas"]["Aggregate"][];
+            /**
+             * Totals
+             * @default false
+             */
+            totals: boolean;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -879,6 +1027,177 @@ export interface components {
             /** Refresh Token */
             refresh_token: string;
         };
+        /**
+         * ResolvedColumn
+         * @description A saved column as the register shows it; ``missing``: no longer in the catalogue.
+         */
+        ResolvedColumn: {
+            /** Id */
+            id: string;
+            /** Width */
+            width?: number | null;
+            /** Pinned */
+            pinned?: ("left" | "right") | null;
+            /**
+             * Visible
+             * @default true
+             */
+            visible: boolean;
+            /**
+             * Missing
+             * @default false
+             */
+            missing: boolean;
+        };
+        /**
+         * SavedViewCreate
+         * @description ``POST .../views`` (also "save as"). The owner is the caller; the project is the path's.
+         *
+         *     ``team_id`` names the team of a ``team`` view and is given for no other visibility.
+         *     ``is_default`` is allowed on ``private`` (the caller's default) and ``project`` (the
+         *     project default, Project Administrator only) views.
+         */
+        SavedViewCreate: {
+            /** Columns */
+            columns?: components["schemas"]["ViewColumn"][];
+            /** Filter */
+            filter?: (components["schemas"]["FilterGroup-Input"] | components["schemas"]["FilterCondition"]) | null;
+            /** Sort */
+            sort?: components["schemas"]["SortKey"][];
+            group_by?: components["schemas"]["GroupBy"] | null;
+            /** Conditional Format */
+            conditional_format?: components["schemas"]["FormatRule"][];
+            /**
+             * Density
+             * @default standard
+             * @enum {string}
+             */
+            density: "compact" | "standard" | "comfortable";
+            /** Register Key */
+            register_key: string;
+            /** Name */
+            name: string;
+            /**
+             * Visibility
+             * @default private
+             * @enum {string}
+             */
+            visibility: "private" | "team" | "project" | "portal";
+            /** Team Id */
+            team_id?: string | null;
+            /**
+             * Is Default
+             * @default false
+             */
+            is_default: boolean;
+        };
+        /**
+         * SavedViewRead
+         * @description A view as loaded: its configuration plus which referenced columns are missing.
+         *
+         *     ``missing_columns`` lists every id (from columns, filter, sort, group-by) the register's
+         *     catalogue no longer has; the register skips them. It is empty when the register has
+         *     no catalogue registered (nothing can be checked).
+         */
+        SavedViewRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /** Register Key */
+            register_key: string;
+            /** Name */
+            name: string;
+            /**
+             * Owner User Id
+             * Format: uuid
+             */
+            owner_user_id: string;
+            /**
+             * Visibility
+             * @enum {string}
+             */
+            visibility: "private" | "team" | "project" | "portal";
+            /** Team Id */
+            team_id: string | null;
+            /** Is Default */
+            is_default: boolean;
+            /** Columns */
+            columns: components["schemas"]["ResolvedColumn"][];
+            /** Filter */
+            filter: (components["schemas"]["FilterGroup-Output"] | components["schemas"]["FilterCondition"]) | null;
+            /** Sort */
+            sort: components["schemas"]["SortKey"][];
+            group_by: components["schemas"]["GroupBy"] | null;
+            /** Conditional Format */
+            conditional_format: components["schemas"]["FormatRule"][];
+            /**
+             * Density
+             * @enum {string}
+             */
+            density: "compact" | "standard" | "comfortable";
+            /** Schema Version */
+            schema_version: number;
+            /** Missing Columns */
+            missing_columns: string[];
+            /** Revision */
+            revision: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
+         * SavedViewUpdate
+         * @description ``PATCH .../views/{id}``: edit, rename, share, make default; only given fields change.
+         *
+         *     ``filter``, ``group_by`` and ``team_id`` may be ``null`` (clears them). The register
+         *     of a view never changes.
+         */
+        SavedViewUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Visibility */
+            visibility?: ("private" | "team" | "project" | "portal") | null;
+            /** Team Id */
+            team_id?: string | null;
+            /** Is Default */
+            is_default?: boolean | null;
+            /** Columns */
+            columns?: components["schemas"]["ViewColumn"][] | null;
+            /** Filter */
+            filter?: (components["schemas"]["FilterGroup-Input"] | components["schemas"]["FilterCondition"]) | null;
+            /** Sort */
+            sort?: components["schemas"]["SortKey"][] | null;
+            group_by?: components["schemas"]["GroupBy"] | null;
+            /** Conditional Format */
+            conditional_format?: components["schemas"]["FormatRule"][] | null;
+            /** Density */
+            density?: ("compact" | "standard" | "comfortable") | null;
+        };
+        /** SortKey */
+        SortKey: {
+            /** Column */
+            column: string;
+            /**
+             * Direction
+             * @default asc
+             * @enum {string}
+             */
+            direction: "asc" | "desc";
+        };
         /** TokenResponse */
         TokenResponse: {
             /** Access Token */
@@ -941,6 +1260,20 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /** ViewColumn */
+        ViewColumn: {
+            /** Id */
+            id: string;
+            /** Width */
+            width?: number | null;
+            /** Pinned */
+            pinned?: ("left" | "right") | null;
+            /**
+             * Visible
+             * @default true
+             */
+            visible: boolean;
         };
     };
     responses: never;
@@ -1571,6 +1904,205 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NotificationRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_views_api_v1_saved_views_projects__project_id__views_get: {
+        parameters: {
+            query: {
+                register_key: string;
+            };
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedViewRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_view_api_v1_saved_views_projects__project_id__views_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SavedViewCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedViewRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    default_view_api_v1_saved_views_projects__project_id__views_default_get: {
+        parameters: {
+            query: {
+                register_key: string;
+            };
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedViewRead"] | null;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_view_api_v1_saved_views_projects__project_id__views__view_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                view_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedViewRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_view_api_v1_saved_views_projects__project_id__views__view_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                view_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_view_api_v1_saved_views_projects__project_id__views__view_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                view_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SavedViewUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedViewRead"];
                 };
             };
             /** @description Validation Error */
