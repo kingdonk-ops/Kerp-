@@ -12,6 +12,9 @@
 
 -include .env
 
+# The backend defaults to KERP_ENVIRONMENT=production (fail safe, T-0070); the local stack
+# and its tests opt in to development.
+KERP_ENVIRONMENT ?= development
 # Runtime role: NOSUPERUSER NOBYPASSRLS, so PostgreSQL row-level security applies.
 KERP_DATABASE_URL ?= postgresql+psycopg://kerp_app:kerp_app@localhost:5432/kerp_test
 # Superuser of the test database, only for tests that tamper behind the app's back.
