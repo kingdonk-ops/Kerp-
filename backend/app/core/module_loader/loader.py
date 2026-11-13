@@ -13,6 +13,7 @@ toggle API at ``/api/v1/modules``.
 from __future__ import annotations
 
 import importlib
+import importlib.util
 from pathlib import Path
 from typing import Final
 
@@ -29,6 +30,7 @@ __all__ = [
     "ModuleLoadError",
     "ModuleRegistry",
     "discover_modules",
+    "import_job_handlers",
     "install_modules",
     "mount_modules",
     "order_by_dependencies",
@@ -37,6 +39,7 @@ __all__ = [
 
 API_PREFIX: Final = "/api/v1"
 DEFAULT_PACKAGE: Final = "app.modules"
+JOB_HANDLERS_MODULE: Final = "jobs"  # optional ``<module>/jobs.py`` with ``register_job`` handlers
 
 
 def _module_dirs(package: str) -> list[Path]:
@@ -94,10 +97,26 @@ def mount_modules(app: FastAPI, registry: ModuleRegistry) -> None:
         app.include_router(router, prefix=API_PREFIX + manifest.route_prefix, dependencies=gate)
 
 
+def import_job_handlers(registry: ModuleRegistry) -> list[str]:
+    """Import ``<module>/jobs.py`` of every module that has one (T-0015).
+
+    Its ``register_job`` decorators register the module's job handlers. The API needs the
+    kinds to enqueue them, the worker to run them. Returns the imported module paths.
+    """
+    imported: list[str] = []
+    for manifest in registry:
+        name = f"{registry.package}.{manifest.name}.{JOB_HANDLERS_MODULE}"
+        if importlib.util.find_spec(name) is not None:
+            importlib.import_module(name)
+            imported.append(name)
+    return imported
+
+
 def install_modules(app: FastAPI, package: str = DEFAULT_PACKAGE) -> ModuleRegistry:
     """Discover the modules of ``package``, store the registry on ``app`` and mount them."""
     registry = discover_modules(package)
     setattr(app.state, STATE_KEY, registry)
     app.include_router(toggle_router, prefix=API_PREFIX)
     mount_modules(app, registry)
+    import_job_handlers(registry)
     return registry

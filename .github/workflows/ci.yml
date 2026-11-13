@@ -156,6 +156,8 @@ jobs:
             sleep 2
           done
           echo "docker health: $health"; [ "$health" = "healthy" ]
+          # The same image runs the SAQ job worker (T-0015, compose service "worker").
+          docker run --rm kerp-backend:ci python -c "import app.modules.jobs.worker"
       - name: Container logs
         if: always()
         run: docker logs kerp-smoke || true
