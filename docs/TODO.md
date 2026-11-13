@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 129 · **Closed:** 57
+**Open:** 133 · **Closed:** 57
 
 ## decision (8)
 
@@ -70,7 +70,7 @@
 | [TD-174](../tracker/todo/TD-174.md) | NFR budgets: 300-question form opens < 1.5 s, 1,000-record delta sync < 30 s on 4G, glove targets >= 48 dp and outdoor high-contrast tokens | T-0024 | clean-room-gap-analysis |
 | [TD-185](../tracker/todo/TD-185.md) | Project status values (ACTIVE/ON_HOLD/CLOSED chosen) and currency/locale defaults (AUD/en-AU) are not in the spec | T-0012 | implementer |
 
-## missed (4)
+## missed (5)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -78,8 +78,9 @@
 | [TD-125](../tracker/todo/TD-125.md) | Booking modules must call work_anchor_for and return 422 when the path has no work anchor (progress, time lines against a work anchor, completion gate) | T-0101, T-0116, T-0124, E-04-03, E-04-05 | reviewer |
 | [TD-131](../tracker/todo/TD-131.md) | Add a root .env.example for the dev stack (the implementer agent's permission rules block writing .env* files) | T-0003 | implementer |
 | [TD-169](../tracker/todo/TD-169.md) | M2 Documents-Lite 'batch inspection PDF export' (consolidation diff §7) has no task | — | clean-room-gap-analysis |
+| [TD-208](../tracker/todo/TD-208.md) | Uploads infra: provision the kerp-vault bucket (CORS for browser PUT/GET, lifecycle on staging/), wire KERP_S3_* in compose, add MinIO to CI for the gated round-trip test | T-0016 | implementer |
 
-## deferred (21)
+## deferred (23)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -104,8 +105,10 @@
 | [TD-180](../tracker/todo/TD-180.md) | RegisterPage: PDF export and server-side export of the full result set | T-0025 | implementer |
 | [TD-181](../tracker/todo/TD-181.md) | DetailPage: audit log and gate-status endpoints | T-0025 | implementer |
 | [TD-182](../tracker/todo/TD-182.md) | RegisterPage: server-side filtering, sorting and paging | T-0025 | implementer |
+| [TD-207](../tracker/todo/TD-207.md) | Uploads: run the orphan sweep on a schedule for every project (needs the scope list of TD-155) | T-0016 | implementer |
+| [TD-209](../tracker/todo/TD-209.md) | Uploads: file deletion and content-object GC; recover files stuck in 'verifying' after a failed verify job | T-0016 | implementer |
 
-## later (37)
+## later (38)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -146,6 +149,7 @@
 | [TD-177](../tracker/todo/TD-177.md) | Form renderer: adopt the T-0110 shared field-type registry + dual-runtime parity | T-0025 | implementer |
 | [TD-186](../tracker/todo/TD-186.md) | spatial_bounds: GiST index and ST_IsValid check (self-intersecting polygons are accepted today); project code stays taken after soft delete | T-0012 | implementer |
 | [TD-189](../tracker/todo/TD-189.md) | Set a psycopg connect_timeout on the worker's DB engine so _settle/_start are bounded when the DB is unreachable | T-0015 | reviewer |
+| [TD-206](../tracker/todo/TD-206.md) | Uploads: replace the always-clean StubScanner with a real malware scanner (e.g. ClamAV/clamd in the worker) | T-0016 | implementer |
 
 ## bug (1)
 

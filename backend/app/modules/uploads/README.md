@@ -8,7 +8,7 @@ the bytes; it signs, checks and records. Helpers adapted from Inspection-ERP
 | File | What |
 |---|---|
 | `storage.py` | `clean_filename`, `content_disposition`, served-type (H-10) and magic-byte allowlists, `Storage` Protocol, `LocalStorage` (traversal guard; tests), `S3Storage` (boto3, lazy), `get_storage`/`set_storage` |
-| `scan.py` | `Scanner` seam; `StubScanner` says every object is clean (real AV scanner: follow-up TODO) |
+| `scan.py` | `Scanner` seam; `StubScanner` says every object is clean (real AV scanner: TD-206) |
 | `models.py` | `oe_uploads_file` (`BaseRecordMixin`, project RLS, migration `0009`) |
 | `service.py` | `presign_upload`, `complete_upload`, `get_file`, `download_request`, `verify_upload`, `sweep_orphans`, `schedule_sweep` |
 | `jobs.py` | `uploads.verify` (interactive), `uploads.sweep_orphans` (batch) |
@@ -41,7 +41,8 @@ the bytes; it signs, checks and records. Helpers adapted from Inspection-ERP
 `pending` file whose URL expired more than an hour ago becomes `expired`, and a staging
 object no `pending`/`verifying` file owns is deleted once older than an hour.
 `schedule_sweep(session)` queues it; a periodic schedule needs the scope list TD-155 asks
-for. A bucket lifecycle rule on `staging/` is the backstop.
+for (TD-207). A bucket lifecycle rule on `staging/` is the backstop (TD-208, with bucket
+provisioning and CORS). No delete endpoint or content-object GC yet (TD-209).
 
 ## Configuration (`KERP_` env)
 

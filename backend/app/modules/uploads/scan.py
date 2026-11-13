@@ -2,8 +2,8 @@
 
 A real scanner (e.g. ClamAV over ``clamd``) implements ``Scanner`` and is installed with
 ``set_scanner`` at process start; the verification job calls ``get_scanner().scan(...)``
-after the SHA-256 check and before the object becomes available. A real scanner is a
-follow-up TODO.
+after the SHA-256 check and before the object becomes available. A real scanner is
+TD-206.
 """
 
 from __future__ import annotations
