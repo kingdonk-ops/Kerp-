@@ -101,4 +101,4 @@ def get_tenancy_context(
     # Imported here: app.core.auth.access needs app.core.db, which imports this module.
     from app.core.auth.access import resolve_request_scope
 
-    return resolve_request_scope(database, base)
+    return resolve_request_scope(database, base, state=request.state)

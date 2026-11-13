@@ -17,7 +17,7 @@ import uuid
 
 from fastapi import APIRouter, HTTPException, Request, status
 
-from app.core.auth.access import Capability, load_grants, project_access, resolve_scope
+from app.core.auth.access import CallerGrants, Capability, Grant, project_access, resolve_scope
 from app.core.auth.deps import CurrentPrincipal, Principal
 from app.core.config import Settings
 from app.core.db import DbSession
@@ -34,9 +34,12 @@ FILES = "/projects/{project_id}/files"
 
 
 def _bind_project(
-    principal: Principal, session: DbSession, project_id: uuid.UUID, capability: Capability
+    principal: Principal,
+    grants: list[Grant],
+    session: DbSession,
+    project_id: uuid.UUID,
+    capability: Capability,
 ) -> None:
-    grants = load_grants(session, principal.tenant_id, principal.user_id)
     if not project_access(grants, project_id).has(capability):  # non-member: 404
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Forbidden")
     base = session_tenancy(session) or TenancyContext(
@@ -63,10 +66,11 @@ def create_upload(
     project_id: uuid.UUID,
     body: UploadCreate,
     principal: CurrentPrincipal,
+    grants: CallerGrants,
     session: DbSession,
     request: Request,
 ) -> UploadTicket:
-    _bind_project(principal, session, project_id, Capability.CREATE)
+    _bind_project(principal, grants, session, project_id, Capability.CREATE)
     settings = _settings(request)
     try:
         file, upload = service.presign_upload(
@@ -86,10 +90,14 @@ def create_upload(
 
 @router.post(FILES + "/{file_id}/complete", response_model=FileRead)
 def complete_upload(
-    project_id: uuid.UUID, file_id: uuid.UUID, principal: CurrentPrincipal, session: DbSession
+    project_id: uuid.UUID,
+    file_id: uuid.UUID,
+    principal: CurrentPrincipal,
+    grants: CallerGrants,
+    session: DbSession,
 ) -> FileRead:
     """``verifying`` (poll the file or its job) or ``rejected`` with a reason code."""
-    _bind_project(principal, session, project_id, Capability.CREATE)
+    _bind_project(principal, grants, session, project_id, Capability.CREATE)
     try:
         file = service.complete_upload(session, get_storage(), file_id, actor_id=principal.user_id)
     except service.NotUploaderError as exc:
@@ -101,9 +109,13 @@ def complete_upload(
 
 @router.get(FILES + "/{file_id}", response_model=FileRead)
 def read_file(
-    project_id: uuid.UUID, file_id: uuid.UUID, principal: CurrentPrincipal, session: DbSession
+    project_id: uuid.UUID,
+    file_id: uuid.UUID,
+    principal: CurrentPrincipal,
+    grants: CallerGrants,
+    session: DbSession,
 ) -> FileRead:
-    _bind_project(principal, session, project_id, Capability.VIEW)
+    _bind_project(principal, grants, session, project_id, Capability.VIEW)
     return FileRead.model_validate(service.get_file(session, file_id))
 
 
@@ -112,10 +124,11 @@ def download_file(
     project_id: uuid.UUID,
     file_id: uuid.UUID,
     principal: CurrentPrincipal,
+    grants: CallerGrants,
     session: DbSession,
     request: Request,
 ) -> PresignedRead:
-    _bind_project(principal, session, project_id, Capability.VIEW)
+    _bind_project(principal, grants, session, project_id, Capability.VIEW)
     try:
         download = service.download_request(
             session, get_storage(), file_id, expires_in=_settings(request).download_url_seconds
