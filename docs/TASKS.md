@@ -3,11 +3,11 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 33/147 tasks done (22%) · **ready now:** 16 · **epics awaiting breakdown:** 47
+**Overall:** 33/148 tasks done (22%) · **ready now:** 16 · **epics awaiting breakdown:** 47
 
 | Phase | Tasks done | Progress |
 |---|---|---|
-| 0 · Platform foundations | 33/63 | `█████░░░░░` 52% |
+| 0 · Platform foundations | 33/64 | `█████░░░░░` 52% |
 | 1 · Asset & Quality backbone | 0/75 (+1 epics) | `░░░░░░░░░░` 0% |
 | 2 · Welding quality | 0/9 | `░░░░░░░░░░` 0% |
 | 3 · Logistics | 0/0 (+7 epics) | `░░░░░░░░░░` 0% |
@@ -36,12 +36,13 @@
 | ✅ | [T-0010](../tracker/tasks/T-0010.md) | Three-tier RBAC/ABAC: capability tiers × 15 personas × project/site scope (Asset-Site filter) + explicit multi-project read scope | identity | M | T-0008 | #39 |
 | ✅ | [T-0011](../tracker/tasks/T-0011.md) | Module loader + manifest contract + per-project enable/disable | platform | M | T-0005 | #32 |
 | ✅ | [T-0012](../tracker/tasks/T-0012.md) | projects module: CRUD + settings (IANA timezone, spatial_bounds, currency/locale) | projects | M | T-0010, T-0011 | #43 |
-| ⬜ | [T-0013](../tracker/tasks/T-0013.md) | teams module: tenant-level teams, team membership, team-project links with a role, team service contract | teams | M | T-0010, T-0011, T-0012, T-0014, T-0073 |  |
 | ▶ | [T-0014](../tracker/tasks/T-0014.md) | admin module: user + project-membership administration API (PER-09 on its projects), admin grants table, membership-based RLS on projects and tenant-level tables | admin | M | T-0010, T-0011, T-0012 |  |
 | ⬜ | [T-0039](../tracker/tasks/T-0039.md) | System admin appoints Project Admins: system_admin/create_projects grant API, project creation gated on create_projects, creator gets PER-09 | admin | S | T-0014 |  |
 | ⬜ | [T-0044](../tracker/tasks/T-0044.md) | Deployment (tenant) settings: offline window (default 7, max 14 days) and new-project defaults (status, timezone, currency, locale) | admin | S | T-0039 |  |
 | ⬜ | [T-0073](../tracker/tasks/T-0073.md) | Team-derived project grants in core auth: derived membership rows (via_team_link_id), sync/revoke API, load_grants union, PER-09 sees but cannot edit derived rows | identity | M | T-0010, T-0014 |  |
+| ⬜ | [T-0013](../tracker/tasks/T-0013.md) | teams module: tenant-level teams, team membership, team-project links with a role, team service contract | teams | M | T-0010, T-0011, T-0012, T-0014, T-0073 |  |
 | ✅ | [T-0015](../tracker/tasks/T-0015.md) | SAQ worker + Redis + jobs module (enqueue/status/poll), interactive+batch priority queues | jobs | M | T-0003, T-0011 | #40 |
+| ⬜ | [T-0075](../tracker/tasks/T-0075.md) | teams reconcile: full-tuple comparison of team-derived grants against the teams tables, orphan link ids, --fix | teams | S | T-0013, T-0073 |  |
 | ✅ | [T-0016](../tracker/tasks/T-0016.md) | Storage service + presigned uploads (presign/complete, sha256 verify, scan stub, orphan sweep) | uploads | M | T-0015 | #49 |
 | ✅ | [T-0017](../tracker/tasks/T-0017.md) | CEL runtime substrate: celpy (server) + JS CEL (client) + shared conformance_fixtures.json harness | platform | M | T-0001, T-0002 | #15 |
 | ✅ | [T-0018](../tracker/tasks/T-0018.md) | Verification engine shell + single rule store: run_checks(context, rule_set), oe_validation_rule_set/rule (kinds, engines), compile-on-save, findings log | validation | M | T-0006, T-0017 | #36 |

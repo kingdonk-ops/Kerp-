@@ -5,7 +5,7 @@
 - **Date:** 2026-11-13
 - **Resolves:** TD-228 (overridden), TD-229, TD-230 / TD-244 (team side)
 - **Open:** TD-251 (which roles a team link may carry)
-- **Affects:** T-0013, T-0073, T-0074, T-0014, `app.core.auth` (`load_grants`, `resolve_scope`),
+- **Affects:** T-0013, T-0073, T-0074, T-0075, T-0014, `app.core.auth` (`load_grants`, `resolve_scope`),
   the `auth_project_membership` core table, saved views (T-0020)
 
 ## Context
@@ -50,6 +50,29 @@ admin screens, and the "active project member" checks in modules.
   Until TD-251 is decided, links allow PER-01 to PER-14 except PER-09, and a PER-07 link
   names its site.
 
+### Separation of duties across sources
+
+Diff §4.1 and edge §5 (Admins) require a warning, an explicit confirmation and an audit flag
+whenever **PER-09 and a hold-authority persona (PER-02, PER-06, PER-07, PER-11) meet on the same
+project for the same user**. Keeping PER-09 off team links is not enough, because the two can
+come from different sources. So the rule is evaluated over the user's **effective** grants on the
+project, individual and team-derived together:
+
+- **Team side (T-0013 via T-0073).** Some changes would give a hold-authority persona on P to a
+  user who already holds individual PER-09 on P: creating or re-roling a link, adding a member,
+  or (for a team linked to several projects) any of those per project. Such a change returns
+  **409** with `sod_warning` (the affected user ids and projects) unless the request carries
+  `confirm_sod: true`. Core enforces it: `sync_team_link_grants` refuses
+  (`SodConfirmationRequired`) unless called with `confirm_sod=True`.
+- **Individual side (T-0014, extended by T-0073).** The same applies when a PER-09 or
+  `system_admin` assigns individual PER-09 to a user who already holds a team-derived
+  hold-authority persona on the project. The check reads all of the user's grants on the
+  project, derived rows included. The individual-only case stays as T-0014 already specifies it.
+- **Audit.** A confirmed combination is written to the audit ledger with `sod_warning: true`,
+  whichever side created it.
+- Admin still confers no `A`/`S` (diff §4.1). The warning makes the combination visible; the
+  hold capability comes only from the hold persona, as for individual memberships.
+
 ### Team-derived grants live in the membership store (T-0073)
 
 `app.core` must not import a module, and RLS policies cannot read module tables without
@@ -63,10 +86,13 @@ store**:
   and removing one leaves the other.
 - `app.core.auth` exposes a narrow API that the teams service calls (CLAUDE.md §6: the module
   calls core, it never writes the table itself):
-  `sync_team_link_grants(session, link_id, project_id, persona, site_node_id, user_ids)`
-  (replaces exactly the derived rows of that link, soft-deleting the ones that are gone) and
-  `revoke_team_link_grants(session, link_id)`. Both are audited on chain `membership:<project>`
-  with the link id and the actor.
+  `sync_team_link_grants(session, link_id, project_id, persona, site_node_id, user_ids,
+  confirm_sod=False)` (replaces exactly the derived rows of that link: it soft-deletes the ones
+  that are gone and restores a soft-deleted row rather than inserting a duplicate),
+  `revoke_team_link_grants(session, link_id)` and a full read for reconciliation,
+  `team_link_grants(session) -> {link_id: {(user_id, project_id, persona, site_node_id)}}`,
+  which covers **every** link id that has non-deleted derived rows. The writes are audited on
+  chain `membership:<project>` with the link id and the actor.
 - `load_grants` keeps reading `auth_project_membership`, so it returns the union without any
   change to its callers. `Grant` stays a value object and duplicate grants collapse.
   `resolve_scope`, `project_access`, `allowed_project_ids` and T-0014's membership-based RLS all
@@ -75,10 +101,22 @@ store**:
   the team, and refuses to edit or remove them (409, "managed through team X"). PER-09 keeps
   full control of individual rows.
 - The teams service is the only writer of derived rows and re-syncs on every change: member
-  added or removed, link created, re-roled or removed, team deleted. Deactivating a user
-  (T-0014) soft-deletes all of that user's membership rows, derived ones included.
-  A reconciliation check (`kerp teams reconcile`, also run in tests) recomputes the expected
-  derived rows from the teams tables and reports or repairs drift.
+  added or removed, link created, re-roled or removed, team deleted.
+- **Deactivating a user leaves their derived rows in place.** A deactivated account cannot
+  authenticate, so the rows grant nothing, and the teams contract counts only active members.
+  Reactivating the user restores their team access with no re-sync, so nothing is left for
+  someone to remember to run.
+- **Reconciliation** (`teams reconcile`, T-0075, also run in tests) recomputes the expected
+  derived tuples (user, project, persona, site) of every live link from the teams tables. It
+  compares them with `team_link_grants` and reports three kinds of drift: missing tuples,
+  excess or mismatched tuples (wrong persona, site or project), and **orphan link ids**
+  (derived rows whose link no longer exists in the teams tables). `--fix` re-syncs live links
+  and revokes orphans. Excess access is the dangerous direction, and it is always detected.
+- **Disabling the teams module.** Teams is not toggleable per project. Derived rows must never
+  outlive the module that manages them: at startup, core refuses to start when the teams module
+  is not loaded and non-deleted derived rows exist (fail closed). The documented way to disable
+  teams is to unlink every team first (which revokes the rows) or run
+  `revoke_team_link_grants` for every link.
 
 ### Consumers
 
@@ -102,7 +140,10 @@ store**:
 ## Consequences
 
 - Core-table change (`auth_project_membership`, one additive column + a replaced unique
-  constraint), so this ADR is required (CLAUDE.md §6). No destructive migration.
+  constraint), so this ADR is required (CLAUDE.md §6). The upgrade is additive. The
+  **downgrade is destructive**: it must delete the derived rows before restoring the old unique
+  constraint, because a user may hold the same persona individually and through a team.
+- Status flips to `accepted` in the PR that merges T-0073.
 - Linking a big team writes one membership row per member and project. That is fine at
   deployment scale (hundreds of users). The sync runs in the same transaction as the team
   change, so access never lags the team. Moving it to an SAQ job is a later optimisation.

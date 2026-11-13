@@ -192,7 +192,11 @@ Wins over any earlier text on tenant selection, tenant administrators and projec
   grants count everywhere individual ones do: allowed project list, site filter, 404 for
   non-members, membership-based RLS. They are stored as derived membership rows that only the
   teams module maintains (ADR 0008). PER-09 still manages the project's individual members. It
-  sees team-derived members, marked with their team, but cannot edit or remove them. Teams are
+  sees team-derived members, marked with their team, but cannot edit or remove them. The
+  PER-09 + hold-authority SoD warning above applies to **effective** grants, whatever their
+  source: a team link or member add that gives a user with individual PER-09 a hold persona on
+  the project (or an individual PER-09 given to a user with a team-derived hold persona) needs
+  the same confirmation and is audited with `sod_warning: true` (ADR 0008). Teams are
   for access only. They are not planner crews, rosters or shift teams (TD-073, TD-083), and
   "project team" anywhere in the spec means everyone with access to the project. Saved views
   can be shared with several teams linked to the view's project (register-views §3).

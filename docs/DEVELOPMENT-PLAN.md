@@ -127,7 +127,7 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
   tenant-level and grant project access through team-project links (diff §4.1, ADR 0008).
   T-0013 re-scoped to tenant-level teams, members and links (now after T-0014 and T-0073).
   New: T-0073 (team-derived grants in the core membership store) and T-0074 (saved views shared
-  with several teams; absorbs TD-242).
+  with several teams; absorbs TD-242), T-0075 (teams reconcile, split from T-0013 in review).
 
 ## Key engineering decisions (baked into the spec — see consolidation diff)
 
