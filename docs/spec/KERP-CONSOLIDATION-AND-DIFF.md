@@ -216,7 +216,7 @@ Wins over any earlier text on tenant selection, tenant administrators and projec
 - **Offline window (TD-170).** A tenant setting (§4.4), default **7 days**, maximum **14**. While
   inside the window the device works offline with local unlock. Once the window passes without a
   successful server contact, the app keeps all queued data but allows no new edits until the user
-  signs in online (planner default, TD-206). Sync and the outbox are built for 14 days of queued work.
+  signs in online (user, 2026-11-13, TD-206; interim until the native Android app with a normal login launches, TD-210). Sync and the outbox are built for 14 days of queued work.
 - **Daily re-login vs offline.** The 12-hour session limit applies only to server calls. Offline
   work continues on local unlock for the whole offline window; on reconnect the user signs in
   (password, SSO, or magic link) and the outbox drains under the new session. Queued mutations
