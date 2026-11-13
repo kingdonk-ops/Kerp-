@@ -26,6 +26,7 @@ DEFAULT_VISIBILITIES: Final = ("private", "project")
 
 
 def _in(column: str, values: tuple[str, ...]) -> str:
+    """SQL ``column IN (...)`` for CHECK constraints. Module constants only, never user input."""
     return f"{column} IN (" + ", ".join(f"'{v}'" for v in values) + ")"
 
 

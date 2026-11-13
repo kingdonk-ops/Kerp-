@@ -10,7 +10,8 @@ caller's membership. Who sees and edits which view is decided here from a ``View
 * Publishing a shared view needs ``can_share`` (the ``C`` capability); making a view the
   project default, or un-making it, needs ``is_admin`` (PER-09).
 * At most one default per owner and register among private views, and one project default
-  per register: setting a default clears the previous one.
+  per register: setting a default clears the previous one. Changing a view's visibility
+  without an explicit ``is_default`` drops its default flag (the two kinds never convert).
 
 A register declares its column catalogue with ``register_catalogue``; a loaded view flags
 every referenced column the catalogue no longer has as missing instead of failing.
@@ -291,7 +292,13 @@ def update_view(
     given = data.model_fields_set
     visibility = data.visibility if "visibility" in given else view.visibility
     team_id = data.team_id if "team_id" in given else view.team_id
-    is_default = data.is_default if "is_default" in given else view.is_default
+    if "is_default" in given:
+        is_default = data.is_default
+    else:
+        # ``is_default`` means "owner's default" on a private view and "project default" on
+        # a project view, so a default never crosses kinds implicitly: a visibility change
+        # without an explicit ``is_default`` drops it.
+        is_default = view.is_default and visibility == view.visibility
     assert visibility is not None
     assert is_default is not None
     if visibility != view.visibility or team_id != view.team_id:

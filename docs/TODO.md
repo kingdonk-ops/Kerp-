@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 152 · **Closed:** 90
+**Open:** 153 · **Closed:** 90
 
 ## decision (7)
 
@@ -101,7 +101,7 @@
 | [TD-242](../tracker/todo/TD-242.md) | saved_views: team visibility needs the teams module (T-0013) - pass the caller's team ids into Viewer and validate team_id | T-0020 | implementer |
 | [TD-243](../tracker/todo/TD-243.md) | saved_views: expose portal views through the client portal layout | T-0020 | implementer |
 
-## later (60)
+## later (61)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -165,6 +165,7 @@
 | [TD-241](../tracker/todo/TD-241.md) | Per-route override of KERP_MAX_BODY_BYTES for a future endpoint that needs a larger JSON body (bulk import); today one app-wide limit | T-0060 | implementer |
 | [TD-245](../tracker/todo/TD-245.md) | saved_views: enforce one default per owner/register and one project default in the database | T-0020 | implementer |
 | [TD-246](../tracker/todo/TD-246.md) | saved_views: validate register_key against register descriptors once modules declare them (E-01-01) | T-0020 | implementer |
+| [TD-247](../tracker/todo/TD-247.md) | saved_views: degrade gracefully when a stored view config no longer validates | T-0020 | implementer |
 
 ## bug (1)
 

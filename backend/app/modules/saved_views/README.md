@@ -47,7 +47,10 @@ is the Project Administrator.
 - **Edit / delete**: owner; a shared view also a Project Administrator (403 otherwise).
 - **Defaults**: one per owner and register among private views, one project default per
   register; setting one clears the previous (service-enforced, TD-245). Setting, removing
-  or deleting the project default needs a Project Administrator.
+  or deleting the project default needs a Project Administrator. A `PATCH` that changes
+  `visibility` without `is_default` drops the default flag: sharing a personal default
+  does not make it the project default, and un-sharing the project default does not make
+  it the owner's personal default.
 - `GET .../views/default?register_key=` returns the caller's default, else the project
   default, else `null`.
 
@@ -71,7 +74,7 @@ from app.modules.saved_views import service as views
 
 viewer = views.Viewer(user_id=user_id, can_share=True)
 view = views.default_view(session, viewer, "asset_management.work_anchor")
-config = views.load_config(view) if view else None   # ViewConfig
+config = views.load_config(view) if view else None  # ViewConfig
 ```
 
 ## Tests

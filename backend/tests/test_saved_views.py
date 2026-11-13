@@ -461,6 +461,69 @@ def test_one_default_per_user_and_one_project_default(db: Database, home: Tenanc
     assert defaults == ["Project B"]
 
 
+def _defaults(db: Database, ctx: TenancyContext) -> dict[str, tuple[str, bool]]:
+    with db.unit_of_work(ctx) as s:
+        views = s.query(SavedView).filter(SavedView.register_key == REGISTER).all()
+        return {v.name: (v.visibility, v.is_default) for v in views}
+
+
+def test_an_admin_sharing_a_personal_default_leaves_the_project_default_alone(
+    db: Database, home: TenancyContext
+) -> None:
+    _save(db, home, PER09, name="Project", visibility="project", is_default=True)
+    mine = _save(db, home, PER09, name="Admin's own", is_default=True)
+    shared = _update(db, home, mine, PER09, visibility="project")
+    assert (shared.visibility, shared.is_default) == ("project", False)
+    assert _defaults(db, home) == {
+        "Project": ("project", True),
+        "Admin's own": ("project", False),
+    }
+    assert _default(db, home, PEER) == "Project"
+
+
+@pytest.mark.parametrize(
+    ("visibility", "team"), [("project", None), ("portal", None), ("team", str(TEAM))]
+)
+def test_a_member_shares_a_personal_default_as_a_plain_view(
+    db: Database, home: TenancyContext, visibility: str, team: str | None
+) -> None:
+    mine = _save(db, home, TEAMMATE, name="Mine", is_default=True)
+    fields: dict[str, Any] = {"visibility": visibility}
+    if team is not None:
+        fields["team_id"] = team
+    shared = _update(db, home, mine, TEAMMATE, **fields)
+    assert (shared.visibility, shared.is_default) == (visibility, False)
+    assert _default(db, home, TEAMMATE) is None
+
+
+def test_an_admin_unsharing_the_project_default_leaves_the_owners_default_alone(
+    db: Database, home: TenancyContext
+) -> None:
+    project = _save(db, home, PER09, name="Project", visibility="project", is_default=True)
+    _save(db, home, PER09, name="Admin's own", is_default=True)
+    unshared = _update(db, home, project, PER09, visibility="private")
+    assert (unshared.visibility, unshared.is_default) == ("private", False)
+    assert _defaults(db, home) == {
+        "Project": ("private", False),
+        "Admin's own": ("private", True),
+    }
+    assert _default(db, home, PER09) == "Admin's own"
+    assert _default(db, home, PEER) is None
+
+
+def test_an_explicit_default_with_a_visibility_change_is_still_checked(
+    db: Database, home: TenancyContext
+) -> None:
+    mine = _save(db, home, ME, name="Mine", is_default=True)
+    with pytest.raises(service.ViewPermissionError, match="Administrator"):
+        _update(db, home, mine, ME, visibility="project", is_default=True)
+    with pytest.raises(service.InvalidViewError, match="default"):
+        _update(db, home, mine, ME, visibility="portal", is_default=True)
+    admin_own = _save(db, home, PER09, name="Admin's own", is_default=True)
+    made = _update(db, home, admin_own, PER09, visibility="project", is_default=True)
+    assert made.is_project_default
+
+
 def test_only_a_project_administrator_changes_the_project_default(
     db: Database, home: TenancyContext
 ) -> None:
