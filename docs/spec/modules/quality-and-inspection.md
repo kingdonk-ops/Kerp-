@@ -44,8 +44,8 @@ What the chain must deliver:
 **Field-user view.** Field users see a single inspection with one status lifecycle
 (Requested → Scheduled → Inspected → Accepted/Rejected), even though the request and the ITR are
 linked records underneath. Mapping: Requested/Scheduled = `inspection_request` `requested` /
-`confirmed` with the ITP line in `INSPECTION_REQUESTED`; Inspected = ITR submitted; Accepted =
-`INSPECTED_PASSED`; Rejected = `INSPECTED_FAILED`.
+`confirmed` with the ITP line in `INSPECTION_REQUESTED`; Inspected = ITR submitted (`SUBMITTED`);
+Returned = `RETURNED`; Accepted = `INSPECTED_PASSED`; Rejected = `INSPECTED_FAILED`.
 
 **RFI number and terminology (user decision, 2026-11-13, amends TD-045).** In KERP, **RFI
 means Request for Inspection**, as clients and site use it. A Request for Information is called a
@@ -62,6 +62,24 @@ Shared palette of field types used by every form, ITP and asset-schema field:
 **`instrument reference`** (binds a calibrated tool, gated by calibration), `calculated`
 (CEL expression). No per-module field designers.
 
+**Photo answers and annotation (Pilot-0, planner spec 2026-11-13; TD-166, Q5a).** A `photo`
+answer is a list of captured photos, each
+`{attachment_id, sha256, captured_at, geo, annotation}`:
+- `captured_at` is the device UTC time of capture; the server also stores when it received the
+  photo. `geo` is `{lat, lon, accuracy_m}` from the device location when the user allowed it,
+  else `null`; a missing location never blocks capture.
+- `annotation` is `null` or `{schema_version: 1, shapes: [...]}`. Shapes: `arrow` (from, to),
+  `ellipse` and `rect` (x, y, w, h), `freehand` (points) and `text` (x, y, text up to 200
+  characters), each with a `color` from a fixed palette of four high-contrast colours and a
+  `stroke` of `thin` or `thick`. Coordinates are normalised 0–1 against the original image, origin
+  top-left. At most 50 shapes per photo (planner defaults).
+- The original image is never changed. The annotation is stored with the answer and drawn as an
+  overlay on screen; it is **burned in only on export** (inspection PDF, §Inspection report).
+- Annotations can be edited until the inspection is submitted and are read-only after that, like
+  the other answers. The server validates the annotation against its schema (422 for that path).
+- Video and audio notes, barcode/QR answer fields and reference images on questions are not in
+  the Pilot-0 palette (deferred, see `docs/TODO.md`).
+
 ## Unified inspection record — `oe_inspections_inspection`
 Single store across all kinds: **`kind IN (inspection, itp)`**. TD-045 (decided 2026-11-10)
 renames the old `rfi` kind and `RFI_ISSUED` state; the Request for Inspection (RFI) becomes its own `inspection_request` record (§`inspection_requests`).
@@ -73,6 +91,9 @@ work under it yet (ADR 0003 Amendment 5). Holds responses authored against a tem
 hash, UTC timestamp, geolocation). Lifecycle (master spec §4.2):
 `PENDING → INSPECTION_REQUESTED → INSPECTED_PASSED → LOCKED_FOR_TURNOVER`, with
 `INSPECTED_FAILED → (Cat A punch | NCR) → RE_INSPECT` (state name confirmed on TD-045). Every transition calls `run_checks`.
+**Review (Pilot-0, TD-165):** the result is reached through `SUBMITTED` and, when returned,
+`RETURNED`: `PENDING | INSPECTION_REQUESTED → SUBMITTED → INSPECTED_PASSED | INSPECTED_FAILED`,
+`SUBMITTED → RETURNED → SUBMITTED` (§Review and return).
 
 - **Dates (ADR 0004 Amendments C–D).** Each record stores `inspection_date` (when the work was
   inspected, entered by the user) and `entered_at` (server time of entry). Validity checks
@@ -125,6 +146,95 @@ T-0131):
 | `decided_by`, `decided_at`, `decision_comment` | the decision |
 | `checked_values_hash` | SHA-256 of the canonical JSON of the values the rule checked (equipment id, specification revision, inspection date…); a later evaluation with a different hash sets `decision = void` and the block returns |
 | `audit_chain_key` | ledger chain the request and decision were appended to (`<record_type>:<record_id>`) |
+
+## Review and return (Pilot-0, planner spec 2026-11-13; TD-165, Q5a)
+
+The Pilot-0 goal is that a reviewer can approve or return an inspection (TD-173). Rules below are
+planner defaults unless marked otherwise.
+
+- **Submit.** The inspector submits from `PENDING`, `INSPECTION_REQUESTED` or `RETURNED` with a
+  proposed result `pass` or `fail`. Submitting signs the record (T-0119 ledger entry: signer,
+  signature hash, UTC timestamp, geolocation, `device_id`) and runs
+  `run_checks(context, "inspection.submit")`: required answers, validity as of `inspection_date`
+  (eligibility, calibration), whether a Request for Inspection had to come first (hold/witness
+  points, `construction_control`), every referenced attachment `complete`
+  (`ATTACHMENTS_INCOMPLETE`) and no open answer conflict flag (`ANSWER_CONFLICT_UNRESOLVED`)
+  (`KERP-CONSOLIDATION-AND-DIFF.md` §6.4). A submit made offline is a queued mutation; if a check
+  fails at sync, that mutation fails with the findings, the record keeps its earlier state and the
+  inspector is notified. In `SUBMITTED` the answers are read-only.
+- **Approve.** A reviewer approves with `run_checks(context, "inspection.approve")`. The record
+  moves to `INSPECTED_PASSED` (proposed `pass`) or `INSPECTED_FAILED` (proposed `fail`, which then
+  raises the Cat A punch or NCR as before). The reviewer cannot change the result; to disagree they
+  return the inspection. The approval is a sign-off ledger entry (reviewer, persona, UTC time;
+  geolocation optional for office users).
+- **Return.** A reviewer returns with a mandatory, non-blank reason and optionally comments on
+  single answers (§Comments on answers). The record moves to `RETURNED`, its answers become
+  editable again and the inspector is notified (in-app, and push on Android, T-0144). The earlier
+  submit signature stays in the ledger; the next submit starts a new review round
+  (`review_round` 1, 2, …). The return reason and round are in the record history and on the PDF.
+- **Who reviews.** A user with quality hold authority (`A`) on the project — PER-06 or PER-07 in
+  the persona matrix — who is not the performer unless `allow_self_approval` is on (TD-070,
+  T-0140). Approve and return are online actions in the web app (planner defaults).
+- **Notifications.** Submit notifies the project's reviewers; return and approve notify the
+  inspector.
+
+## Planning fields (Pilot-0, planner spec 2026-11-13; TD-165)
+
+An inspection carries `assignee_user_id` (nullable; a project member who may perform
+inspections), `planned_start` (date, nullable) and `planned_duration_days` (integer ≥ 1, default 1).
+`due_date` = `planned_start` + `planned_duration_days` − 1, stored and recomputed on change. An
+inspection is **overdue** when `due_date` is before today in the project timezone and its status
+is `PENDING`, `INSPECTION_REQUESTED` or `RETURNED` (planner defaults). PER-06 and PER-07 on the
+project set these fields; assigning notifies the assignee (in-app, push on Android). A calendar
+view, general recurrence and work-order grouping are not in Pilot-0 (deferred, see
+`docs/TODO.md`).
+
+## Comments on answers (Pilot-0, planner spec 2026-11-13; TD-165)
+
+`oe_inspections_answer_comment` (`BaseRecordMixin` + project RLS): `inspection_id`,
+`question_key`, `repeat_index` (null for a question outside a repeating group), `review_round`,
+`body` (non-blank), author and time, `resolved_at` / `resolved_by`. A comment addresses one
+answer by `(inspection_id, question_key, repeat_index)`; an address that is not in the pinned
+template revision → 422. Comments are flat (no threads), append-only once synced (no edit, no
+delete), and created offline with client-generated ids (`KERP-CONSOLIDATION-AND-DIFF.md` §6.4).
+The inspector or a reviewer may mark a comment resolved. Comments sync to the devices that hold
+the inspection (planner defaults).
+
+## Inspection report (PDF) and batch export (Pilot-0, planner spec 2026-11-13; TD-169)
+
+- **Per inspection.** `POST /api/v1/inspections/{id}/report` enqueues a SAQ `batch` job and
+  returns its job id (T-0015 polling); the job renders the PDF with PyMuPDF (imported lazily,
+  T-0022), stores it through the storage service with its sha256 and returns a presigned download
+  link. A report exists for `SUBMITTED` (watermarked "Not approved") and for approved records; a
+  report for an unchanged record version is reused, not rendered again. When an inspection is
+  approved its report is rendered and its object key and sha256 are kept on the record for the
+  dossier later.
+- **Content.** Header: project, anchor display path in the project's terminology (T-0136), Item
+  tag, template name and revision, RFI no. when a request is linked, `inspection_date`,
+  `entered_at`, backdating flag and reason. Body: answers in template order with labels in the
+  template's default language and units, conflict flags, photos with annotations burned in plus
+  capture time and location, linked NCR and punch references. Signatures: inspector and reviewer
+  with name, persona, UTC and site-local time, geolocation and the ledger content hash. Review
+  history: rounds and return reasons. Footer: record id, page x of y, generation time.
+- **Batch export.** `POST /api/v1/inspections/reports/batch` with a list of ids or a filter
+  (status, `inspection_date` range, anchor subtree) of at most 500 inspections enqueues one SAQ
+  `batch` job. It produces a ZIP with one PDF per inspection, named
+  `<anchor-code>_<template-key>_<inspection-date>_<short-id>.pdf`, and an `index.csv`; the link
+  expires after 24 hours and the requester is notified when it is ready (planner defaults).
+
+## Pilot-0 dashboard tiles (planner spec 2026-11-13; TD-173)
+
+Three tiles on Overview → dashboards (diff §6.1) for the current project, computed on request
+from the owning modules' services (no rollup tables until E-06-05; planner default) and online
+only, with the time they were computed:
+- **Progress:** inspection counts by field-user status (not started = `PENDING` /
+  `INSPECTION_REQUESTED`, returned, submitted, accepted, rejected) and the share reviewed
+  ((accepted + rejected + `LOCKED_FOR_TURNOVER`) / all); filter "all" or "assigned to me".
+- **Overdue:** count of overdue inspections (§Planning fields) and the ten most overdue with
+  assignee and due date.
+- **Open defects:** open NCRs and open punch items by category A/B/C, through the `ncr` and
+  `punchlist` services.
+Each tile opens the matching filtered list. Soft-deleted records are not counted.
 
 ## `eligibility` service (stateless, no tables)
 Answers "is this person / instrument / material valid **on the inspection date**?" (ADR 0004

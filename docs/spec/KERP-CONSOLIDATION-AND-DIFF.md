@@ -333,6 +333,59 @@ personas, and links to the lobby ("Find a project").
 Automated performance tests **warn in CI now** and become a **hard gate before Pilot-0** (§7).
 The reference device and network profile are confirmed before the gate flips (TD-205).
 
+### 6.4 Sync scope and download for offline (Pilot-0; TD-162, planner spec 2026-11-13, Q5a)
+
+The user chose to cut the Pilot-0 tasks (Q5a). The rules below are planner defaults unless marked
+otherwise; they refine master spec §4.3 and ADR 0005 and keep the sync contract client-agnostic
+(§6.2).
+
+- **Download selection = checkout.** A field user picks what to take offline per device and
+  project. Each pick is a checkout of ADR 0005 (`oe_field_checkout`, master spec §1.3 rule 4) with
+  scope `inspection` (one inspection record) or `node` (an anchor subtree: its Items, their scan
+  identifiers and their open inspections, for ad-hoc work). Removing a pick releases the checkout.
+  At most **500 inspections** per device and project (planner default; NFR sizing in §6.2).
+- **Candidates with state and size.** `GET /api/v1/sync/download-candidates?project_id=` lists the
+  inspections assigned to the user first, then unassigned ones (planner default), each with status,
+  anchor display path, due date, whether it is already downloaded to this device, and an estimated
+  size in bytes: the record JSON plus the stored sizes of its attachments (T-0016). Nothing is
+  downloaded automatically (planner default).
+- **Pull scope.** `pull-deltas` is scoped per **device and project**:
+  `GET /api/v1/sync/pull-deltas?project_id=&since_version=&limit=`. In scope are the device's
+  picks (records, answers, answer comments, attachment metadata, linked open defects) and the
+  project reference data the client needs offline: level definitions, terminology, item types and
+  field definitions, the template revisions pinned by the picks or allowed on picked anchors, the
+  equipment register with calibration state, the project's rule sets and member display names.
+  Records outside the scope are never sent. A newly added pick is back-filled in full on the next
+  pull, whatever `since_version` is.
+- **Paging.** The response is `{deltas, new_version, has_more}`, ordered by the server commit
+  sequence; `limit` defaults to 500 and is capped at 1,000 (planner default). The client pulls
+  again with `since_version = new_version` until `has_more` is false. Each delta is `upsert` or
+  `remove`; `remove` means the record left the device's scope (pick removed, record soft-deleted,
+  or the inspection was approved, see purge).
+- **Local purge.** On `remove` the client deletes the local records and media of that pick, but
+  only once its outbox holds no pending mutation for them; until then the pick stays local and is
+  shown as "waiting to sync". The user may remove a pick by hand on the same terms. The server
+  drops an inspection from every device's picks once it is `INSPECTED_PASSED`,
+  `INSPECTED_FAILED` or `LOCKED_FOR_TURNOVER` (planner default). Purge never deletes unsynced
+  work; only a remote wipe (§4.3) does.
+- **Client-generated ids.** Records created offline (ad-hoc inspections, answers, answer comments,
+  attachment metadata, NCR and punch items raised in the field) carry a client-generated
+  **UUIDv7** `id` (planner default). The server keeps that id. A replay of the same `client_op_id`
+  is a no-op; a create whose id already belongs to a different record fails that mutation with
+  `ERR_ID_CONFLICT`; an id that is not a UUIDv7 fails with `ERR_ID_INVALID`. Other mutations in
+  the batch still apply.
+- **Stale-base flag on answers.** When the per-field apply keeps the server value (ADR 0005 §4,
+  p6 spec §8.3 rule 4), the answer carries a `conflict` flag that points to its
+  `sync_conflict_log` entry. Inspector and reviewer see the flag on the answer; choosing a value
+  is a normal edit and clears it. Submit is blocked while an answer has an open conflict flag
+  (`ANSWER_CONFLICT_UNRESOLVED`, planner default).
+- **Submit waits for attachments.** The `inspection.submit` rule set contains a built-in check
+  that every attachment referenced by the record's answers is `complete` (uploaded and
+  sha256-verified, T-0016); otherwise the submit fails with `ATTACHMENTS_INCOMPLETE`. The client
+  orders a queued submit after the uploads it depends on and keeps the submit button disabled,
+  with the pending count, until they finish. A failed submit is a per-mutation result, never a
+  failed batch.
+
 ---
 
 ## 7. Task tracker & phasing
