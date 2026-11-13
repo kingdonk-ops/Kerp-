@@ -8,6 +8,53 @@ Anchors, header binding and template/register versioning follow
 and validity dates follow [ADR 0004](../../decisions/0004-project-rule-sets-with-defaults.md)
 (both accepted with amendments, 2026-11-10). "RSW" below means the project's work-anchor level.
 
+## ITP, Request for Inspection and ITR — purpose of each (user clarification, 2026-11-13)
+
+| Document | Role | Answers | How often |
+|---|---|---|---|
+| **ITP** — Inspection & Test Plan | **The plan.** Lists every inspection/test activity, its reference specification, acceptance criteria, the records required, and who is involved at each step through **Hold, Witness, Review or Surveillance** points (`H`/`W`/`R`/`S`). | *What* must be checked | Approved **once**, before work starts |
+| **Request for Inspection** (clients and site call it "RFI") | **The trigger.** Notifies the client or third-party inspector that a specific ITP activity is ready, so they can attend `H`/`W` points. | *When* it is ready | Raised **many times**, once per inspection event |
+| **ITR** — Inspection & Test Record | **The evidence.** Records what was actually inspected, results and measurements, accept/reject, and signatures. Feeds the final handover dossier (MDR). | *Proof* it was done | One per inspected activity per anchor |
+
+In short: the ITP says what must be checked, the Request for Inspection says when it is ready, and
+the ITR proves it was done.
+
+**All three functions are required, but not as three separate paper documents.** KERP builds them
+as one linked chain:
+
+1. **ITP = master template.** Each ITP line item defines the activity, criteria, intervention
+   points (`H`/`W`/`R`/`S`/`M`) and the ITR form (template revision) to use. Authored in `qms`;
+   instantiated per anchor (node or Item) as `kind = itp` records.
+2. **Request for Inspection = a workflow step on an ITP line item** for a specific location or
+   component. Raising it moves the line to `INSPECTION_REQUESTED`, auto-notifies the right
+   parties, logs date and time, and enforces the contractual notice period. Per TD-045 it is
+   backed by its own `inspection_request` record (booking, calendar, reschedule history, client
+   delay attribution — §`inspection_requests`); one request may cover several anchors.
+3. **ITR = the form filled in on site against that same request** (`kind = inspection`), with
+   photos, readings and e-signatures. When it is completed and accepted, the ITP line closes
+   automatically (`INSPECTED_PASSED`).
+
+What the chain must deliver:
+- **Traceability** — every ITR links back to its ITP line and its Request for Inspection.
+- **No duplicate data entry** — the ITR header is bound from the ITP line, request and anchor
+  context (header binding by role, below), never retyped.
+- **Hold points block progress until signed** — enforced via `run_checks` (§`construction_control`).
+- **Live progress** — dashboards show the percentage of ITP line items closed, per anchor/system.
+
+**Field-user view.** Field users see a single inspection with one status lifecycle
+(Requested → Scheduled → Inspected → Accepted/Rejected), even though the request and the ITR are
+linked records underneath. Mapping: Requested/Scheduled = `inspection_request` `requested` /
+`confirmed` with the ITP line in `INSPECTION_REQUESTED`; Inspected = ITR submitted; Accepted =
+`INSPECTED_PASSED`; Rejected = `INSPECTED_FAILED`.
+
+**RFI number.** Many clients require a separate RFI number for contractual tracking, so the
+`inspection_request` always carries an **RFI no.** field (TD-045 field list) and it is printed on
+the notification and on the ITR, even where no separate request form is issued. Terminology: in
+KERP code and data the abbreviation "RFI" is reserved for *Request for Information* (TD-045), so
+the record and state are named `inspection_request` / `INSPECTION_REQUESTED`; the user-facing
+label "RFI no." is kept because that is what clients call it. RFI numbering scheme and
+per-discipline layout remain open on TD-045.
+
 ## One field-type registry (`core/fields`)
 Shared palette of field types used by every form, ITP and asset-schema field:
 `numeric`, `text`, unit-bound **`measurement`** (value + unit), `photo`, `signature`,

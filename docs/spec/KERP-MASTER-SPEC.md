@@ -294,6 +294,8 @@ The industrial supply chain, material control, and positive material identificat
 #### 1. What It Is & Purpose
 The quality assurance and quality control (QA/QC) verification engine. It translates static Inspection and Test Plans (ITPs) into living digital execution workflows, enforcing witness, hold, surveillance, and review check points across fabrication and construction.
 
+**ITP vs Request for Inspection vs ITR:** the ITP is the plan (*what* must be checked, approved once), the Request for Inspection is the trigger (*when* an ITP activity is ready, raised per inspection event), and the ITR (Inspection & Test Record) is the evidence (*proof* it was done, feeds the MDR). They are one linked chain, not three separate documents — see `docs/spec/modules/quality-and-inspection.md` §ITP, Request for Inspection and ITR.
+
 #### 2. What It Does
 * Digital ITP library: manages standardized quality plans for structural, mechanical, piping, electrical, instrumentation, civil, coatings, and insulation.
 * Granular step execution: manages multi-party inspection hold points with mandatory digital sign-offs (Contractor QC, Principal Contractor, Third-Party Verifier, Client Inspector).
