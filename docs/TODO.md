@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 135 · **Closed:** 88
+**Open:** 136 · **Closed:** 88
 
 ## decision (4)
 
@@ -92,7 +92,7 @@
 | [TD-212](../tracker/todo/TD-212.md) | Uploads: run the orphan sweep on a schedule for every project (needs the scope list of TD-155) | T-0016 | implementer |
 | [TD-217](../tracker/todo/TD-217.md) | Inspection scheduling after Pilot-0: calendar view, general recurrence (beyond scaffolds), light work-order grouping (TD-165 remainder) | T-0152 | planner |
 
-## later (53)
+## later (54)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -149,6 +149,7 @@
 | [TD-211](../tracker/todo/TD-211.md) | Uploads: replace the always-clean StubScanner with a real malware scanner (e.g. ClamAV/clamd in the worker) | T-0016 | implementer |
 | [TD-215](../tracker/todo/TD-215.md) | Optional chain-of-custody hash for offline records: SHA-256(prev_hash + payload + monotonic_ms) per device clock session | T-0148 | planner |
 | [TD-226](../tracker/todo/TD-226.md) | Key the per-client login lockout on the IPv6 /64, not the full address (clients can rotate within their prefix) | T-0068 | reviewer |
+| [TD-227](../tracker/todo/TD-227.md) | Task board totals count dropped tasks: leave status dropped out of the Overall and per-phase denominators in scripts/tracker.py render | T-0029 | planner |
 
 ## bug (1)
 
