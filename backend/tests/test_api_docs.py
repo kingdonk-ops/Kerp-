@@ -6,8 +6,16 @@ from fastapi.testclient import TestClient
 from app.core.config import Settings
 from app.main import create_app
 from app.openapi import openapi_schema
+from tests.auth_support import T1
 
 DOCS_PATHS = ("/docs", "/redoc", "/docs/oauth2-redirect", "/openapi.json")
+
+
+def _production(api_docs_enabled: bool | None = None) -> Settings:
+    """Production settings that pass the startup check (T-0037 needs the deployment tenant)."""
+    return Settings(
+        environment="production", default_tenant_id=T1, api_docs_enabled=api_docs_enabled
+    )
 
 
 def _status(settings: Settings, path: str) -> int:
@@ -17,7 +25,7 @@ def _status(settings: Settings, path: str) -> int:
 
 @pytest.mark.parametrize("path", DOCS_PATHS)
 def test_docs_return_404_in_production(path: str) -> None:
-    assert _status(Settings(environment="production"), path) == 404
+    assert _status(_production(), path) == 404
 
 
 @pytest.mark.parametrize("environment", ["development", "test"])
@@ -28,7 +36,7 @@ def test_docs_are_served_in_dev_and_test(environment: str, path: str) -> None:
 
 @pytest.mark.parametrize("path", DOCS_PATHS)
 def test_docs_can_be_enabled_in_production(path: str) -> None:
-    assert _status(Settings(environment="production", api_docs_enabled=True), path) == 200
+    assert _status(_production(api_docs_enabled=True), path) == 200
 
 
 @pytest.mark.parametrize("path", DOCS_PATHS)
@@ -61,7 +69,7 @@ def test_api_docs_active_property(environment: str, override: bool | None, expec
 
 
 def test_health_still_served_in_production() -> None:
-    assert _status(Settings(environment="production"), "/health") == 200
+    assert _status(_production(), "/health") == 200
 
 
 def test_schema_export_works_whatever_the_environment(monkeypatch: pytest.MonkeyPatch) -> None:

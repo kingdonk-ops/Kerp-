@@ -120,7 +120,9 @@ def test_create_app_refuses_debug_in_production(clean_env: pytest.MonkeyPatch) -
     from app.main import create_app
 
     clean_env.setenv("KERP_DEBUG", "true")
-    with pytest.raises(ValidationError):
+    # A valid deployment tenant (T-0037): the refusal comes from the debug check alone.
+    clean_env.setenv("KERP_DEFAULT_TENANT_ID", "00000000-0000-4000-8000-0000000000e1")
+    with pytest.raises(ValidationError, match="KERP_DEBUG"):
         create_app()
 
 
