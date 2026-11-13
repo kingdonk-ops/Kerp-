@@ -13,6 +13,7 @@ from fastapi.responses import JSONResponse
 from app.api.health import router as health_router
 from app.core.auth.router import router as auth_router
 from app.core.auth.runtime import close_auth_runtime
+from app.core.body_limit import BodyLimitMiddleware
 from app.core.config import Settings, get_settings
 from app.core.db import Database
 from app.core.logging import configure_logging
@@ -68,7 +69,9 @@ def create_app(
     app.state.db = database
 
     # Middleware added last runs outermost: security headers wrap the request-context
-    # middleware so they are also applied to the generic 500 it produces.
+    # middleware so they are also applied to the generic 500 it produces. The body limit is
+    # innermost, so its 413 carries a request id and the security headers (T-0060).
+    app.add_middleware(BodyLimitMiddleware, max_bytes=settings.max_body_bytes)
     app.add_middleware(RequestContextMiddleware, debug=settings.debug)
     docs_paths = {app.docs_url, app.redoc_url, app.swagger_ui_oauth2_redirect_url}
     app.add_middleware(

@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import json
 import uuid
 from datetime import datetime
-from typing import Any, Literal
+from typing import Any, Final, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+# The payload names what to work on (ids, options), never the data itself (T-0060).
+MAX_PAYLOAD_BYTES: Final = 64 * 1024
 
 
 class JobCreate(BaseModel):
@@ -16,6 +20,15 @@ class JobCreate(BaseModel):
 
     kind: str = Field(min_length=3, max_length=120)
     payload: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("payload")
+    @classmethod
+    def _bounded(cls, payload: dict[str, Any]) -> dict[str, Any]:
+        size = len(json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode())
+        if size > MAX_PAYLOAD_BYTES:
+            limit = MAX_PAYLOAD_BYTES // 1024
+            raise ValueError(f"payload is {size} bytes as compact JSON; the limit is {limit} KiB")
+        return payload
 
 
 class JobRead(BaseModel):

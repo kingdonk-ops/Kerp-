@@ -5,6 +5,7 @@ on PostgreSQL under project RLS. Real SAQ on Redis is ``tests/test_jobs_saq.py``
 """
 
 import asyncio
+import json
 import logging
 import subprocess
 import sys
@@ -34,6 +35,7 @@ from app.modules.jobs import worker as worker_module
 from app.modules.jobs.broker import JobRef, LoopDispatcher, SaqBroker
 from app.modules.jobs.models import MAX_TEXT, TABLE, Job
 from app.modules.jobs.registry import JobContext, JobKind, JobRegistry
+from app.modules.jobs.schemas import MAX_PAYLOAD_BYTES
 from app.modules.jobs.worker import WorkerContext, build_workers, load_registry, run_job, serve
 from tests.audit_support import migrated_database
 from tests.module_support import FakeModule, ModulePackages
@@ -76,6 +78,10 @@ async def not_json(job: JobContext) -> dict[str, Any]:
     return {"id": uuid.uuid4()}  # a UUID is not JSON: storing it fails at flush
 
 
+async def a_list(job: JobContext) -> Any:
+    return [1, 2, 3]  # JSON, but not an object: the handler breaks its contract
+
+
 async def slow(job: JobContext) -> None:
     await asyncio.sleep(60)
 
@@ -89,6 +95,7 @@ def make_registry() -> JobRegistry:
     registry.add(JobKind("demo.refuse", "interactive", refuse))
     registry.add(JobKind("demo.slow", "batch", slow))
     registry.add(JobKind("demo.not_json", "batch", not_json))
+    registry.add(JobKind("demo.a_list", "batch", a_list, api=True))
     return registry
 
 
@@ -538,6 +545,14 @@ def test_a_result_that_cannot_be_stored_fails_the_job_with_a_sanitised_error(
     assert record.exc_info is not None
 
 
+@pytest.mark.parametrize("bad", [[1, 2, 3], "text", 42, True])
+def test_finish_job_refuses_a_result_that_is_not_an_object(db: Database, bad: Any) -> None:
+    job_id = create(db, CTX_A)
+    with pytest.raises(TypeError, match="JSON object"), db.unit_of_work(CTX_A) as s:
+        service.finish_job(s, job_id, result=bad)
+    assert load(db, CTX_A, job_id).status == "queued"  # nothing was stored
+
+
 def test_sanitise_error_bounds_and_strips_control_characters() -> None:
     assert service.sanitise_error(service.JobError("")) == "Job failed"
     assert service.sanitise_error(service.JobError("a\tb\nsecond line")) == "a b"
@@ -684,6 +699,64 @@ def test_post_rejects_a_scope_in_the_body(
     body = {"kind": "demo.ocr", field: str(CTX_C.tenant_id)}
     assert client.post(JOBS, json=body).status_code == 422  # scope comes from the JWT only
     assert dispatched == []
+
+
+def test_a_handler_returning_a_list_fails_the_job_and_the_poll_still_works(
+    http: tuple[TestClient, Caller], db: Database, dispatched: list[JobRef]
+) -> None:
+    client, caller = http
+    caller.as_(CTX_A)
+    job_id = client.post(JOBS, json={"kind": "demo.a_list"}).json()["id"]
+    run(db, dispatched[0])
+    polled = client.get(f"{JOBS}/{job_id}")
+    assert polled.status_code == 200  # was a 500: JobRead.result is an object or null
+    body = polled.json()
+    assert (body["status"], body["result"], body["error"]) == (
+        "failed",
+        None,
+        "Internal error (TypeError)",
+    )
+
+
+def test_a_scope_inside_the_payload_does_not_change_the_rows_scope(
+    http: tuple[TestClient, Caller], db: Database, dispatched: list[JobRef]
+) -> None:
+    client, caller = http
+    caller.as_(CTX_A)
+    smuggled = {"tenant_id": str(CTX_C.tenant_id), "project_id": str(CTX_C.project_id)}
+    response = client.post(JOBS, json={"kind": "demo.ocr", "payload": smuggled})
+    assert response.status_code == 202
+    job_id = uuid.UUID(response.json()["id"])
+    with db.unit_of_work(CTX_A) as s:
+        job = service.get_job(s, job_id)
+        assert (job.tenant_id, job.project_id, job.payload) == (
+            CTX_A.tenant_id,
+            CTX_A.project_id,
+            smuggled,
+        )
+    assert (dispatched[0].tenant_id, dispatched[0].project_id) == (
+        CTX_A.tenant_id,
+        CTX_A.project_id,
+    )
+    caller.as_(CTX_C)  # the tenant named in the payload never sees the job
+    assert client.get(f"{JOBS}/{job_id}").status_code == 404
+
+
+def test_the_payload_has_a_byte_cap(
+    http: tuple[TestClient, Caller], dispatched: list[JobRef]
+) -> None:
+    client, caller = http
+    caller.as_(CTX_A)
+    overhead = len(json.dumps({"blob": ""}, separators=(",", ":")).encode())
+    at_cap = {"blob": "x" * (MAX_PAYLOAD_BYTES - overhead)}
+    assert client.post(JOBS, json={"kind": "demo.ocr", "payload": at_cap}).status_code == 202
+    over = {"blob": "x" * (MAX_PAYLOAD_BYTES - overhead + 1)}
+    response = client.post(JOBS, json={"kind": "demo.ocr", "payload": over})
+    assert response.status_code == 422
+    assert "64 KiB" in response.text
+    multibyte = {"blob": "\u00e9" * ((MAX_PAYLOAD_BYTES - overhead) // 2 + 1)}  # 2 bytes each
+    assert client.post(JOBS, json={"kind": "demo.ocr", "payload": multibyte}).status_code == 422
+    assert len(dispatched) == 1
 
 
 def test_jobs_api_needs_authentication(http: tuple[TestClient, Caller]) -> None:

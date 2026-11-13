@@ -650,3 +650,31 @@ def test_a_deleted_project_is_404(api: Api) -> None:
     with api.db.unit_of_work(CTX_T1) as s:
         projects.delete_project(s, api.home.project_id)  # type: ignore[arg-type]
     assert api.client.post(api.files(), json=_body(), headers=alice).status_code == 404
+
+
+@pytest.fixture
+def small_body_api(tmp_path: Path, db: Database, storage: LocalStorage) -> Iterator[Api]:
+    settings = make_settings(
+        database_url=database_url(tmp_path), upload_max_bytes=MAX, max_body_bytes=1024
+    )
+    app, _runtime = auth_app(settings)
+    with TestClient(app) as client:
+        yield Api(client, db)
+
+
+def test_the_body_limit_does_not_cap_presigned_uploads(
+    small_body_api: Api, storage: LocalStorage
+) -> None:
+    # KERP_MAX_BODY_BYTES (T-0060) bounds API requests only: the file itself goes to object
+    # storage by presigned PUT, so a file far above the body limit still uploads.
+    api, data = small_body_api, PNG * 64
+    assert len(data) > 64 * 1024
+    alice = api.headers(ALICE)
+    created = api.client.post(api.files(), json=_body(data), headers=alice)
+    assert created.status_code == 201, created.text
+    file_id = created.json()["file"]["id"]
+    storage.write(f"staging/{T1}/{api.home.project_id}/{file_id}", data)
+    completed = api.client.post(f"{api.files()}/{file_id}/complete", headers=alice)
+    assert completed.status_code == 200, completed.text
+    oversized = {**_body(data), "filename": "x" * 2048}  # the request itself is still bounded
+    assert api.client.post(api.files(), json=oversized, headers=alice).status_code == 413

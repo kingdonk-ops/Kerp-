@@ -11,6 +11,7 @@ FastAPI modular monolith (see `docs/spec/` and `CLAUDE.md` §6).
 | `app/core/db.py` | `Base`, `BaseRecordMixin`, portable `GUID`/`JSONType`, `Database` + `get_db`, metadata contract check |
 | `migrations/`, `alembic.ini` | Alembic (URL from settings, metadata from every module's `models.py`) |
 | `app/api/health.py` | `GET /health` liveness endpoint |
+| `app/core/body_limit.py` | App-wide request body limit (`KERP_MAX_BODY_BYTES`, 413) |
 | `app/core/tenancy/` | Project-scoped RLS, tenancy context, ORM scope + soft-delete filter — see its `README.md` |
 | `app/core/cel/` | CEL rule evaluation (celpy, lazy) with the KERP error taxonomy — see its `README.md` |
 | `app/core/audit/` | Hash-chained, append-only audit ledger (`append`, `verify_chain`; REVOKE + triggers) — see its `README.md` |
@@ -39,6 +40,7 @@ hardcoded config, no `.env` file is read).
 | `KERP_VERSION` | installed package version | Reported by `/health` |
 | `KERP_DATABASE_URL` | unset | SQLAlchemy URL of the runtime role (e.g. `postgresql+psycopg://…`, `sqlite:///…`) |
 | `KERP_MIGRATION_DATABASE_URL` | unset (= `KERP_DATABASE_URL`) | Schema-owner URL Alembic runs as |
+| `KERP_MAX_BODY_BYTES` | `1048576` (1 MiB) | Largest request body any endpoint accepts (413 above it; min 1024). File bytes go to object storage by presigned URL and are not capped by it (`app/core/body_limit.py`) |
 | `KERP_REDIS_URL` | unset | Redis URL (auth token revocation; job queue later). Required in production |
 | `KERP_JWT_*`, `KERP_ACCESS_TOKEN_MINUTES`, `KERP_REFRESH_TOKEN_DAYS`, `KERP_DEFAULT_TENANT_ID` | see `app/core/auth/README.md` | Token signing keys and lifetimes |
 | `KERP_STORAGE_BUCKET`, `KERP_S3_ENDPOINT_URL`, `KERP_S3_PUBLIC_ENDPOINT_URL`, `KERP_S3_ACCESS_KEY_ID`, `KERP_S3_SECRET_ACCESS_KEY`, `KERP_UPLOAD_*`, `KERP_DOWNLOAD_URL_SECONDS` | see `app/modules/uploads/README.md` | Object storage (S3 / MinIO) and upload limits |

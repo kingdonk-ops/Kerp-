@@ -50,6 +50,10 @@ class Settings(BaseSettings):
     content_security_policy: str = "default-src 'none'; frame-ancestors 'none'"
     hsts_enabled: bool | None = None
 
+    # Request bounds (T-0060): no endpoint accepts a larger body (413). File bytes go to object
+    # storage by presigned URL, never through the API, so this does not cap uploads.
+    max_body_bytes: int = Field(default=1024 * 1024, ge=1024, le=100 * 1024 * 1024)
+
     # Database (T-0005). Kept out of repr so credentials embedded in URLs are never logged.
     # ``database_url`` is the runtime role (NOSUPERUSER NOBYPASSRLS on PostgreSQL);
     # ``migration_database_url`` is the schema owner Alembic runs as (falls back to the former).
