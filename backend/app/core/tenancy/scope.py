@@ -7,12 +7,16 @@ same on SQLite (where it is the only filter) and on PostgreSQL (where RLS backs 
 * **Soft delete** (TD-033): every ORM ``SELECT`` hides rows with ``deleted_at`` set, unless
   the statement carries ``execution_options(include_deleted=True)``.
 * **Tenancy scope**: for a session bound with ``bind_tenancy``, every ORM ``SELECT`` sees
-  only rows of the bound tenant whose ``project_id`` is ``NULL`` or the bound project.
+  only rows of the bound tenant whose ``project_id`` is ``NULL``, the bound project or one
+  of the allowed projects (T-0010, TD-053).
   Out-of-scope rows do not exist for the caller: lists omit them, lookups by id 404.
 * **Write guard**: a bound session refuses to flush (insert, update or delete) a row
   outside its exact scope with ``OutOfScopeError``: another tenant, another project, or a
   tenant-level row from a project session. The API answers 404 (never 403, so the
-  existence of another project's data is not revealed).
+  existence of another project's data is not revealed). Allowed projects are read-only.
+* **Asset-Site scope** (T-0010, diff §4, PER-07): for a session whose context carries
+  ``site_node_ids``, rows of ``SiteScopedMixin`` models are visible and writable only when
+  their ``site_node_id`` is one of those sites. This filter is ORM-only (no RLS policy).
 
 An unbound session is not filtered here. On PostgreSQL RLS then shows it nothing.
 ORM bulk ``update()``/``delete()`` statements skip both the loader criteria and the flush
@@ -26,9 +30,17 @@ import uuid
 from typing import Any, Final
 
 from sqlalchemy import and_, event, or_
-from sqlalchemy.orm import ORMExecuteState, Session, UOWTransaction, with_loader_criteria
+from sqlalchemy.orm import (
+    Mapped,
+    ORMExecuteState,
+    Session,
+    UOWTransaction,
+    mapped_column,
+    with_loader_criteria,
+)
 
-from app.core.db import BaseRecordMixin
+from app.core.db import GUID, BaseRecordMixin
+from app.core.tenancy.context import TenancyContext
 from app.core.tenancy.rls import session_tenancy
 
 INCLUDE_DELETED: Final = "include_deleted"
@@ -38,6 +50,23 @@ class OutOfScopeError(LookupError):
     """A record outside the caller's tenant/project. The API maps it to 404."""
 
 
+class SiteScopedMixin:
+    """Opt-in Asset-Site scoping: the record belongs to one physical site (asset node).
+
+    A model that a Site Inspector (PER-07) must only see for their own site mixes this in
+    next to ``BaseRecordMixin``. ``NULL`` means "no site yet" and is hidden from a
+    site-scoped session (fail closed).
+    """
+
+    site_node_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), nullable=True, index=True)
+
+
+def _site_allows(context: TenancyContext, record: object) -> bool:
+    if context.site_node_ids is None or not isinstance(record, SiteScopedMixin):
+        return True
+    return record.site_node_id in context.site_node_ids
+
+
 def is_visible(session: Session, record: BaseRecordMixin, *, include_deleted: bool = False) -> bool:
     """Whether ``record`` is readable by ``session``: same rule as the read filters."""
     if record.deleted_at is not None and not include_deleted:
@@ -45,9 +74,10 @@ def is_visible(session: Session, record: BaseRecordMixin, *, include_deleted: bo
     context = session_tenancy(session)
     if context is None:
         return True
-    return record.tenant_id == context.tenant_id and record.project_id in (
-        None,
-        context.project_id,
+    return (
+        record.tenant_id == context.tenant_id
+        and (record.project_id is None or record.project_id in context.readable_project_ids)
+        and _site_allows(context, record)
     )
 
 
@@ -82,8 +112,8 @@ def _filter_reads(state: ORMExecuteState) -> None:
         )
     context = session_tenancy(state.session)
     if context is not None:
-        tenant_id, project_id = context.tenant_id, context.project_id
-        if project_id is None:
+        tenant_id, readable = context.tenant_id, sorted(context.readable_project_ids)
+        if not readable:
             options.append(
                 with_loader_criteria(
                     BaseRecordMixin,
@@ -97,8 +127,17 @@ def _filter_reads(state: ORMExecuteState) -> None:
                     BaseRecordMixin,
                     lambda cls: and_(
                         cls.tenant_id == tenant_id,
-                        or_(cls.project_id.is_(None), cls.project_id == project_id),
+                        or_(cls.project_id.is_(None), cls.project_id.in_(readable)),
                     ),
+                    include_aliases=True,
+                )
+            )
+        if context.site_node_ids is not None:
+            sites = sorted(context.site_node_ids)
+            options.append(
+                with_loader_criteria(
+                    SiteScopedMixin,
+                    lambda cls: cls.site_node_id.in_(sites),
                     include_aliases=True,
                 )
             )
@@ -114,10 +153,11 @@ def _guard_writes(session: Session, flush_context: UOWTransaction, instances: ob
     # Writes need the exact scope (mirrors project_isolation_policy): a project session
     # writes only its project, a tenant-level session only tenant-level rows. NULL is not
     # a wildcard here, so a row cannot be created as, or demoted to, a tenant-level row.
+    # Allowed projects are read-only; a site-scoped session writes only its sites' rows.
     for obj in (*session.new, *session.dirty, *session.deleted):
         if not isinstance(obj, BaseRecordMixin):
             continue
         if obj.tenant_id is not None and obj.tenant_id != context.tenant_id:
             raise OutOfScopeError(f"{type(obj).__name__} not found")
-        if obj.project_id != context.project_id:
+        if obj.project_id != context.project_id or not _site_allows(context, obj):
             raise OutOfScopeError(f"{type(obj).__name__} not found")

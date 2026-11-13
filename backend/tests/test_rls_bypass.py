@@ -302,6 +302,7 @@ def test_a_migration_that_forgets_rls_is_caught() -> None:
                 "test_unprotected: row level security not forced",
                 "test_unprotected: policy project_isolation_policy missing",
                 "test_unprotected: policy tenant_level_read_policy missing",
+                "test_unprotected: policy allowed_projects_read_policy missing",
             ]
             op = Operations(MigrationContext.configure(conn))
             for statement in rls_policy_sql("test_unprotected"):

@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 93 · **Closed:** 56
+**Open:** 102 · **Closed:** 56
 
 ## decision (2)
 
@@ -12,7 +12,7 @@
 | [TD-096](../tracker/todo/TD-096.md) | Approved coating ITR dropped the residual-dust rating row the ITP requires; Grating and Gridmesh ITR has no approved version: confirm with the client before shipping default templates | T-0113 | planner |
 | [TD-141](../tracker/todo/TD-141.md) | Rule store: explicit per-rule version column, findings log only non-passing rules | T-0018 | implementer |
 
-## spec-gap (36)
+## spec-gap (37)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -52,6 +52,7 @@
 | [TD-135](../tracker/todo/TD-135.md) | Field-worker PIN semantics: confirm server-checked PIN per session that gates every refresh, and the lockout/magic-link numbers | T-0009 | implementer |
 | [TD-139](../tracker/todo/TD-139.md) | Confirm per-kind rule context schemas and action vocabularies (validation compiler) | T-0018 | implementer |
 | [TD-148](../tracker/todo/TD-148.md) | Module-to-navigation-group mapping for the 8-group IA is unspecified | T-0024 | implementer |
+| [TD-151](../tracker/todo/TD-151.md) | Persona matrix interpretation: default-tier labels vs V/C/E/A/S, PER-03 progress sign-off, PER-09 combined with a hold-authority persona | T-0010 | implementer |
 
 ## missed (3)
 
@@ -61,7 +62,7 @@
 | [TD-125](../tracker/todo/TD-125.md) | Booking modules must call work_anchor_for and return 422 when the path has no work anchor (progress, time lines against a work anchor, completion gate) | T-0101, T-0116, T-0124, E-04-03, E-04-05 | reviewer |
 | [TD-131](../tracker/todo/TD-131.md) | Add a root .env.example for the dev stack (the implementer agent's permission rules block writing .env* files) | T-0003 | implementer |
 
-## deferred (14)
+## deferred (16)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -77,10 +78,12 @@
 | [TD-145](../tracker/todo/TD-145.md) | Wire the project switcher to the projects/membership API and gate All-Projects on the allowed project list | T-0024 | implementer |
 | [TD-146](../tracker/todo/TD-146.md) | Send the selected project scope with API requests and key cached queries by scope | T-0024 | implementer |
 | [TD-147](../tracker/todo/TD-147.md) | Field-worker sign-in screens: magic-link request/redeem and 6-digit PIN unlock in the SPA | T-0024 | implementer |
+| [TD-149](../tracker/todo/TD-149.md) | Area/discipline scoping (PER-04) and granted-subtree scoping (PER-15) are not enforced yet | T-0010 | implementer |
+| [TD-150](../tracker/todo/TD-150.md) | Asset-Site scoping is ORM-only and matches site_node_id exactly (no RLS, no subtree) | T-0010 | implementer |
 | [TD-155](../tracker/todo/TD-155.md) | Schedule the jobs sweep: enumerate tenant/project scopes under RLS (no BYPASSRLS) and run service.sweep from an SAQ cron | T-0015 | implementer |
 | [TD-156](../tracker/todo/TD-156.md) | Jobs API: per-kind capability check on POST /jobs and GET /jobs/{id} once RBAC lands (T-0010) | T-0015 | implementer |
 
-## later (31)
+## later (33)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -114,9 +117,17 @@
 | [TD-138](../tracker/todo/TD-138.md) | Per-client-IP throttling for login and magic-link requests (needs trusted-proxy config for the real client address) | T-0009 | implementer |
 | [TD-143](../tracker/todo/TD-143.md) | run_checks persist=False dry-run flag (evaluate without logging findings) | T-0018 | implementer |
 | [TD-144](../tracker/todo/TD-144.md) | run_checks: translate an uncommitted-rule-set ForeignKeyViolation into a clear RuleStoreError | T-0018 | implementer |
+| [TD-153](../tracker/todo/TD-153.md) | Membership lookup adds a DB round-trip per authenticated request | T-0010 | implementer |
 | [TD-157](../tracker/todo/TD-157.md) | Jobs worker: liveness healthcheck for the worker container, and re-queue (not fail) jobs interrupted by a worker shutdown | T-0015 | implementer |
+| [TD-160](../tracker/todo/TD-160.md) | Test that revoking (soft-deleting) a project membership removes that project from the resolved scope; extend TD-150 to bulk ORM update/delete | T-0010 | reviewer |
 
-## risk (7)
+## bug (1)
+
+| ID | Title | Related tasks | Raised by |
+|---|---|---|---|
+| [TD-159](../tracker/todo/TD-159.md) | Site filter from the bound project is applied to all site-scoped rows: a PER-07 on A who is PER-01 on B loses B's site-scoped rows (over-restrictive) | T-0010 | reviewer |
+
+## risk (10)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -127,6 +138,9 @@
 | [TD-111](../tracker/todo/TD-111.md) | All coastal input files (planning, comm matrix, registers, reports, templates) contain real client and personal data: extend TD-069 beyond the inspection exports | T-0113, T-0107 | planner |
 | [TD-132](../tracker/todo/TD-132.md) | docker-compose dev stack never run end to end (no Docker on the T-0003 implementer machine): verify make test-pg once | T-0003 | implementer |
 | [TD-142](../tracker/todo/TD-142.md) | PIN gating fails open if Redis evicts the pin:<sid> key: add an amr=["pin"] token claim or require maxmemory-policy noeviction | T-0009 | implementer |
+| [TD-152](../tracker/todo/TD-152.md) | T-0014 membership-based policy must keep the caller's own memberships readable by the scope resolver | T-0010 | implementer |
+| [TD-154](../tracker/todo/TD-154.md) | Migrations 0002-0005 call the live rls_policy_sql, so changing it rewrites history | T-0010 | implementer |
+| [TD-158](../tracker/todo/TD-158.md) | require_hold_release passes a PER-07 for any site; endpoints must also check can_release_hold against the hold's site (add a load-and-check helper) | T-0010 | reviewer |
 
 ## Closed
 

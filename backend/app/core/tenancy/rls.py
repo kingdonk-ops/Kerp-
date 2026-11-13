@@ -6,6 +6,7 @@ tenant to the project dimension. Every table that carries ``tenant_id`` gets::
     ENABLE + FORCE ROW LEVEL SECURITY
     CREATE POLICY project_isolation_policy ... FOR ALL USING (<exact>) WITH CHECK (<exact>)
     CREATE POLICY tenant_level_read_policy ... FOR SELECT USING (<tenant-level row>)
+    CREATE POLICY allowed_projects_read_policy ... FOR SELECT USING (<allowed project row>)
 
 ``<exact>`` is ``tenant_id = app.current_tenant_id AND project_id IS NOT DISTINCT FROM
 app.current_project_id`` (edge spec §6). A session reads, inserts, updates and deletes rows
@@ -13,7 +14,10 @@ of exactly its scope: a project session writes only its project, and a tenant-le
 (no project) writes only tenant-level rows. Permissive policies are OR-ed per command, so
 the second policy only adds *read* access to the tenant's tenant-level rows
 (``project_id IS NULL``). A project session cannot create, demote a row to, change or
-delete a tenant-level row.
+delete a tenant-level row. The third policy (T-0010, TD-053) adds *read* access to rows of
+the projects in ``app.allowed_project_ids`` (comma-separated UUIDs bound from the user's
+memberships): a portfolio session reads several projects but still writes only
+``app.current_project_id``.
 
 * ``NULLIF(..., '')``: once a connection has set a custom setting, it reads back as ``''``
   after the transaction, not ``NULL``. ``''::uuid`` would raise; ``NULL`` matches nothing.
@@ -43,9 +47,11 @@ from app.core.tenancy.context import TenancyContext
 
 TENANT_SETTING: Final = "app.current_tenant_id"
 PROJECT_SETTING: Final = "app.current_project_id"
+ALLOWED_SETTING: Final = "app.allowed_project_ids"
 POLICY_NAME: Final = "project_isolation_policy"
 READ_POLICY_NAME: Final = "tenant_level_read_policy"
-POLICY_NAMES: Final = (POLICY_NAME, READ_POLICY_NAME)
+ALLOWED_READ_POLICY_NAME: Final = "allowed_projects_read_policy"
+POLICY_NAMES: Final = (POLICY_NAME, READ_POLICY_NAME, ALLOWED_READ_POLICY_NAME)
 SESSION_INFO_KEY: Final = "kerp_tenancy"
 
 # Tables with tenant_id that are deliberately not under RLS, each with its reason
@@ -61,6 +67,11 @@ SCOPE_ROW_SQL: Final = (
 )
 # Read only: the tenant's tenant-level rows.
 TENANT_LEVEL_ROW_SQL: Final = f"tenant_id = {_TENANT_EXPR} AND project_id IS NULL"
+# Read only: rows of the allowed projects. An unset list is NULL; ANY(NULL) matches nothing.
+ALLOWED_PROJECT_ROW_SQL: Final = (
+    f"tenant_id = {_TENANT_EXPR} AND project_id = ANY(string_to_array("
+    f"NULLIF(current_setting('{ALLOWED_SETTING}', true), ''), ',')::uuid[])"
+)
 
 
 def rls_tables(metadata: MetaData, *, exempt: frozenset[str] = RLS_EXEMPT) -> list[str]:
@@ -88,6 +99,9 @@ def rls_policy_sql(table: str) -> list[str]:
         f"USING ({SCOPE_ROW_SQL}) WITH CHECK ({SCOPE_ROW_SQL})",
         f"DROP POLICY IF EXISTS {READ_POLICY_NAME} ON {table}",
         f"CREATE POLICY {READ_POLICY_NAME} ON {table} FOR SELECT USING ({TENANT_LEVEL_ROW_SQL})",
+        f"DROP POLICY IF EXISTS {ALLOWED_READ_POLICY_NAME} ON {table}",
+        f"CREATE POLICY {ALLOWED_READ_POLICY_NAME} ON {table} FOR SELECT "
+        f"USING ({ALLOWED_PROJECT_ROW_SQL})",
     ]
 
 
@@ -206,12 +220,17 @@ def bind_connection(connection: Connection, context: TenancyContext | None) -> N
         return
     # set_config, not SET LOCAL: SET cannot take bind parameters (psycopg 3 binds server-side).
     connection.execute(
-        text("SELECT set_config(:t_name, :tenant, true), set_config(:p_name, :project, true)"),
+        text(
+            "SELECT set_config(:t_name, :tenant, true), set_config(:p_name, :project, true),"
+            " set_config(:a_name, :allowed, true)"
+        ),
         {
             "t_name": TENANT_SETTING,
             "p_name": PROJECT_SETTING,
+            "a_name": ALLOWED_SETTING,
             "tenant": str(context.tenant_id) if context else "",
             "project": str(context.project_id) if context and context.project_id else "",
+            "allowed": ",".join(sorted(map(str, context.allowed_project_ids))) if context else "",
         },
     )
 
@@ -226,7 +245,7 @@ def _rebind_on_begin(
 
 
 def install_pool_reset(engine: Engine) -> None:
-    """Clear both settings whenever a connection goes back to the pool."""
+    """Clear the tenancy settings whenever a connection goes back to the pool."""
     if engine.dialect.name != "postgresql":
         return
 
@@ -240,6 +259,7 @@ def install_pool_reset(engine: Engine) -> None:
             cursor = dbapi_connection.cursor()
             cursor.execute(f"RESET {TENANT_SETTING}")
             cursor.execute(f"RESET {PROJECT_SETTING}")
+            cursor.execute(f"RESET {ALLOWED_SETTING}")
             cursor.close()
             dbapi_connection.commit()
         except Exception:  # pragma: no cover - a connection we cannot reset is dropped
