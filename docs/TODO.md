@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 155 · **Closed:** 91
+**Open:** 158 · **Closed:** 91
 
 ## decision (7)
 
@@ -170,13 +170,14 @@
 | [TD-246](../tracker/todo/TD-246.md) | saved_views: validate register_key against register descriptors once modules declare them (E-01-01) | T-0020 | implementer |
 | [TD-247](../tracker/todo/TD-247.md) | saved_views: degrade gracefully when a stored view config no longer validates | T-0020 | implementer |
 
-## bug (1)
+## bug (2)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
 | [TD-159](../tracker/todo/TD-159.md) | Site filter from the bound project is applied to all site-scoped rows: a PER-07 on A who is PER-01 on B loses B's site-scoped rows (over-restrictive) | T-0010 | reviewer |
+| [TD-252](../tracker/todo/TD-252.md) | tracker.py new-todo cannot see open PRs in cloud sessions: gh pr list uses GraphQL (blocked), so TODO ids collide | T-0029 | coordinator |
 
-## risk (14)
+## risk (16)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -194,6 +195,8 @@
 | [TD-225](../tracker/todo/TD-225.md) | Login account backstop can still be held locked at ~1 request per lock after 51 distributed failures | T-0068 | reviewer |
 | [TD-232](../tracker/todo/TD-232.md) | Frontend lint toolchain: npm audit reports moderate minimatch ReDoS (GHSA-g3hv-75wg-m249) via eslint 10 / typescript-eslint 8.72.2 | T-0031 | implementer |
 | [TD-235](../tracker/todo/TD-235.md) | review-gate patch-id ignores dated note lines entirely - a scope decision recorded as a dated Note can be added or reworded after approval without re-review | T-0029 | implementer |
+| [TD-253](../tracker/todo/TD-253.md) | Refresh Origin fallback fails closed behind a TLS proxy: production without KERP_WEB_ORIGIN signs users out ~15 min after login; SPA treats the 403 as transient | T-0037 | coordinator |
+| [TD-254](../tracker/todo/TD-254.md) | spatial_bounds 10,000-position cap also runs on reads (ProjectRead): a stored row above the cap makes GET /projects 500 for the whole tenant | T-0060 | coordinator |
 
 ## Closed
 
