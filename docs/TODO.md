@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 86 · **Closed:** 56
+**Open:** 90 · **Closed:** 56
 
 ## decision (2)
 
@@ -12,7 +12,7 @@
 | [TD-096](../tracker/todo/TD-096.md) | Approved coating ITR dropped the residual-dust rating row the ITP requires; Grating and Gridmesh ITR has no approved version: confirm with the client before shipping default templates | T-0113 | planner |
 | [TD-141](../tracker/todo/TD-141.md) | Rule store: explicit per-rule version column, findings log only non-passing rules | T-0018 | implementer |
 
-## spec-gap (35)
+## spec-gap (36)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -51,6 +51,7 @@
 | [TD-121](../tracker/todo/TD-121.md) | Refresh-token lifetime, absolute session lifetime and SPA refresh-token transport are unspecified | T-0008 | implementer |
 | [TD-135](../tracker/todo/TD-135.md) | Field-worker PIN semantics: confirm server-checked PIN per session that gates every refresh, and the lockout/magic-link numbers | T-0009 | implementer |
 | [TD-139](../tracker/todo/TD-139.md) | Confirm per-kind rule context schemas and action vocabularies (validation compiler) | T-0018 | implementer |
+| [TD-148](../tracker/todo/TD-148.md) | Module-to-navigation-group mapping for the 8-group IA is unspecified | T-0024 | implementer |
 
 ## missed (3)
 
@@ -60,7 +61,7 @@
 | [TD-125](../tracker/todo/TD-125.md) | Booking modules must call work_anchor_for and return 422 when the path has no work anchor (progress, time lines against a work anchor, completion gate) | T-0101, T-0116, T-0124, E-04-03, E-04-05 | reviewer |
 | [TD-131](../tracker/todo/TD-131.md) | Add a root .env.example for the dev stack (the implementer agent's permission rules block writing .env* files) | T-0003 | implementer |
 
-## deferred (9)
+## deferred (12)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -73,6 +74,9 @@
 | [TD-129](../tracker/todo/TD-129.md) | Guard the module toggle API (PUT /api/v1/modules/{name}) with the admin capability tier once RBAC lands (T-0010/T-0014) | T-0011 | implementer |
 | [TD-136](../tracker/todo/TD-136.md) | Restrict magic-link sign-in to the Field Worker persona (PER-14) once T-0010 personas exist | T-0009 | implementer |
 | [TD-140](../tracker/todo/TD-140.md) | Compile-on-save checks CEL rules only at top-level variables; field-level type checking against kind context schemas | T-0018 | implementer |
+| [TD-145](../tracker/todo/TD-145.md) | Wire the project switcher to the projects/membership API and gate All-Projects on the allowed project list | T-0024 | implementer |
+| [TD-146](../tracker/todo/TD-146.md) | Send the selected project scope with API requests and key cached queries by scope | T-0024 | implementer |
+| [TD-147](../tracker/todo/TD-147.md) | Field-worker sign-in screens: magic-link request/redeem and 6-digit PIN unlock in the SPA | T-0024 | implementer |
 
 ## later (30)
 

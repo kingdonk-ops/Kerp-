@@ -11,6 +11,7 @@ Single-page app for the KERP Field Operations Platform (`docs/spec/`).
 | Styling | Tailwind CSS v4 via `@tailwindcss/vite` (`src/index.css` → `@import "tailwindcss"`) |
 | Routing | React Router v7 (library / data-router mode, `src/app/routes.tsx`) |
 | Server state | TanStack Query v5 (`src/app/queryClient.ts`) |
+| API client | `openapi-fetch` typed by the generated `src/api/schema.ts` (`src/lib/api/client.ts`) |
 | Offline outbox | Dexie 4 on IndexedDB (`src/db/`) |
 | Rule expressions | CEL via `@marcbachmann/cel-js` (`src/lib/cel/`) |
 | i18n | i18next + react-i18next (`src/i18n/`) |
@@ -34,13 +35,36 @@ npm run gen:api    # regenerate src/api/ from the backend OpenAPI schema (backen
 ```
 src/
   api/        generated API types (openapi.json, schema.ts) — never hand-edit (see src/api/README.md)
-  app/        providers (AppRoot/AppProviders), router, layout, query client
+  app/        providers (AppRoot/AppProviders), services, router, shell layout, nav groups, query client
+  auth/       token store, AuthProvider (login/logout/me), RequireAuth route guard
   db/         Dexie database (KerpDb) + offline outbox helpers
   i18n/       i18next instance + message catalogues (locales/en.ts)
+  lib/api/    API client (bearer token, single-flight refresh rotation + one retry on 401)
   lib/cel/    offline CEL rule evaluation (@marcbachmann/cel-js), parity with the server
   pages/      route components
-  test/       Vitest setup
+  projects/   project scope: ProjectDirectory seam, ProjectScopeProvider, top-bar ProjectSwitcher
+  test/       Vitest setup, fake backend (`fakeApi.ts`)
 ```
+
+## Shell (T-0024)
+
+- **Auth.** `/login` posts to `/api/v1/auth/login`. The access token is memory-only; the
+  rotating refresh token is in `sessionStorage` (TD-121), so a reload resumes the session
+  via `/api/v1/auth/refresh`. Every other route sits behind `RequireAuth`. Sign-out calls
+  `/api/v1/auth/logout` and clears the session even when the server is unreachable.
+- **Navigation (diff §6).** 8 groups in `src/app/nav.ts`: Overview, the 4 pillars
+  (Logistics, Execution, Defense & Claims, Controls & Insights), Backbone, Documents,
+  Admin. Module screens register under a group (mapping: TD-148).
+- **Project scope.** The top-bar switcher selects one project or the **All-Projects**
+  portfolio scope; the choice is stored per user in `localStorage`. Projects come from the
+  `ProjectDirectory` seam, empty until the projects API exists (TD-145); sending the scope
+  with requests is TD-146. The scope is a UI selection — the server binds the allowed
+  projects from memberships (TD-053).
+- **Design tokens.** `src/index.css` `@theme` defines semantic colours (`brand`, `surface`,
+  `panel`, `ink`, `muted`, `line`, `pillar`, `success`, `warning`, `danger`); components use
+  those utilities, not raw palette colours.
+- **Services.** `AppServices` (`src/app/services.tsx`: api, tokens, projects, preferences)
+  is injected through `AppRoot` so tests use the fake backend in `src/test/fakeApi.ts`.
 
 ## Rules
 

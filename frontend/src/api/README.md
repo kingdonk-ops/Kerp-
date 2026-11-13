@@ -18,3 +18,6 @@ npm run gen:api
 `python -m app.openapi` builds the app with test settings and no database, so the schema
 does not depend on the local environment. Request code can use the types directly, e.g.
 `components["schemas"]["ModuleState"]`.
+
+Requests go through the typed client in `src/lib/api/client.ts` (`openapi-fetch` over
+`paths`), obtained from `useServices().api`: `api.GET("/api/v1/auth/me")`.
