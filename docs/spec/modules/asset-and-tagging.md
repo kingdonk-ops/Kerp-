@@ -91,6 +91,28 @@ root-to-leaf path as `asset_id`; replaces the old `rsw_id`), `status`, `inspecta
   `nominal_thickness_mm`, `minimum_structural_thickness_mm`, `design_corrosion_allowance_mm`,
   `active_corrosion_rate_mm_yr`, `last_measured_thickness_mm`, `last_inspection_date`.
 
+### Scan identifiers and scan-to-locate (Pilot-0, planner spec 2026-11-13; TD-163, Q5a)
+Rules below are planner defaults unless marked otherwise.
+An Item may carry scan identifiers in `oe_asset_item_identifier` (`BaseRecordMixin` + project
+RLS): `item_id`, `kind` (`barcode` | `qr` | `nfc`), `value`, `is_active`. Values are trimmed; an
+NFC value is the tag UID as upper-case hex without separators. An active `(project_id, kind,
+value)` is unique; an Item may have several identifiers, and a replaced tag is deactivated, not
+deleted (planner defaults: a separate table rather than columns, Items only — nodes get
+identifiers later if needed).
+- `GET /api/v1/assets/items/lookup?value=&kind=` (`kind` optional) returns the Item id, tag, item
+  type, node display path, work anchor and `inspectable`; no match, or a match in another
+  project → 404.
+- PER-06 and PER-09 may add or deactivate identifiers, including "assign this scanned code to an
+  Item" from the scan screen when online (planner default). The ingestion wizard may map
+  identifier columns (T-0107 mapping profiles).
+- **Scan-to-locate on the client.** The Android build reads barcodes and QR codes with the camera
+  through a native plugin and NFC tag UIDs through a Capacitor NFC plugin; the web PWA reads
+  barcodes and QR codes where the browser offers barcode detection and otherwise offers manual
+  entry; NFC is Android only. Offline, the lookup runs against the identifiers of downloaded Items
+  (`KERP-CONSOLIDATION-AND-DIFF.md` §6.4); online, a miss falls back to the lookup endpoint. A hit
+  opens the Item with its downloaded inspections. Every path has a manual tag search. Plugins must
+  have a permissive licence (no GPL).
+
 ## Dynamic attributes (EAV deleted)
 - Values live **only** in `custom_fields jsonb` on node + item.
 - `oe_asset_field_def` is **purely the JSONSchema registry** (categories/types/field defs).
@@ -131,7 +153,7 @@ mapping-profile fields.
 ## Endpoints
 Level defs CRUD (additive once used); tree CRUD + `POST /assets/nodes/{id}/move`,
 `/split`, `/merge`, `/retire`; collections CRUD + membership; items CRUD; schema registry;
-contextual inspections (`GET /assets/nodes/{id}/inspections` aggregating descendants and
+item scan identifiers + `GET /assets/items/lookup`; contextual inspections (`GET /assets/nodes/{id}/inspections` aggregating descendants and
 lineage predecessors); terminology packs; ingestion (`POST /assets/import` → SAQ job → `/apply`
 atomic, with mapping profiles); **P6 import/export** (idempotent on
 `(project_id, external_activity_id)`, with the **Unmatched-Row Linking Screen**; P6 activities

@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 131 · **Closed:** 79
+**Open:** 129 · **Closed:** 87
 
 ## decision (3)
 
@@ -13,7 +13,7 @@
 | [TD-191](../tracker/todo/TD-191.md) | Login/magic-link lockout keyed by tenant+email lets anyone keep a known user at a 15-minute delay; decide per-email+per-IP keying and fix the begin() check/count race (single Lua script) | T-0009 | reviewer |
 | [TD-213](../tracker/todo/TD-213.md) | Object key layout: confirm {tenant}/{project}/{module}/{sha256} (no extension) instead of the master spec's {hash}.ext, plus transient staging/ and quarantine/ prefixes | T-0016 | implementer |
 
-## spec-gap (37)
+## spec-gap (33)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -48,24 +48,19 @@
 | [TD-109](../tracker/todo/TD-109.md) | Equipment availability (onsite / in use) and required operator credential per equipment type; resource demand counts equipment units | E-03-07, T-0112, E-04-08 | planner |
 | [TD-114](../tracker/todo/TD-114.md) | P6 open points left by TD-079: run_checks rule-set names for import-commit and link-approval, and link behaviour when schedule_link and work_anchor sit on different levels | T-0104, T-0105, T-0125 | planner |
 | [TD-117](../tracker/todo/TD-117.md) | Findings register (TD-106 decision) has no spec section or task: assessment step, configurable name/types per project, follow-up work, priority derivation | T-0116, T-0117 | planner |
-| [TD-162](../tracker/todo/TD-162.md) | Sync pull scope: per-device/per-project pull-deltas scope, has-more paging, download-for-offline selection with size, local purge, client-generated record ids, stale-base flag on answers, submit blocked until attachments complete | T-0126 | clean-room-gap-analysis |
-| [TD-163](../tracker/todo/TD-163.md) | Barcode/QR/NFC identifiers on Items + scan-to-locate lookup (master user story exists; no columns, endpoint, or NFC path for PWA vs Capacitor) | T-0103 | clean-room-gap-analysis |
-| [TD-165](../tracker/todo/TD-165.md) | Inspection scheduling and review: planned start/duration, calendar, general recurrence, light work-order grouping, explicit returned state, comments addressable to a single answer | T-0111 | clean-room-gap-analysis |
-| [TD-166](../tracker/todo/TD-166.md) | Field-type palette additions: video, audio, barcode/QR fields, annotation on captured photos (stored JSON, burned in on export), reference images on questions | T-0110 | clean-room-gap-analysis |
 | [TD-167](../tracker/todo/TD-167.md) | Defect close-out loop: open -> action assigned (owner, due) -> rectified -> verified closed by a re-inspection (closed_by_inspection link); extends TD-066 | T-0117 | clean-room-gap-analysis |
 | [TD-205](../tracker/todo/TD-205.md) | NFR budgets need a reference device and a 4G network profile before they become a hard gate for Pilot-0 | T-0045, T-0146 | planner |
 
-## missed (5)
+## missed (4)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
 | [TD-094](../tracker/todo/TD-094.md) | Per-RSW area handover sheet required by the ITP closeout (not the shift handover module) | T-0113, E-04-10 | planner |
 | [TD-125](../tracker/todo/TD-125.md) | Booking modules must call work_anchor_for and return 422 when the path has no work anchor (progress, time lines against a work anchor, completion gate) | T-0101, T-0116, T-0124, E-04-03, E-04-05 | reviewer |
 | [TD-131](../tracker/todo/TD-131.md) | Add a root .env.example for the dev stack (the implementer agent's permission rules block writing .env* files) | T-0003 | implementer |
-| [TD-169](../tracker/todo/TD-169.md) | M2 Documents-Lite 'batch inspection PDF export' (consolidation diff §7) has no task | — | clean-room-gap-analysis |
 | [TD-208](../tracker/todo/TD-208.md) | Uploads infra: provision the kerp-vault bucket (CORS for browser PUT/GET, lifecycle on staging/), wire KERP_S3_* in compose, add MinIO to CI for the gated round-trip test | T-0016 | implementer |
 
-## deferred (23)
+## deferred (24)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -92,8 +87,9 @@
 | [TD-182](../tracker/todo/TD-182.md) | RegisterPage: server-side filtering, sorting and paging | T-0025 | implementer |
 | [TD-209](../tracker/todo/TD-209.md) | Uploads: file deletion and content-object GC; recover files stuck in 'verifying' after a failed verify job | T-0016 | implementer |
 | [TD-212](../tracker/todo/TD-212.md) | Uploads: run the orphan sweep on a schedule for every project (needs the scope list of TD-155) | T-0016 | implementer |
+| [TD-217](../tracker/todo/TD-217.md) | Inspection scheduling after Pilot-0: calendar view, general recurrence (beyond scaffolds), light work-order grouping (TD-165 remainder) | T-0152 | planner |
 
-## later (51)
+## later (52)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -148,6 +144,7 @@
 | [TD-207](../tracker/todo/TD-207.md) | Local PIN unlock for the web PWA build (no platform keystore): e.g. a non-extractable WebCrypto key wrapping the IndexedDB data key | T-0143 | planner |
 | [TD-210](../tracker/todo/TD-210.md) | Native Android app: normal login system and offline-window expiry behaviour (replaces the TD-206 interim rule) | T-0143 | user |
 | [TD-211](../tracker/todo/TD-211.md) | Uploads: replace the always-clean StubScanner with a real malware scanner (e.g. ClamAV/clamd in the worker) | T-0016 | implementer |
+| [TD-215](../tracker/todo/TD-215.md) | Optional chain-of-custody hash for offline records: SHA-256(prev_hash + payload + monotonic_ms) per device clock session | T-0148 | planner |
 
 ## bug (1)
 
@@ -155,7 +152,7 @@
 |---|---|---|---|
 | [TD-159](../tracker/todo/TD-159.md) | Site filter from the bound project is applied to all site-scoped rows: a PER-07 on A who is PER-01 on B loses B's site-scoped rows (over-restrictive) | T-0010 | reviewer |
 
-## risk (11)
+## risk (12)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -170,6 +167,7 @@
 | [TD-154](../tracker/todo/TD-154.md) | Migrations 0002-0005 call the live rls_policy_sql, so changing it rewrites history | T-0010 | implementer |
 | [TD-158](../tracker/todo/TD-158.md) | require_hold_release passes a PER-07 for any site; endpoints must also check can_release_hold against the hold's site (add a load-and-check helper) | T-0010 | reviewer |
 | [TD-176](../tracker/todo/TD-176.md) | No availability target or HA design for the production API (clean-room asks 99.5 %; offline client tolerates outages) | — | clean-room-gap-analysis |
+| [TD-216](../tracker/todo/TD-216.md) | Client co-sign residual risk: a provisional wet signature is only an inspector-witnessed claim until the client confirms it; a stolen client device key is stopped only by revoking the device (T-0043) | T-0174, T-0173 | planner |
 
 ## Closed
 
@@ -239,8 +237,13 @@
 | ✅ | [TD-148](../tracker/todo/TD-148.md) | Module-to-navigation-group mapping for the 8-group IA is unspecified | 6a: module -> nav group mapping written into diff §6.1 (items may move later) (user, 2026-11-13) |
 | ✅ | [TD-151](../tracker/todo/TD-151.md) | Persona matrix interpretation: default-tier labels vs V/C/E/A/S, PER-03 progress sign-off, PER-09 combined with a hold-authority persona | 2a: T-0010 tier mapping confirmed (edge §5.2 amendment); PER-09 + hold-authority persona allowed with a warning at assignment and an audit-ledger entry; no admin role confers hold release or sign-off without a qualified persona and credentials (TD-099/TD-100). Spec diff §4.1, edge §5; tasks T-0014, T-0026, T-0039 (user, 2026-11-13) |
 | ✅ | [TD-161](../tracker/todo/TD-161.md) | Field client local store: Dexie/IndexedDB (edge spec, T-0127) vs embedded SQLite (master §1); clean-room needs 500 inspections + 10 GB media, SQLCipher-grade encryption at rest, Android 11+ minimum and managed-Play/MDM distribution | 16a + d: Capacitor Android build uses SQLCipher SQLite + file-system media behind one client storage contract; web-only PWA apps keep Dexie; Android 11+, managed Play/MDM; storage and sync contract client-agnostic. Spec diff §6.2, master §1.3, edge §1; tasks T-0127, T-0141, T-0142 (user, 2026-11-13) |
+| ✅ | [TD-162](../tracker/todo/TD-162.md) | Sync pull scope: per-device/per-project pull-deltas scope, has-more paging, download-for-offline selection with size, local purge, client-generated record ids, stale-base flag on answers, submit blocked until attachments complete | Cut into T-0147, T-0148, T-0149 and the attachments check in T-0150; spec in diff §6.4 with planner defaults (user, 2026-11-13, Q5a) |
+| ✅ | [TD-163](../tracker/todo/TD-163.md) | Barcode/QR/NFC identifiers on Items + scan-to-locate lookup (master user story exists; no columns, endpoint, or NFC path for PWA vs Capacitor) | Cut into T-0154 (Item scan identifiers + lookup) and T-0155 (scan-to-locate, Android NFC, offline lookup); spec in asset-and-tagging.md (user, 2026-11-13, Q5a) |
 | ✅ | [TD-164](../tracker/todo/TD-164.md) | Device registry: enrolled devices, remote revoke/wipe, device_id in audit (T-0006) with before/after diff, biometric unlock, certificate pinning (Capacitor), per-device sync health | 17a: device registry, remote revoke (sessions killed, local wipe on next contact) and device_id in the audit ledger for Pilot-0. Spec diff §4.3; tasks T-0043, T-0048, T-0143, T-0126. Biometric unlock, certificate pinning and sync-health views after the pilot: TD-204 (user, 2026-11-13) |
+| ✅ | [TD-165](../tracker/todo/TD-165.md) | Inspection scheduling and review: planned start/duration, calendar, general recurrence, light work-order grouping, explicit returned state, comments addressable to a single answer | Review/return, answer comments and planning fields cut into T-0150, T-0151, T-0152, T-0153; calendar, recurrence and work orders deferred to TD-217 (user, 2026-11-13, Q5a) |
+| ✅ | [TD-166](../tracker/todo/TD-166.md) | Field-type palette additions: video, audio, barcode/QR fields, annotation on captured photos (stored JSON, burned in on export), reference images on questions | Photo annotation (with capture time and location) cut into T-0156, T-0157 and burn-in in T-0158; video, audio, barcode/QR fields and reference images deferred to TD-218 (user, 2026-11-13, Q5a) |
 | ✅ | [TD-168](../tracker/todo/TD-168.md) | Push notification channel (FCM via the Capacitor build) for assignment and return; T-0019 is in-app only and email is TD-084 | 5a: T-0019 stays in-app only behind a pluggable channel interface; FCM push is T-0144 in the Android build work (user, 2026-11-13) |
+| ✅ | [TD-169](../tracker/todo/TD-169.md) | M2 Documents-Lite 'batch inspection PDF export' (consolidation diff §7) has no task | Cut into T-0158 (inspection PDF) and T-0159 (batch PDF export); spec in quality-and-inspection.md (user, 2026-11-13, Q5a) |
 | ✅ | [TD-170](../tracker/todo/TD-170.md) | Offline window: 14 days (clean-room FR-02) vs up to 7 days (master §6); tenant setting and default | 14a: offline window is a tenant setting, default 7 days, maximum 14; sync and sessions built for 14. Spec diff §4.2/§4.4, master §6; tasks T-0044, T-0126, T-0127, T-0143 (user, 2026-11-13) |
 | ✅ | [TD-171](../tracker/todo/TD-171.md) | Production AWS region / data residency: EU (clean-room NFR-10, GDPR) vs Australia; TD-004 settled AWS but not the region | 13a: region is a per-deployment setting: AWS ap-southeast-2 (Sydney) for Australian deployments, eu-central-1 only for an EU deployment. Spec diff §4.4; T-0016 (user, 2026-11-13) |
 | ✅ | [TD-172](../tracker/todo/TD-172.md) | Per-business-unit theming (logo/palette) vs one tenant per deploy (TD-007); German translations at launch (clean-room NFR-16) | English only for now; no per-BU theming or branding (main site logo/colours). Client logo co-branding: TD-190 (later). (user, 2026-11-13) |
@@ -254,3 +257,6 @@
 | ✅ | [TD-202](../tracker/todo/TD-202.md) | Lobby details: a project code only finds the project and files an access request (never grants access); the lobby is also reachable from the project picker for users who already have projects | Q1a: a project code only finds that one project and lets the user file an access request decided by the project's PER-09 holders; it never grants access by itself. Users who already have projects open the lobby from the picker. Spec diff §4.1; T-0040, T-0041 (user, 2026-11-13) |
 | ✅ | [TD-203](../tracker/todo/TD-203.md) | SPA refresh-token transport: keep the JSON body (sessionStorage) or move to an httpOnly SameSite cookie | Q6a: the web SPA gets the refresh token as an httpOnly Secure SameSite cookie (CSRF-protected /auth/refresh); the Capacitor Android build keeps the JSON-body transport. Spec diff §4.2; T-0037 (user, 2026-11-13) |
 | ✅ | [TD-206](../tracker/todo/TD-206.md) | Confirm planner default: once the offline window expires without server contact, queued data is kept but new edits are blocked until an online sign-in | Accepted for the Capacitor/PWA field client until the native Android app launches with a normal login system; revisit then (TD-210). (user, 2026-11-13) |
+| ✅ | [TD-214](../tracker/todo/TD-214.md) | Pilot-0 checklist gaps: no inspector capture screen in the subset (T-0130 not listed; needs T-0124/T-0112/T-0128), no ad-hoc inspection UI, and T-0133 depends on the deferred P6 import T-0104 | R2a: T-0130 joins Pilot-0, T-0165 cut for capture and ad-hoc start, T-0133's P6 tests split to T-0166 outside the pilot so T-0104 leaves the gate (user, 2026-11-13) |
+| ✅ | [TD-218](../tracker/todo/TD-218.md) | Field palette after Pilot-0: video and audio notes, barcode/QR answer fields, reference images on questions (TD-166 remainder) | R4b: in Pilot-0; cut into T-0167 (video/audio/barcode field types), T-0168 (reference images), T-0169 (SAQ media probe), T-0170 (video/audio capture), T-0171 (barcode field + reference image display) (user, 2026-11-13) |
+| ✅ | [TD-219](../tracker/todo/TD-219.md) | Pilot-0 client co-sign on the inspector's device: who the client signer is (named PER-15 account with own PIN vs typed name + drawn signature) and which states it applies to | R1a + co-sign redesign: the client co-signs with their own KERP account (PER-15): (i) online PIN (T-0162), (ii) QR assertion signed by the client's own device key (T-0173, T-0175), (iii) provisional wet signature confirmed by the client (T-0174, T-0176); ledger T-0163, inspector screens T-0164 (user, 2026-11-13) |

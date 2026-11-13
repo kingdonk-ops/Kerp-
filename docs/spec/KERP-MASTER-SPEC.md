@@ -669,6 +669,7 @@ ITP Hold Point Lifecycle:
 * `INSPECTED_PASSED`: Verifier signs off the physical check point. Requires authenticated digital signature, current UTC timestamp, and geographic coordinates.
 * `INSPECTED_FAILED`: Inspection fails to meet technical criteria. The engine automatically forces creation of an associated `punch_items` record (Category A) or formal `non_conformance_reports` record.
 * `LOCKED_FOR_TURNOVER`: Record verified and immutable. No modifications permitted; queued for MDR document collation.
+* **Amended (Pilot-0, planner spec 2026-11-13; TD-165, Q5a):** an inspection record is reviewed before its result stands: the inspector submits (`SUBMITTED`), and a reviewer approves (→ `INSPECTED_PASSED` / `INSPECTED_FAILED` as submitted) or returns it with a reason (`RETURNED` → edited → `SUBMITTED` again). See `docs/spec/modules/quality-and-inspection.md` §Review and return.
 
 ---
 
@@ -699,6 +700,7 @@ Client Device                                              Sync Gateway Server
 2. **Concurrent Entity Modification**: When two supervisors edit non-conflicting attributes of the same entity (e.g., Supervisor A logs installed linear meters while Supervisor B adds a crane delay note on the shift log), the mutations are merged automatically.
 3. **Array Mutation Preservation**: For child collections (e.g., punchlist photos, shift worker allocations), mutations are treated as additive list operations rather than destructive array overwrites.
 4. **Per-field three-way apply (ADR 0005).** Rule 2 is decided per changed path: a path not owned by `field` is rejected (`ERR_FIELD_NOT_OWNED`), a locked record is rejected (rule 1), an unchanged server value is overwritten, a changed server value is kept and the tablet value goes to `sync_conflict_log` with a review item. `base_revision` stays on the envelope for idempotency and diagnostics only. See `docs/spec/modules/p6-import-and-rsw-matching.md` §8.
+5. **Scope, paging and client ids (Pilot-0, planner spec 2026-11-13; TD-162).** `pull-deltas` is scoped per device and project to the device's download picks plus project reference data, pages with `has_more`, and signals `remove` for records that leave the scope; offline creates carry client-generated UUIDv7 ids; submit waits for attachments. See `KERP-CONSOLIDATION-AND-DIFF.md` §6.4. Every offline action carries device wall time, monotonic time and a clock session id; the server reconstructs `occurred_at` with a `time_confidence` (user, 2026-11-13; §6.4.1); `timestamp_utc` in the envelope above is the raw `device_wall_time`.
 
 ---
 

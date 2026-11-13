@@ -243,7 +243,8 @@ Wins over any earlier text on tenant selection, tenant administrators and projec
 
 - **Tenant (deployment) settings**, edited by System admins: offline window (days, default 7,
   1–14), and the defaults for new projects: status `ACTIVE`, site timezone `Australia/Perth`,
-  currency `AUD`, locale `en-AU`. Project status values are `ACTIVE`, `ON_HOLD`, `CLOSED`.
+  currency `AUD`, locale `en-AU`. Also `max_checkout_clock_skew_s` (default 5; user, 2026-11-13):
+  the largest device clock skew allowed when taking work offline (§6.4.1). Project status values are `ACTIVE`, `ON_HOLD`, `CLOSED`.
 - **Region is a per-deployment setting**, not code: AWS `ap-southeast-2` (Sydney) for Australian
   deployments; `eu-central-1` (Frankfurt) only if an EU deployment is ever needed. S3, SES and
   any other regional AWS client read the deployment's region; nothing hard-codes a region.
@@ -332,6 +333,140 @@ personas, and links to the lobby ("Find a project").
 
 Automated performance tests **warn in CI now** and become a **hard gate before Pilot-0** (§7).
 The reference device and network profile are confirmed before the gate flips (TD-205).
+
+### 6.4 Sync scope and download for offline (Pilot-0; TD-162, planner spec 2026-11-13, Q5a)
+
+The user chose to cut the Pilot-0 tasks (Q5a). The rules below are planner defaults unless marked
+otherwise; they refine master spec §4.3 and ADR 0005 and keep the sync contract client-agnostic
+(§6.2).
+
+- **Download selection = checkout.** A field user picks what to take offline per device and
+  project. Each pick is a checkout of ADR 0005 (`oe_field_checkout`, master spec §1.3 rule 4) with
+  scope `inspection` (one inspection record) or `node` (an anchor subtree: its Items, their scan
+  identifiers and their open inspections, for ad-hoc work). Removing a pick releases the checkout.
+  At most **500 inspections** per device and project (planner default; NFR sizing in §6.2).
+  `node` is a new checkout scope next to ADR 0005's inspection job / RSW batch (ADR 0005
+  Addendum A).
+- **One checkout per record (ADR 0005 §2).** Picking an inspection that another user or device
+  already holds fails with **409 naming the holder** (user and device name) (planner default). A
+  `node` pick is **partial** (planner default): it checks out every inspection under the node
+  that nobody else holds, and the response lists the held ones with their holders; the Items,
+  scan identifiers and reference data of the subtree are still downloaded read-only. A record
+  held by someone else is never sent to another device as editable.
+- **Lease length.** A pick's lease lasts the deployment's offline window (§4.2/§4.4: default 7
+  days, at most 14) and is renewed on every successful sync of that device (planner default).
+  Lease expiry does **not** produce a `remove` delta and does not purge the device: the pick stays
+  local, and data synced after expiry is accepted as in p6 spec §8.5 (accepted if nobody else
+  checked the record out, otherwise conflict log + review, never dropped). Once another user
+  picks the expired record, the first device sees it as "checked out by <holder>" on its next
+  pull (planner default).
+- **Candidates with state and size.** `GET /api/v1/sync/download-candidates?project_id=` lists the
+  inspections assigned to the user first, then unassigned ones (planner default), each with status,
+  anchor display path, due date, whether it is already downloaded to this device,
+  `checked_out_by` (user and device of another holder, else null; planner default) and an estimated
+  size in bytes: the record JSON plus the stored sizes of its attachments (T-0016). Nothing is
+  downloaded automatically (planner default).
+- **Pull scope.** `pull-deltas` is scoped per **device and project**:
+  `GET /api/v1/sync/pull-deltas?project_id=&since_version=&limit=`. In scope are the device's
+  picks (records, answers, answer comments, attachment metadata, linked open defects) and the
+  project reference data the client needs offline: level definitions, terminology, item types and
+  field definitions, the template revisions (with their reference images) pinned by the picks or
+  allowed on picked anchors, the **public** signing keys of enrolled client devices (quality-and-inspection.md §Client
+  co-sign; never PIN hashes or other secrets), the
+  equipment register with calibration state, the project's rule sets and member display names.
+  Records outside the scope are never sent. A newly added pick is back-filled in full on the next
+  pull, whatever `since_version` is.
+- **Paging.** The response is `{deltas, new_version, has_more}`, ordered by the server commit
+  sequence; `limit` defaults to 500 and is capped at 1,000 (planner default). The client pulls
+  again with `since_version = new_version` until `has_more` is false. Each delta is `upsert` or
+  `remove`; `remove` means the record left the device's scope (pick removed, record soft-deleted,
+  or the inspection was approved, see purge).
+- **Local purge.** On `remove` the client deletes the local records and media of that pick, but
+  only once its outbox holds no pending mutation for them; until then the pick stays local and is
+  shown as "waiting to sync". The user may remove a pick by hand on the same terms. The server
+  drops an inspection from every device's picks once it is `INSPECTED_PASSED`,
+  `INSPECTED_FAILED` or `LOCKED_FOR_TURNOVER` (planner default). Purge never deletes unsynced
+  work; only a remote wipe (§4.3) does.
+- **Client-generated ids.** Records created offline (ad-hoc inspections, answers, answer comments,
+  attachment metadata, NCR and punch items raised in the field) carry a client-generated
+  **UUIDv7** `id` (planner default). The server keeps that id. A replay of the same `client_op_id`
+  is a no-op; a create whose id already belongs to a different record fails that mutation with
+  `ERR_ID_CONFLICT`; an id that is not a UUIDv7 fails with `ERR_ID_INVALID`. Other mutations in
+  the batch still apply.
+- **Stale-base flag on answers.** When the per-field apply keeps the server value (ADR 0005 §4,
+  p6 spec §8.3 rule 4), the answer carries a `conflict` flag that points to its
+  `sync_conflict_log` entry. Inspector and reviewer see the flag on the answer; choosing a value
+  is a normal edit and clears it. Submit is blocked while an answer has an open conflict flag
+  (`ANSWER_CONFLICT_UNRESOLVED`, planner default).
+- **Submit waits for attachments.** The `inspection.submit` rule set contains a built-in check
+  that every attachment referenced by the record's answers is `complete` (uploaded and
+  sha256-verified, T-0016); otherwise the submit fails with `ATTACHMENTS_INCOMPLETE`. The client
+  orders a queued submit after the uploads it depends on and keeps the submit button disabled,
+  with the pending count, until they finish. A failed submit is a per-mutation result, never a
+  failed batch.
+
+#### 6.4.1 Time of offline actions (user, 2026-11-13)
+
+The user's design. It applies to **every offline-capable timed action** (answers, sign-offs,
+submit, client co-sign, comments, NCR/punch raised in the field), not only submit. Items marked
+"(planner default)" are planner choices; everything else is the user's decision.
+
+- **Capture on the device, per action:** `device_wall_time` (UTC ISO 8601), `monotonic_ms` and
+  `clock_session_id` (a UUID minted when the monotonic origin starts). Each push batch also
+  carries `device_sync_wall_time`, `device_sync_monotonic_ms` and the current `clock_session_id`;
+  the server stamps `server_sync_time` on receipt.
+- **Reconstruction on the server:**
+  - **Same clock session** as the push: `occurred_at = server_sync_time − (device_sync_monotonic_ms
+    − action monotonic_ms)`, `time_confidence = MONOTONIC_RECONSTRUCTED`.
+  - **Same clock session as a stored time anchor** (below), but not the push:
+    `occurred_at = anchor.server_time + (action monotonic_ms − anchor.monotonic_ms)`,
+    `MONOTONIC_RECONSTRUCTED`. The action carries its anchor; the server accepts only an anchor it
+    issued (the `/api/v1/time` response carries a server-signed token, planner default).
+  - **Different session:** `clock_skew_ms = server_sync_time − device_sync_wall_time`,
+    `occurred_at = device_wall_time + clock_skew_ms`, `SKEW_ADJUSTED`; when |`clock_skew_ms`| is
+    above **2 minutes** across a reboot (threshold: planner default) it is `UNVERIFIED_REBOOT`
+    instead.
+  - **Online actions:** `occurred_at` = server time, `VERIFIED_ONLINE`.
+  - `occurred_at` drives sorting, SLAs, ITP sign-offs, overdue, dashboard tiles and the PDF. The
+    offline-window check (§4.2) uses `occurred_at`.
+- **Stored evidence, never overwritten.** Each record with an offline-capable timed action stores
+  `occurred_at` (timestamptz), `recorded_device_at` (timestamptz, the raw device wall time),
+  `synced_at` (timestamptz, `server_sync_time`), `clock_skew_ms` (bigint) and `time_confidence`
+  (`VERIFIED_ONLINE | MONOTONIC_RECONSTRUCTED | SKEW_ADJUSTED | UNVERIFIED_REBOOT`). Column
+  placement (planner default): the five columns on every sign-off ledger entry (T-0119 table:
+  inspector submit signature, reviewer approval, client co-sign), on the inspection record for its
+  submit (prefixed `submit_`), and on answer and answer-comment rows. Additive migrations. The
+  T-0006 audit ledger gets **no new columns** (planner default): audit entries for offline actions
+  carry the same five values inside their hashed payload, so no core-table ADR is needed; the
+  sign-off ledger of T-0119 is a module table that is not built yet.
+- **Time anchor.** `GET /api/v1/time?clock_session_id=&monotonic_ms=` (lightweight; needs a
+  signed-in session, any persona — planner default) returns server time and an anchor token: an
+  HMAC over server time, the client's `clock_session_id` **and** the `monotonic_ms` it sent, so a
+  carried anchor cannot be paired with another monotonic origin (planner default). Whenever it has
+  connectivity (login, pre-shift, each sync) the client stores an anchor
+  `(server_time, monotonic_ms, clock_session_id, token)` and uses it offline for actions in the
+  same clock session.
+- **Skew check before going offline.** When the user takes a download/checkout (§6.4 picks), the
+  client compares the device wall time with `/api/v1/time` (round-trip midpoint, planner default).
+  If |skew| is above the deployment setting `max_checkout_clock_skew_s` (§4.4; default **5 s**),
+  the checkout is blocked and the user is asked to turn on automatic date and time (NTP). The pick
+  request carries the measured skew and the server refuses it too (`CLOCK_SKEW_TOO_LARGE`, 409;
+  planner default).
+- **Warning badge.** Records with `UNVERIFIED_REBOOT` show a high-contrast warning badge in the
+  web UI (review screen, inspection detail) so a QA/QC reviewer can check them against shift logs.
+  The PDF prints `time_confidence` next to each time.
+- **Platform notes (planner).**
+  - **Web/PWA:** `performance.now()` restarts on every page load or app restart, not only on
+    device boot, so `clock_session_id` is per JavaScript realm and a reload starts a new session
+    (skew path). The PWA persists its anchor and re-anchors on reload whenever it is online.
+  - **Android (Capacitor):** monotonic time comes from `SystemClock.elapsedRealtime()` through a
+    small native plugin (planner default), because it keeps counting through deep sleep while
+    `performance.now()` may pause in some WebViews. A new `clock_session_id` is minted after a
+    device boot (detected when `elapsedRealtime` is below the last stored value or the boot count
+    changed).
+  - **iOS:** out of scope (Android only).
+- **Optional chain-of-custody hash** of offline records (SHA-256 of previous hash + payload +
+  `monotonic_ms`): the user called it optional; tracked as a `later` TODO (TD-215), no task.
 
 ---
 

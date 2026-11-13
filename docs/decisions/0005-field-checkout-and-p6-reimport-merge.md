@@ -66,3 +66,18 @@ The current spec does not guarantee that:
 
 Accepted as proposed. Office edits to field-owned values of a checked-out record are
 **blocked** (not queued) until the lease is returned or released.
+
+## Addendum A — `node` checkout scope and lease length (planner defaults, pending user confirmation (TD-162); 2026-11-13, Pilot-0)
+
+Planner defaults, recorded with the Pilot-0 sync scope (`docs/spec/KERP-CONSOLIDATION-AND-DIFF.md`
+§6.4); the accepted decision above is unchanged.
+
+- **New scope `node`.** Besides an inspection job / RSW batch, a checkout may name an anchor
+  subtree (`node`). It checks out every inspection under the node that nobody else holds (partial
+  pick) and downloads the subtree's Items, scan identifiers and reference data read-only. One
+  active checkout per record still holds: a record already held is skipped and reported with its
+  holder; a single-record pick of a held record is refused with 409 naming the holder.
+- **Lease length.** The lease lasts the deployment's offline window (default 7 days, max 14) and
+  is renewed on each successful sync of the holding device. Expiry neither removes nor purges the
+  pick on the device; later data follows p6 spec §8.5.
+

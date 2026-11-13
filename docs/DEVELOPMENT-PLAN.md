@@ -35,7 +35,7 @@ pluggable parser adapter). Money is a **read-only external mirror** only.
 | Phase | Scope | Depth | Exit criterion |
 |---|---|---|---|
 | **0** Platform substrate & security core | scaffold, DB + BaseRecordMixin, **project-scoped RLS** (+4 bypass tests), **RS256/EdDSA JWT + JWKS**, field-worker magic-link+PIN, 15-persona RBAC, module loader, **SAQ** jobs, presigned uploads, **CEL runtime substrate**, `run_checks` shell, hash-chain audit, frontend shell (8-group IA) + reusable shells; access model (System admin → Project Admins, lobby, project picker), 12 h sessions, hybrid PIN, device registry, deployment settings (2026-11-13) | **48 tasks** | tenant/project created, user authed & scoped, module toggled, rule set run — CI green |
-| **1** Asset backbone, one-engine & quality core | **ltree** hierarchy, **JSONB** field registry (EAV deleted), Items + CML stubs, P6 import/export (idempotent + unmatched-row linking), **one-engine** forms+CEL, **unified inspection record** + **eligibility**, **equipment calibration** register + hard gate, qms/construction_control/inspection_requests, NCR/punch, signing, completion-gate + P6 rule sets, offline sync core (Dexie), UI, **M1 freeze gate (T-0131)**; Capacitor Android build + SQLCipher store, FCM push, Pilot-0 gate (2026-11-13) | **44 tasks** | P6→hierarchy; inspections gated by CEL; expired tool blocked; completion blocked by open NCR; backbone contract frozen |
+| **1** Asset backbone, one-engine & quality core | **ltree** hierarchy, **JSONB** field registry (EAV deleted), Items + CML stubs, P6 import/export (idempotent + unmatched-row linking), **one-engine** forms+CEL, **unified inspection record** + **eligibility**, **equipment calibration** register + hard gate, qms/construction_control/inspection_requests, NCR/punch, signing, completion-gate + P6 rule sets, offline sync core (Dexie), UI, **M1 freeze gate (T-0131)**; Capacitor Android build + SQLCipher store, FCM push, Pilot-0 gate (2026-11-13); Pilot-0 slice: sync scope + download, review/return, client co-sign, capture screen, scan-to-locate, photo annotation, video/audio/barcode fields + reference images, inspection PDF, dashboard tiles | **75 tasks** | P6→hierarchy; inspections gated by CEL; expired tool blocked; completion blocked by open NCR; backbone contract frozen |
 | **2** Welding quality & traceability | WPS, welder quals/continuity, welds as Items, NDE, heat/MTR trace, R-WPS rules | **9 tasks** | a weld can't be accepted outside qualification/NDE rules |
 | **3** Logistics & supply chain | **contacts**, **procurement (front)**, materials/MRIR+heat, inventory, **cutting (FFD + rectpack)**, Gate Delivery edge screen, equipment/fleet | 7 epics | delivery → gate receipt + OS&D; cutting plan → inventory |
 | **4** Execution & LPS | schedule, Look-Ahead board, earned-qty progress, Daily Workface Log + CBS burn, field time, estimating/EVM, tasks, **resource rollup (moved here)**, safety/PTW, supervision/closeout, **shift/swing handover register** | 11 epics | progress as earned qty (gated), actuals → P6, PPC computed |
@@ -65,15 +65,50 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
   - **Daily re-login dependency:** sessions end 12 h after sign-in, so the pilot inspectors
     sign in every day. Entra ID SSO (TD-043) or magic-link e-mail delivery (TD-084) must be
     live in the pilot deployment (checked by T-0146).
-  - **Phase 1 subset:** T-0101, T-0103 (hierarchy + Items), T-0107 (equipment import), T-0110
+  - **Phase 1 subset:** T-0101, T-0103 (hierarchy + Items), T-0107 (equipment import; in T-0146's gate since PR #51 round 3), T-0110
     (field registry + CEL), T-0111 (inspection record), T-0116/T-0117 (defects, TD-167), T-0119
-    (signing), T-0126/T-0127 (offline sync), T-0133 (field checkout), T-0141–T-0145 (Android
-    build, SQLCipher store, device session + offline unlock, FCM push, sync budget).
-  - **Still without tasks** (cut before the gate): sync pull scope and download selection
-    (TD-162), scan-to-locate (TD-163), review/return (TD-165), photo annotation (TD-166),
-    inspection PDF export (TD-169), three dashboard tiles.
-  - **Deferred for the pilot:** P6 import/export (T-0104–T-0106, T-0125, T-0129), Phase 2,
-    Phases 3–7. The client signs on the inspector's device with a PIN instead of the portal.
+    (signing), T-0126/T-0127 (offline sync), T-0133 (field checkout; its P6 tests split to
+    T-0166, outside the pilot — user, 2026-11-13, R2a), T-0130 (inspections register +
+    calibration-gated tool pick; user, 2026-11-13, R2a), T-0141–T-0145 (Android build, SQLCipher
+    store, device session + offline unlock, FCM push, sync budget).
+  - **Pilot-0 slice** (cut 2026-11-13, user Q5a; spec with planner defaults in diff §6.4,
+    `quality-and-inspection.md` and `asset-and-tagging.md`):
+    - sync scope and download for offline (TD-162): T-0147 (picks, candidates with size, paged
+      scoped pull), T-0148 (client UUIDv7 ids, answer conflict flag), T-0149 (download screen,
+      local purge);
+    - review/return (TD-165): T-0150 (`SUBMITTED` / `RETURNED`, approve/return, submit waits for
+      attachments), T-0151 (comments on single answers), T-0152 (assignee, planned start,
+      duration, overdue), T-0153 (review and returned-work screens);
+    - scan-to-locate (TD-163): T-0154 (Item scan identifiers + lookup), T-0155 (camera/NFC scan,
+      offline lookup);
+    - photo annotation (TD-166): T-0156 (capture time, location, annotation JSON), T-0157
+      (capture + annotation editor);
+    - inspection PDF (TD-169): T-0158 (per inspection, annotations burned in), T-0159 (batch
+      export);
+    - dashboard tiles: T-0160 (progress, overdue, open defects);
+    - client co-sign with the client's own PER-15 account (TD-219; user, 2026-11-13, R1a and the
+      co-sign redesign; no client secret on inspector devices): (i) online PIN — T-0162; (ii) QR
+      assertion signed on the client's own device — T-0173 (device signing keys), T-0175 (client
+      app); (iii) provisional wet signature confirmed by the client — T-0174, T-0176; ledger
+      entries T-0163; inspector-side screens and hand-back T-0164;
+    - inspector capture screen and ad-hoc start (TD-214; user, 2026-11-13, R2a): T-0165;
+    - video and audio notes, barcode/QR answer fields, reference images (TD-218; user,
+      2026-11-13, R4b): T-0167 (field types), T-0168 (reference images), T-0169 (SAQ media
+      probe), T-0170 (video/audio capture), T-0171 (barcode field + reference image display);
+    - time of offline actions (user, 2026-11-13; diff §6.4.1): T-0172 (client clock stamps,
+      anchors, Android `elapsedRealtime` plugin); server reconstruction T-0177, evidence
+      columns in T-0177/T-0150/T-0163; `/api/v1/time` and the checkout skew block in T-0147/T-0149 with the
+      setting in T-0044; badge in T-0153; `time_confidence` on the PDF in T-0158;
+    - end-to-end: T-0161 (Pilot-0 journey).
+  - **Also in the gate through dependencies** (T-0146 depends on them transitively): T-0102,
+    T-0112, T-0113, T-0114, T-0118, T-0124, T-0128, T-0134, T-0138 (via T-0107), T-0139, T-0140
+    (inspection date and self-approval, via T-0150) and T-0136 (terminology layer, via the PDF T-0158; user,
+    2026-11-13, R5a). T-0104 is no longer in the gate.
+  - **Not in the pilot:** inspection calendar, general recurrence and work orders (TD-217); the P6
+    half of the checkout contract (T-0166).
+  - **Deferred for the pilot:** P6 import/export (T-0104–T-0106, T-0125, T-0129, T-0166), Phase 2,
+    Phases 3–7. The client signs on the inspector's device with their own PER-15 account and PIN
+    instead of the portal (user, 2026-11-13, R1a).
 - **M2 — MVP cut line (next milestone after Pilot-0):** Phase 0 + 1 + 2 + **Documents-Lite**
   (VFS tree, presigned uploads, batch inspection PDF export) + **P6 schedule round-trip**
   (~85–95 tasks).
