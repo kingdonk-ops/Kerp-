@@ -3,9 +3,9 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 128 · **Closed:** 59
+**Open:** 139 · **Closed:** 59
 
-## decision (6)
+## decision (7)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -15,6 +15,7 @@
 | [TD-173](../tracker/todo/TD-173.md) | Pilot-0 (8 inspectors, one project, Android only, no P6 / Phase 2) ahead of the M2 cut line resolved in TD-009 | — | clean-room-gap-analysis |
 | [TD-183](../tracker/todo/TD-183.md) | Localisation of form template content (labels, option labels, error messages) | T-0025 | implementer |
 | [TD-184](../tracker/todo/TD-184.md) | Who may create a project and how the creator gets a membership: POST /projects is gated on the admin capability in any project until T-0014's tenant administrator | T-0012 | implementer |
+| [TD-191](../tracker/todo/TD-191.md) | Login/magic-link lockout keyed by tenant+email lets anyone keep a known user at a 15-minute delay; decide per-email+per-IP keying and fix the begin() check/count race (single Lua script) | T-0009 | reviewer |
 
 ## spec-gap (47)
 
@@ -103,7 +104,7 @@
 | [TD-181](../tracker/todo/TD-181.md) | DetailPage: audit log and gate-status endpoints | T-0025 | implementer |
 | [TD-182](../tracker/todo/TD-182.md) | RegisterPage: server-side filtering, sorting and paging | T-0025 | implementer |
 
-## later (38)
+## later (47)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -145,6 +146,15 @@
 | [TD-186](../tracker/todo/TD-186.md) | spatial_bounds: GiST index and ST_IsValid check (self-intersecting polygons are accepted today); project code stays taken after soft delete | T-0012 | implementer |
 | [TD-189](../tracker/todo/TD-189.md) | Set a psycopg connect_timeout on the worker's DB engine so _settle/_start are bounded when the DB is unreachable | T-0015 | reviewer |
 | [TD-190](../tracker/todo/TD-190.md) | Client-side co-branding (client logo on client-facing pages/reports): decide later | T-0136 | user |
+| [TD-193](../tracker/todo/TD-193.md) | Jobs: let modules register worker/dispatcher via a ModuleManifest lifespan hook instead of app/main.py importing the jobs module directly | T-0015 | reviewer |
+| [TD-194](../tracker/todo/TD-194.md) | API docs behind a proxy with root_path get the strict CSP and Swagger UI breaks | T-0021 | reviewer |
+| [TD-195](../tracker/todo/TD-195.md) | frontend api client clones every request, so streamed upload bodies cannot be retried; fix when uploads use it | T-0016 | reviewer |
+| [TD-196](../tracker/todo/TD-196.md) | scripts/setup_github.sh: update existing labels, paginate variables past 100, handle empty variable values (409) | — | reviewer |
+| [TD-197](../tracker/todo/TD-197.md) | frontend/index.html hard-codes lang="en"; set it from the active i18n locale when a second language lands | T-0136 | reviewer |
+| [TD-198](../tracker/todo/TD-198.md) | Validation: CEL-error finding message hides what was checked; reuse params.message | T-0018 | reviewer |
+| [TD-199](../tracker/todo/TD-199.md) | Logout depends on CurrentPrincipal, so a just-deactivated user gets 401 and the client may refresh just to revoke; require_claims is enough | T-0008 | reviewer |
+| [TD-200](../tracker/todo/TD-200.md) | WORKFLOW.md: document that check-ids compares only against the base, and that gh pr list returns ~100 files per PR | — | reviewer |
+| [TD-201](../tracker/todo/TD-201.md) | Coverage gaps: validation _side_write_sessionmaker bare-session fallback; lockout ExpiresBeforeIncr test does not exercise the race inside the pipeline | T-0018 | reviewer |
 
 ## bug (1)
 
@@ -152,7 +162,7 @@
 |---|---|---|---|
 | [TD-159](../tracker/todo/TD-159.md) | Site filter from the bound project is applied to all site-scoped rows: a PER-07 on A who is PER-01 on B loses B's site-scoped rows (over-restrictive) | T-0010 | reviewer |
 
-## risk (11)
+## risk (12)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -167,6 +177,7 @@
 | [TD-154](../tracker/todo/TD-154.md) | Migrations 0002-0005 call the live rls_policy_sql, so changing it rewrites history | T-0010 | implementer |
 | [TD-158](../tracker/todo/TD-158.md) | require_hold_release passes a PER-07 for any site; endpoints must also check can_release_hold against the hold's site (add a load-and-check helper) | T-0010 | reviewer |
 | [TD-176](../tracker/todo/TD-176.md) | No availability target or HA design for the production API (clean-room asks 99.5 %; offline client tolerates outages) | — | clean-room-gap-analysis |
+| [TD-192](../tracker/todo/TD-192.md) | Ask GitHub Support to purge old commit 819cf31 (contained a client name) from the repository's cached objects | — | reviewer |
 
 ## Closed
 
