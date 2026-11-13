@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 96 · **Closed:** 56
+**Open:** 99 · **Closed:** 56
 
 ## decision (2)
 
@@ -81,7 +81,7 @@
 | [TD-149](../tracker/todo/TD-149.md) | Area/discipline scoping (PER-04) and granted-subtree scoping (PER-15) are not enforced yet | T-0010 | implementer |
 | [TD-150](../tracker/todo/TD-150.md) | Asset-Site scoping is ORM-only and matches site_node_id exactly (no RLS, no subtree) | T-0010 | implementer |
 
-## later (31)
+## later (32)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -116,8 +116,15 @@
 | [TD-143](../tracker/todo/TD-143.md) | run_checks persist=False dry-run flag (evaluate without logging findings) | T-0018 | implementer |
 | [TD-144](../tracker/todo/TD-144.md) | run_checks: translate an uncommitted-rule-set ForeignKeyViolation into a clear RuleStoreError | T-0018 | implementer |
 | [TD-153](../tracker/todo/TD-153.md) | Membership lookup adds a DB round-trip per authenticated request | T-0010 | implementer |
+| [TD-160](../tracker/todo/TD-160.md) | Test that revoking (soft-deleting) a project membership removes that project from the resolved scope; extend TD-150 to bulk ORM update/delete | T-0010 | reviewer |
 
-## risk (9)
+## bug (1)
+
+| ID | Title | Related tasks | Raised by |
+|---|---|---|---|
+| [TD-159](../tracker/todo/TD-159.md) | Site filter from the bound project is applied to all site-scoped rows: a PER-07 on A who is PER-01 on B loses B's site-scoped rows (over-restrictive) | T-0010 | reviewer |
+
+## risk (10)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -130,6 +137,7 @@
 | [TD-142](../tracker/todo/TD-142.md) | PIN gating fails open if Redis evicts the pin:<sid> key: add an amr=["pin"] token claim or require maxmemory-policy noeviction | T-0009 | implementer |
 | [TD-152](../tracker/todo/TD-152.md) | T-0014 membership-based policy must keep the caller's own memberships readable by the scope resolver | T-0010 | implementer |
 | [TD-154](../tracker/todo/TD-154.md) | Migrations 0002-0005 call the live rls_policy_sql, so changing it rewrites history | T-0010 | implementer |
+| [TD-158](../tracker/todo/TD-158.md) | require_hold_release passes a PER-07 for any site; endpoints must also check can_release_hold against the hold's site (add a load-and-check helper) | T-0010 | reviewer |
 
 ## Closed
 
