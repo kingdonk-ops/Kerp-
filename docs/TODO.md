@@ -3,15 +3,14 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 127 · **Closed:** 77
+**Open:** 127 · **Closed:** 78
 
-## decision (3)
+## decision (2)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
 | [TD-096](../tracker/todo/TD-096.md) | Approved coating ITR dropped the residual-dust rating row the ITP requires; Grating and Gridmesh ITR has no approved version: confirm with the client before shipping default templates | T-0113 | planner |
 | [TD-191](../tracker/todo/TD-191.md) | Login/magic-link lockout keyed by tenant+email lets anyone keep a known user at a 15-minute delay; decide per-email+per-IP keying and fix the begin() check/count race (single Lua script) | T-0009 | reviewer |
-| [TD-206](../tracker/todo/TD-206.md) | Confirm planner default: once the offline window expires without server contact, queued data is kept but new edits are blocked until an online sign-in | T-0143, T-0044 | planner |
 
 ## spec-gap (37)
 
@@ -90,7 +89,7 @@
 | [TD-181](../tracker/todo/TD-181.md) | DetailPage: audit log and gate-status endpoints | T-0025 | implementer |
 | [TD-182](../tracker/todo/TD-182.md) | RegisterPage: server-side filtering, sorting and paging | T-0025 | implementer |
 
-## later (49)
+## later (50)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -143,6 +142,7 @@
 | [TD-201](../tracker/todo/TD-201.md) | Coverage gaps: validation _side_write_sessionmaker bare-session fallback; lockout ExpiresBeforeIncr test does not exercise the race inside the pipeline | T-0018 | reviewer |
 | [TD-204](../tracker/todo/TD-204.md) | After Pilot-0: biometric unlock, certificate pinning (Capacitor) and per-device sync-health views | T-0043 | planner |
 | [TD-207](../tracker/todo/TD-207.md) | Local PIN unlock for the web PWA build (no platform keystore): e.g. a non-extractable WebCrypto key wrapping the IndexedDB data key | T-0143 | planner |
+| [TD-210](../tracker/todo/TD-210.md) | Native Android app: normal login system and offline-window expiry behaviour (replaces the TD-206 interim rule) | T-0143 | user |
 
 ## bug (1)
 
@@ -248,3 +248,4 @@
 | ✅ | [TD-187](../tracker/todo/TD-187.md) | jobs worker: a cancellation/timeout while _start is returning leaves the row 'running' forever (flaky test_a_cancelled_or_timed_out_job_is_marked_failed) | run_job shields the _start thread; a cancel during start waits for it, then fails a started row with 'Job timed out or was cancelled' (shielded) and re-raises (fix/jobs-cancel-during-start) |
 | ✅ | [TD-202](../tracker/todo/TD-202.md) | Lobby details: a project code only finds the project and files an access request (never grants access); the lobby is also reachable from the project picker for users who already have projects | Q1a: a project code only finds that one project and lets the user file an access request decided by the project's PER-09 holders; it never grants access by itself. Users who already have projects open the lobby from the picker. Spec diff §4.1; T-0040, T-0041 (user, 2026-11-13) |
 | ✅ | [TD-203](../tracker/todo/TD-203.md) | SPA refresh-token transport: keep the JSON body (sessionStorage) or move to an httpOnly SameSite cookie | Q6a: the web SPA gets the refresh token as an httpOnly Secure SameSite cookie (CSRF-protected /auth/refresh); the Capacitor Android build keeps the JSON-body transport. Spec diff §4.2; T-0037 (user, 2026-11-13) |
+| ✅ | [TD-206](../tracker/todo/TD-206.md) | Confirm planner default: once the offline window expires without server contact, queued data is kept but new edits are blocked until an online sign-in | Accepted for the Capacitor/PWA field client until the native Android app launches with a normal login system; revisit then (TD-210). (user, 2026-11-13) |
