@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 142 · **Closed:** 90
+**Open:** 144 · **Closed:** 90
 
 ## decision (6)
 
@@ -96,7 +96,7 @@
 | [TD-217](../tracker/todo/TD-217.md) | Inspection scheduling after Pilot-0: calendar view, general recurrence (beyond scaffolds), light work-order grouping (TD-165 remainder) | T-0152 | planner |
 | [TD-231](../tracker/todo/TD-231.md) | Teams admin screen in the Backbone nav group (list, create, rename, delete, add/remove members) | T-0013 | planner |
 
-## later (55)
+## later (57)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -155,6 +155,8 @@
 | [TD-227](../tracker/todo/TD-227.md) | Task board totals count dropped tasks: leave status dropped out of the Overall and per-phase denominators in scripts/tracker.py render | T-0029 | planner |
 | [TD-233](../tracker/todo/TD-233.md) | Form engine: record visibility non-convergence + server parity under the TD-177 work (PR #42 review suggestion) | T-0031 | implementer |
 | [TD-234](../tracker/todo/TD-234.md) | Frontend: add a formatter (Prettier or ESLint stylistic) so lint --fix output and hand edits share one layout | T-0031 | implementer |
+| [TD-240](../tracker/todo/TD-240.md) | Jobs: bound the stored result size and apply the payload byte cap in service.create_job (internal callers bypass the POST /jobs 64 KiB check) | T-0060 | implementer |
+| [TD-241](../tracker/todo/TD-241.md) | Per-route override of KERP_MAX_BODY_BYTES for a future endpoint that needs a larger JSON body (bulk import); today one app-wide limit | T-0060 | implementer |
 
 ## bug (1)
 
