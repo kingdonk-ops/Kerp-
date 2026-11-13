@@ -123,6 +123,12 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
   (absorbed T-0066: `tracker.py set --note` date fix), T-0037 (absorbed T-0061: same-second
   password-change token rejection). T-0032, T-0033, T-0063, T-0039 and T-0044 stay separate.
 
+- **2026-11-13 — Teams re-plan (user decisions TD-228, TD-229, TD-230, TD-237):** teams are
+  tenant-level and grant project access through team-project links (diff §4.1, ADR 0008).
+  T-0013 re-scoped to tenant-level teams, members and links (now after T-0014 and T-0073).
+  New: T-0073 (team-derived grants in the core membership store) and T-0074 (saved views shared
+  with several teams; absorbs TD-242), T-0075 (teams reconcile, split from T-0013 in review), T-0076 (PER-16 Project Viewer persona). ADR 0008 accepted with grants keyed by source (`direct` | `team_link`); TD-251 resolved (links: PER-01–PER-14 except PER-09, plus PER-16).
+
 ## Key engineering decisions (baked into the spec — see consolidation diff)
 
 | Area | Decision |
@@ -137,6 +143,7 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
 | Calibration | lifecycle + SAQ OCR + supersede-lock + hard CEL gate (expired tool blocked) |
 | Frontend | 8-group IA on 4 pillars (nav mapping diff §6.1); RegisterPage/DetailPage/Dynamic Form Renderer first; **Dexie** offline outbox for web PWA apps |
 | Access (2026-11-13) | One hidden tenant per deployment; System admins appoint Project Admins (`create_projects`); creator gets PER-09; lobby + access requests; project picker; one URL; admin roles never confer hold/sign-off (diff §4.1) |
+| Teams (2026-11-13) | Tenant-level teams, managed by System admins; a team links to several projects with one role (persona) per project; effective access = individual memberships ∪ team-derived grants, stored as membership rows keyed by source type/id (diff §4.1, ADR 0008); new PER-16 Project Viewer; teams are not planner crews; saved views share to several linked teams |
 | Sessions & devices (2026-11-13) | 15 min access, 12 h refresh from sign-in (daily re-login); hybrid device PIN, offline unlock independent of the server session; offline window 7 days default, 14 max; device registry + remote revoke/wipe (diff §4.2–§4.4) |
 | Field client (2026-11-13) | Capacitor Android 11+, SQLCipher SQLite + file-system media, managed Play/MDM; one client storage contract and a client-agnostic sync contract (diff §6.2); NFR budgets warn now, hard gate before Pilot-0 (diff §6.3) |
 | Region (2026-11-13) | Per-deployment setting: AWS `ap-southeast-2` for Australian deployments (diff §4.4) |

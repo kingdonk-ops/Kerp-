@@ -498,7 +498,7 @@ To support initial construction and structural remediation without carrying main
 
 ## 5. Persona Access Matrix & Site Scoping (Item 13)
 
-The enterprise access model formalizes 15 distinct operational roles with explicit separation of duties (e.g., project administrators cannot release quality hold points without designated QA/QC authority).
+The enterprise access model formalizes 15 distinct operational roles (16 with PER-16 Project Viewer, amendment below) with explicit separation of duties (e.g., project administrators cannot release quality hold points without designated QA/QC authority).
 
 ### 5.1 Capability Tiers
 * **Viewer (V)**: Read-only access across scoped records.
@@ -526,10 +526,18 @@ The enterprise access model formalizes 15 distinct operational roles with explic
 | **PER-13** | Quality Director | Manager | Portfolio (All Projects) | Audit oversight | None | QMS Audits, Trend Analytics |
 | **PER-14** | Field Worker (Mobile) | Editor | Single Project (Module Grant)| None | Direct timesheet | Field Diary, Deliveries, Workpack |
 | **PER-15** | Client Representative | Portal | Granted Subtree Only | **Witness / Co-sign (`S`)**| Claim verification | Client Portal, RFI, ITP Witness |
+| **PER-16** | Project Viewer | Viewer | Single Project | None | None | Read-only across modules |
+
+**PER-16 Project Viewer (user, 2026-11-13; TD-251, ADR 0008).** A read-only internal persona:
+Viewer tier (`V` only), single-project scope, read access across the project's modules, no
+hold, approval or signing authority, and therefore no separation-of-duties implications. It
+can be assigned individually (by the project's PER-09) or granted through a team-project link
+(diff §4.1 Teams). Team links may carry PER-01 to PER-14 except PER-09, plus PER-16; PER-09
+and PER-15 are individual assignments only.
 
 **Tier mapping (user, 2026-11-13; TD-151, decision 2a — confirms T-0010).** The default-tier
 labels map to capability tiers: Manager and Editor → `V`, `C`, `E`; Admin → `V`, `C`, `E` +
-administer the project; Portal → `V`. `A` is added where the matrix gives hold or commercial
+administer the project; Portal → `V`; Viewer (PER-16, added 2026-11-13) → `V`. `A` is added where the matrix gives hold or commercial
 authority (PER-02, PER-06, PER-07, PER-11) and `S` for PER-15. PER-03 "Progress sign-off" is
 not `A`. Separation of duties is per persona: PER-09 contributes no hold authority.
 
