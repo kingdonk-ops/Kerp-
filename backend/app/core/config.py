@@ -98,10 +98,22 @@ class Settings(BaseSettings):
     # Tenant a login without an explicit ``tenant_id`` signs in to (single-company deployment).
     default_tenant_id: uuid.UUID | None = None
 
+    # Notification channels (T-0019, TD-168): the registered channel names every notification
+    # goes to (JSON list in the environment). ``in_app`` is the inbox record and always on;
+    # FCM push (T-0144) and e-mail (TD-084) are added here once they exist.
+    notification_channels: tuple[str, ...] = ("in_app",)
+
     @field_validator("log_level", mode="before")
     @classmethod
     def _upper_log_level(cls, value: object) -> object:
         return value.upper() if isinstance(value, str) else value
+
+    @field_validator("notification_channels")
+    @classmethod
+    def _in_app_channel(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+        if "in_app" not in value:
+            raise ValueError("notification_channels must include 'in_app'")
+        return value
 
     @property
     def hsts_active(self) -> bool:

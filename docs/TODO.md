@@ -3,9 +3,9 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 144 · **Closed:** 90
+**Open:** 147 · **Closed:** 90
 
-## decision (6)
+## decision (7)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -15,6 +15,7 @@
 | [TD-224](../tracker/todo/TD-224.md) | Magic-link request lockout is still per tenant+email: anyone can keep a known field worker from getting a link (4/hour, then doubling delay); decide per-client keying vs mailbox-flood protection | T-0068 | reviewer |
 | [TD-228](../tracker/todo/TD-228.md) | Teams scope and management: project-level teams only, managed by PER-09 (no tenant-level or cross-project teams) | T-0013 | planner |
 | [TD-229](../tracker/todo/TD-229.md) | Teams module vs planner crews and roster teams (TD-073/TD-083) and the handover 'project team' | T-0013 | planner |
+| [TD-237](../tracker/todo/TD-237.md) | Who may send a notification through the API: T-0019 allows only the admin capability (PER-09) and no pins; modules notify through service.notify. Confirm or widen (e.g. PER-02/PER-03 broadcasts) | T-0019 | implementer |
 
 ## spec-gap (36)
 
@@ -66,7 +67,7 @@
 | [TD-131](../tracker/todo/TD-131.md) | Add a root .env.example for the dev stack (the implementer agent's permission rules block writing .env* files) | T-0003 | implementer |
 | [TD-208](../tracker/todo/TD-208.md) | Uploads infra: provision the kerp-vault bucket (CORS for browser PUT/GET, lifecycle on staging/), wire KERP_S3_* in compose, add MinIO to CI for the gated round-trip test | T-0016 | implementer |
 
-## deferred (25)
+## deferred (26)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -95,8 +96,9 @@
 | [TD-212](../tracker/todo/TD-212.md) | Uploads: run the orphan sweep on a schedule for every project (needs the scope list of TD-155) | T-0016 | implementer |
 | [TD-217](../tracker/todo/TD-217.md) | Inspection scheduling after Pilot-0: calendar view, general recurrence (beyond scaffolds), light work-order grouping (TD-165 remainder) | T-0152 | planner |
 | [TD-231](../tracker/todo/TD-231.md) | Teams admin screen in the Backbone nav group (list, create, rename, delete, add/remove members) | T-0013 | planner |
+| [TD-238](../tracker/todo/TD-238.md) | Notifications: run non-in-app channels (FCM T-0144, e-mail TD-084) as an SAQ job after commit, with a persisted per-channel delivery log and retry; T-0019 calls them synchronously inside the caller's transaction | T-0019 | implementer |
 
-## later (57)
+## later (58)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -155,6 +157,7 @@
 | [TD-227](../tracker/todo/TD-227.md) | Task board totals count dropped tasks: leave status dropped out of the Overall and per-phase denominators in scripts/tracker.py render | T-0029 | planner |
 | [TD-233](../tracker/todo/TD-233.md) | Form engine: record visibility non-convergence + server parity under the TD-177 work (PR #42 review suggestion) | T-0031 | implementer |
 | [TD-234](../tracker/todo/TD-234.md) | Frontend: add a formatter (Prettier or ESLint stylistic) so lint --fix output and hand edits share one layout | T-0031 | implementer |
+| [TD-239](../tracker/todo/TD-239.md) | Notifications inbox in the web/field client (list, unread badge, mark read, t() keys per kind/label) plus unread-count and mark-all-read endpoints and a retention purge; no task schedules it yet | T-0019 | implementer |
 | [TD-240](../tracker/todo/TD-240.md) | Jobs: bound the stored result size and apply the payload byte cap in service.create_job (internal callers bypass the POST /jobs 64 KiB check) | T-0060 | implementer |
 | [TD-241](../tracker/todo/TD-241.md) | Per-route override of KERP_MAX_BODY_BYTES for a future endpoint that needs a larger JSON body (bulk import); today one app-wide limit | T-0060 | implementer |
 
