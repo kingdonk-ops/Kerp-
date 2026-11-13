@@ -44,9 +44,11 @@ Dispatch **kerp-reviewer** with PR number, task id, branch, round number. It pos
 ```bash
 git switch task/<id>-<slug> && git fetch origin && git rebase origin/dev   # conflicts only in docs/TASKS.md|TODO.md → re-render, continue
 python scripts/tracker.py set <id> --status done --pr <n>
-python scripts/tracker.py render && git commit -am "chore(tracker): <id> done" && git push --force-with-lease
+python scripts/tracker.py render
+python scripts/pr_suggestions.py rebuild   # refresh docs/pr-suggestions.md digest of surfaced notes/TODOs/suggestions
+git commit -am "chore(tracker): <id> done + pr-suggestions" && git push --force-with-lease
 ```
-Tracker-only commits keep the approval valid (patch-id excludes tracker paths). Any **code** change after approval → back to step 4.
+Tracker-only commits keep the approval valid (patch-id excludes `tracker/**`, the boards and `docs/pr-suggestions.md`). Any **code** change after approval → back to step 4.
 Wait for checks (`gh api $R/commits/<sha>/check-runs -q '.check_runs[]|[.name,.status,.conclusion]|@tsv'`) — `ci-gate` and `review-gate` must be `success`. Then:
 ```bash
 gh api -X PUT $R/pulls/<n>/merge -f merge_method=squash -f commit_title="<id>: <title> (#<n>)"
