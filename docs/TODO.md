@@ -3,14 +3,15 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 124 · **Closed:** 87
+**Open:** 129 · **Closed:** 87
 
-## decision (2)
+## decision (3)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
 | [TD-096](../tracker/todo/TD-096.md) | Approved coating ITR dropped the residual-dust rating row the ITP requires; Grating and Gridmesh ITR has no approved version: confirm with the client before shipping default templates | T-0113 | planner |
 | [TD-191](../tracker/todo/TD-191.md) | Login/magic-link lockout keyed by tenant+email lets anyone keep a known user at a 15-minute delay; decide per-email+per-IP keying and fix the begin() check/count race (single Lua script) | T-0009 | reviewer |
+| [TD-213](../tracker/todo/TD-213.md) | Object key layout: confirm {tenant}/{project}/{module}/{sha256} (no extension) instead of the master spec's {hash}.ext, plus transient staging/ and quarantine/ prefixes | T-0016 | implementer |
 
 ## spec-gap (33)
 
@@ -50,15 +51,16 @@
 | [TD-167](../tracker/todo/TD-167.md) | Defect close-out loop: open -> action assigned (owner, due) -> rectified -> verified closed by a re-inspection (closed_by_inspection link); extends TD-066 | T-0117 | clean-room-gap-analysis |
 | [TD-205](../tracker/todo/TD-205.md) | NFR budgets need a reference device and a 4G network profile before they become a hard gate for Pilot-0 | T-0045, T-0146 | planner |
 
-## missed (3)
+## missed (4)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
 | [TD-094](../tracker/todo/TD-094.md) | Per-RSW area handover sheet required by the ITP closeout (not the shift handover module) | T-0113, E-04-10 | planner |
 | [TD-125](../tracker/todo/TD-125.md) | Booking modules must call work_anchor_for and return 422 when the path has no work anchor (progress, time lines against a work anchor, completion gate) | T-0101, T-0116, T-0124, E-04-03, E-04-05 | reviewer |
 | [TD-131](../tracker/todo/TD-131.md) | Add a root .env.example for the dev stack (the implementer agent's permission rules block writing .env* files) | T-0003 | implementer |
+| [TD-208](../tracker/todo/TD-208.md) | Uploads infra: provision the kerp-vault bucket (CORS for browser PUT/GET, lifecycle on staging/), wire KERP_S3_* in compose, add MinIO to CI for the gated round-trip test | T-0016 | implementer |
 
-## deferred (22)
+## deferred (24)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -83,9 +85,11 @@
 | [TD-180](../tracker/todo/TD-180.md) | RegisterPage: PDF export and server-side export of the full result set | T-0025 | implementer |
 | [TD-181](../tracker/todo/TD-181.md) | DetailPage: audit log and gate-status endpoints | T-0025 | implementer |
 | [TD-182](../tracker/todo/TD-182.md) | RegisterPage: server-side filtering, sorting and paging | T-0025 | implementer |
-| [TD-211](../tracker/todo/TD-211.md) | Inspection scheduling after Pilot-0: calendar view, general recurrence (beyond scaffolds), light work-order grouping (TD-165 remainder) | T-0152 | planner |
+| [TD-209](../tracker/todo/TD-209.md) | Uploads: file deletion and content-object GC; recover files stuck in 'verifying' after a failed verify job | T-0016 | implementer |
+| [TD-212](../tracker/todo/TD-212.md) | Uploads: run the orphan sweep on a schedule for every project (needs the scope list of TD-155) | T-0016 | implementer |
+| [TD-217](../tracker/todo/TD-217.md) | Inspection scheduling after Pilot-0: calendar view, general recurrence (beyond scaffolds), light work-order grouping (TD-165 remainder) | T-0152 | planner |
 
-## later (51)
+## later (52)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -139,6 +143,7 @@
 | [TD-204](../tracker/todo/TD-204.md) | After Pilot-0: biometric unlock, certificate pinning (Capacitor) and per-device sync-health views | T-0043 | planner |
 | [TD-207](../tracker/todo/TD-207.md) | Local PIN unlock for the web PWA build (no platform keystore): e.g. a non-extractable WebCrypto key wrapping the IndexedDB data key | T-0143 | planner |
 | [TD-210](../tracker/todo/TD-210.md) | Native Android app: normal login system and offline-window expiry behaviour (replaces the TD-206 interim rule) | T-0143 | user |
+| [TD-211](../tracker/todo/TD-211.md) | Uploads: replace the always-clean StubScanner with a real malware scanner (e.g. ClamAV/clamd in the worker) | T-0016 | implementer |
 | [TD-215](../tracker/todo/TD-215.md) | Optional chain-of-custody hash for offline records: SHA-256(prev_hash + payload + monotonic_ms) per device clock session | T-0148 | planner |
 
 ## bug (1)
@@ -235,8 +240,8 @@
 | ✅ | [TD-162](../tracker/todo/TD-162.md) | Sync pull scope: per-device/per-project pull-deltas scope, has-more paging, download-for-offline selection with size, local purge, client-generated record ids, stale-base flag on answers, submit blocked until attachments complete | Cut into T-0147, T-0148, T-0149 and the attachments check in T-0150; spec in diff §6.4 with planner defaults (user, 2026-11-13, Q5a) |
 | ✅ | [TD-163](../tracker/todo/TD-163.md) | Barcode/QR/NFC identifiers on Items + scan-to-locate lookup (master user story exists; no columns, endpoint, or NFC path for PWA vs Capacitor) | Cut into T-0154 (Item scan identifiers + lookup) and T-0155 (scan-to-locate, Android NFC, offline lookup); spec in asset-and-tagging.md (user, 2026-11-13, Q5a) |
 | ✅ | [TD-164](../tracker/todo/TD-164.md) | Device registry: enrolled devices, remote revoke/wipe, device_id in audit (T-0006) with before/after diff, biometric unlock, certificate pinning (Capacitor), per-device sync health | 17a: device registry, remote revoke (sessions killed, local wipe on next contact) and device_id in the audit ledger for Pilot-0. Spec diff §4.3; tasks T-0043, T-0048, T-0143, T-0126. Biometric unlock, certificate pinning and sync-health views after the pilot: TD-204 (user, 2026-11-13) |
-| ✅ | [TD-165](../tracker/todo/TD-165.md) | Inspection scheduling and review: planned start/duration, calendar, general recurrence, light work-order grouping, explicit returned state, comments addressable to a single answer | Review/return, answer comments and planning fields cut into T-0150, T-0151, T-0152, T-0153; calendar, recurrence and work orders deferred to TD-211 (user, 2026-11-13, Q5a) |
-| ✅ | [TD-166](../tracker/todo/TD-166.md) | Field-type palette additions: video, audio, barcode/QR fields, annotation on captured photos (stored JSON, burned in on export), reference images on questions | Photo annotation (with capture time and location) cut into T-0156, T-0157 and burn-in in T-0158; video, audio, barcode/QR fields and reference images deferred to TD-212 (user, 2026-11-13, Q5a) |
+| ✅ | [TD-165](../tracker/todo/TD-165.md) | Inspection scheduling and review: planned start/duration, calendar, general recurrence, light work-order grouping, explicit returned state, comments addressable to a single answer | Review/return, answer comments and planning fields cut into T-0150, T-0151, T-0152, T-0153; calendar, recurrence and work orders deferred to TD-217 (user, 2026-11-13, Q5a) |
+| ✅ | [TD-166](../tracker/todo/TD-166.md) | Field-type palette additions: video, audio, barcode/QR fields, annotation on captured photos (stored JSON, burned in on export), reference images on questions | Photo annotation (with capture time and location) cut into T-0156, T-0157 and burn-in in T-0158; video, audio, barcode/QR fields and reference images deferred to TD-218 (user, 2026-11-13, Q5a) |
 | ✅ | [TD-168](../tracker/todo/TD-168.md) | Push notification channel (FCM via the Capacitor build) for assignment and return; T-0019 is in-app only and email is TD-084 | 5a: T-0019 stays in-app only behind a pluggable channel interface; FCM push is T-0144 in the Android build work (user, 2026-11-13) |
 | ✅ | [TD-169](../tracker/todo/TD-169.md) | M2 Documents-Lite 'batch inspection PDF export' (consolidation diff §7) has no task | Cut into T-0158 (inspection PDF) and T-0159 (batch PDF export); spec in quality-and-inspection.md (user, 2026-11-13, Q5a) |
 | ✅ | [TD-170](../tracker/todo/TD-170.md) | Offline window: 14 days (clean-room FR-02) vs up to 7 days (master §6); tenant setting and default | 14a: offline window is a tenant setting, default 7 days, maximum 14; sync and sessions built for 14. Spec diff §4.2/§4.4, master §6; tasks T-0044, T-0126, T-0127, T-0143 (user, 2026-11-13) |
@@ -252,6 +257,6 @@
 | ✅ | [TD-202](../tracker/todo/TD-202.md) | Lobby details: a project code only finds the project and files an access request (never grants access); the lobby is also reachable from the project picker for users who already have projects | Q1a: a project code only finds that one project and lets the user file an access request decided by the project's PER-09 holders; it never grants access by itself. Users who already have projects open the lobby from the picker. Spec diff §4.1; T-0040, T-0041 (user, 2026-11-13) |
 | ✅ | [TD-203](../tracker/todo/TD-203.md) | SPA refresh-token transport: keep the JSON body (sessionStorage) or move to an httpOnly SameSite cookie | Q6a: the web SPA gets the refresh token as an httpOnly Secure SameSite cookie (CSRF-protected /auth/refresh); the Capacitor Android build keeps the JSON-body transport. Spec diff §4.2; T-0037 (user, 2026-11-13) |
 | ✅ | [TD-206](../tracker/todo/TD-206.md) | Confirm planner default: once the offline window expires without server contact, queued data is kept but new edits are blocked until an online sign-in | Accepted for the Capacitor/PWA field client until the native Android app launches with a normal login system; revisit then (TD-210). (user, 2026-11-13) |
-| ✅ | [TD-212](../tracker/todo/TD-212.md) | Field palette after Pilot-0: video and audio notes, barcode/QR answer fields, reference images on questions (TD-166 remainder) | R4b: in Pilot-0; cut into T-0167 (video/audio/barcode field types), T-0168 (reference images), T-0169 (SAQ media probe), T-0170 (video/audio capture), T-0171 (barcode field + reference image display) (user, 2026-11-13) |
-| ✅ | [TD-213](../tracker/todo/TD-213.md) | Pilot-0 client co-sign on the inspector's device: who the client signer is (named PER-15 account with own PIN vs typed name + drawn signature) and which states it applies to | R1a: the client representative signs on the inspector's device with their own KERP account (PER-15) and PIN; cut into T-0162 (signing PIN, co-sign token, offline verifier), T-0163 (ledger entry), T-0164 (hand-to-client / hand-back screens) (user, 2026-11-13) |
 | ✅ | [TD-214](../tracker/todo/TD-214.md) | Pilot-0 checklist gaps: no inspector capture screen in the subset (T-0130 not listed; needs T-0124/T-0112/T-0128), no ad-hoc inspection UI, and T-0133 depends on the deferred P6 import T-0104 | R2a: T-0130 joins Pilot-0, T-0165 cut for capture and ad-hoc start, T-0133's P6 tests split to T-0166 outside the pilot so T-0104 leaves the gate (user, 2026-11-13) |
+| ✅ | [TD-218](../tracker/todo/TD-218.md) | Field palette after Pilot-0: video and audio notes, barcode/QR answer fields, reference images on questions (TD-166 remainder) | R4b: in Pilot-0; cut into T-0167 (video/audio/barcode field types), T-0168 (reference images), T-0169 (SAQ media probe), T-0170 (video/audio capture), T-0171 (barcode field + reference image display) (user, 2026-11-13) |
+| ✅ | [TD-219](../tracker/todo/TD-219.md) | Pilot-0 client co-sign on the inspector's device: who the client signer is (named PER-15 account with own PIN vs typed name + drawn signature) and which states it applies to | R1a + co-sign redesign: the client co-signs with their own KERP account (PER-15): (i) online PIN (T-0162), (ii) QR assertion signed by the client's own device key (T-0173, T-0175), (iii) provisional wet signature confirmed by the client (T-0174, T-0176); ledger T-0163, inspector screens T-0164 (user, 2026-11-13) |

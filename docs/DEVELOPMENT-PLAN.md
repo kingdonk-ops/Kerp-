@@ -86,13 +86,13 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
     - inspection PDF (TD-169): T-0158 (per inspection, annotations burned in), T-0159 (batch
       export);
     - dashboard tiles: T-0160 (progress, overdue, open defects);
-    - client co-sign with the client's own PER-15 account (TD-213; user, 2026-11-13, R1a and the
+    - client co-sign with the client's own PER-15 account (TD-219; user, 2026-11-13, R1a and the
       co-sign redesign; no client secret on inspector devices): (i) online PIN — T-0162; (ii) QR
       assertion signed on the client's own device — T-0173 (device signing keys), T-0175 (client
       app); (iii) provisional wet signature confirmed by the client — T-0174, T-0176; ledger
       entries T-0163; inspector-side screens and hand-back T-0164;
     - inspector capture screen and ad-hoc start (TD-214; user, 2026-11-13, R2a): T-0165;
-    - video and audio notes, barcode/QR answer fields, reference images (TD-212; user,
+    - video and audio notes, barcode/QR answer fields, reference images (TD-218; user,
       2026-11-13, R4b): T-0167 (field types), T-0168 (reference images), T-0169 (SAQ media
       probe), T-0170 (video/audio capture), T-0171 (barcode field + reference image display);
     - time of offline actions (user, 2026-11-13; diff §6.4.1): T-0172 (client clock stamps,
@@ -104,7 +104,7 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
     T-0112, T-0113, T-0114, T-0118, T-0124, T-0128, T-0134, T-0138 (via T-0107), T-0139, T-0140
     (inspection date and self-approval, via T-0150) and T-0136 (terminology layer, via the PDF T-0158; user,
     2026-11-13, R5a). T-0104 is no longer in the gate.
-  - **Not in the pilot:** inspection calendar, general recurrence and work orders (TD-211); the P6
+  - **Not in the pilot:** inspection calendar, general recurrence and work orders (TD-217); the P6
     half of the checkout contract (T-0166).
   - **Deferred for the pilot:** P6 import/export (T-0104–T-0106, T-0125, T-0129, T-0166), Phase 2,
     Phases 3–7. The client signs on the inspector's device with their own PER-15 account and PIN

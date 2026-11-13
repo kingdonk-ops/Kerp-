@@ -80,7 +80,7 @@ are planner defaults unless marked otherwise. A `photo` answer is a list of capt
 - Video and audio notes, barcode/QR answer fields and reference images on questions are in
   Pilot-0 too (user, 2026-11-13, R4b): §Media, barcode fields and reference images below.
 
-**Media, barcode fields and reference images (Pilot-0; user, 2026-11-13, R4b; TD-212).** The user
+**Media, barcode fields and reference images (Pilot-0; user, 2026-11-13, R4b; TD-218).** The user
 brought these into Pilot-0; limits, formats and the processing split are planner defaults.
 - **`video` field.** Value: a list of `{attachment_id, sha256, captured_at, geo, duration_s,
   poster_attachment_id}`. Recorded on the device as MP4 (H.264 video, AAC audio), at most 720p,
@@ -221,7 +221,7 @@ planner defaults unless marked otherwise.
 - **Notifications.** Submit notifies the project's reviewers; return and approve notify the
   inspector.
 
-## Client co-sign (Pilot-0; user, 2026-11-13, R1a and co-sign redesign; TD-213)
+## Client co-sign (Pilot-0; user, 2026-11-13, R1a and co-sign redesign; TD-219)
 
 The client representative co-signs with **their own KERP account (PER-15)** (user decision R1a).
 After review round 3 of PR #51 the user replaced the offline PIN check (2026-11-13): **no client
