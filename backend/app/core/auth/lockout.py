@@ -8,9 +8,10 @@ How an attempt runs (``ProgressiveLockout.begin``):
 1. If the subject is locked, refuse at once with ``LockedOutError(retry_after)``. The
    secret is not even checked, and the refused attempt is not counted.
 2. Otherwise count the attempt as a failure *before* checking the secret and, if the count
-   is past the free attempts, arm the lock for the next one. Counting first means parallel
-   requests cannot all slip through before a lock is written: each one takes its own
-   attempt number, and attempts past ``max_attempts`` are refused by the caller outright.
+   is past the free attempts, arm the lock for the next one. Steps 1 and 2 are one atomic
+   store operation (``RevocationStore.begin_attempt``, TD-191): parallel requests each take
+   their own attempt number, and none of them can pass a lock another one has just armed;
+   attempts past ``max_attempts`` are refused by the caller outright.
 3. The caller checks the secret. On success it calls ``succeeded``, which clears the
    counter and the lock (so a right answer leaves no trace).
 
@@ -90,10 +91,24 @@ PIN_POLICY: Final = LockoutPolicy(
     max_attempts=10,
 )
 
-# Password login per tenant + e-mail (TD-123): 6 tries back to back (no lock after failures
-# 1-5), then the same escalation.
+# Password login per tenant + e-mail + client IP (TD-123, T-0068): 6 tries back to back (no
+# lock after failures 1-5), then the same escalation. Keyed by client so that someone else's
+# failures cannot keep a user locked out.
 LOGIN_POLICY: Final = LockoutPolicy(
     free_attempts=5,
+    base_delay=timedelta(seconds=30),
+    max_delay=timedelta(minutes=15),
+    window=timedelta(hours=24),
+)
+
+# Password login per tenant + e-mail, across all clients (T-0068): a backstop against
+# guessing one account's password from many addresses. Generous, so that the *first* account
+# lock costs an attacker 51 failures (at once from 9+ addresses, or over hours from one)
+# instead of 6. After that it escalates like every policy, so one request per lock expiry
+# keeps the account locked for every client until the 24 h window ends: a residual lock-out
+# risk, TD-225.
+LOGIN_ACCOUNT_POLICY: Final = LockoutPolicy(
+    free_attempts=50,
     base_delay=timedelta(seconds=30),
     max_delay=timedelta(minutes=15),
     window=timedelta(hours=24),
@@ -122,19 +137,13 @@ class ProgressiveLockout:
 
     def begin(self, subject: str) -> int:
         """Start an attempt; returns its number (1-based). Raises ``LockedOutError``."""
-        key = self._key(subject)
-        remaining = self.store.lock_remaining(key)
+        attempt, remaining = self.store.begin_attempt(
+            self._key(subject), self.policy.window, self.policy.delay_after
+        )
         if remaining > 0:
             raise LockedOutError(remaining)
-        attempt = self.store.count_failure(key, self.policy.window)
-        delay = self.policy.delay_after(attempt)
-        if delay > timedelta(0):
-            self.store.set_lock(key, delay)
         return attempt
 
     def succeeded(self, subject: str) -> None:
         """The secret was right: forget the failures and lift the lock."""
         self.store.clear_failures(self._key(subject))
-
-    def failures(self, subject: str) -> int:
-        return self.store.failure_count(self._key(subject))

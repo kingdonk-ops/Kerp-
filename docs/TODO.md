@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 133 · **Closed:** 88
+**Open:** 135 · **Closed:** 88
 
 ## decision (4)
 
@@ -92,7 +92,7 @@
 | [TD-212](../tracker/todo/TD-212.md) | Uploads: run the orphan sweep on a schedule for every project (needs the scope list of TD-155) | T-0016 | implementer |
 | [TD-217](../tracker/todo/TD-217.md) | Inspection scheduling after Pilot-0: calendar view, general recurrence (beyond scaffolds), light work-order grouping (TD-165 remainder) | T-0152 | planner |
 
-## later (52)
+## later (53)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -148,6 +148,7 @@
 | [TD-210](../tracker/todo/TD-210.md) | Native Android app: normal login system and offline-window expiry behaviour (replaces the TD-206 interim rule) | T-0143 | user |
 | [TD-211](../tracker/todo/TD-211.md) | Uploads: replace the always-clean StubScanner with a real malware scanner (e.g. ClamAV/clamd in the worker) | T-0016 | implementer |
 | [TD-215](../tracker/todo/TD-215.md) | Optional chain-of-custody hash for offline records: SHA-256(prev_hash + payload + monotonic_ms) per device clock session | T-0148 | planner |
+| [TD-226](../tracker/todo/TD-226.md) | Key the per-client login lockout on the IPv6 /64, not the full address (clients can rotate within their prefix) | T-0068 | reviewer |
 
 ## bug (1)
 
@@ -155,7 +156,7 @@
 |---|---|---|---|
 | [TD-159](../tracker/todo/TD-159.md) | Site filter from the bound project is applied to all site-scoped rows: a PER-07 on A who is PER-01 on B loses B's site-scoped rows (over-restrictive) | T-0010 | reviewer |
 
-## risk (13)
+## risk (14)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -172,6 +173,7 @@
 | [TD-176](../tracker/todo/TD-176.md) | No availability target or HA design for the production API (clean-room asks 99.5 %; offline client tolerates outages) | — | clean-room-gap-analysis |
 | [TD-216](../tracker/todo/TD-216.md) | Client co-sign residual risk: a provisional wet signature is only an inspector-witnessed claim until the client confirms it; a stolen client device key is stopped only by revoking the device (T-0043) | T-0174, T-0173 | planner |
 | [TD-222](../tracker/todo/TD-222.md) | Rate-limit unauthenticated /api/v1/auth/* at the proxy: each login/magic-link with a fresh e-mail costs one scrypt (16 MB) before any lockout applies | — | reviewer |
+| [TD-225](../tracker/todo/TD-225.md) | Login account backstop can still be held locked at ~1 request per lock after 51 distributed failures | T-0068 | reviewer |
 
 ## Closed
 
