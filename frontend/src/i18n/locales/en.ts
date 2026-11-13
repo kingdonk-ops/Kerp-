@@ -61,6 +61,52 @@ export const en = {
   home: {
     welcome: "Welcome, {{name}}.",
   },
+  shells: {
+    register: {
+      quickFilter: "Filter",
+      columnFilter: "Filter {{column}}",
+      columns: "Columns",
+      count: "{{shown}} of {{total}} records",
+      empty: "No records match the current filters.",
+      exportCsv: "Export CSV",
+      savedViews: {
+        label: "Saved view",
+        none: "Current view",
+        name: "View name",
+        save: "Save view",
+        delete: "Delete view",
+      },
+    },
+    detail: {
+      tabs: "Sections",
+      gate: {
+        title: "Gate status",
+        summary: "{{state}} — {{label}}",
+        states: {
+          open: "Open",
+          passed: "Passed",
+          hold: "On hold",
+          blocked: "Blocked",
+        },
+      },
+      audit: {
+        tab: "Audit log",
+        empty: "No audit entries yet.",
+        loadError: "Could not load the audit log.",
+        source: {
+          ai: "AI",
+        },
+      },
+    },
+    form: {
+      submit: "Submit",
+      requiredMark: "required",
+      errors: {
+        required: "This field is required.",
+        ruleError: "This rule could not be evaluated. Check the related fields.",
+      },
+    },
+  },
   notFound: {
     title: "Page not found",
     body: "The page you requested does not exist.",

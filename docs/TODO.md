@@ -3,9 +3,9 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 118 · **Closed:** 56
+**Open:** 125 · **Closed:** 56
 
-## decision (6)
+## decision (7)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -15,6 +15,7 @@
 | [TD-171](../tracker/todo/TD-171.md) | Production AWS region / data residency: EU (clean-room NFR-10, GDPR) vs Australia; TD-004 settled AWS but not the region | — | clean-room-gap-analysis |
 | [TD-172](../tracker/todo/TD-172.md) | Per-business-unit theming (logo/palette) vs one tenant per deploy (TD-007); German translations at launch (clean-room NFR-16) | T-0136 | clean-room-gap-analysis |
 | [TD-173](../tracker/todo/TD-173.md) | Pilot-0 (8 inspectors, one project, Android only, no P6 / Phase 2) ahead of the M2 cut line resolved in TD-009 | — | clean-room-gap-analysis |
+| [TD-183](../tracker/todo/TD-183.md) | Localisation of form template content (labels, option labels, error messages) | T-0025 | implementer |
 
 ## spec-gap (46)
 
@@ -76,7 +77,7 @@
 | [TD-131](../tracker/todo/TD-131.md) | Add a root .env.example for the dev stack (the implementer agent's permission rules block writing .env* files) | T-0003 | implementer |
 | [TD-169](../tracker/todo/TD-169.md) | M2 Documents-Lite 'batch inspection PDF export' (consolidation diff §7) has no task | — | clean-room-gap-analysis |
 
-## deferred (16)
+## deferred (21)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -96,8 +97,13 @@
 | [TD-150](../tracker/todo/TD-150.md) | Asset-Site scoping is ORM-only and matches site_node_id exactly (no RLS, no subtree) | T-0010 | implementer |
 | [TD-155](../tracker/todo/TD-155.md) | Schedule the jobs sweep: enumerate tenant/project scopes under RLS (no BYPASSRLS) and run service.sweep from an SAQ cron | T-0015 | implementer |
 | [TD-156](../tracker/todo/TD-156.md) | Jobs API: per-kind capability check on POST /jobs and GET /jobs/{id} once RBAC lands (T-0010) | T-0015 | implementer |
+| [TD-178](../tracker/todo/TD-178.md) | Form renderer: calculated fields (dynamic math) and dynamic ranges | T-0025 | implementer |
+| [TD-179](../tracker/todo/TD-179.md) | RegisterPage: server-side saved views (per user, shareable) | T-0025 | implementer |
+| [TD-180](../tracker/todo/TD-180.md) | RegisterPage: PDF export and server-side export of the full result set | T-0025 | implementer |
+| [TD-181](../tracker/todo/TD-181.md) | DetailPage: audit log and gate-status endpoints | T-0025 | implementer |
+| [TD-182](../tracker/todo/TD-182.md) | RegisterPage: server-side filtering, sorting and paging | T-0025 | implementer |
 
-## later (34)
+## later (35)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -135,6 +141,7 @@
 | [TD-157](../tracker/todo/TD-157.md) | Jobs worker: liveness healthcheck for the worker container, and re-queue (not fail) jobs interrupted by a worker shutdown | T-0015 | implementer |
 | [TD-160](../tracker/todo/TD-160.md) | Test that revoking (soft-deleting) a project membership removes that project from the resolved scope; extend TD-150 to bulk ORM update/delete | T-0010 | reviewer |
 | [TD-175](../tracker/todo/TD-175.md) | Record retention rules + legal hold per project | — | clean-room-gap-analysis |
+| [TD-177](../tracker/todo/TD-177.md) | Form renderer: adopt the T-0110 shared field-type registry + dual-runtime parity | T-0025 | implementer |
 
 ## bug (1)
 
