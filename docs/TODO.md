@@ -3,9 +3,9 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 143 · **Closed:** 59
+**Open:** 144 · **Closed:** 59
 
-## decision (7)
+## decision (8)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -16,6 +16,7 @@
 | [TD-183](../tracker/todo/TD-183.md) | Localisation of form template content (labels, option labels, error messages) | T-0025 | implementer |
 | [TD-184](../tracker/todo/TD-184.md) | Who may create a project and how the creator gets a membership: POST /projects is gated on the admin capability in any project until T-0014's tenant administrator | T-0012 | implementer |
 | [TD-191](../tracker/todo/TD-191.md) | Login/magic-link lockout keyed by tenant+email lets anyone keep a known user at a 15-minute delay; decide per-email+per-IP keying and fix the begin() check/count race (single Lua script) | T-0009 | reviewer |
+| [TD-210](../tracker/todo/TD-210.md) | Object key layout: confirm {tenant}/{project}/{module}/{sha256} (no extension) instead of the master spec's {hash}.ext, plus transient staging/ and quarantine/ prefixes | T-0016 | implementer |
 
 ## spec-gap (47)
 
