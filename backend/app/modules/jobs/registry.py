@@ -12,9 +12,12 @@ import re
 import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import Any, Final, Literal, Protocol
+from typing import TYPE_CHECKING, Any, Final, Literal, Protocol
 
 from app.core.tenancy.context import TenancyContext
+
+if TYPE_CHECKING:
+    from app.core.db import Database
 
 QueueName = Literal["interactive", "batch"]
 KIND_PATTERN: Final = re.compile(r"^[a-z][a-z0-9_]{1,39}\.[a-z][a-z0-9_.]{0,79}$")
@@ -29,7 +32,11 @@ class JobUpdate(Protocol):
 
 @dataclass(frozen=True, slots=True)
 class JobContext:
-    """What a handler receives. ``tenancy`` is bound from the SAQ job kwargs."""
+    """What a handler receives. ``tenancy`` is bound from the SAQ job kwargs.
+
+    ``db`` is the worker's database: a handler opens its own short units of work with
+    ``job.db.unit_of_work(job.tenancy)`` and keeps slow I/O outside them.
+    """
 
     job_id: uuid.UUID
     kind: str
@@ -37,6 +44,7 @@ class JobContext:
     payload: dict[str, Any]
     request_id: str | None
     update: JobUpdate
+    db: Database
 
 
 Handler = Callable[[JobContext], Awaitable[dict[str, Any] | None]]
