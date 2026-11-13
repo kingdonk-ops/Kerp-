@@ -67,7 +67,7 @@ Redis with `maxmemory-policy noeviction` (TD-142 tracks a token-claim remedy).
 Password login is keyed by client (T-0068, TD-191): someone else's failures in the
 per-client lock lock only their own client. The per-account backstop caps guessing from many
 addresses, and is the remaining way to lock a known user out: the first backstop lock costs an
-attacker 51 failures (9+ addresses), after which about one request per lock expiry keeps the
+attacker 51 failures (at once from 9+ addresses, or over hours from one), after which about one request per lock expiry keeps the
 account locked for every client within its 24 h window (TD-225, owner decision pending).
 The client is `request.client.host`. Behind a reverse proxy, set uvicorn's
 `FORWARDED_ALLOW_IPS` to the proxy's address so the real client comes from

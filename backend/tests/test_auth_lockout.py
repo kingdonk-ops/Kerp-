@@ -27,6 +27,7 @@ from app.core.auth.lockout import (
 )
 from app.core.auth.revocation import (
     KEY_PREFIX,
+    MAX_ATTEMPT_RETRIES,
     InMemoryRevocationStore,
     RedisRevocationStore,
     RevocationStore,
@@ -267,12 +268,23 @@ def test_redis_lock_with_under_half_a_second_left_still_refuses() -> None:
 
 
 class AlwaysConflicting(fakeredis.FakeRedis):
-    """Every transaction loses its WATCH (an endless stream of rival attempts)."""
+    """Every transaction loses its WATCH (an endless stream of rival attempts).
+
+    Like redis-py's own ``execute``, the failed EXEC resets the pipeline before raising, so
+    the store can WATCH again on its next pass.
+    """
+
+    def __init__(self, *args: object, **kwargs: object) -> None:
+        super().__init__(*args, **kwargs)  # type: ignore[arg-type]
+        self.execs = 0
 
     def pipeline(self, transaction: bool = True, shard_hint: object = None):  # type: ignore[no-untyped-def]
         pipe = super().pipeline(transaction, shard_hint)  # type: ignore[arg-type]
+        outer = self
 
         def execute(raise_on_error: bool = True) -> list[object]:
+            outer.execs += 1
+            pipe.reset()
             raise redis.WatchError("watched key changed")
 
         pipe.execute = execute
@@ -280,9 +292,12 @@ class AlwaysConflicting(fakeredis.FakeRedis):
 
 
 def test_redis_attempt_gives_up_after_bounded_retries_and_fails_closed() -> None:
-    lockout = ProgressiveLockout(RedisRevocationStore(AlwaysConflicting()), POLICY, "pin")
-    with pytest.raises(RevocationUnavailableError):
+    client = AlwaysConflicting()
+    lockout = ProgressiveLockout(RedisRevocationStore(client), POLICY, "pin")
+    with pytest.raises(RevocationUnavailableError) as failed:
         lockout.begin("s")
+    assert client.execs == MAX_ATTEMPT_RETRIES  # every retry ran, then it stopped
+    assert "kept conflicting" in str(failed.value.__cause__)
 
 
 def test_a_burst_cannot_pass_the_lock(store: RevocationStore) -> None:
