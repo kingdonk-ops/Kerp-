@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import TYPE_CHECKING, Annotated, Final
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -241,27 +241,54 @@ def load_grants(session: Session, tenant_id: uuid.UUID, user_id: uuid.UUID) -> l
     return [Grant(row[0], Persona(row[1]), row[2]) for row in rows]
 
 
-def resolve_request_scope(database: Database, base: TenancyContext) -> TenancyContext:
+# ``request.state`` attribute holding ``(tenant_id, user_id, grants)`` once the request's
+# scope has been resolved, so guards and routers do not query the memberships again (T-0071).
+GRANTS_STATE: Final = "kerp_grants"
+
+
+def resolve_request_scope(
+    database: Database, base: TenancyContext, *, state: object | None = None
+) -> TenancyContext:
     """Bind the request's allowed projects from the membership store (never the request).
 
     Runs in its own short tenant-level unit of work, before the request session is bound.
+    With ``state`` (the request's ``request.state``) the loaded grants are kept there for
+    ``get_caller_grants``.
     """
     if base.user_id is None:
         return base
     with database.unit_of_work(TenancyContext(tenant_id=base.tenant_id)) as session:
         grants = load_grants(session, base.tenant_id, base.user_id)
+    if state is not None:
+        setattr(state, GRANTS_STATE, (base.tenant_id, base.user_id, tuple(grants)))
     return resolve_scope(grants, base, base.project_id)
 
 
 # --- FastAPI guards ----------------------------------------------------------------------
 
 
-def get_project_access(principal: CurrentPrincipal, session: DbSession) -> ProjectAccess:
+def get_caller_grants(
+    request: Request, principal: CurrentPrincipal, session: DbSession
+) -> list[Grant]:
+    """The caller's memberships: the ones this request's scope was resolved from, else loaded.
+
+    They are only reused when they belong to the authenticated tenant and user; a request
+    whose tenancy dependency was overridden (tests) has none and loads them here.
+    """
+    cached = getattr(request.state, GRANTS_STATE, None)
+    if cached is not None and cached[:2] == (principal.tenant_id, principal.user_id):
+        return list(cached[2])
+    return load_grants(session, principal.tenant_id, principal.user_id)
+
+
+CallerGrants = Annotated[list[Grant], Depends(get_caller_grants)]
+
+
+def get_project_access(grants: CallerGrants, session: DbSession) -> ProjectAccess:
     """The caller's access to the session's bound project; 404 without one or a membership."""
     context = session_tenancy(session)
     if context is None or context.project_id is None:
         raise OutOfScopeError("project not found")
-    grants = load_grants(session, principal.tenant_id, principal.user_id)
     return project_access(grants, context.project_id)
 
 

@@ -27,7 +27,7 @@
 
 - **`ci-gate`** (`.github/workflows/ci.yml`): tracker validation + boards fresh + pipeline tests, then backend / frontend / e2e jobs, each auto-enabled once that component exists.
 - Required checks are pinned to the GitHub Actions app, so a hand-posted commit status can't fake them.
-- **`review-gate`** (`.github/workflows/review-gate.yml` → `scripts/review_gate.py`): the latest `KERP-REVIEW:` marker from an allowed reviewer must be `APPROVED` with a `patch-id` equal to the PR's current code diff. Tracker-only commits (status, boards) don't invalidate it; any code change does.
+- **`review-gate`** (`.github/workflows/review-gate.yml` → `scripts/review_gate.py`): the latest `KERP-REVIEW:` marker from an allowed reviewer must be `APPROVED` with a `patch-id` equal to the PR's current code diff. Tracker-only commits (status, boards) don't invalidate it; any code change does. The gate script runs from the PR's **base** checkout (a PR's edits to the script don't judge that PR; edits to the workflow file itself still would — TD-223), and only markers posted as PR **reviews** count — issue comments never re-run the gate.
 - **Promotion** (`.github/workflows/promote.yml`): threshold in repo variable `KERP_PROMOTE_EVERY` (default 5). Manual "Run workflow" promotes now. Tags `release-YYYYMMDD-HHMM-<sha>` with the list of merged PRs.
 
 ## Trackers

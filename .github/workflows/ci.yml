@@ -82,6 +82,9 @@ jobs:
       redis:
         image: redis:7-alpine
         ports: ["6379:6379"]
+    # The backend defaults to production (T-0070); the test job opts in explicitly.
+    env:
+      KERP_ENVIRONMENT: test
     defaults:
       run:
         working-directory: backend

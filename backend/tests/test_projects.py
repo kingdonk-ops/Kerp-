@@ -15,11 +15,11 @@ from alembic.autogenerate import compare_metadata
 from alembic.runtime.migration import MigrationContext
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
-from sqlalchemy import Column, MetaData, Table, text
+from sqlalchemy import Column, MetaData, Table, event, text
 
 from app.core.audit.service import chain_entries
 from app.core.auth.access import Persona
-from app.core.auth.models import ProjectMembership
+from app.core.auth.models import MEMBERSHIP_TABLE, ProjectMembership
 from app.core.db import Base, Database, contract_violations
 from app.core.geo import GeoJSONGeometry
 from app.core.module_loader.loader import discover_modules
@@ -458,6 +458,32 @@ def test_members_list_and_read_only_their_projects(api: Api) -> None:
     for hidden in (foreign, other_tenant, uuid.uuid4()):
         assert api.client.get(f"{PROJECTS}/{hidden}", headers=headers).status_code == 404
     assert api.client.get(PROJECTS, headers=api.headers(CAROL)).json() == []
+
+
+def test_a_request_reads_the_callers_memberships_once(api: Api) -> None:
+    """T-0071: the grants loaded to resolve the request's scope are reused by the router."""
+    headers = api.headers(ALICE)
+    engine = api.client.app.state.db.engine
+    reads: list[str] = []
+
+    def record(_conn: Any, _cursor: Any, statement: str, *_args: Any) -> None:
+        if statement.lstrip().upper().startswith("SELECT") and MEMBERSHIP_TABLE in statement:
+            reads.append(statement)
+
+    calls = [
+        ("GET", PROJECTS, None),
+        ("GET", f"{PROJECTS}/{api.home}", None),
+        ("PATCH", f"{PROJECTS}/{api.home}", {"name": "Home, renamed"}),
+    ]
+    event.listen(engine, "before_cursor_execute", record)
+    try:
+        for method, url, body in calls:
+            reads.clear()
+            response = api.client.request(method, url, json=body, headers=headers)
+            assert response.status_code == 200, response.text
+            assert len(reads) == 1, (method, url, reads)
+    finally:
+        event.remove(engine, "before_cursor_execute", record)
 
 
 def test_an_administrator_edits_the_settings(api: Api) -> None:

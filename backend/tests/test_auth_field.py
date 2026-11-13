@@ -9,12 +9,14 @@ token. Runs on the real migration with a store whose clock the tests control.
 import logging
 import uuid
 from collections.abc import Iterator
+from dataclasses import replace
 from pathlib import Path
 
 import httpx
 import pytest
 from fastapi.testclient import TestClient
 
+from app.core.auth import service as service_module
 from app.core.auth.field import (
     PIN_TTL_MARGIN,
     LoggingMagicLinkSender,
@@ -23,6 +25,7 @@ from app.core.auth.field import (
     magic_link_digest,
     sender_from_settings,
 )
+from app.core.auth.lockout import LOGIN_ACCOUNT_POLICY
 from app.core.auth.revocation import InMemoryRevocationStore, RedisRevocationStore
 from app.core.auth.runtime import AuthRuntime
 from app.core.auth.service import AuthService
@@ -402,8 +405,10 @@ def test_pin_counter_lives_as_long_as_the_refresh_token(h: Harness) -> None:
     tokens = h.field_session()
     _wrong_pins(h, tokens["refresh_token"], 1)
     h.clock.now += h.runtime.tokens.ttl["refresh"].total_seconds()
-    session_id = h.runtime.tokens.verify(tokens["refresh_token"], "refresh").session_id
-    assert AuthService(h.runtime).pin_lockout.failures(str(session_id)) == 1
+    # Still counting: failures 2-4 run back to back only if failure 1 was kept; failure 4
+    # then arms the first lock.
+    assert _wrong_pins(h, tokens["refresh_token"], 3) == []
+    assert h.unlock(tokens["refresh_token"], WRONG).status_code == 429
 
 
 def test_pin_lockout_is_per_session(h: Harness) -> None:
@@ -445,6 +450,56 @@ def test_login_lock_is_per_address_and_case_insensitive(h: Harness) -> None:
         _login(h, email=ALICE.upper(), password="wrong")
     assert _login(h) == 429
     assert _login(h, email="nobody@example.test") == 401  # other addresses unaffected
+
+
+def _login_from(h: Harness, client: str, password: str = PASSWORD) -> int:
+    """A login from another client address (as uvicorn reports it in ``request.client``)."""
+    other = TestClient(h.client.app, client=(client, 40000))
+    return other.post(
+        LOGIN, json={"email": ALICE, "password": password, "tenant_id": str(T1)}
+    ).status_code
+
+
+def test_another_clients_failures_do_not_lock_the_user_out(h: Harness) -> None:
+    """T-0068: an attacker who knows the address cannot keep its owner out."""
+    for _ in range(6):
+        assert _login_from(h, "203.0.113.66", password="wrong") == 401
+    assert _login_from(h, "203.0.113.66") == 429  # the attacker's client is locked...
+    assert _login(h) == 200  # ...the owner's is not
+    assert _login_from(h, "203.0.113.66") == 429  # and the owner's success did not unlock it
+
+
+def test_account_backstop_locks_across_clients(h: Harness, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Rotating client addresses does not give unlimited guesses at one account."""
+    monkeypatch.setattr(
+        service_module, "LOGIN_ACCOUNT_POLICY", replace(LOGIN_ACCOUNT_POLICY, free_attempts=8)
+    )
+    for n in range(9):  # 8 free, the 9th arms the account lock; each from a new address
+        assert _login_from(h, f"198.51.100.{n}", password="wrong") == 401
+    assert _login_from(h, "198.51.100.200") == 429
+    assert _login(h) == 429  # the backstop holds for every client
+    h.clock.now += 30
+    assert _login(h) == 200
+
+
+def test_success_clears_the_client_and_the_account_counters(
+    h: Harness, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        service_module, "LOGIN_ACCOUNT_POLICY", replace(LOGIN_ACCOUNT_POLICY, free_attempts=12)
+    )
+    for n in range(5):
+        assert _login_from(h, f"198.51.100.{n}", password="wrong") == 401
+    for _ in range(5):
+        assert _login(h, password="wrong") == 401
+    assert _login(h) == 200
+    # Both counts restarted. Without that, this client would be past its 6 free tries and
+    # the account past its 12; with it, 10 more failures (5 from this client) all run.
+    for n in range(5):
+        assert _login_from(h, f"192.0.2.{n}", password="wrong") == 401
+    for _ in range(5):
+        assert _login(h, password="wrong") == 401
+    assert _login(h) == 200
 
 
 def test_unknown_address_locks_like_a_real_one(h: Harness) -> None:

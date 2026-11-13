@@ -35,7 +35,10 @@ class Settings(BaseSettings):
     )
 
     app_name: str = "KERP"
-    environment: Environment = "development"
+    # Fail safe (T-0070): a deployment that forgets KERP_ENVIRONMENT gets production behaviour
+    # (no ephemeral JWT key, no in-memory revocation, magic-link tokens never logged).
+    # Development, tests and CI opt in to "development" / "test" explicitly.
+    environment: Environment = "production"
     debug: bool = False
     version: str = Field(default_factory=_installed_version)
 
