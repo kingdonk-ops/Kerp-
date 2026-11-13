@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 127 · **Closed:** 78
+**Open:** 126 · **Closed:** 79
 
 ## decision (2)
 
@@ -150,7 +150,7 @@
 |---|---|---|---|
 | [TD-159](../tracker/todo/TD-159.md) | Site filter from the bound project is applied to all site-scoped rows: a PER-07 on A who is PER-01 on B loses B's site-scoped rows (over-restrictive) | T-0010 | reviewer |
 
-## risk (12)
+## risk (11)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -165,7 +165,6 @@
 | [TD-154](../tracker/todo/TD-154.md) | Migrations 0002-0005 call the live rls_policy_sql, so changing it rewrites history | T-0010 | implementer |
 | [TD-158](../tracker/todo/TD-158.md) | require_hold_release passes a PER-07 for any site; endpoints must also check can_release_hold against the hold's site (add a load-and-check helper) | T-0010 | reviewer |
 | [TD-176](../tracker/todo/TD-176.md) | No availability target or HA design for the production API (clean-room asks 99.5 %; offline client tolerates outages) | — | clean-room-gap-analysis |
-| [TD-192](../tracker/todo/TD-192.md) | Ask GitHub Support to purge old commit 819cf31 (contained a client name) from the repository's cached objects | — | reviewer |
 
 ## Closed
 
@@ -246,6 +245,7 @@
 | ✅ | [TD-184](../tracker/todo/TD-184.md) | Who may create a project and how the creator gets a membership: POST /projects is gated on the admin capability in any project until T-0014's tenant administrator | 1a + 3a: projects are created by Project Admins (create_projects grant, appointed by a System admin); the creator gets PER-09 automatically; memberships on soft-deleted projects are ignored. Spec diff §4.1; tasks T-0014, T-0039 (user, 2026-11-13) |
 | ✅ | [TD-185](../tracker/todo/TD-185.md) | Project status values (ACTIVE/ON_HOLD/CLOSED chosen) and currency/locale defaults (AUD/en-AU) are not in the spec | 7a: project status ACTIVE/ON_HOLD/CLOSED and AUD/en-AU confirmed; defaults (status, timezone, currency, locale) move to tenant (deployment) settings. Spec master §4.1, diff §4.4; task T-0044 (user, 2026-11-13) |
 | ✅ | [TD-187](../tracker/todo/TD-187.md) | jobs worker: a cancellation/timeout while _start is returning leaves the row 'running' forever (flaky test_a_cancelled_or_timed_out_job_is_marked_failed) | run_job shields the _start thread; a cancel during start waits for it, then fails a started row with 'Job timed out or was cancelled' (shielded) and re-raises (fix/jobs-cancel-during-start) |
+| ⚫ | [TD-192](../tracker/todo/TD-192.md) | Ask GitHub Support to purge old commit 819cf31 (contained a client name) from the repository's cached objects | Ignored by the user; no purge request. (user, 2026-11-13) |
 | ✅ | [TD-202](../tracker/todo/TD-202.md) | Lobby details: a project code only finds the project and files an access request (never grants access); the lobby is also reachable from the project picker for users who already have projects | Q1a: a project code only finds that one project and lets the user file an access request decided by the project's PER-09 holders; it never grants access by itself. Users who already have projects open the lobby from the picker. Spec diff §4.1; T-0040, T-0041 (user, 2026-11-13) |
 | ✅ | [TD-203](../tracker/todo/TD-203.md) | SPA refresh-token transport: keep the JSON body (sessionStorage) or move to an httpOnly SameSite cookie | Q6a: the web SPA gets the refresh token as an httpOnly Secure SameSite cookie (CSRF-protected /auth/refresh); the Capacitor Android build keeps the JSON-body transport. Spec diff §4.2; T-0037 (user, 2026-11-13) |
 | ✅ | [TD-206](../tracker/todo/TD-206.md) | Confirm planner default: once the offline window expires without server contact, queued data is kept but new edits are blocked until an online sign-in | Accepted for the Capacitor/PWA field client until the native Android app launches with a normal login system; revisit then (TD-210). (user, 2026-11-13) |
