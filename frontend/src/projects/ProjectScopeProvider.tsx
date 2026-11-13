@@ -18,7 +18,7 @@ interface ProjectScopeValue {
   project: ProjectSummary | null;
   projects: ProjectSummary[];
   isLoading: boolean;
-  setScope(scope: ProjectScope): void;
+  setScope: (scope: ProjectScope) => void;
 }
 
 const ProjectScopeContext = createContext<ProjectScopeValue | null>(null);

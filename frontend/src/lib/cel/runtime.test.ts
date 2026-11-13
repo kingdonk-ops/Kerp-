@@ -52,7 +52,7 @@ describe("CEL client wrapper", () => {
     ["timestamp without offset", { $timestamp: "2024-01-01T00:00:00" }],
     ["timestamp lowercase t", { $timestamp: "2024-01-01t00:00:00Z" }],
     ["timestamp lowercase z", { $timestamp: "2024-01-01T00:00:00z" }],
-    ["non-JSON value", (() => 1) as unknown],
+    ["non-JSON value", () => 1],
   ])("throws on an invalid context (%s)", (_name, value) => {
     expect(() => evaluate("true", { fields: value as never })).toThrow();
   });

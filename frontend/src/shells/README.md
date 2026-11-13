@@ -22,12 +22,14 @@ tab labels; the shells translate their own chrome through `t()` (`shells.*` keys
 - **Filter**: quick filter across the visible columns + per-column "contains" filters (AND),
   client-side over the loaded rows (server-side filter/sort/paging: TD-182).
 - **Columns**: visibility toggles; `defaultHidden` columns start hidden; the last visible
-  column cannot be hidden.
+  column cannot be hidden. At least one column always shows: if a stored view (or
+  `defaultHidden` on every column) would hide them all, the first column is shown.
 - **Export**: CSV (RFC 4180, CRLF, UTF-8 BOM) of the filtered rows and visible columns.
   Text cells starting with `= + - @` or tab/CR are prefixed with `'` (formula injection).
   PDF and full-result-set export: TD-180. `download` is injectable for tests.
 - **Saved views**: shown only when a `SavedViewStore` is passed. `localSavedViewStore`
-  keeps them in the preferences storage under `kerp.views.<userId>.<registerId>`; saving
+  keeps them in the preferences storage under `kerp.views.<userId>.<registerId>` (each part
+  URI-encoded, `.` as `%2E`, so ids containing `.` cannot collide); saving
   under an existing name replaces it. Server-side views: TD-179.
 - **Store identity**: `SavedViewStore.key` identifies user + register. When it changes (another
   sign-in, the same mounted page reused for another register) the register state — views,
@@ -50,8 +52,11 @@ tab labels; the shells translate their own chrome through `t()` (`shells.*` keys
 - **Gate banner** (`GateBanner`): `open | passed | hold | blocked` + label + reasons (e.g.
   failed `run_checks` results). `hold`/`blocked` use `role="alert"`, the others `role="status"`.
 - **Tabs**: WAI-ARIA tabs, routed through the `?tab=<id>` search parameter (other params are
-  kept, history entry replaced); unknown ids fall back to the first tab; Left/Right arrows move.
-- **Audit log**: an `audit` source adds an "Audit log" tab (id `audit`, so do not reuse it),
+  kept, history entry replaced); unknown ids fall back to the first tab; Left/Right arrows move
+  (wrapping), Home/End jump to the first/last tab; roving `tabindex`; only the selected tab
+  carries `aria-controls` (only its panel is rendered).
+- **Audit log**: an `audit` source adds an "Audit log" tab (id `audit`, reserved: a module tab
+  with that id logs a dev-time `console.error`, and is dropped when an `audit` source is given),
   loaded with TanStack Query when first opened; AI-initiated entries (`source: "ai"`) are
   badged. No audit/gate endpoint exists yet — pages pass the data (TD-181).
 
@@ -69,7 +74,9 @@ tab labels; the shells translate their own chrome through `t()` (`shells.*` keys
   - `visible_if` error / non-bool → hidden. Hidden values are dropped (sanitised) and never
     submitted or validated. Visibility is iterated to a fixpoint so fields depending on a
     hidden field hide too; a field whose visibility never settles is hidden.
-  - `required_if` → required unless it evaluates to exactly `false`. An empty field makes
+  - `required_if` → required unless it evaluates to exactly `false`. `evaluation.required`
+    holds the visible fields required now (static or active `required_if`); it drives the
+    asterisk and `aria-required`. An empty field makes
     `fields.x` a `NO_SUCH_KEY`, so guard optional references with `has(fields.x)`.
   - `validation` → `invalid` (template `error_message`) on `false`; `rule_error` (generic
     message) on an error or non-bool. Empty optional fields skip validation.

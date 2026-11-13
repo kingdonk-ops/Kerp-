@@ -48,7 +48,7 @@ export function LoginPage() {
             required
             autoComplete="username"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) => { setEmail(e.target.value); }}
             className="mt-1 w-full rounded border border-line px-2 py-1"
           />
         </label>
@@ -59,7 +59,7 @@ export function LoginPage() {
             required
             autoComplete="current-password"
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={(e) => { setPassword(e.target.value); }}
             className="mt-1 w-full rounded border border-line px-2 py-1"
           />
         </label>

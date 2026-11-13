@@ -46,7 +46,7 @@ export function decodeValue(value: JsonValue): unknown {
   }
   const keys = Object.keys(value);
   const tag = keys[0];
-  if (keys.length === 1 && tag !== undefined && tag.startsWith("$")) {
+  if (keys.length === 1 && tag?.startsWith("$")) {
     return decodeTag(tag, value[tag] as JsonValue);
   }
   return Object.fromEntries(keys.map((key) => [key, decodeValue(value[key] as JsonValue)]));
@@ -71,7 +71,7 @@ function decodeTag(tag: string, inner: JsonValue): unknown {
     if (match === null) throw new TypeError(`invalid $timestamp (RFC 3339 with offset): ${inner}`);
     // Date has millisecond precision; truncate the fraction explicitly (the server does too).
     const millis = (match[2] ?? "").slice(0, 4).padEnd(4, "0");
-    return new Date(`${match[1]}${millis === "0000" ? ".000" : millis}${match[3]}`);
+    return new Date(`${match[1] ?? ""}${millis === "0000" ? ".000" : millis}${match[3] ?? ""}`);
   }
   throw new TypeError(`unsupported tag in a context: ${tag}`);
 }
@@ -80,7 +80,7 @@ function decodeTag(tag: string, inner: JsonValue): unknown {
 export function encodeValue(value: unknown, classes?: RuntimeClasses): JsonValue {
   if (value === null || typeof value === "boolean" || typeof value === "string") return value;
   if (typeof value === "bigint") {
-    if (value < INT64_MIN || value > INT64_MAX) throw new IntOverflowError(`int out of int64 range: ${value}`);
+    if (value < INT64_MIN || value > INT64_MAX) throw new IntOverflowError(`int out of int64 range: ${value.toString()}`);
     return { $int: value.toString() };
   }
   if (typeof value === "number") {
@@ -113,7 +113,7 @@ export function encodeValue(value: unknown, classes?: RuntimeClasses): JsonValue
       );
     }
   }
-  throw new UnencodableValueError(`no KERP CEL JSON form for ${String(value)}`);
+  throw new UnencodableValueError(`no KERP CEL JSON form for ${Object.prototype.toString.call(value)}`);
 }
 
 function formatDuration(seconds: bigint, nanos: number): string {
@@ -123,5 +123,5 @@ function formatDuration(seconds: bigint, nanos: number): string {
   const whole = magnitude / 1_000_000_000n;
   const fraction = magnitude % 1_000_000_000n;
   const fractionText = fraction === 0n ? "" : `.${fraction.toString().padStart(9, "0")}`.replace(/0+$/, "");
-  return `${sign}${whole}${fractionText}s`;
+  return `${sign}${whole.toString()}${fractionText}s`;
 }

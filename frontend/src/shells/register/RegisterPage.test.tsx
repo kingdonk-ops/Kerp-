@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { memoryStorage } from "../../auth/tokenStore";
 import { i18n } from "../../i18n";
+import { must } from "../../test/must";
 import { localSavedViewStore, type RegisterColumn } from "./model";
 import { RegisterPage } from "./RegisterPage";
 
@@ -43,7 +44,7 @@ function renderRegister(overrides: Partial<Parameters<typeof RegisterPage<Tag>>[
 
 function bodyRows() {
   const [, body] = screen.getAllByRole("rowgroup");
-  return within(body!).queryAllByRole("row");
+  return within(must(body)).queryAllByRole("row");
 }
 
 function columnHeaders() {
@@ -109,7 +110,7 @@ describe("RegisterPage", () => {
     fireEvent.click(screen.getByText("SYN-PIPE-002"));
     expect(onRowClick).toHaveBeenCalledWith(ROWS[1]);
 
-    fireEvent.keyDown(screen.getByText("SYN-VLV-003").closest("tr")!, { key: "Enter" });
+    fireEvent.keyDown(must(screen.getByText("SYN-VLV-003").closest("tr")), { key: "Enter" });
     expect(onRowClick).toHaveBeenLastCalledWith(ROWS[2]);
   });
 
@@ -138,7 +139,7 @@ describe("RegisterPage", () => {
     expect(bodyRows()).toHaveLength(3);
 
     const picker = screen.getByLabelText(i18n.t("shells.register.savedViews.label"));
-    fireEvent.change(picker, { target: { value: store.list()[0]!.id } });
+    fireEvent.change(picker, { target: { value: must(store.list()[0]).id } });
     expect(screen.getByLabelText(i18n.t("shells.register.quickFilter"))).toHaveValue("area 10");
     expect(columnHeaders()).toEqual(["tag", "area", "status"]);
     expect(bodyRows()).toHaveLength(2);
@@ -159,7 +160,7 @@ describe("RegisterPage", () => {
     const { rerender } = render(<RegisterPage<Tag> {...props} savedViews={first} />);
 
     const picker = () => screen.getByLabelText(i18n.t("shells.register.savedViews.label"));
-    fireEvent.change(picker(), { target: { value: first.list()[0]!.id } });
+    fireEvent.change(picker(), { target: { value: must(first.list()[0]).id } });
     expect(bodyRows()).toHaveLength(1);
 
     const second = localSavedViewStore(storage, nextUser, nextRegister);
@@ -185,6 +186,26 @@ describe("RegisterPage", () => {
     fireEvent.change(screen.getByLabelText(i18n.t("shells.register.quickFilter")), { target: { value: "pipe" } });
     rerender(<RegisterPage<Tag> {...props} savedViews={localSavedViewStore(storage, "u", "tags")} />);
     expect(screen.getByLabelText(i18n.t("shells.register.quickFilter"))).toHaveValue("pipe");
+  });
+
+  it("never lets a stored view hide every column", () => {
+    const store = localSavedViewStore(memoryStorage(), "user-1", "tags");
+    store.save({ name: "Nothing", query: "", hiddenColumns: ["tag", "area", "status"], columnFilters: {} });
+    renderRegister({ savedViews: store });
+    fireEvent.change(screen.getByLabelText(i18n.t("shells.register.savedViews.label")), {
+      target: { value: must(store.list()[0]).id },
+    });
+    expect(columnHeaders()).toEqual(["tag"]);
+    expect(screen.getByRole("checkbox", { name: "Tag" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Tag" })).toBeDisabled();
+    expect(bodyRows()).toHaveLength(3);
+  });
+
+  it("keeps a column visible when every column is hidden by default", () => {
+    renderRegister({ columns: COLUMNS.map((column) => ({ ...column, defaultHidden: true })), rows: [] });
+    expect(columnHeaders()).toEqual(["tag"]);
+    const emptyCell = screen.getByText(i18n.t("shells.register.empty"));
+    expect(emptyCell).toHaveAttribute("colspan", "1");
   });
 
   it("does not save a view without a name", () => {

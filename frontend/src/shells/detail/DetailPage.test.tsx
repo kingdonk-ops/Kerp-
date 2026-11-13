@@ -5,6 +5,7 @@ import { MemoryRouter, useLocation } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 
 import { i18n } from "../../i18n";
+import { must } from "../../test/must";
 import { DetailPage, type AuditEntry, type DetailPageProps } from "./DetailPage";
 import { GateBanner } from "./GateBanner";
 
@@ -78,6 +79,69 @@ describe("DetailPage tabs", () => {
     expect(screen.getByRole("tab", { name: "Items" })).toHaveAttribute("aria-selected", "true");
   });
 
+  it("jumps to the first and last tab with Home and End", () => {
+    renderDetail({ audit: { key: ["audit", "keys"], load: () => Promise.resolve(AUDIT) } });
+    fireEvent.keyDown(screen.getByRole("tab", { name: "Overview" }), { key: "End" });
+    const auditTab = screen.getByRole("tab", { name: i18n.t("shells.detail.audit.tab") });
+    expect(auditTab).toHaveAttribute("aria-selected", "true");
+    expect(auditTab).toHaveFocus();
+    fireEvent.keyDown(auditTab, { key: "Home" });
+    expect(screen.getByRole("tab", { name: "Overview" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: "Overview" })).toHaveFocus();
+  });
+
+  it("uses a roving tabindex: only the selected tab is in the tab order", () => {
+    renderDetail({}, "/records/1?tab=items");
+    expect(screen.getByRole("tab", { name: "Items" })).toHaveAttribute("tabindex", "0");
+    expect(screen.getByRole("tab", { name: "Overview" })).toHaveAttribute("tabindex", "-1");
+  });
+
+  it("sets aria-controls only on the tab whose panel is rendered", () => {
+    renderDetail({}, "/records/1?tab=items");
+    const panel = screen.getByRole("tabpanel");
+    const selected = screen.getByRole("tab", { name: "Items" });
+    expect(selected).toHaveAttribute("aria-controls", panel.id);
+    expect(panel).toHaveAttribute("aria-labelledby", selected.id);
+    expect(screen.getByRole("tab", { name: "Overview" })).not.toHaveAttribute("aria-controls");
+  });
+
+  it("reports a module tab that reuses the reserved audit id (dev-time)", () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      renderDetail({
+        tabs: [...TABS, { id: "audit", label: "Module audit", render: () => <p>Module audit body</p> }],
+        audit: { key: ["audit", "reserved"], load: () => Promise.resolve(AUDIT) },
+      });
+      expect(error).toHaveBeenCalledWith(expect.stringContaining('"audit" is reserved'));
+      // The shell's audit tab wins; the colliding module tab is not rendered (no duplicate keys/ids).
+      expect(screen.queryByRole("tab", { name: "Module audit" })).not.toBeInTheDocument();
+      expect(screen.getAllByRole("tab")).toHaveLength(3);
+    } finally {
+      error.mockRestore();
+    }
+  });
+
+  it("reports the reserved audit id even without an audit source, but still renders the tab", () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      renderDetail({ tabs: [...TABS, { id: "audit", label: "Module audit", render: () => <p>Body</p> }] });
+      expect(error).toHaveBeenCalledWith(expect.stringContaining('"audit" is reserved'));
+      expect(screen.getByRole("tab", { name: "Module audit" })).toBeInTheDocument();
+    } finally {
+      error.mockRestore();
+    }
+  });
+
+  it("does not report anything for ordinary tab ids", () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      renderDetail({ audit: { key: ["audit", "ok"], load: () => Promise.resolve(AUDIT) } });
+      expect(error).not.toHaveBeenCalled();
+    } finally {
+      error.mockRestore();
+    }
+  });
+
   it("renders header actions", () => {
     renderDetail({ actions: <button type="button">Release</button> });
     expect(screen.getByRole("button", { name: "Release" })).toBeInTheDocument();
@@ -102,7 +166,7 @@ describe("DetailPage audit tab", () => {
     expect(items[0]).toHaveTextContent("Synthetic Inspector");
     expect(items[0]).toHaveTextContent("status_changed");
     expect(items[0]).toHaveTextContent("OPEN → HOLD");
-    expect(within(items[0]!).getByText(/2026/)).toHaveAttribute("datetime", "2026-03-01T08:30:00Z");
+    expect(within(must(items[0])).getByText(/2026/)).toHaveAttribute("datetime", "2026-03-01T08:30:00Z");
     expect(items[1]).toHaveTextContent(i18n.t("shells.detail.audit.source.ai"));
     expect(items[0]).not.toHaveTextContent(i18n.t("shells.detail.audit.source.ai"));
     expect(load).toHaveBeenCalledTimes(1);
@@ -123,7 +187,7 @@ describe("DetailPage audit tab", () => {
     const load = vi.fn().mockRejectedValueOnce(new Error("offline")).mockResolvedValueOnce(AUDIT);
     renderDetail({ audit: { key: ["audit", "err"], load } }, "/r?tab=audit");
     fireEvent.click(await screen.findByRole("button", { name: i18n.t("app.retry") }));
-    await waitFor(() => expect(screen.getAllByRole("listitem")).toHaveLength(2));
+    await waitFor(() => { expect(screen.getAllByRole("listitem")).toHaveLength(2); });
   });
 });
 
@@ -152,7 +216,7 @@ describe("GateBanner", () => {
   });
 
   it("renders repeated reasons without duplicate-key warnings", () => {
-    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
     render(<GateBanner gate={{ state: "hold", label: "Hold", reasons: ["Same reason", "Same reason"] }} />);
     expect(within(screen.getByRole("alert")).getAllByRole("listitem")).toHaveLength(2);
     expect(error).not.toHaveBeenCalled();

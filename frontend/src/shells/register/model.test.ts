@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import { memoryStorage } from "../../auth/tokenStore";
-import { filterRows, localSavedViewStore, savedViewsStorageKey, toCsv, type RegisterColumn } from "./model";
+import {
+  effectiveHiddenColumns,
+  filterRows,
+  localSavedViewStore,
+  savedViewsStorageKey,
+  toCsv,
+  type RegisterColumn,
+} from "./model";
 
 interface Delivery {
   id: string;
@@ -114,5 +121,39 @@ describe("localSavedViewStore", () => {
     expect(localSavedViewStore(storage, "u", "r").list()).toEqual([]);
     storage.setItem(savedViewsStorageKey("u", "r"), JSON.stringify([{ id: 1 }, "x", null]));
     expect(localSavedViewStore(storage, "u", "r").list()).toEqual([]);
+  });
+});
+
+describe("savedViewsStorageKey", () => {
+  it("keeps plain ids readable", () => {
+    expect(savedViewsStorageKey("user-1", "deliveries")).toBe("kerp.views.user-1.deliveries");
+  });
+
+  it("encodes its parts so ids containing the separator cannot collide", () => {
+    expect(savedViewsStorageKey("a.b", "c")).not.toBe(savedViewsStorageKey("a", "b.c"));
+    expect(savedViewsStorageKey("a%2Eb", "c")).not.toBe(savedViewsStorageKey("a.b", "c"));
+    expect(savedViewsStorageKey("a.b", "c")).toBe("kerp.views.a%2Eb.c");
+  });
+
+  it("keeps the views of colliding-looking ids apart", () => {
+    const storage = memoryStorage();
+    localSavedViewStore(storage, "a.b", "c").save({ name: "Mine", query: "", hiddenColumns: [], columnFilters: {} });
+    expect(localSavedViewStore(storage, "a", "b.c").list()).toEqual([]);
+  });
+});
+
+describe("effectiveHiddenColumns", () => {
+  const columns = [{ id: "x" }, { id: "y" }, { id: "z" }];
+
+  it("keeps a hidden set that leaves a column visible", () => {
+    expect([...effectiveHiddenColumns(columns, new Set(["x", "z"]))]).toEqual(["x", "z"]);
+  });
+
+  it("re-shows the first column when every column would be hidden", () => {
+    expect([...effectiveHiddenColumns(columns, new Set(["x", "y", "z", "gone"]))].sort()).toEqual(["gone", "y", "z"]);
+  });
+
+  it("leaves an empty column list alone", () => {
+    expect([...effectiveHiddenColumns([], new Set(["x"]))]).toEqual(["x"]);
   });
 });

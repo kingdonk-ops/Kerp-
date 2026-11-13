@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { KerpDb, OUTBOX_TABLE, type NewOutboxMutation } from "./db";
 import { enqueueMutation, listPendingMutations } from "./outbox";
+import { must } from "../test/must";
 
 // Synthetic identifiers only.
 const TENANT = "00000000-0000-7000-8000-000000000001";
@@ -62,7 +63,7 @@ describe("KerpDb offline outbox", () => {
     await enqueueMutation(db, mutation("op-raw"));
     const again = await db.outbox_mutations.get("op-raw");
     expect(again).toBeDefined();
-    await expect(db.outbox_mutations.add(again!)).rejects.toThrow();
+    await expect(db.outbox_mutations.add(must(again))).rejects.toThrow();
   });
 
   it("lists pending mutations oldest first", async () => {

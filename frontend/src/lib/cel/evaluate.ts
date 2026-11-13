@@ -79,7 +79,7 @@ export function classifyCelError(error: unknown): { ok: false; code: CelErrorCod
 export function evaluate(expression: string, context: Readonly<Record<string, JsonValue>>): CelResult {
   const activation = decodeContext(context);
   if (utf8.encode(expression).length > MAX_EXPRESSION_BYTES) {
-    return { ok: false, code: "INVALID_ARGUMENT", message: `expression longer than ${MAX_EXPRESSION_BYTES} bytes` };
+    return { ok: false, code: "INVALID_ARGUMENT", message: `expression longer than ${String(MAX_EXPRESSION_BYTES)} bytes` };
   }
   let result: unknown;
   try {

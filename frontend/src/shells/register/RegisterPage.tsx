@@ -1,7 +1,15 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { cellText, filterRows, toCsv, type RegisterColumn, type SavedView, type SavedViewStore } from "./model";
+import {
+  cellText,
+  effectiveHiddenColumns,
+  filterRows,
+  toCsv,
+  type RegisterColumn,
+  type SavedView,
+  type SavedViewStore,
+} from "./model";
 
 export type DownloadFn = (filename: string, content: string, mimeType: string) => void;
 
@@ -58,25 +66,27 @@ function RegisterView<Row>({
   const { t } = useTranslation();
   const [query, setQuery] = useState("");
   const [columnFilters, setColumnFilters] = useState<Record<string, string>>({});
-  const [hidden, setHidden] = useState<ReadonlySet<string>>(
+  const [hiddenState, setHidden] = useState<ReadonlySet<string>>(
     () => new Set(columns.filter((column) => column.defaultHidden === true).map((column) => column.id)),
   );
   const [views, setViews] = useState<SavedView[]>(() => savedViews?.list() ?? []);
   const [selectedView, setSelectedView] = useState("");
   const [viewName, setViewName] = useState("");
 
+  // Whatever was stored or defaulted, at least one column stays visible (no empty table).
+  const hidden = useMemo(() => effectiveHiddenColumns(columns, hiddenState), [columns, hiddenState]);
   const visibleColumns = useMemo(() => columns.filter((column) => !hidden.has(column.id)), [columns, hidden]);
   const shown = useMemo(
     () => filterRows(rows, visibleColumns, { query, columnFilters }),
     [rows, visibleColumns, query, columnFilters],
   );
 
-  const toggleColumn = (id: string) =>
-    setHidden((current) => {
-      const next = new Set(current);
-      if (!next.delete(id)) next.add(id);
-      return next;
-    });
+  const toggleColumn = (id: string) => {
+    // From the effective set, so a column re-shown by the guard toggles as displayed.
+    const next = new Set(hidden);
+    if (!next.delete(id)) next.add(id);
+    setHidden(next);
+  };
 
   const applyView = (id: string) => {
     setSelectedView(id);
@@ -114,7 +124,7 @@ function RegisterView<Row>({
       <div className="flex flex-wrap items-end gap-3">
         <label className="flex flex-col text-sm">
           {t("shells.register.quickFilter")}
-          <input className={CONTROL} type="search" value={query} onChange={(e) => setQuery(e.target.value)} />
+          <input className={CONTROL} type="search" value={query} onChange={(e) => { setQuery(e.target.value); }} />
         </label>
 
         <fieldset className="flex flex-wrap gap-2 text-sm">
@@ -127,7 +137,7 @@ function RegisterView<Row>({
                   type="checkbox"
                   checked={!hidden.has(column.id)}
                   disabled={isLastVisible}
-                  onChange={() => toggleColumn(column.id)}
+                  onChange={() => { toggleColumn(column.id); }}
                 />
                 {column.header}
               </label>
@@ -138,7 +148,7 @@ function RegisterView<Row>({
         <button
           type="button"
           className={BUTTON}
-          onClick={() => download(`${exportFileName}.csv`, toCsv(shown, visibleColumns), "text/csv;charset=utf-8")}
+          onClick={() => { download(`${exportFileName}.csv`, toCsv(shown, visibleColumns), "text/csv;charset=utf-8"); }}
         >
           {t("shells.register.exportCsv")}
         </button>
@@ -147,7 +157,7 @@ function RegisterView<Row>({
           <div className="flex flex-wrap items-end gap-2 text-sm">
             <label className="flex flex-col">
               {t("shells.register.savedViews.label")}
-              <select className={CONTROL} value={selectedView} onChange={(e) => applyView(e.target.value)}>
+              <select className={CONTROL} value={selectedView} onChange={(e) => { applyView(e.target.value); }}>
                 <option value="">{t("shells.register.savedViews.none")}</option>
                 {views.map((view) => (
                   <option key={view.id} value={view.id}>
@@ -158,7 +168,7 @@ function RegisterView<Row>({
             </label>
             <label className="flex flex-col">
               {t("shells.register.savedViews.name")}
-              <input className={CONTROL} value={viewName} onChange={(e) => setViewName(e.target.value)} />
+              <input className={CONTROL} value={viewName} onChange={(e) => { setViewName(e.target.value); }} />
             </label>
             <button type="button" className={BUTTON} disabled={viewName.trim() === ""} onClick={saveView}>
               {t("shells.register.savedViews.save")}
@@ -191,7 +201,7 @@ function RegisterView<Row>({
                     className={`${CONTROL} w-full`}
                     aria-label={t("shells.register.columnFilter", { column: column.header })}
                     value={columnFilters[column.id] ?? ""}
-                    onChange={(e) => setColumnFilters((current) => ({ ...current, [column.id]: e.target.value }))}
+                    onChange={(e) => { setColumnFilters((current) => ({ ...current, [column.id]: e.target.value })); }}
                   />
                 </td>
               ))}
@@ -200,13 +210,13 @@ function RegisterView<Row>({
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={visibleColumns.length} className="px-3 py-4 text-muted">
+                <td colSpan={Math.max(1, visibleColumns.length)} className="px-3 py-4 text-muted">
                   {t("app.loading")}
                 </td>
               </tr>
             ) : shown.length === 0 ? (
               <tr>
-                <td colSpan={visibleColumns.length} className="px-3 py-4 text-muted">
+                <td colSpan={Math.max(1, visibleColumns.length)} className="px-3 py-4 text-muted">
                   {t("shells.register.empty")}
                 </td>
               </tr>
@@ -216,8 +226,8 @@ function RegisterView<Row>({
                   key={rowKey(row)}
                   className={onRowClick ? "cursor-pointer border-t border-line hover:bg-surface" : "border-t border-line"}
                   tabIndex={onRowClick ? 0 : undefined}
-                  onClick={onRowClick ? () => onRowClick(row) : undefined}
-                  onKeyDown={onRowClick ? (e) => e.key === "Enter" && onRowClick(row) : undefined}
+                  onClick={onRowClick ? () => { onRowClick(row); } : undefined}
+                  onKeyDown={onRowClick ? (e) => { if (e.key === "Enter") onRowClick(row); } : undefined}
                 >
                   {visibleColumns.map((column) => (
                     <td key={column.id} className="px-3 py-2">

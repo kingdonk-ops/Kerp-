@@ -11,7 +11,7 @@ import { NAV_GROUPS } from "./nav";
 import { createQueryClient } from "./queryClient";
 import type { AppServices } from "./services";
 
-const PROJECTS: ProjectSummary[] = [
+const PROJECTS: [ProjectSummary, ProjectSummary] = [
   { id: "p-alpha", code: "SYN-001", name: "Synthetic Refinery Unit" },
   { id: "p-beta", code: "SYN-002", name: "Synthetic Tank Farm" },
 ];
@@ -156,17 +156,17 @@ describe("app shell", () => {
     const indicator = () => screen.getByTestId("scope-indicator");
     await waitFor(() =>
       expect(indicator()).toHaveTextContent(
-        i18n.t("scope.current", { scope: project(PROJECTS[0]!) }),
+        i18n.t("scope.current", { scope: project(PROJECTS[0]) }),
       ),
     );
     expect(within(switcher).getAllByRole("option").map((o) => o.textContent)).toEqual([
       i18n.t("scope.allProjects"),
-      project(PROJECTS[0]!),
-      project(PROJECTS[1]!),
+      project(PROJECTS[0]),
+      project(PROJECTS[1]),
     ]);
 
     fireEvent.change(switcher, { target: { value: "p-beta" } });
-    expect(indicator()).toHaveTextContent(project(PROJECTS[1]!));
+    expect(indicator()).toHaveTextContent(project(PROJECTS[1]));
 
     fireEvent.change(switcher, { target: { value: "__all__" } });
     expect(indicator()).toHaveTextContent(
@@ -180,14 +180,14 @@ describe("app shell", () => {
     preferences.setItem(scopeStorageKey(FAKE_USER.id), "project:p-beta");
     const { unmount } = renderApp("/", setup({ preferences }));
     expect(
-      await screen.findByText(new RegExp(PROJECTS[1]!.name), { selector: "[data-testid]" }),
+      await screen.findByText(new RegExp(PROJECTS[1].name), { selector: "[data-testid]" }),
     ).toBeInTheDocument();
     unmount();
 
     preferences.setItem(scopeStorageKey(FAKE_USER.id), "project:p-gone");
     renderApp("/", setup({ preferences }));
     expect(
-      await screen.findByText(new RegExp(PROJECTS[0]!.name), { selector: "[data-testid]" }),
+      await screen.findByText(new RegExp(PROJECTS[0].name), { selector: "[data-testid]" }),
     ).toBeInTheDocument();
   });
 

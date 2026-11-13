@@ -16,6 +16,7 @@ Single-page app for the KERP Field Operations Platform (`docs/spec/`).
 | Rule expressions | CEL via `@marcbachmann/cel-js` (`src/lib/cel/`) |
 | i18n | i18next + react-i18next (`src/i18n/`) |
 | Tests | Vitest 5 + jsdom + Testing Library; `fake-indexeddb` for Dexie |
+| Lint | ESLint 10 flat config (`eslint.config.js`): typescript-eslint `strictTypeChecked` + `stylisticTypeChecked`, react-hooks; `src/api/` ignored |
 
 Requires Node `>=22.12`.
 
@@ -24,6 +25,7 @@ Requires Node `>=22.12`.
 ```bash
 npm ci
 npm run dev        # local dev server
+npm run lint       # ESLint (type-aware typescript-eslint strict + react-hooks), zero warnings
 npm run typecheck  # tsc --noEmit (strict)
 npm run test       # vitest run (all suites)
 npm run build      # typecheck + production build to dist/

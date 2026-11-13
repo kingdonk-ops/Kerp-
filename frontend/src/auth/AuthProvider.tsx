@@ -21,9 +21,9 @@ export class LoginError extends Error {
 interface AuthContextValue {
   status: AuthStatus;
   user: CurrentUser | null;
-  login(email: string, password: string): Promise<void>;
-  logout(): Promise<void>;
-  retry(): void;
+  login: (email: string, password: string) => Promise<void>;
+  logout: () => Promise<void>;
+  retry: () => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -43,7 +43,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     enabled: hasSession,
     queryFn: async () => {
       const { data, response } = await api.GET("/api/v1/auth/me");
-      if (!data) throw new Error(`me: ${response.status}`);
+      if (!data) throw new Error(`me: ${String(response.status)}`);
       return data;
     },
   });
