@@ -3,7 +3,63 @@
 > **Generated — do not hand-edit.** Rebuild with `python scripts/pr_suggestions.py rebuild`.
 > A running digest of everything agents surfaced on merged PRs — review notes, must-fix items, suggestions, nits, follow-ups and ideas — so nothing is lost after a squash-merge. Formal follow-ups also live as `TD-xxx` in `tracker/todo/` and on [TODO.md](TODO.md); this file is the readable skim. Each item links back to its PR or review for full context.
 
-_Repo `kingdonk-ops/Kerp-`, base `dev` · 41 merged PRs · 40 with surfaced notes._
+_Repo `kingdonk-ops/Kerp-`, base `dev` · 42 merged PRs · 41 with surfaced notes._
+
+---
+
+## PR #43 — T-0012: projects module: CRUD + settings (IANA timezone, spatial_bounds, currency/locale)
+task `T-0012` · merged 2026-11-13 · by `kingdonk-ops` · [PR](https://github.com/kingdonk-ops/Kerp-/pull/43)
+
+**TODOs raised**
+
+- TD-184 (decision): who may create a project, and whether the creator automatically gets a membership. Today creation needs `admin` on any project in the tenant, the first project is created by seed or script, and the creator gets no membership.
+- TD-185 (spec-gap): the project status values and the currency/locale defaults are not in the spec
+- TD-186 (later): no GiST index, no `ST_IsValid` check, and the code of a soft-deleted project cannot be reused
+- References TD-122 (binding the request's project) and TD-053 (membership-based policy).
+
+**Review by `kingdonk-ops` — KERP-REVIEW: CHANGES_REQUESTED patch-id=5b5cc11e44c3166c17833cf93f132bff17e455ec** · [full review](https://github.com/kingdonk-ops/Kerp-/pull/43#pullrequestreview-5887847953)
+
+- _Must fix_
+  1. **`backend/app/modules/projects/schemas.py:439-447` (`_zones`/`_iana`) accepts non-IANA names such as `localtime` and `Factory`.**
+     - **Problem:**
+       - `zoneinfo.available_timezones()` lists every file under the system `TZPATH`.
+       - On this host it includes `localtime`, a symlink to `/etc/localtime`, and `Factory`.
+       - So `site_timezone: "localtime"` passes validation and is stored.
+       - It then resolves to whatever zone the API or worker host is set to, which varies by deployment.
+       - Browsers reject both names: `new Intl.DateTimeFormat('en', {timeZone: 'localtime'})` throws `RangeError: Invalid time zone specified`. Any client that renders timestamps for that project in the site zone would break.
+     - **Fixed looks like:**
+       - Validate against the `tzdata` package's zone list, which `README.md` already names as the source, rather than the host filesystem. At minimum, exclude `localtime`, `posixrules` and `Factory`.
+       - Add `"localtime"` and `"Factory"` to `test_unknown_timezones_are_rejected`.
+  2. **`backend/app/modules/projects/schemas.py:470` (`Coordinate`) coerces booleans and numeric strings into coordinates.**
+     - **Problem:** with pydantic's lax mode:
+       - `[[true, false], [1, 0], [1, 1], [true, false]]` is stored as `[[1.0, 0.0], …]`;
+       - `["116.5", "-32"]` is accepted as well.
+     - RFC 7946 positions are JSON numbers, so the API silently stores a different polygon from the one the client sent.
+     - **Fixed looks like:**
+       - Declare `Coordinate = Annotated[float, Field(strict=True, allow_inf_nan=False)]`. Strict float still accepts J
+
+- _Suggestions (non-blocking)_
+  - `service.py:616`: on PostgreSQL, match `exc.orig.diag.constraint_name == "uq_oe_projects_project_tenant_code"`, and keep the text match only for SQLite.
+  - `schemas.py:435-436`: the caps allow 100 x 10,000 = 1M positions, which is a ~22 MB body that takes ~0.7 s to validate before PostGIS sees it. A total-positions cap (e.g. 10,000 across all rings) would fit a site boundary and bound the cost. There is no request body limit app-wide; that is a TODO for core.
+  - `ST_AsGeoJSON` returns at most 9 decimals by default, so positions are rounded on round-trip (sub-millimetre). Mention this in the README, or pass `maxdecimaldigits` explicitly.
+  - Tests:
+    - add a non-member DELETE (404);
+    - add an admin of HOME patching a project they are not a member of (404);
+    - add a project-bound `update_project`.
+  - Spec §4.1 has server-side defaults (`DEFAULT 'Australia/Perth'`, `'ACTIVE'`). The migration relies on ORM defaults only. That is fine while all writes go through the service; add it to TD-185 if you want parity.
+
+**Review by `kingdonk-ops` — KERP-REVIEW: APPROVED patch-id=bc514ac06e44b4b8685e0ff11f641a195a8e0ab8** · [full review](https://github.com/kingdonk-ops/Kerp-/pull/43#pullrequestreview-5888320102)
+
+- _Must fix_
+  None.
+
+- _Suggestions (non-blocking)_
+  These round-1 suggestions still stand:
+  - On PostgreSQL, map the duplicate code by `exc.orig.diag.constraint_name`.
+  - Add a total-positions cap across all rings.
+  - Document the 9-decimal `ST_AsGeoJSON` rounding, or set the precision explicitly.
+  - Add 3 tests: non-member DELETE → 404, an administrator of another project patching one they are not a member of → 404, and a project-bound `update_project`.
+  - Spec §4.1 has server-side defaults for timezone and status; the migration uses ORM defaults only.
 
 ---
 

@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 128 · **Closed:** 57
+**Open:** 129 · **Closed:** 57
 
 ## decision (8)
 
@@ -105,7 +105,7 @@
 | [TD-181](../tracker/todo/TD-181.md) | DetailPage: audit log and gate-status endpoints | T-0025 | implementer |
 | [TD-182](../tracker/todo/TD-182.md) | RegisterPage: server-side filtering, sorting and paging | T-0025 | implementer |
 
-## later (36)
+## later (37)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -145,6 +145,7 @@
 | [TD-175](../tracker/todo/TD-175.md) | Record retention rules + legal hold per project | — | clean-room-gap-analysis |
 | [TD-177](../tracker/todo/TD-177.md) | Form renderer: adopt the T-0110 shared field-type registry + dual-runtime parity | T-0025 | implementer |
 | [TD-186](../tracker/todo/TD-186.md) | spatial_bounds: GiST index and ST_IsValid check (self-intersecting polygons are accepted today); project code stays taken after soft delete | T-0012 | implementer |
+| [TD-189](../tracker/todo/TD-189.md) | Set a psycopg connect_timeout on the worker's DB engine so _settle/_start are bounded when the DB is unreachable | T-0015 | reviewer |
 
 ## bug (1)
 
