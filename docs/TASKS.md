@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 28/145 tasks done (19%) · **ready now:** 20 · **epics awaiting breakdown:** 47
+**Overall:** 28/145 tasks done (19%) · **ready now:** 19 · **epics awaiting breakdown:** 47
 
 | Phase | Tasks done | Progress |
 |---|---|---|
@@ -36,7 +36,7 @@
 | ✅ | [T-0010](../tracker/tasks/T-0010.md) | Three-tier RBAC/ABAC: capability tiers × 15 personas × project/site scope (Asset-Site filter) + explicit multi-project read scope | identity | M | T-0008 | #39 |
 | ✅ | [T-0011](../tracker/tasks/T-0011.md) | Module loader + manifest contract + per-project enable/disable | platform | M | T-0005 | #32 |
 | ✅ | [T-0012](../tracker/tasks/T-0012.md) | projects module: CRUD + settings (IANA timezone, spatial_bounds, currency/locale) | projects | M | T-0010, T-0011 | #43 |
-| ▶ | [T-0013](../tracker/tasks/T-0013.md) | teams module: teams, membership, entity visibility | teams | S | T-0012 |  |
+| ▶ | [T-0013](../tracker/tasks/T-0013.md) | teams module: project teams, team membership, team-visibility service contract | teams | M | T-0010, T-0011, T-0012 |  |
 | ▶ | [T-0014](../tracker/tasks/T-0014.md) | admin module: user + project-membership administration API (PER-09 on its projects), admin grants table, membership-based RLS on projects and tenant-level tables | admin | M | T-0010, T-0011, T-0012 |  |
 | ⬜ | [T-0039](../tracker/tasks/T-0039.md) | System admin appoints Project Admins: system_admin/create_projects grant API, project creation gated on create_projects, creator gets PER-09 | admin | S | T-0014 |  |
 | ⬜ | [T-0044](../tracker/tasks/T-0044.md) | Deployment (tenant) settings: offline window (default 7, max 14 days) and new-project defaults (status, timezone, currency, locale) | admin | S | T-0039 |  |
@@ -49,7 +49,7 @@
 | ▶ | [T-0019](../tracker/tasks/T-0019.md) | notifications module (in-app) behind a pluggable channel interface | notifications | S | T-0012 |  |
 | ⬜ | [T-0035](../tracker/tasks/T-0035.md) | Per-record override of a blocked check: reasoned request, routed approver (never self), notifications, audit, bound to the checked values | validation | M | T-0018, T-0010, T-0019 |  |
 | ⬜ | [T-0040](../tracker/tasks/T-0040.md) | Lobby and access requests API: visible-in-lobby flag, lobby listing, project-code lookup, request/approve/reject by the project's admins | admin | M | T-0014, T-0019 |  |
-| ▶ | [T-0020](../tracker/tasks/T-0020.md) | saved_views module | saved_views | S | T-0012 |  |
+| ⬜ | [T-0020](../tracker/tasks/T-0020.md) | saved_views module | saved_views | S | T-0012, T-0013 |  |
 | ✅ | [T-0021](../tracker/tasks/T-0021.md) | Observability + security headers (request id, structured logs, CSP/HSTS) | platform | S | T-0001 | #9 |
 | ✅ | [T-0022](../tracker/tasks/T-0022.md) | Lint rule: heavy libs (fitz, cv2, rectpack, celpy, pyhanko) lazily imported | platform | S | T-0001 | #10 |
 | ⬜ | [T-0023](../tracker/tasks/T-0023.md) | onboarding: first-run provisioning (the deployment's hidden tenant, first System admin, deployment settings) | onboarding | S | T-0012, T-0014, T-0044 |  |
