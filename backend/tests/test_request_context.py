@@ -225,8 +225,13 @@ def test_error_after_response_started_is_reraised_and_logged(
 # --- client disconnect (T-0030) ---------------------------------------------
 
 
-def _run_cancelled(*, start_response: bool) -> list[Message]:
-    """Drive the middleware with an app that is cancelled (client went away)."""
+def _run_cancelled(*, start_response: bool) -> tuple[list[Message], str | None]:
+    """Drive the middleware with an app that is cancelled (client went away).
+
+    Returns the sent messages and the request id seen afterwards *in the same context*
+    the middleware ran in (``asyncio.run`` copies the context, so checking it outside
+    would always see ``None``).
+    """
     sent: list[Message] = []
 
     async def app(_scope: Scope, _receive: Receive, send: Send) -> None:
@@ -246,9 +251,14 @@ def _run_cancelled(*, start_response: bool) -> list[Message]:
         "path": "/_probe/slow",
         "headers": [(b"x-request-id", b"synthetic-gone")],
     }
-    with pytest.raises(asyncio.CancelledError):
-        asyncio.run(RequestContextMiddleware(app)(scope, receive, send))
-    return sent
+
+    async def drive() -> str | None:
+        with pytest.raises(asyncio.CancelledError):
+            await RequestContextMiddleware(app)(scope, receive, send)
+        return get_request_id()
+
+    after = asyncio.run(drive())
+    return sent, after
 
 
 def test_client_closed_request_status_is_499() -> None:
@@ -260,7 +270,7 @@ def test_client_disconnect_is_logged_as_499_not_500(
     caplog: pytest.LogCaptureFixture, start_response: bool
 ) -> None:
     caplog.set_level(logging.INFO)
-    sent = _run_cancelled(start_response=start_response)
+    sent, request_id_after = _run_cancelled(start_response=start_response)
 
     (access,) = _access_records(caplog)
     assert access.__dict__["status"] == 499
@@ -270,7 +280,8 @@ def test_client_disconnect_is_logged_as_499_not_500(
     # Not an error: no traceback line, no 500 body sent to a client that is gone.
     assert [r for r in caplog.records if r.name == "kerp.error"] == []
     assert all(m.get("status") != 500 for m in sent)
-    assert get_request_id() is None
+    # The request id is reset in the middleware's own context even on cancellation.
+    assert request_id_after is None
 
 
 def test_completed_request_is_not_marked_disconnected(
