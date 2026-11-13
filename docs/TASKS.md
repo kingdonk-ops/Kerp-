@@ -3,11 +3,11 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 21/139 tasks done (15%) · **ready now:** 27 · **epics awaiting breakdown:** 47
+**Overall:** 21/145 tasks done (14%) · **ready now:** 33 · **epics awaiting breakdown:** 47
 
 | Phase | Tasks done | Progress |
 |---|---|---|
-| 0 · Platform foundations | 21/55 | `███░░░░░░░` 38% |
+| 0 · Platform foundations | 21/61 | `███░░░░░░░` 34% |
 | 1 · Asset & Quality backbone | 0/75 (+1 epics) | `░░░░░░░░░░` 0% |
 | 2 · Welding quality | 0/9 | `░░░░░░░░░░` 0% |
 | 3 · Logistics | 0/0 (+7 epics) | `░░░░░░░░░░` 0% |
@@ -70,11 +70,17 @@
 | ▶ | [T-0030](../tracker/tasks/T-0030.md) | Backend hardening: httpx/httpcore loggers at WARNING; hide /docs, /redoc, /openapi.json in production | platform | S | T-0021 |  |
 | ▶ | [T-0031](../tracker/tasks/T-0031.md) | Frontend ESLint (typescript-eslint, react-hooks) + npm run lint in the CLAUDE.md §4 gate and CI | platform | S | T-0002 |  |
 | ▶ | [T-0060](../tracker/tasks/T-0060.md) | Request size bounds: app-wide body limit, total-position cap on spatial_bounds, jobs payload cap, list-safe job result + jobs scope tests | platform | S | T-0012, T-0015 |  |
+| ▶ | [T-0067](../tracker/tasks/T-0067.md) | Review gate runs from base; SHA-pin write-token workflow actions | platform | S | — |  |
 | ▶ | [T-0061](../tracker/tasks/T-0061.md) | Auth: reject tokens issued in the same second as a password change (sub-second iat vs password_changed_at) | identity | S | T-0008 |  |
+| ▶ | [T-0068](../tracker/tasks/T-0068.md) | Login lockout per client IP with a per-account backstop; drop test-only lockout API | identity | M | — |  |
 | ▶ | [T-0062](../tracker/tasks/T-0062.md) | UI shells hardening: hidden-all-columns guard, encoded storage keys, required_if a11y, tab keyboard/aria, reserved audit tab id check | frontend | S | T-0025 |  |
+| ▶ | [T-0069](../tracker/tasks/T-0069.md) | Password change also invalidates tokens issued in the same second; drop unused tenancy helpers | identity | S | — |  |
 | ▶ | [T-0063](../tracker/tasks/T-0063.md) | Projects follow-ups: constraint-name duplicate detection, missing authorisation tests, GeoJSON precision, DB-side defaults | projects | S | T-0012 |  |
+| ▶ | [T-0070](../tracker/tasks/T-0070.md) | Default KERP_ENVIRONMENT to production; development opts in | platform | S | — |  |
 | ▶ | [T-0064](../tracker/tasks/T-0064.md) | Logging and config safety: ASCII-safe JSON logs, client disconnect not logged as 500, refuse debug in production | platform | S | T-0021 |  |
+| ▶ | [T-0071](../tracker/tasks/T-0071.md) | Load the caller's memberships once per request | projects | S | — |  |
 | ▶ | [T-0065](../tracker/tasks/T-0065.md) | Worker RLS binding test uses the real asyncio/SAQ worker path instead of threading.Thread | jobs | S | T-0015 |  |
+| ▶ | [T-0072](../tracker/tasks/T-0072.md) | Duplicated tab keeps its session: cross-tab refresh lock and token hand-off | frontend | M | — |  |
 | ▶ | [T-0066](../tracker/tasks/T-0066.md) | tracker.py set --note: do not double the date when the note already starts with one; clean existing doubled notes | platform | S | — |  |
 
 ## Phase 1 — Asset & Quality backbone

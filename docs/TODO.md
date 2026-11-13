@@ -3,15 +3,16 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 131 · **Closed:** 87
+**Open:** 133 · **Closed:** 87
 
-## decision (3)
+## decision (4)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
 | [TD-096](../tracker/todo/TD-096.md) | Approved coating ITR dropped the residual-dust rating row the ITP requires; Grating and Gridmesh ITR has no approved version: confirm with the client before shipping default templates | T-0113 | planner |
 | [TD-191](../tracker/todo/TD-191.md) | Login/magic-link lockout keyed by tenant+email lets anyone keep a known user at a 15-minute delay; decide per-email+per-IP keying and fix the begin() check/count race (single Lua script) | T-0009 | reviewer |
 | [TD-213](../tracker/todo/TD-213.md) | Object key layout: confirm {tenant}/{project}/{module}/{sha256} (no extension) instead of the master spec's {hash}.ext, plus transient staging/ and quarantine/ prefixes | T-0016 | implementer |
+| [TD-223](../tracker/todo/TD-223.md) | Who may open PRs to dev? If any account other than KERP_ALLOWED_REVIEWERS (or forks) can, require a human approval as well as review-gate | T-0067 | reviewer |
 
 ## spec-gap (35)
 
@@ -154,7 +155,7 @@
 |---|---|---|---|
 | [TD-159](../tracker/todo/TD-159.md) | Site filter from the bound project is applied to all site-scoped rows: a PER-07 on A who is PER-01 on B loses B's site-scoped rows (over-restrictive) | T-0010 | reviewer |
 
-## risk (12)
+## risk (13)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -170,6 +171,7 @@
 | [TD-158](../tracker/todo/TD-158.md) | require_hold_release passes a PER-07 for any site; endpoints must also check can_release_hold against the hold's site (add a load-and-check helper) | T-0010 | reviewer |
 | [TD-176](../tracker/todo/TD-176.md) | No availability target or HA design for the production API (clean-room asks 99.5 %; offline client tolerates outages) | — | clean-room-gap-analysis |
 | [TD-216](../tracker/todo/TD-216.md) | Client co-sign residual risk: a provisional wet signature is only an inspector-witnessed claim until the client confirms it; a stolen client device key is stopped only by revoking the device (T-0043) | T-0174, T-0173 | planner |
+| [TD-222](../tracker/todo/TD-222.md) | Rate-limit unauthenticated /api/v1/auth/* at the proxy: each login/magic-link with a fresh e-mail costs one scrypt (16 MB) before any lockout applies | — | reviewer |
 
 ## Closed
 
