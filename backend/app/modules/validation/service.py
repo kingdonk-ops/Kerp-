@@ -20,10 +20,11 @@ from collections.abc import Mapping
 from typing import Final
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.audit import service as audit
 from app.core.cel import CelError, CelOk, JsonValue, evaluate
+from app.core.db import SIDE_WRITE_DB_KEY
 from app.core.tenancy.context import TenancyContext
 from app.core.tenancy.rls import bind_tenancy, session_tenancy
 from app.core.tenancy.scope import get_or_404
@@ -240,10 +241,12 @@ def run_checks(
     being checked (e.g. ``"inspection:<uuid>"``). An unknown set raises
     ``RuleSetNotFoundError``, so a misconfigured gate never passes silently.
 
-    The findings are committed in their **own** unit of work (same engine, same tenancy),
-    so they survive when the caller then refuses the transition and rolls back: a blocked
-    transition always leaves its findings (the record the T-0035 override builds on). The
-    rule set must be committed before it is run (the findings reference it).
+    The findings are committed in their **own** unit of work on a dedicated pool (same
+    tenancy), so they survive when the caller then refuses the transition and rolls back: a
+    blocked transition always leaves its findings (the record the T-0035 override builds on).
+    That pool is never the caller's request pool, so logging a finding never waits on a
+    connection a request already holds. The rule set must be committed before it is run (the
+    findings reference it).
     """
     tenancy = _context(session)
     if "params" in context:
@@ -301,15 +304,33 @@ def run_checks(
 def _persist_findings(session: Session, tenancy: TenancyContext, rows: list[Finding]) -> None:
     """Commit ``rows`` independently of the caller's transaction (see ``run_checks``).
 
-    On SQLite (local tests only) a caller that has already written in its open transaction
-    holds the database write lock, so call ``run_checks`` before writing.
+    The write runs on the ``Database``'s dedicated side-write pool, never on the request pool
+    the caller's connection belongs to: that pool can be fully held by requests sitting inside
+    ``run_checks``, so checking out a second connection from it would risk a client-side
+    deadlock (every holder waiting on another) that times out and 500s. The separate pool
+    cannot form that cycle. On SQLite (local tests only) a caller that has already written in
+    its open transaction holds the database write lock, so call ``run_checks`` before writing.
     """
     if not rows:
         return
-    with Session(bind=session.get_bind().engine) as log:
+    with _side_write_sessionmaker(session)() as log:
         bind_tenancy(log, tenancy)
         log.add_all(rows)
         log.commit()
+
+
+def _side_write_sessionmaker(session: Session) -> sessionmaker[Session]:
+    """The dedicated findings-log session factory for ``session``'s ``Database``.
+
+    ``Database.session`` stashes its ``Database`` on ``session.info``. A session opened some
+    other way (a bare ``Session`` in a script or test) has none; such a session is never the
+    shared request pool, so a plain factory on its own engine is safe (no circular-wait risk).
+    """
+    database = session.info.get(SIDE_WRITE_DB_KEY)
+    if database is not None:
+        maker: sessionmaker[Session] = database.side_write_sessionmaker
+        return maker
+    return sessionmaker(bind=session.get_bind().engine, autoflush=False, expire_on_commit=False)
 
 
 def _guard_source(source: str) -> None:

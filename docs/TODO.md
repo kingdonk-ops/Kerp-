@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 79 · **Closed:** 56
+**Open:** 81 · **Closed:** 56
 
 ## decision (2)
 
@@ -72,7 +72,7 @@
 | [TD-129](../tracker/todo/TD-129.md) | Guard the module toggle API (PUT /api/v1/modules/{name}) with the admin capability tier once RBAC lands (T-0010/T-0014) | T-0011 | implementer |
 | [TD-140](../tracker/todo/TD-140.md) | Compile-on-save checks CEL rules only at top-level variables; field-level type checking against kind context schemas | T-0018 | implementer |
 
-## later (26)
+## later (28)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -102,6 +102,8 @@
 | [TD-130](../tracker/todo/TD-130.md) | Module loader: require CurrentPrincipal on every mounted module router by default (opt-out for public routes) | T-0011 | implementer |
 | [TD-133](../tracker/todo/TD-133.md) | Dev stack: separate dev database from kerp_test, and create the kerp-vault MinIO bucket + backend storage settings | T-0003 | implementer |
 | [TD-134](../tracker/todo/TD-134.md) | Dev infra follow-ups from PR #33 review: .gitattributes eol=lf for Makefile/*.sql/*.yml/*.sh, explicit pyyaml dev dep, test_pg_extensions.py in PG_TESTS guard | T-0003 | reviewer |
+| [TD-143](../tracker/todo/TD-143.md) | run_checks persist=False dry-run flag (evaluate without logging findings) | T-0018 | implementer |
+| [TD-144](../tracker/todo/TD-144.md) | run_checks: translate an uncommitted-rule-set ForeignKeyViolation into a clear RuleStoreError | T-0018 | implementer |
 
 ## risk (6)
 

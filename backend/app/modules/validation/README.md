@@ -40,11 +40,16 @@ if result.blocked:
   `result.findings` and written to `oe_validation_finding` with `run_id`, `subject`, the set's
   key and version, and the `rule_key` and rule version (ADR 0004 §3). Passing rules are not
   logged; `result.evaluated` counts the rules that ran.
-- Findings are committed in their **own** unit of work (same engine, same tenancy), not in the
-  caller's transaction, so they survive when the gate raises and the caller rolls back: a
-  blocked transition always leaves its findings (the record the T-0035 override needs). The
-  rule set must already be committed. On SQLite (local tests only) call `run_checks` before
-  writing in the caller's transaction, or the second writer waits for the database lock.
+- Findings are committed in their **own** unit of work on a dedicated pool
+  (`Database.side_write_sessionmaker`), not in the caller's transaction, so they survive when
+  the gate raises and the caller rolls back — a blocked transition always leaves its findings
+  (the record the T-0035 override needs), and they likewise outlive a failure at the caller's
+  own commit. The dedicated pool means the write never waits on the request pool the caller's
+  connection belongs to (that pool can be wholly held by requests sitting inside `run_checks`,
+  and reusing it would risk a client-side deadlock that times out and 500s); on PostgreSQL a
+  short `lock_timeout` keeps an FK wait on a row the caller still holds from hanging. The rule
+  set must already be committed. On SQLite (local tests only) call `run_checks` before writing
+  in the caller's transaction, or the second writer waits for the database lock.
 - Ties between visible sets of one layer (possible only on SQLite, see uniqueness below)
   break by set id, deterministically.
 - `result.blocked` is true when a finding has `action == "block"`; `result.reason` joins those

@@ -257,6 +257,28 @@ def test_findings_survive_when_the_caller_rolls_back_the_blocked_transition(
     ]
 
 
+def test_findings_persist_when_the_callers_pool_is_exhausted(db: Database) -> None:
+    # The caller holds the single connection of its request pool throughout run_checks. If the
+    # findings log reused that pool it would block waiting for a second connection and time out
+    # (TD review round 2); the dedicated side-write pool must let it through.
+    set_id = make_set(db, CTX_A)
+    add(db, CTX_A, set_id, cel_rule("cal", "false", params={"message": "Calibration expired"}))
+    url = db.engine.url.render_as_string(hide_password=False)
+    constrained = Database(url, pool_size=1, max_overflow=0, pool_timeout=3)
+    try:
+        with constrained.unit_of_work(CTX_A) as s:
+            result = run_checks({}, "demo.submit", session=s, subject="inspection:11")
+            assert result.blocked
+            run_id = result.run_id
+        with db.unit_of_work(CTX_A) as s:
+            rows = s.scalars(select(Finding).where(Finding.subject == "inspection:11")).all()
+        assert [(r.run_id, r.rule_key, r.message) for r in rows] == [
+            (run_id, "cal", "Calibration expired")
+        ]
+    finally:
+        constrained.dispose()
+
+
 def test_a_new_rule_takes_effect_without_a_deploy(db: Database) -> None:
     set_id = make_set(db, CTX_A)
     with db.unit_of_work(CTX_A) as s:

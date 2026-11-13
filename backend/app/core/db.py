@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import importlib
 import pkgutil
+import threading
 import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -63,6 +64,17 @@ NAMING_CONVENTION: Final[dict[str, str]] = {
 # Allowed values of ``BaseRecordMixin.source``. ``ai`` writes need human confirmation
 # before they are applied (CLAUDE.md §6).
 RECORD_SOURCES: Final[frozenset[str]] = frozenset({"ui", "api", "import", "sync", "ai", "system"})
+
+# The dedicated side-write pool (see ``Database.side_write_sessionmaker``). A write that must
+# outlive the caller's transaction — the verification findings log — runs here, on a pool that
+# is separate from and smaller than the request pool, so it never waits on a connection the
+# caller's request already holds. ``Database.session`` stashes its ``Database`` under this key
+# on every session it opens, so service code can reach the pool from the session alone.
+SIDE_WRITE_DB_KEY: Final = "kerp_side_write_db"
+SIDE_WRITE_POOL_SIZE: Final = 5
+SIDE_WRITE_MAX_OVERFLOW: Final = 10
+SIDE_WRITE_POOL_TIMEOUT: Final = 10
+SIDE_WRITE_LOCK_TIMEOUT_MS: Final = 3000
 
 
 class GUID(TypeDecorator[uuid.UUID]):
@@ -259,21 +271,54 @@ def import_all_models(package: str = "app.modules") -> list[str]:
 # --- engine / sessions -----------------------------------------------------------------
 
 
-def create_db_engine(url: str) -> Engine:
-    """Create an engine. SQLite connections may be shared across FastAPI's worker threads."""
-    connect_args = {"check_same_thread": False} if url.startswith("sqlite") else {}
-    return create_engine(url, connect_args=connect_args, pool_pre_ping=True)
+def create_db_engine(
+    url: str,
+    *,
+    connect_args: dict[str, Any] | None = None,
+    pool_size: int | None = None,
+    max_overflow: int | None = None,
+    pool_timeout: float | None = None,
+) -> Engine:
+    """Create an engine. SQLite connections may be shared across FastAPI's worker threads.
+
+    The optional pool arguments size a dedicated pool (the findings side-write pool, or a test
+    that deliberately exhausts one); unset, SQLAlchemy's defaults apply.
+    """
+    args: dict[str, Any] = {"check_same_thread": False} if url.startswith("sqlite") else {}
+    if connect_args:
+        args.update(connect_args)
+    options: dict[str, Any] = {"connect_args": args, "pool_pre_ping": True}
+    if pool_size is not None:
+        options["pool_size"] = pool_size
+    if max_overflow is not None:
+        options["max_overflow"] = max_overflow
+    if pool_timeout is not None:
+        options["pool_timeout"] = pool_timeout
+    return create_engine(url, **options)
 
 
 class Database:
     """One engine and session factory per configured URL. ``app.state.db`` holds one."""
 
-    def __init__(self, url: str) -> None:
-        self.engine = create_db_engine(url)
+    def __init__(
+        self,
+        url: str,
+        *,
+        pool_size: int | None = None,
+        max_overflow: int | None = None,
+        pool_timeout: float | None = None,
+    ) -> None:
+        self.url = url
+        self.engine = create_db_engine(
+            url, pool_size=pool_size, max_overflow=max_overflow, pool_timeout=pool_timeout
+        )
         install_pool_reset(self.engine)
         self.sessionmaker: sessionmaker[Session] = sessionmaker(
             bind=self.engine, autoflush=False, expire_on_commit=False
         )
+        self._side_write_lock = threading.Lock()
+        self._side_write_engine: Engine | None = None
+        self._side_write_sessionmaker: sessionmaker[Session] | None = None
 
     @classmethod
     def from_settings(cls, settings: Settings | None = None) -> Database:
@@ -282,12 +327,46 @@ class Database:
             raise RuntimeError("KERP_DATABASE_URL is not set")
         return cls(settings.database_url)
 
+    @property
+    def side_write_sessionmaker(self) -> sessionmaker[Session]:
+        """A session factory on a dedicated pool, for a write that must outlive the caller's
+        transaction and must never wait on the request pool — the verification findings log.
+
+        Sharing the request pool here risks a client-side deadlock the database cannot see:
+        under load every request could hold its own connection while sitting inside a
+        side-write that waits for a second one, so all of them time out (30s by default) and
+        the gated transition returns 500. This pool is separate and small; on PostgreSQL a
+        short ``lock_timeout`` makes an FK ``KEY SHARE`` wait on a row the caller still holds
+        fail fast instead of hanging. Created once per ``Database`` (lazily).
+        """
+        with self._side_write_lock:
+            if self._side_write_sessionmaker is None:
+                connect_args = (
+                    {"options": f"-c lock_timeout={SIDE_WRITE_LOCK_TIMEOUT_MS}"}
+                    if self.url.startswith("postgresql")
+                    else None
+                )
+                engine = create_db_engine(
+                    self.url,
+                    connect_args=connect_args,
+                    pool_size=SIDE_WRITE_POOL_SIZE,
+                    max_overflow=SIDE_WRITE_MAX_OVERFLOW,
+                    pool_timeout=SIDE_WRITE_POOL_TIMEOUT,
+                )
+                install_pool_reset(engine)
+                self._side_write_engine = engine
+                self._side_write_sessionmaker = sessionmaker(
+                    bind=engine, autoflush=False, expire_on_commit=False
+                )
+            return self._side_write_sessionmaker
+
     def session(self, tenancy: TenancyContext | None = None) -> Iterator[Session]:
         """Unit of work: commit on success, roll back on any error, always close.
 
         With ``tenancy`` the session is bound for RLS and the ORM scope before first use.
         """
         session = self.sessionmaker()
+        session.info[SIDE_WRITE_DB_KEY] = self
         bind_tenancy(session, tenancy)
         try:
             yield session
@@ -310,6 +389,8 @@ class Database:
 
     def dispose(self) -> None:
         self.engine.dispose()
+        if self._side_write_engine is not None:
+            self._side_write_engine.dispose()
 
 
 def get_db(
