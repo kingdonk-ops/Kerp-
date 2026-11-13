@@ -57,7 +57,10 @@ export function ProjectScopeProvider({ children }: { children: ReactNode }) {
     scope: decode(preferences.getItem(key)),
   }));
   // Another user signed in: read their stored scope.
-  const storedScope = stored.key === key ? stored.scope : decode(preferences.getItem(key));
+  const storedScope = useMemo(
+    () => (stored.key === key ? stored.scope : decode(preferences.getItem(key))),
+    [stored, key, preferences],
+  );
 
   const list = useQuery({
     queryKey: ["projects", "mine", userId],

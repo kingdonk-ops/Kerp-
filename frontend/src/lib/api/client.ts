@@ -6,6 +6,9 @@ import type { TokenStore } from "../../auth/tokenStore";
 /** Typed client over the generated OpenAPI schema (`src/api/schema.ts`). */
 export type ApiClient = Client<paths>;
 
+/** Refresh responses meaning the refresh token itself is invalid (terminal). */
+const REFRESH_REJECTED: ReadonlySet<number> = new Set([400, 401, 422]);
+
 export type FetchFn = (input: Request) => Promise<Response>;
 
 export interface ApiClientOptions {
@@ -17,8 +20,9 @@ export interface ApiClientOptions {
 
 /**
  * Builds the app's API client. Every request carries the access token; a `401` triggers
- * one refresh-token rotation (shared by concurrent requests) and one retry. A refused
- * refresh clears the session, which signs the user out.
+ * one refresh-token rotation (shared by concurrent requests) and one retry. A refresh the
+ * server rejects (400/401/422) clears the session, which signs the user out; transient
+ * failures (network, 429, 5xx) keep it.
  */
 export function createApiClient({ baseUrl, tokens, fetch }: ApiClientOptions): ApiClient {
   const baseFetch: FetchFn = fetch ?? ((input) => globalThis.fetch(input));
@@ -31,15 +35,17 @@ export function createApiClient({ baseUrl, tokens, fetch }: ApiClientOptions): A
       const refreshToken = tokens.refresh;
       if (refreshToken === null) return false;
       try {
-        const { data } = await raw.POST("/api/v1/auth/refresh", {
+        const { data, response } = await raw.POST("/api/v1/auth/refresh", {
           body: { refresh_token: refreshToken },
         });
-        if (!data) {
-          tokens.clear();
-          return false;
+        if (data) {
+          tokens.set(data);
+          return true;
         }
-        tokens.set(data);
-        return true;
+        // Only a rejected token ends the session; 429/5xx (e.g. 503 when the revocation
+        // store is down) are transient, so the refresh token is kept for a later attempt.
+        if (REFRESH_REJECTED.has(response.status)) tokens.clear();
+        return false;
       } catch {
         // Network failure: keep the session so a later request can retry.
         return false;
