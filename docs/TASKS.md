@@ -69,7 +69,7 @@
 | ✅ | [T-0029](../tracker/tasks/T-0029.md) | Pipeline tooling: tracker-aware review-gate patch-id + `tracker.py set --note` date fix | platform | S | — | #62 |
 | ▶ | [T-0030](../tracker/tasks/T-0030.md) | Backend runtime hardening: quiet httpx/httpcore logs, API docs hidden in production, ASCII-safe JSON logs, client disconnect as 499, refuse debug in production | platform | M | T-0021 |  |
 | ✅ | [T-0031](../tracker/tasks/T-0031.md) | Frontend hardening: ESLint gate (typescript-eslint, react-hooks) + UI shell fixes (hidden-all-columns guard, encoded storage keys, required_if a11y, tab keyboard/aria, reserved audit tab id) | platform | M | T-0002, T-0025 | #63 |
-| 🟦 | [T-0060](../tracker/tasks/T-0060.md) | Request size bounds + jobs hardening: app-wide body limit, spatial_bounds cap, jobs payload cap, list-safe job result, jobs scope tests, real SAQ-worker RLS binding test | platform | M | T-0012, T-0015 |  |
+| 🟪 | [T-0060](../tracker/tasks/T-0060.md) | Request size bounds + jobs hardening: app-wide body limit, spatial_bounds cap, jobs payload cap, list-safe job result, jobs scope tests, real SAQ-worker RLS binding test | platform | M | T-0012, T-0015 | #67 |
 | ⚫ | [T-0061](../tracker/tasks/T-0061.md) | Auth: reject tokens issued in the same second as a password change (sub-second iat vs password_changed_at) | identity | S | T-0008 |  |
 | ⚫ | [T-0062](../tracker/tasks/T-0062.md) | UI shells hardening: hidden-all-columns guard, encoded storage keys, required_if a11y, tab keyboard/aria, reserved audit tab id check | frontend | S | T-0025 |  |
 | ▶ | [T-0063](../tracker/tasks/T-0063.md) | Projects follow-ups: constraint-name duplicate detection, missing authorisation tests, GeoJSON precision, DB-side defaults | projects | S | T-0012 |  |
