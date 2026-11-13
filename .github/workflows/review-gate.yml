@@ -22,11 +22,24 @@ jobs:
     if: github.event.pull_request.base.ref == 'dev'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      # The gate script comes from the PR's *base* (already reviewed), never from the PR head,
+      # so a PR's edits to the script do not judge that PR. (pull_request runs the PR's copy of
+      # this workflow file itself; that remaining path is TD-223.)
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: base
+          persist-credentials: false
+          sparse-checkout: scripts
+      # The PR head is only *read* (git diff → patch-id); none of its code runs.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
+          path: pr
           fetch-depth: 0
+          persist-credentials: false
       - name: Check approval
+        working-directory: pr
         env:
           GITHUB_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -34,4 +47,4 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           # Logins whose KERP-REVIEW markers count. Agents act as the repo owner.
           ALLOWED_REVIEWERS: ${{ vars.KERP_ALLOWED_REVIEWERS || 'kingdonk-ops' }}
-        run: python scripts/review_gate.py
+        run: python ../base/scripts/review_gate.py

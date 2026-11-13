@@ -34,6 +34,7 @@ from app.core.auth.field import (
     new_magic_link_token,
 )
 from app.core.auth.lockout import (
+    LOGIN_ACCOUNT_POLICY,
     LOGIN_POLICY,
     MAGIC_LINK_REQUEST_POLICY,
     PIN_POLICY,
@@ -116,12 +117,18 @@ def _subject(tenant_id: uuid.UUID, email: str) -> str:
     return f"{tenant_id}:{normalize_email(email)}"
 
 
+UNKNOWN_CLIENT = "unknown"
+
+
 class AuthService:
     def __init__(self, runtime: AuthRuntime, provider: AuthProvider | None = None) -> None:
         self.runtime = runtime
         self.provider: AuthProvider = provider or LocalPasswordProvider()
         store = runtime.store
         self.login_lockout = ProgressiveLockout(store, LOGIN_POLICY, "login")
+        self.login_account_lockout = ProgressiveLockout(
+            store, LOGIN_ACCOUNT_POLICY, "login-account"
+        )
         self.magic_link_lockout = ProgressiveLockout(store, MAGIC_LINK_REQUEST_POLICY, "magic")
         # The PIN cap holds for the whole session: the counter outlives the refresh token.
         pin_policy = replace(PIN_POLICY, window=self._pin_ttl())
@@ -133,19 +140,26 @@ class AuthService:
         *,
         tenant_id: uuid.UUID | None,
         credentials: PasswordCredentials,
+        client: str | None = None,
     ) -> TokenPair:
+        """``client`` is the caller's address (``request.client.host``), the lockout key."""
         tenant = tenant_id or self.runtime.settings.default_tenant_id
         if tenant is None:
             raise AuthenticationError("no tenant")
         # Keyed by tenant + e-mail whether or not the account exists: an unknown address
-        # locks exactly like a real one, so the lockout reveals nothing.
-        subject = _subject(tenant, credentials.email)
-        self.login_lockout.begin(subject)
+        # locks exactly like a real one, so the lockout reveals nothing. The tight lock is per
+        # client, so another client's failures never lock this one out (T-0068); the loose
+        # per-account backstop caps guessing from many clients.
+        account = _subject(tenant, credentials.email)
+        per_client = f"{account}|{client or UNKNOWN_CLIENT}"
+        self.login_lockout.begin(per_client)
+        self.login_account_lockout.begin(account)
         bind_tenancy(session, TenancyContext(tenant_id=tenant))
         user = self.provider.authenticate(session, tenant, credentials)
         if user is None:
             raise AuthenticationError("invalid credentials")
-        self.login_lockout.succeeded(subject)
+        self.login_lockout.succeeded(per_client)
+        self.login_account_lockout.succeeded(account)
         return self._issue_pair(user.id, tenant, uuid.uuid4())
 
     def refresh(self, session: Session, refresh_token: str) -> TokenPair:
