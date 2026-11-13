@@ -193,7 +193,12 @@ Wins over any earlier text on tenant selection, tenant administrators and projec
   refresh token only as an `httpOnly`, `Secure`, `SameSite` cookie scoped to the auth endpoints;
   it never sees it in JavaScript or storage, and `/auth/refresh` is protected against CSRF
   (`SameSite=Strict` plus an Origin check). The Capacitor Android build keeps the JSON-body
-  transport, with the token in the keystore-backed store.
+  transport, with the token in the keystore-backed store. The server returns or accepts the
+  refresh token in a body **only** for requests whose `Origin` is on an explicit native-app
+  allow-list in deployment configuration (the Capacitor app origin), which must never contain the
+  deployment's own web origin. It never decides by the client-reported device platform, so
+  script running on the web origin cannot obtain a refresh token in a body (planner mechanism
+  for TD-203; device-bound attestation may be added later).
 - **Field PIN, hybrid (TD-135, decision 8a).** The PIN belongs to the enrolled device (§4.3),
   not to a server session:
   - **Local unlock.** The app unlocks on the device with the 6-digit PIN against a key held in
@@ -224,9 +229,9 @@ Wins over any earlier text on tenant selection, tenant administrators and projec
   last-seen/last-sync times, status `active | revoked`. Sessions are bound to the device.
 - **Remote revoke and wipe.** A System admin, a PER-09 holder of a project the device's user
   belongs to, or the user may revoke a device (user, 2026-11-13). A wipe clears the whole device, so a PER-09
-  of one project can wipe unsynced work of the user's other projects: the revoke dialog warns
-  about that when the device's user has other projects, and every revoke is audited with the
-  actor and their role. Revoke kills every session of the device at once;
+  of one project can wipe unsynced work of the user's other projects. As a planner addition
+  (mitigation for Q4a), the revoke dialog warns about that when the device's user has other
+  projects, and every revoke is audited with the actor and their role. Revoke kills every session of the device at once;
   on its next contact the server answers `401` with `code: DEVICE_REVOKED` and the client wipes
   its local store (records, outbox, media, keys) and confirms the wipe. Unsynced work on a
   revoked device is lost; the admin UI shows the last-sync time before confirming.
