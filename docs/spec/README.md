@@ -18,7 +18,7 @@ Disagreements found while building → `spec-gap` TODO.
 
 ## What the merge changed (summary — full detail in the consolidation diff)
 - **Culled:** GL/accounting, HR/payroll, e-commerce/POS/CRM, `enterprise_workflows`, `module_builder`, 3D CAD/BIM viewers & `.dwg` parsers. Money is a read-only external mirror.
-- **One-engine (TD-002):** one field-type registry (`core/fields`), one inspection record (`oe_inspections_inspection`, kind inspection/itp/rfi), stateless `eligibility`, new `inspection_requests`.
+- **One-engine (TD-002):** one field-type registry (`core/fields`), one inspection record (`oe_inspections_inspection`, kind inspection/itp — TD-045), stateless `eligibility`, new `inspection_requests`. ITP = plan, Request for Inspection = trigger, ITR = evidence: see [modules/quality-and-inspection.md](modules/quality-and-inspection.md).
 - **Overhauls:** ltree hierarchy; JSONB attributes (EAV deleted); **CEL** (not JSONLogic); **SAQ** (not ARQ); **FFD + rectpack** cutting; project-scoped RLS + 4 bypass tests; **RS256/EdDSA + JWKS**; hash-chain audit → pyHanko PAdES at turnover; calibration hard gate; 15 personas; 8-group IA; Dexie offline outbox.
 
 ## Reference only (do NOT build to these)
