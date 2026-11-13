@@ -1,1 +1,23 @@
 @import "tailwindcss";
+
+/*
+ * KERP design tokens (Tailwind v4 theme variables). Components use the semantic names
+ * (`bg-surface`, `text-ink`, `bg-brand`, `border-line`, …), never raw palette colours,
+ * so the theme can change in one place.
+ */
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  --color-brand: oklch(0.45 0.13 255);
+  --color-on-brand: oklch(0.99 0 0);
+  --color-surface: oklch(0.98 0.003 250);
+  --color-panel: oklch(1 0 0);
+  --color-ink: oklch(0.22 0.02 260);
+  --color-muted: oklch(0.52 0.02 260);
+  --color-line: oklch(0.9 0.01 260);
+  --color-pillar: oklch(0.93 0.04 85);
+
+  --color-success: oklch(0.55 0.14 150);
+  --color-warning: oklch(0.72 0.15 75);
+  --color-danger: oklch(0.55 0.2 27);
+}
