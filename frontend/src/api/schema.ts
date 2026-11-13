@@ -120,7 +120,7 @@ export interface paths {
         put?: never;
         /**
          * Pin Unlock
-         * @description Unlock a PIN-gated session: the device's refresh token + the PIN rotate the tokens.
+         * @description Unlock a PIN-gated session: the device's refresh cookie + the PIN rotate the tokens.
          *
          *     Wrong PINs lock the session progressively; the 10th wrong PIN revokes it.
          */
@@ -142,7 +142,9 @@ export interface paths {
         put?: never;
         /**
          * Refresh
-         * @description Rotate: the refresh token is spent and a new pair is issued. Reuse revokes the session.
+         * @description Rotate: the refresh cookie is spent and a new pair is issued. Reuse revokes the session.
+         *
+         *     The new refresh token keeps the session's end (sign-in + 12 h); after it, sign in again.
          */
         post: operations["refresh_api_v1_auth_refresh_post"];
         delete?: never;
@@ -162,7 +164,7 @@ export interface paths {
         put?: never;
         /**
          * Logout
-         * @description Revoke this access token and every token of its login session.
+         * @description Revoke this access token and every token of its login session; clear the cookie.
          */
         post: operations["logout_api_v1_auth_logout_post"];
         delete?: never;
@@ -734,8 +736,6 @@ export interface components {
             email: string;
             /** Password */
             password: string;
-            /** Tenant Id */
-            tenant_id?: string | null;
         };
         /**
          * MagicLinkRedeemRequest
@@ -754,8 +754,6 @@ export interface components {
         MagicLinkRequest: {
             /** Email */
             email: string;
-            /** Tenant Id */
-            tenant_id?: string | null;
         };
         /** MeResponse */
         MeResponse: {
@@ -885,12 +883,10 @@ export interface components {
         };
         /**
          * PinUnlockRequest
-         * @description The device's refresh token and the PIN. Both are required: a PIN alone is never a
-         *     credential.
+         * @description The PIN. The device's refresh token comes from the refresh cookie: both are
+         *     required, a PIN alone is never a credential.
          */
         PinUnlockRequest: {
-            /** Refresh Token */
-            refresh_token: string;
             /**
              * Pin
              * @description 6-digit PIN of this device's session
@@ -1021,11 +1017,6 @@ export interface components {
             currency_code?: string | null;
             /** Locale */
             locale?: string | null;
-        };
-        /** RefreshRequest */
-        RefreshRequest: {
-            /** Refresh Token */
-            refresh_token: string;
         };
         /**
          * ResolvedColumn
@@ -1198,12 +1189,14 @@ export interface components {
              */
             direction: "asc" | "desc";
         };
-        /** TokenResponse */
+        /**
+         * TokenResponse
+         * @description The access token. The refresh token is never in a body: it is the ``httpOnly``
+         *     refresh cookie (diff §4.2, TD-203).
+         */
         TokenResponse: {
             /** Access Token */
             access_token: string;
-            /** Refresh Token */
-            refresh_token: string;
             /**
              * Token Type
              * @default bearer
@@ -1217,7 +1210,7 @@ export interface components {
             expires_in: number;
             /**
              * Refresh Expires In
-             * @description Refresh token lifetime in seconds
+             * @description Seconds until the login session ends (sign-in + 12 h); then sign in again
              */
             refresh_expires_in: number;
         };
@@ -1442,7 +1435,10 @@ export interface operations {
             query?: never;
             header?: never;
             path?: never;
-            cookie?: never;
+            cookie?: {
+                /** @description The refresh token (httpOnly cookie, never JS) */
+                kerp_refresh?: string | null;
+            };
         };
         requestBody: {
             content: {
@@ -1458,6 +1454,13 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["TokenResponse"];
                 };
+            };
+            /** @description `Origin` is not the web app's origin */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -1482,13 +1485,12 @@ export interface operations {
             query?: never;
             header?: never;
             path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RefreshRequest"];
+            cookie?: {
+                /** @description The refresh token (httpOnly cookie, never JS) */
+                kerp_refresh?: string | null;
             };
         };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {
@@ -1498,6 +1500,13 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["TokenResponse"];
                 };
+            };
+            /** @description `Origin` is not the web app's origin */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

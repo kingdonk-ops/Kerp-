@@ -200,17 +200,42 @@
           "auth"
         ],
         "summary": "Pin Unlock",
-        "description": "Unlock a PIN-gated session: the device's refresh token + the PIN rotate the tokens.\n\nWrong PINs lock the session progressively; the 10th wrong PIN revokes it.",
+        "description": "Unlock a PIN-gated session: the device's refresh cookie + the PIN rotate the tokens.\n\nWrong PINs lock the session progressively; the 10th wrong PIN revokes it.",
         "operationId": "pin_unlock_api_v1_auth_pin_unlock_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "kerp_refresh",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The refresh token (httpOnly cookie, never JS)",
+              "title": "Kerp Refresh"
+            },
+            "description": "The refresh token (httpOnly cookie, never JS)"
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/PinUnlockRequest"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "200": {
@@ -226,6 +251,9 @@
           "429": {
             "description": "Locked after repeated failures; retry after `Retry-After` seconds"
           },
+          "403": {
+            "description": "`Origin` is not the web app's origin"
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -236,12 +264,7 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
+        }
       }
     },
     "/api/v1/auth/refresh": {
@@ -250,18 +273,33 @@
           "auth"
         ],
         "summary": "Refresh",
-        "description": "Rotate: the refresh token is spent and a new pair is issued. Reuse revokes the session.",
+        "description": "Rotate: the refresh cookie is spent and a new pair is issued. Reuse revokes the session.\n\nThe new refresh token keeps the session's end (sign-in + 12 h); after it, sign in again.",
         "operationId": "refresh_api_v1_auth_refresh_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RefreshRequest"
-              }
-            }
-          },
-          "required": true
-        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "kerp_refresh",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The refresh token (httpOnly cookie, never JS)",
+              "title": "Kerp Refresh"
+            },
+            "description": "The refresh token (httpOnly cookie, never JS)"
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -273,6 +311,9 @@
               }
             }
           },
+          "403": {
+            "description": "`Origin` is not the web app's origin"
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -283,12 +324,7 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
+        }
       }
     },
     "/api/v1/auth/logout": {
@@ -297,7 +333,7 @@
           "auth"
         ],
         "summary": "Logout",
-        "description": "Revoke this access token and every token of its login session.",
+        "description": "Revoke this access token and every token of its login session; clear the cookie.",
         "operationId": "logout_api_v1_auth_logout_post",
         "responses": {
           "204": {
@@ -2181,18 +2217,6 @@
             "maxLength": 1024,
             "minLength": 1,
             "title": "Password"
-          },
-          "tenant_id": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "uuid"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Tenant Id"
           }
         },
         "additionalProperties": false,
@@ -2234,18 +2258,6 @@
             "maxLength": 320,
             "minLength": 3,
             "title": "Email"
-          },
-          "tenant_id": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "uuid"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Tenant Id"
           }
         },
         "additionalProperties": false,
@@ -2567,12 +2579,6 @@
       },
       "PinUnlockRequest": {
         "properties": {
-          "refresh_token": {
-            "type": "string",
-            "maxLength": 4096,
-            "minLength": 1,
-            "title": "Refresh Token"
-          },
           "pin": {
             "type": "string",
             "pattern": "^[0-9]{6}$",
@@ -2583,11 +2589,10 @@
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "refresh_token",
           "pin"
         ],
         "title": "PinUnlockRequest",
-        "description": "The device's refresh token and the PIN. Both are required: a PIN alone is never a\ncredential."
+        "description": "The PIN. The device's refresh token comes from the refresh cookie: both are\nrequired, a PIN alone is never a credential."
       },
       "PolygonGeoJSON": {
         "properties": {
@@ -2892,22 +2897,6 @@
         "type": "object",
         "title": "ProjectUpdate",
         "description": "``PATCH /projects/{id}``: only the given fields change; ``spatial_bounds: null`` clears."
-      },
-      "RefreshRequest": {
-        "properties": {
-          "refresh_token": {
-            "type": "string",
-            "maxLength": 4096,
-            "minLength": 1,
-            "title": "Refresh Token"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "refresh_token"
-        ],
-        "title": "RefreshRequest"
       },
       "ResolvedColumn": {
         "properties": {
@@ -3416,10 +3405,6 @@
             "type": "string",
             "title": "Access Token"
           },
-          "refresh_token": {
-            "type": "string",
-            "title": "Refresh Token"
-          },
           "token_type": {
             "type": "string",
             "const": "bearer",
@@ -3434,17 +3419,17 @@
           "refresh_expires_in": {
             "type": "integer",
             "title": "Refresh Expires In",
-            "description": "Refresh token lifetime in seconds"
+            "description": "Seconds until the login session ends (sign-in + 12 h); then sign in again"
           }
         },
         "type": "object",
         "required": [
           "access_token",
-          "refresh_token",
           "expires_in",
           "refresh_expires_in"
         ],
-        "title": "TokenResponse"
+        "title": "TokenResponse",
+        "description": "The access token. The refresh token is never in a body: it is the ``httpOnly``\nrefresh cookie (diff §4.2, TD-203)."
       },
       "UploadCreate": {
         "properties": {
