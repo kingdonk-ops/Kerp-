@@ -78,7 +78,7 @@
 | ▶ | [T-0066](../tracker/tasks/T-0066.md) | tracker.py set --note: do not double the date when the note already starts with one; clean existing doubled notes | platform | S | — |  |
 | ▶ | [T-0067](../tracker/tasks/T-0067.md) | Review gate runs from base; SHA-pin write-token workflow actions | platform | S | — |  |
 | ▶ | [T-0068](../tracker/tasks/T-0068.md) | Login lockout per client IP with a per-account backstop; drop test-only lockout API | identity | M | — |  |
-| 🟦 | [T-0069](../tracker/tasks/T-0069.md) | Drop unused tenancy helpers require_tenant_id / require_project_id | platform | S | — |  |
+| 🟪 | [T-0069](../tracker/tasks/T-0069.md) | Drop unused tenancy helpers require_tenant_id / require_project_id | platform | S | — | #56 |
 | ▶ | [T-0070](../tracker/tasks/T-0070.md) | Default KERP_ENVIRONMENT to production; development opts in | platform | S | — |  |
 | ▶ | [T-0071](../tracker/tasks/T-0071.md) | Load the caller's memberships once per request | projects | S | — |  |
 | ⬜ | [T-0072](../tracker/tasks/T-0072.md) | Duplicated tab keeps its session: cross-tab refresh lock and token hand-off | frontend | M | T-0037 |  |
