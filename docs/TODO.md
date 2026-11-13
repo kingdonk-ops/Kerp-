@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 122 · **Closed:** 56
+**Open:** 121 · **Closed:** 56
 
 ## decision (7)
 
@@ -139,12 +139,11 @@
 | [TD-175](../tracker/todo/TD-175.md) | Record retention rules + legal hold per project | — | clean-room-gap-analysis |
 | [TD-186](../tracker/todo/TD-186.md) | spatial_bounds: GiST index and ST_IsValid check (self-intersecting polygons are accepted today); project code stays taken after soft delete | T-0012 | implementer |
 
-## bug (2)
+## bug (1)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
 | [TD-159](../tracker/todo/TD-159.md) | Site filter from the bound project is applied to all site-scoped rows: a PER-07 on A who is PER-01 on B loses B's site-scoped rows (over-restrictive) | T-0010 | reviewer |
-| [TD-188](../tracker/todo/TD-188.md) | Flaky on PostgreSQL: tests/test_jobs.py::test_a_cancelled_or_timed_out_job_is_marked_failed sometimes leaves the job 'running' (cancel races the start/finish write) | T-0015 | implementer |
 
 ## risk (11)
 
