@@ -3,9 +3,9 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 158 · **Closed:** 91
+**Open:** 153 · **Closed:** 97
 
-## decision (7)
+## decision (5)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -13,11 +13,9 @@
 | [TD-213](../tracker/todo/TD-213.md) | Object key layout: confirm {tenant}/{project}/{module}/{sha256} (no extension) instead of the master spec's {hash}.ext, plus transient staging/ and quarantine/ prefixes | T-0016 | implementer |
 | [TD-223](../tracker/todo/TD-223.md) | Who may open PRs to dev? If any account other than KERP_ALLOWED_REVIEWERS (or forks) can, require a human approval as well as review-gate | T-0067 | reviewer |
 | [TD-224](../tracker/todo/TD-224.md) | Magic-link request lockout is still per tenant+email: anyone can keep a known field worker from getting a link (4/hour, then doubling delay); decide per-client keying vs mailbox-flood protection | T-0068 | reviewer |
-| [TD-228](../tracker/todo/TD-228.md) | Teams scope and management: project-level teams only, managed by PER-09 (no tenant-level or cross-project teams) | T-0013 | planner |
-| [TD-229](../tracker/todo/TD-229.md) | Teams module vs planner crews and roster teams (TD-073/TD-083) and the handover 'project team' | T-0013 | planner |
-| [TD-237](../tracker/todo/TD-237.md) | Who may send a notification through the API: T-0019 allows only the admin capability (PER-09) and no pins; modules notify through service.notify. Confirm or widen (e.g. PER-02/PER-03 broadcasts) | T-0019 | implementer |
+| [TD-251](../tracker/todo/TD-251.md) | Team-to-project link role: the persona matrix has no read-only 'Viewer' or generic 'Editor' role - which roles may a team link carry? | T-0013, T-0073 | planner |
 
-## spec-gap (38)
+## spec-gap (36)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -56,8 +54,6 @@
 | [TD-205](../tracker/todo/TD-205.md) | NFR budgets need a reference device and a 4G network profile before they become a hard gate for Pilot-0 | T-0045, T-0146 | planner |
 | [TD-220](../tracker/todo/TD-220.md) | Client QR co-sign (mode ii): judge 'key active at occurred_at' by the tablet's reconstructed scan time, not the client device clock | T-0163 | reviewer |
 | [TD-221](../tracker/todo/TD-221.md) | Client wet signature (mode iii): outcome when the client rejects after the inspection is already approved (INSPECTED_PASSED/INSPECTED_FAILED) or LOCKED_FOR_TURNOVER | T-0174 | reviewer |
-| [TD-230](../tracker/todo/TD-230.md) | Saved view visibility 'team' names no team: oe_saved_view (register-views 3) has no team reference | T-0013 | planner |
-| [TD-244](../tracker/todo/TD-244.md) | register-views spec 3: oe_saved_view lists no team reference and one is_default for two kinds of default | T-0020 | implementer |
 | [TD-249](../tracker/todo/TD-249.md) | GET /auth/me (and the JWT tid claim) still expose the tenant id to the SPA: confirm diff 4.1 'never see the tenant' allows it or drop tenant_id from MeResponse | T-0037 | implementer |
 
 ## missed (4)
@@ -69,7 +65,7 @@
 | [TD-131](../tracker/todo/TD-131.md) | Add a root .env.example for the dev stack (the implementer agent's permission rules block writing .env* files) | T-0003 | implementer |
 | [TD-208](../tracker/todo/TD-208.md) | Uploads infra: provision the kerp-vault bucket (CORS for browser PUT/GET, lifecycle on staging/), wire KERP_S3_* in compose, add MinIO to CI for the gated round-trip test | T-0016 | implementer |
 
-## deferred (30)
+## deferred (29)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -97,9 +93,8 @@
 | [TD-209](../tracker/todo/TD-209.md) | Uploads: file deletion and content-object GC; recover files stuck in 'verifying' after a failed verify job | T-0016 | implementer |
 | [TD-212](../tracker/todo/TD-212.md) | Uploads: run the orphan sweep on a schedule for every project (needs the scope list of TD-155) | T-0016 | implementer |
 | [TD-217](../tracker/todo/TD-217.md) | Inspection scheduling after Pilot-0: calendar view, general recurrence (beyond scaffolds), light work-order grouping (TD-165 remainder) | T-0152 | planner |
-| [TD-231](../tracker/todo/TD-231.md) | Teams admin screen in the Backbone nav group (list, create, rename, delete, add/remove members) | T-0013 | planner |
+| [TD-231](../tracker/todo/TD-231.md) | Teams admin screen (system_admin): list, create, rename, delete, add/remove members, link teams to projects with a role; read-only linked-teams view per project | T-0013 | planner |
 | [TD-238](../tracker/todo/TD-238.md) | Notifications: run non-in-app channels (FCM T-0144, e-mail TD-084) as an SAQ job after commit, with a persisted per-channel delivery log and retry; T-0019 calls them synchronously inside the caller's transaction | T-0019 | implementer |
-| [TD-242](../tracker/todo/TD-242.md) | saved_views: team visibility needs the teams module (T-0013) - pass the caller's team ids into Viewer and validate team_id | T-0020 | implementer |
 | [TD-243](../tracker/todo/TD-243.md) | saved_views: expose portal views through the client portal layout | T-0020 | implementer |
 | [TD-248](../tracker/todo/TD-248.md) | Startup check that KERP_DEFAULT_TENANT_ID names an existing tenant row (needs the tenant table from T-0023) | T-0037 | implementer |
 | [TD-250](../tracker/todo/TD-250.md) | Request-context middleware: starlette ClientDisconnect (raised by request.body() after http.disconnect) is still logged as an unhandled 500; map it to 499/disconnected like CancelledError | T-0030 | implementer |
@@ -293,3 +288,9 @@
 | ✅ | [TD-214](../tracker/todo/TD-214.md) | Pilot-0 checklist gaps: no inspector capture screen in the subset (T-0130 not listed; needs T-0124/T-0112/T-0128), no ad-hoc inspection UI, and T-0133 depends on the deferred P6 import T-0104 | R2a: T-0130 joins Pilot-0, T-0165 cut for capture and ad-hoc start, T-0133's P6 tests split to T-0166 outside the pilot so T-0104 leaves the gate (user, 2026-11-13) |
 | ✅ | [TD-218](../tracker/todo/TD-218.md) | Field palette after Pilot-0: video and audio notes, barcode/QR answer fields, reference images on questions (TD-166 remainder) | R4b: in Pilot-0; cut into T-0167 (video/audio/barcode field types), T-0168 (reference images), T-0169 (SAQ media probe), T-0170 (video/audio capture), T-0171 (barcode field + reference image display) (user, 2026-11-13) |
 | ✅ | [TD-219](../tracker/todo/TD-219.md) | Pilot-0 client co-sign on the inspector's device: who the client signer is (named PER-15 account with own PIN vs typed name + drawn signature) and which states it applies to | R1a + co-sign redesign: the client co-signs with their own KERP account (PER-15): (i) online PIN (T-0162), (ii) QR assertion signed by the client's own device key (T-0173, T-0175), (iii) provisional wet signature confirmed by the client (T-0174, T-0176); ledger T-0163, inspector screens T-0164 (user, 2026-11-13) |
+| ✅ | [TD-228](../tracker/todo/TD-228.md) | Teams scope and management: project-level teams only, managed by PER-09 (no tenant-level or cross-project teams) | Overridden (user, 2026-11-13): teams are tenant-level, created and staffed by system_admin, linked to several projects with one role (persona) per project; every member gets that access; PER-09 keeps managing individual members (diff 4.1 Teams, ADR 0008) |
+| ✅ | [TD-229](../tracker/todo/TD-229.md) | Teams module vs planner crews and roster teams (TD-073/TD-083) and the handover 'project team' | Confirmed (user, 2026-11-13): teams are separate from planner crews/rosters and are only about who has access with what permissions; 'project team' in the spec means everyone on the project (diff 4.1 Teams) |
+| ✅ | [TD-230](../tracker/todo/TD-230.md) | Saved view visibility 'team' names no team: oe_saved_view (register-views 3) has no team reference | Decided (user, 2026-11-13): a team view can be shared with several teams, all linked to the view's project, visible only on that project (register-views 3); built by T-0074 |
+| ✅ | [TD-237](../tracker/todo/TD-237.md) | Who may send a notification through the API: T-0019 allows only the admin capability (PER-09) and no pins; modules notify through service.notify. Confirm or widen (e.g. PER-02/PER-03 broadcasts) | Confirmed (user, 2026-11-13): only the Project Administrator (PER-09) may send manual notifications through the API; modules notify through service.notify (diff 4.1) |
+| ✅ | [TD-242](../tracker/todo/TD-242.md) | saved_views: team visibility needs the teams module (T-0013) - pass the caller's team ids into Viewer and validate team_id | Scheduled as T-0074 (user decision TD-230, 2026-11-13): saved_views team visibility wired to the teams contract and widened from a single team_id to several linked teams |
+| ✅ | [TD-244](../tracker/todo/TD-244.md) | register-views spec 3: oe_saved_view lists no team reference and one is_default for two kinds of default | Team part decided (user, 2026-11-13): several teams per view via a view-team link, all linked to the view's project (register-views 3, T-0074); the is_default reading of T-0020 stands as built |

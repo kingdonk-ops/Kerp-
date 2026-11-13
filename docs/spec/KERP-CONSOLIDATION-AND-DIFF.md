@@ -181,6 +181,23 @@ Wins over any earlier text on tenant selection, tenant administrators and projec
   by itself; users who already have projects can open the lobby from the picker (user,
   2026-11-13; TD-202). The lobby and code lookup read through a narrow path (code, name, id of
   matching projects only); the membership-based `projects` policy is not widened.
+- **Teams (user, 2026-11-13; TD-228, TD-229, TD-230, ADR 0008).** A team is a **tenant-level**
+  named group of user accounts. Only a `system_admin` creates, renames and deletes teams,
+  manages their members and links them to projects. A team can be linked to several projects.
+  **Each team-project link carries one role for that project**, i.e. one persona of edge spec §5.2,
+  e.g. a Trade Supervisor role on project A and a different role on project B. Every member of the
+  team gets that access on that project. Which personas a link may carry is TD-251 (default:
+  PER-01 to PER-14 except PER-09; a PER-07 link names its site). **Effective access to a project
+  = the user's individual memberships ∪ the grants from teams linked to it.** Team-derived
+  grants count everywhere individual ones do: allowed project list, site filter, 404 for
+  non-members, membership-based RLS. They are stored as derived membership rows that only the
+  teams module maintains (ADR 0008). PER-09 still manages the project's individual members. It
+  sees team-derived members, marked with their team, but cannot edit or remove them. Teams are
+  for access only. They are not planner crews, rosters or shift teams (TD-073, TD-083), and
+  "project team" anywhere in the spec means everyone with access to the project. Saved views
+  can be shared with several teams linked to the view's project (register-views §3).
+- **Manual notifications (user, 2026-11-13; TD-237).** Only a project's PER-09 may send a
+  notification through the API. Modules notify through the notifications service.
 
 ### 4.2 Sessions (user, 2026-11-13; TD-121, TD-135, TD-170)
 

@@ -64,6 +64,12 @@ set by PER-09), `columns` (ordered: id, width, pinned, visible), `filter` (AST),
 `group_by` (+ aggregates and totals row), `conditional_format` (rules: CEL condition → style,
 e.g. `Scoped == "No"` → amber), `density`, `schema_version`.
 
+- **Team visibility (user, 2026-11-13; TD-230, TD-244).** A `team` view names **one or more
+  teams** (a view-team link, not a column). Every named team must be linked to the view's project
+  (diff §4.1 Teams). The view is visible only in that project, to its owner, the project's
+  PER-09 and the members of any named team. A team that is deleted or unlinked from the project
+  stops seeing the view. When no named team is left, the view is visible to its owner (and
+  PER-09) only. The `my_teams` filter op means the caller's teams linked to the bound project.
 - Create / edit / save / save-as / rename / delete; edit of shared views by owner or PER-09.
 - **Add / remove / reorder columns** from the catalogue; "Add new field…" shortcut opens the
   field-def editor for the level/item type (PER-09 only; additive, versioned per ADR 0003).
