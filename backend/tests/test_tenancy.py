@@ -8,6 +8,8 @@ import uuid
 from collections.abc import Iterator
 from datetime import UTC, datetime
 from pathlib import Path
+from types import SimpleNamespace
+from typing import Any
 
 import pytest
 from fastapi import FastAPI
@@ -28,6 +30,8 @@ from app.core.tenancy.context import (
     use_tenancy,
 )
 from app.core.tenancy.rls import (
+    ALLOWED_READ_POLICY_NAME,
+    ALLOWED_SETTING,
     POLICY_NAME,
     POLICY_NAMES,
     PROJECT_SETTING,
@@ -84,12 +88,14 @@ def test_use_tenancy_sets_and_resets_context_vars() -> None:
 
 def test_tenancy_seam_comes_from_the_verified_token_only() -> None:
     # No token, or a token that failed verification: the request session stays unbound.
-    assert get_tenancy_context(ANONYMOUS) is None
-    assert get_tenancy_context(BearerResult(claims=None, presented=True)) is None
+    # No database on the app: the token's scope only (memberships: tests/test_access.py).
+    request: Any = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace()))
+    assert get_tenancy_context(request, ANONYMOUS) is None
+    assert get_tenancy_context(request, BearerResult(claims=None, presented=True)) is None
     user = uuid.uuid4()
     now = datetime.now(UTC)
     claims = TokenClaims("access", user, T1, uuid.uuid4(), "jti", now, now)
-    bound = get_tenancy_context(BearerResult(claims=claims, presented=True))
+    bound = get_tenancy_context(request, BearerResult(claims=claims, presented=True))
     assert bound == TenancyContext(tenant_id=T1, project_id=None, user_id=user)
 
 
@@ -267,7 +273,8 @@ def test_rls_tables_cover_every_tenant_table() -> None:
 
 
 def test_policy_sql_forces_rls_and_guards_empty_settings() -> None:
-    enable, force, drop, create, drop_read, create_read = rls_policy_sql("test_widget")
+    statements = rls_policy_sql("test_widget")
+    enable, force, drop, create, drop_read, create_read, drop_allowed, create_allowed = statements
     assert enable == "ALTER TABLE test_widget ENABLE ROW LEVEL SECURITY"
     assert force == "ALTER TABLE test_widget FORCE ROW LEVEL SECURITY"
     assert drop == f"DROP POLICY IF EXISTS {POLICY_NAME} ON test_widget"
@@ -287,7 +294,14 @@ def test_policy_sql_forces_rls_and_guards_empty_settings() -> None:
         f"CREATE POLICY {READ_POLICY_NAME} ON test_widget FOR SELECT "
         f"USING ({tenant} AND project_id IS NULL)"
     )
-    assert POLICY_NAMES == (POLICY_NAME, READ_POLICY_NAME)
+    # Reads only: rows of the allowed projects (T-0010, TD-053); an unset list matches nothing.
+    assert drop_allowed == f"DROP POLICY IF EXISTS {ALLOWED_READ_POLICY_NAME} ON test_widget"
+    assert create_allowed == (
+        f"CREATE POLICY {ALLOWED_READ_POLICY_NAME} ON test_widget FOR SELECT "
+        f"USING ({tenant} AND project_id = ANY(string_to_array("
+        f"NULLIF(current_setting('{ALLOWED_SETTING}', true), ''), ',')::uuid[]))"
+    )
+    assert POLICY_NAMES == (POLICY_NAME, READ_POLICY_NAME, ALLOWED_READ_POLICY_NAME)
 
 
 # --- HTTP: cross-project is a 404 ---------------------------------------------------------
