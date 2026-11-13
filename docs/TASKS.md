@@ -3,11 +3,11 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 16/83 tasks done (19%) · **ready now:** 10 · **epics awaiting breakdown:** 47
+**Overall:** 17/83 tasks done (20%) · **ready now:** 11 · **epics awaiting breakdown:** 47
 
 | Phase | Tasks done | Progress |
 |---|---|---|
-| 0 · Platform foundations | 16/36 | `████░░░░░░` 44% |
+| 0 · Platform foundations | 17/36 | `████░░░░░░` 47% |
 | 1 · Asset & Quality backbone | 0/38 (+1 epics) | `░░░░░░░░░░` 0% |
 | 2 · Welding quality | 0/9 | `░░░░░░░░░░` 0% |
 | 3 · Logistics | 0/0 (+7 epics) | `░░░░░░░░░░` 0% |
@@ -30,9 +30,9 @@
 | ✅ | [T-0007](../tracker/tasks/T-0007.md) | Project-scoped RLS: project_id context, policy helper, cross-project→404, 4 RLS-bypass contract tests | tenancy | M | T-0005 | #19 |
 | ✅ | [T-0008](../tracker/tasks/T-0008.md) | Auth: users, RS256/EdDSA JWT + JWKS endpoint, 15-min access + rotating refresh, jti revocation in Redis | identity | M | T-0007 | #31 |
 | ✅ | [T-0009](../tracker/tasks/T-0009.md) | Field-worker auth: magic-link + 6-digit PIN local unlock + progressive lockout | identity | M | T-0008 | #35 |
-| 🟪 | [T-0010](../tracker/tasks/T-0010.md) | Three-tier RBAC/ABAC: capability tiers × 15 personas × project/site scope (Asset-Site filter) + explicit multi-project read scope | identity | M | T-0008 | #39 |
+| ✅ | [T-0010](../tracker/tasks/T-0010.md) | Three-tier RBAC/ABAC: capability tiers × 15 personas × project/site scope (Asset-Site filter) + explicit multi-project read scope | identity | M | T-0008 | #39 |
 | ✅ | [T-0011](../tracker/tasks/T-0011.md) | Module loader + manifest contract + per-project enable/disable | platform | M | T-0005 | #32 |
-| ⬜ | [T-0012](../tracker/tasks/T-0012.md) | projects module: CRUD + settings (IANA timezone, spatial_bounds, currency/locale) | projects | S | T-0010, T-0011 |  |
+| ▶ | [T-0012](../tracker/tasks/T-0012.md) | projects module: CRUD + settings (IANA timezone, spatial_bounds, currency/locale) | projects | S | T-0010, T-0011 |  |
 | ⬜ | [T-0013](../tracker/tasks/T-0013.md) | teams module: teams, membership, entity visibility | teams | S | T-0012 |  |
 | ⬜ | [T-0014](../tracker/tasks/T-0014.md) | admin module: tenant/user/role administration API + membership-based RLS on projects and tenant-level tables | admin | M | T-0010, T-0011, T-0012 |  |
 | ▶ | [T-0015](../tracker/tasks/T-0015.md) | SAQ worker + Redis + jobs module (enqueue/status/poll), interactive+batch priority queues | jobs | M | T-0003, T-0011 |  |
