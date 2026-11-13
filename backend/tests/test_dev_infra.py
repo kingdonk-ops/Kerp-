@@ -110,6 +110,8 @@ def test_compose_worker_runs_the_saq_worker_from_the_backend_image(
     assert worker["environment"]["KERP_REDIS_URL"] == "redis://redis:6379/0"
     assert "kerp_app:" in worker["environment"]["KERP_DATABASE_URL"]  # RLS applies
     assert worker["healthcheck"] == {"disable": True}  # the image's check probes the API
+    # T-0070: the backend defaults to production; the dev worker opts in.
+    assert worker["environment"]["KERP_ENVIRONMENT"] == "development"
 
 
 def test_postgres_healthcheck_uses_tcp_not_the_init_socket(compose: dict[str, Any]) -> None:
@@ -200,3 +202,11 @@ def test_makefile_recipes_use_tabs() -> None:
     # POSIX make (Git Bash on Windows too) needs tab-indented recipes.
     for n, line in enumerate(MAKEFILE.read_text(encoding="utf-8").splitlines(), 1):
         assert not line.startswith("    "), f"Makefile:{n} indented with spaces"
+
+
+# --- explicit environment opt-ins (T-0070: the backend defaults to production) ----------------
+
+
+def test_make_and_ci_opt_out_of_the_production_default(ci_backend: dict[str, Any]) -> None:
+    assert _make_defaults().get("KERP_ENVIRONMENT") in {"development", "test"}
+    assert ci_backend["env"]["KERP_ENVIRONMENT"] in {"development", "test"}

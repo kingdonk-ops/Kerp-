@@ -96,5 +96,5 @@ def test_the_default_refuses_to_issue_tokens_without_a_key(clean_env: pytest.Mon
     """T-0070: forgetting KERP_ENVIRONMENT must not give ephemeral keys or logged links."""
     for name in ("KERP_JWT_PRIVATE_KEY", "KERP_JWT_PRIVATE_KEY_FILE"):
         clean_env.delenv(name, raising=False)
-    with pytest.raises(AuthConfigError, match="must be set in production"):
+    with pytest.raises(AuthConfigError, match="KERP_JWT_PRIVATE_KEY"):
         build_auth_runtime(Settings(redis_url="redis://cache.invalid:6379/0"))
