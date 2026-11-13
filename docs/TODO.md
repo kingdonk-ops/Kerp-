@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 126 · **Closed:** 56
+**Open:** 125 · **Closed:** 57
 
 ## decision (7)
 
@@ -143,12 +143,11 @@
 | [TD-175](../tracker/todo/TD-175.md) | Record retention rules + legal hold per project | — | clean-room-gap-analysis |
 | [TD-177](../tracker/todo/TD-177.md) | Form renderer: adopt the T-0110 shared field-type registry + dual-runtime parity | T-0025 | implementer |
 
-## bug (2)
+## bug (1)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
 | [TD-159](../tracker/todo/TD-159.md) | Site filter from the bound project is applied to all site-scoped rows: a PER-07 on A who is PER-01 on B loses B's site-scoped rows (over-restrictive) | T-0010 | reviewer |
-| [TD-187](../tracker/todo/TD-187.md) | jobs worker: a cancellation/timeout while _start is returning leaves the row 'running' forever (flaky test_a_cancelled_or_timed_out_job_is_marked_failed) | T-0015 | coordinator |
 
 ## risk (11)
 
@@ -226,3 +225,4 @@
 | ✅ | [TD-116](../tracker/todo/TD-116.md) | ADR 0004 Amendment B: two-person unlock of a locked rule names approval_routes (E-06-07, Phase 6) - who is the second approver until then? | Interim default approved: until approval_routes (E-06-07) exists, a second, different PER-13 or PER-01 user approves an unlock of a locked rule (user, 2026-11-10) |
 | ✅ | [TD-118](../tracker/todo/TD-118.md) | Qualification-type catalogue (TD-101): who is the 'super admin', and may a project-scoped PER-09 edit a tenant-wide (global) catalogue? | No super admin: the tenant administrator edits the tenant-wide qualification catalogue; PER-09 Project Administrator may add project-level types (user, 2026-11-10) |
 | ✅ | [TD-119](../tracker/todo/TD-119.md) | CLAUDE.md section 6 anchor bullet still says 'work anchors to an RSW': apply the ADR 0003 amended wording (human edit; agents may not change CLAUDE.md) | CLAUDE.md section 6 anchor bullet updated to the ADR 0003 wording with 'at most one per root-to-leaf path' (TD-113) (user, 2026-11-10) |
+| ✅ | [TD-187](../tracker/todo/TD-187.md) | jobs worker: a cancellation/timeout while _start is returning leaves the row 'running' forever (flaky test_a_cancelled_or_timed_out_job_is_marked_failed) | run_job shields the _start thread; a cancel during start waits for it, then fails a started row with 'Job timed out or was cancelled' (shielded) and re-raises (fix/jobs-cancel-during-start) |
