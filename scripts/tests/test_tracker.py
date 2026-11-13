@@ -337,8 +337,9 @@ def test_patch_id_bookkeeping_only_tracker_change_keeps_id(task_repo, edit):
         lambda s: s.replace("- [ ] It works", "- [ ] It works\n- [ ] It is fast"),
         lambda s: s.replace('title: "Task"', 'title: "Other task"'),
         lambda s: s.replace("## Notes\n", "## Notes\n- undated note\n"),
+        lambda s: s.replace("- [ ] It works", "- [ ] It works\n  - 2026-11-13 also covers offline mode"),
     ],
-    ids=["goal", "acceptance", "title", "undated-note"],
+    ids=["goal", "acceptance", "title", "undated-note", "indented-dated-sub-bullet"],
 )
 def test_patch_id_tracker_content_change_gives_new_id(task_repo, edit):
     path, run, before = task_repo

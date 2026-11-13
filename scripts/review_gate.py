@@ -59,7 +59,8 @@ TRACKER_EXCLUDES = [
 ]
 # Front-matter keys that are pure bookkeeping (set by tracker.py / the coordinator).
 BOOKKEEPING_KEYS = frozenset({"status", "pr", "owner", "updated"})
-DATED_NOTE_RE = re.compile(r"^\s*- \d{4}-\d{2}-\d{2}\b")
+# Column 0 only: indented dated sub-bullets (e.g. under an acceptance criterion) are content.
+DATED_NOTE_RE = re.compile(r"^- \d{4}-\d{2}-\d{2}\b")
 
 
 @dataclass(frozen=True)

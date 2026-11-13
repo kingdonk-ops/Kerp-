@@ -175,8 +175,8 @@
 | [TD-216](../tracker/todo/TD-216.md) | Client co-sign residual risk: a provisional wet signature is only an inspector-witnessed claim until the client confirms it; a stolen client device key is stopped only by revoking the device (T-0043) | T-0174, T-0173 | planner |
 | [TD-222](../tracker/todo/TD-222.md) | Rate-limit unauthenticated /api/v1/auth/* at the proxy: each login/magic-link with a fresh e-mail costs one scrypt (16 MB) before any lockout applies | — | reviewer |
 | [TD-225](../tracker/todo/TD-225.md) | Login account backstop can still be held locked at ~1 request per lock after 51 distributed failures | T-0068 | reviewer |
-| [TD-228](../tracker/todo/TD-228.md) | review-gate patch-id ignores dated note lines entirely - a scope decision recorded as a dated Note can be added or reworded after approval without re-review | T-0029 | implementer |
 | [TD-232](../tracker/todo/TD-232.md) | Frontend lint toolchain: npm audit reports moderate minimatch ReDoS (GHSA-g3hv-75wg-m249) via eslint 10 / typescript-eslint 8.72.2 | T-0031 | implementer |
+| [TD-235](../tracker/todo/TD-235.md) | review-gate patch-id ignores dated note lines entirely - a scope decision recorded as a dated Note can be added or reworded after approval without re-review | T-0029 | implementer |
 
 ## Closed
 
