@@ -3,16 +3,17 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 102 · **Closed:** 56
+**Open:** 105 · **Closed:** 56
 
-## decision (2)
+## decision (3)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
 | [TD-096](../tracker/todo/TD-096.md) | Approved coating ITR dropped the residual-dust rating row the ITP requires; Grating and Gridmesh ITR has no approved version: confirm with the client before shipping default templates | T-0113 | planner |
 | [TD-141](../tracker/todo/TD-141.md) | Rule store: explicit per-rule version column, findings log only non-passing rules | T-0018 | implementer |
+| [TD-177](../tracker/todo/TD-177.md) | Who may create a project and how the creator gets a membership: POST /projects is gated on the admin capability in any project until T-0014's tenant administrator | T-0012 | implementer |
 
-## spec-gap (37)
+## spec-gap (38)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -53,6 +54,7 @@
 | [TD-139](../tracker/todo/TD-139.md) | Confirm per-kind rule context schemas and action vocabularies (validation compiler) | T-0018 | implementer |
 | [TD-148](../tracker/todo/TD-148.md) | Module-to-navigation-group mapping for the 8-group IA is unspecified | T-0024 | implementer |
 | [TD-151](../tracker/todo/TD-151.md) | Persona matrix interpretation: default-tier labels vs V/C/E/A/S, PER-03 progress sign-off, PER-09 combined with a hold-authority persona | T-0010 | implementer |
+| [TD-178](../tracker/todo/TD-178.md) | Project status values (ACTIVE/ON_HOLD/CLOSED chosen) and currency/locale defaults (AUD/en-AU) are not in the spec | T-0012 | implementer |
 
 ## missed (3)
 
@@ -83,7 +85,7 @@
 | [TD-155](../tracker/todo/TD-155.md) | Schedule the jobs sweep: enumerate tenant/project scopes under RLS (no BYPASSRLS) and run service.sweep from an SAQ cron | T-0015 | implementer |
 | [TD-156](../tracker/todo/TD-156.md) | Jobs API: per-kind capability check on POST /jobs and GET /jobs/{id} once RBAC lands (T-0010) | T-0015 | implementer |
 
-## later (33)
+## later (34)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -120,6 +122,7 @@
 | [TD-153](../tracker/todo/TD-153.md) | Membership lookup adds a DB round-trip per authenticated request | T-0010 | implementer |
 | [TD-157](../tracker/todo/TD-157.md) | Jobs worker: liveness healthcheck for the worker container, and re-queue (not fail) jobs interrupted by a worker shutdown | T-0015 | implementer |
 | [TD-160](../tracker/todo/TD-160.md) | Test that revoking (soft-deleting) a project membership removes that project from the resolved scope; extend TD-150 to bulk ORM update/delete | T-0010 | reviewer |
+| [TD-179](../tracker/todo/TD-179.md) | spatial_bounds: GiST index and ST_IsValid check (self-intersecting polygons are accepted today); project code stays taken after soft delete | T-0012 | implementer |
 
 ## bug (1)
 
