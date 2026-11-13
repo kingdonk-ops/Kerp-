@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 129 · **Closed:** 87
+**Open:** 131 · **Closed:** 87
 
 ## decision (3)
 
@@ -13,7 +13,7 @@
 | [TD-191](../tracker/todo/TD-191.md) | Login/magic-link lockout keyed by tenant+email lets anyone keep a known user at a 15-minute delay; decide per-email+per-IP keying and fix the begin() check/count race (single Lua script) | T-0009 | reviewer |
 | [TD-213](../tracker/todo/TD-213.md) | Object key layout: confirm {tenant}/{project}/{module}/{sha256} (no extension) instead of the master spec's {hash}.ext, plus transient staging/ and quarantine/ prefixes | T-0016 | implementer |
 
-## spec-gap (33)
+## spec-gap (35)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -50,6 +50,8 @@
 | [TD-117](../tracker/todo/TD-117.md) | Findings register (TD-106 decision) has no spec section or task: assessment step, configurable name/types per project, follow-up work, priority derivation | T-0116, T-0117 | planner |
 | [TD-167](../tracker/todo/TD-167.md) | Defect close-out loop: open -> action assigned (owner, due) -> rectified -> verified closed by a re-inspection (closed_by_inspection link); extends TD-066 | T-0117 | clean-room-gap-analysis |
 | [TD-205](../tracker/todo/TD-205.md) | NFR budgets need a reference device and a 4G network profile before they become a hard gate for Pilot-0 | T-0045, T-0146 | planner |
+| [TD-220](../tracker/todo/TD-220.md) | Client QR co-sign (mode ii): judge 'key active at occurred_at' by the tablet's reconstructed scan time, not the client device clock | T-0163 | reviewer |
+| [TD-221](../tracker/todo/TD-221.md) | Client wet signature (mode iii): outcome when the client rejects after the inspection is already approved (INSPECTED_PASSED/INSPECTED_FAILED) or LOCKED_FOR_TURNOVER | T-0174 | reviewer |
 
 ## missed (4)
 
