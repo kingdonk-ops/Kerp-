@@ -1,16 +1,19 @@
 """The four RLS-bypass contract tests (diff §4): SAQ worker, cross-module service call,
-raw-SQL aggregation and DB migration (T-0007).
+raw-SQL aggregation and DB migration (T-0007; the worker runs through real SAQ since
+T-0060).
 
 Each path skips the ORM scope in some way, so only PostgreSQL RLS stands between it and
 another project's rows. These tests need real PostgreSQL and a role that is neither
-SUPERUSER nor BYPASSRLS (CI's ``kerp_app``). RLS does not exist on SQLite.
+SUPERUSER nor BYPASSRLS (CI's ``kerp_app``). RLS does not exist on SQLite. The SAQ worker
+tests also need Redis (``KERP_REDIS_URL``), which CI's PostgreSQL step provides.
 """
 
+import asyncio
 import os
-import threading
 import uuid
 from collections.abc import Iterator
 from pathlib import Path
+from typing import Any
 
 import pytest
 from alembic import command
@@ -23,8 +26,14 @@ from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import QueuePool
 
+from app.core.config import Settings
 from app.core.db import GUID, Base, Database, import_all_models
-from app.core.tenancy.context import TenancyContext, current_tenant_id, use_tenancy
+from app.core.tenancy.context import (
+    TenancyContext,
+    current_project_id,
+    current_tenant_id,
+    use_tenancy,
+)
 from app.core.tenancy.rls import (
     PROJECT_SETTING,
     TENANT_SETTING,
@@ -35,6 +44,13 @@ from app.core.tenancy.rls import (
     rls_enforcement_problems,
     rls_policy_sql,
 )
+from app.modules.jobs import service
+from app.modules.jobs import worker as worker_module
+from app.modules.jobs.broker import LoopDispatcher, SaqBroker
+from app.modules.jobs.models import Job
+from app.modules.jobs.registry import JobContext, JobKind, JobRegistry
+from app.modules.jobs.worker import build_workers
+from tests.audit_support import migrated_database
 from tests.db_support import ON_POSTGRES, POSTGRES_URL, Gadget, Widget
 from tests.tenancy_support import (
     CTX_A,
@@ -43,7 +59,9 @@ from tests.tenancy_support import (
     CTX_T1,
     PA,
     PB,
+    PC,
     T1,
+    T2,
     VISIBLE_TO_A,
     seeded_database,
 )
@@ -53,6 +71,7 @@ pytestmark = pytest.mark.skipif(
 )
 
 OWNER_URL = os.environ.get("KERP_TEST_OWNER_URL", "")
+REDIS_URL = os.environ.get("KERP_REDIS_URL", "")
 ALEMBIC_INI = Path(__file__).resolve().parents[1] / "alembic.ini"
 RLS_ERROR = "row-level security"
 
@@ -83,22 +102,138 @@ def test_worker_without_context_reads_and_writes_nothing(db: Database) -> None:
         s.add(Widget(tenant_id=T1, project_id=PA, name="orphan-job"))
 
 
-def test_worker_binds_the_job_context_not_the_enqueuers(db: Database) -> None:
+# The worker tests below run a job through the real SAQ path: ``build_workers`` (the same
+# workers ``python -m app.modules.jobs.worker`` serves), a Redis queue, SAQ's job processing
+# task and the ``run_job`` wrapper, on one asyncio loop. The workers are started inside an
+# ambient ``use_tenancy(CTX_C)``: asyncio tasks copy the context variables of the task that
+# creates them, so a wrapper that did not bind the job's own scope would hand the handler
+# tenant T2's context. (The thread-based test this replaces proved nothing: a new thread
+# starts with empty context variables whatever the code under test does.)
+
+
+@pytest.fixture
+def jobs_db(tmp_path: Path) -> Iterator[Database]:
+    """The migrated schema (the job table, under RLS) plus the seeded scratch tables."""
+    migrated = migrated_database(tmp_path)
+    next(migrated)
+    try:
+        yield from seeded_database(tmp_path)
+    finally:
+        migrated.close()  # dispose and downgrade
+
+
+def _run_through_saq(
+    db: Database, monkeypatch: pytest.MonkeyPatch, kind: JobKind, enqueue_in: TenancyContext
+) -> Job:
+    """Enqueue one job in ``enqueue_in`` and let the real SAQ workers run it to the end."""
+    monkeypatch.setattr(worker_module, "SHUTDOWN_GRACE_S", 0)
+    registry = JobRegistry()
+    registry.add(kind)
+
+    async def scenario() -> uuid.UUID:
+        broker = SaqBroker(REDIS_URL, prefix=f"kerp-rls-{uuid.uuid4().hex[:8]}")
+        dispatcher = LoopDispatcher(broker, asyncio.get_running_loop())
+        service.set_dispatcher(dispatcher)
+        settings = Settings(environment="test")
+        workers = build_workers(settings, db=db, registry=registry, broker=broker)
+        with use_tenancy(CTX_C):  # an ambient context the worker tasks inherit
+            tasks = [asyncio.create_task(w.start()) for w in workers]
+        try:
+            with db.unit_of_work(enqueue_in) as s:
+                job_id = service.create_job(s, kind).id
+            await dispatcher.drain()
+
+            async def finished() -> None:
+                while True:
+                    with db.unit_of_work(enqueue_in) as s:
+                        if service.get_job(s, job_id).status in ("succeeded", "failed"):
+                            return
+                    await asyncio.sleep(0.05)
+
+            await asyncio.wait_for(finished(), 15)
+            return job_id
+        finally:
+            service.set_dispatcher(None)
+            for w in workers:
+                await w.stop()
+            for t in tasks:
+                t.cancel()
+            await broker.close()
+
+    job_id = asyncio.run(scenario())
+    with db.unit_of_work(enqueue_in) as s:
+        return service.get_job(s, job_id)
+
+
+@pytest.mark.skipif(not REDIS_URL, reason="needs Redis (KERP_REDIS_URL); CI's PG step (TD-052)")
+def test_the_saq_worker_binds_the_jobs_own_scope_under_rls(
+    jobs_db: Database, monkeypatch: pytest.MonkeyPatch
+) -> None:
     seen: dict[str, object] = {}
 
-    def job() -> None:
-        seen["inherited_tenant"] = current_tenant_id.get()
-        with db.unit_of_work(CTX_A) as s:
+    async def probe(job: JobContext) -> dict[str, Any]:
+        seen["context"] = (current_tenant_id.get(), current_project_id.get())
+        seen["tenancy"] = job.tenancy
+        with job.db.unit_of_work(job.tenancy) as s:
+            seen["settings"] = _setting_values(s.connection())
             seen["names"] = set(s.scalars(select(Widget.name)))
             seen["raw"] = s.execute(text("SELECT count(*) FROM test_widget")).scalar_one()
+            s.add(Widget(tenant_id=T1, project_id=PA, name="written-by-job"))
+        with job.db.sessionmaker() as unbound:  # no inherited binding: fails closed
+            seen["unbound"] = unbound.execute(text("SELECT count(*) FROM test_widget")).scalar_one()
+        return {"ok": True}
 
-    with use_tenancy(CTX_C):  # the enqueuing request's context
-        worker = threading.Thread(target=job)
-        worker.start()
-        worker.join()
-    assert seen["inherited_tenant"] is None
+    job = _run_through_saq(jobs_db, monkeypatch, JobKind("rls.probe", "interactive", probe), CTX_A)
+
+    assert (job.status, job.error, job.result) == ("succeeded", None, {"ok": True})
+    assert (job.tenant_id, job.project_id) == (T1, PA)
+    assert seen["context"] == (T1, PA)  # not CTX_C, the context the worker tasks inherited
+    assert seen["tenancy"] == CTX_A
+    assert seen["settings"] == (str(T1), str(PA))  # the handler's session is bound in PostgreSQL
     assert seen["names"] == VISIBLE_TO_A
     assert seen["raw"] == 4  # a1, a2, a-deleted (raw SQL has no soft-delete filter), library
+    assert seen["unbound"] == 0
+    with jobs_db.unit_of_work(CTX_A) as s:
+        assert "written-by-job" in set(s.scalars(select(Widget.name)))
+
+
+@pytest.mark.skipif(not REDIS_URL, reason="needs Redis (KERP_REDIS_URL); CI's PG step (TD-052)")
+def test_a_saq_job_cannot_read_or_write_another_tenants_or_projects_rows(
+    jobs_db: Database, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    seen: dict[str, object] = {}
+    others = {"pb": PB, "t2": T2}
+
+    async def snoop(job: JobContext) -> None:
+        with job.db.unit_of_work(job.tenancy) as s:
+            seen["orm"] = set(s.scalars(select(Widget.name).where(Widget.project_id.in_([PB, PC]))))
+            seen["raw"] = s.execute(
+                text("SELECT count(*) FROM test_widget WHERE project_id = :pb OR tenant_id = :t2"),
+                others,
+            ).scalar_one()
+            seen["gadgets"] = set(
+                s.execute(text("SELECT label FROM test_gadget WHERE tenant_id = :t2"), others)
+                .scalars()
+                .all()
+            )
+            seen["renamed"] = s.execute(
+                text("UPDATE test_widget SET name = 'x' WHERE project_id = :pb OR tenant_id = :t2"),
+                others,
+            ).rowcount
+        with job.db.unit_of_work(job.tenancy) as s:  # a write into project B is refused
+            s.execute(Widget.__table__.insert().values(**_raw_row(PB), name="smuggled"))
+
+    job = _run_through_saq(jobs_db, monkeypatch, JobKind("rls.snoop", "batch", snoop), CTX_A)
+
+    assert seen == {"orm": set(), "raw": 0, "gadgets": set(), "renamed": 0}
+    assert job.status == "failed"
+    assert job.error is not None
+    assert job.error.startswith("Internal error (")  # the RLS violation, sanitised
+    with jobs_db.unit_of_work(CTX_B) as s:
+        names = set(s.execute(text("SELECT name FROM test_widget")).scalars())
+    assert names == {"b1", "b2", "b3", "t1-library"}
+    with jobs_db.unit_of_work(CTX_C) as s:
+        assert set(s.execute(text("SELECT name FROM test_widget")).scalars()) == {"c1"}
 
 
 def test_job_context_survives_commits(db: Database) -> None:
