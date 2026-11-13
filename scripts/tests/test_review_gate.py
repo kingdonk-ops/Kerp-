@@ -79,3 +79,26 @@ def test_every_workflow_action_is_pinned_to_a_commit_sha() -> None:
             if m and not m.group(1).startswith("./") and not re.search(r"@[0-9a-f]{40}$", m.group(1)):
                 unpinned.append(f"{wf.name}:{n} {m.group(1)}")
     assert unpinned == []
+
+
+def test_reviewer_and_coordinator_docs_describe_the_gate_computation() -> None:
+    """T-0029: workflow, reviewer and coordinator docs all use the one patch-id computation."""
+    docs = [
+        ROOT / ".claude" / "agents" / "kerp-reviewer.md",
+        ROOT / ".claude" / "commands" / "kerp-run.md",
+        ROOT / "docs" / "WORKFLOW.md",
+    ]
+    for doc in docs:
+        text = doc.read_text()
+        assert "python scripts/review_gate.py --patch-id origin/dev" in text, doc.name
+        assert "**normalised** `tracker/**` diff" in text, doc.name
+        for key in ("`status`", "`pr`", "`owner`", "`updated`", "- YYYY-MM-DD"):
+            assert key in text, (doc.name, key)
+        for board in ("docs/TASKS.md", "docs/TODO.md", "docs/pr-suggestions.md"):
+            assert board in text, (doc.name, board)
+        assert "excludes `tracker/**`" not in text, doc.name
+    # The workflow takes the id from the script (no computation of its own), and the
+    # script's bookkeeping keys are exactly the ones the docs promise.
+    run_lines = [ln for ln in (WORKFLOWS / "review-gate.yml").read_text().splitlines() if ln.strip().startswith("run:")]
+    assert run_lines and all("review_gate.py" in ln and "patch-id" not in ln for ln in run_lines)
+    assert review_gate.BOOKKEEPING_KEYS == {"status", "pr", "owner", "updated"}

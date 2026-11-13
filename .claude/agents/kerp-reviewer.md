@@ -16,6 +16,12 @@ gh api repos/{owner}/{repo}/pulls/<n> -q '.title,.body'
 git diff origin/dev...HEAD --stat && git diff origin/dev...HEAD
 python scripts/review_gate.py --patch-id origin/dev        # the id your verdict must carry
 ```
+The patch-id is `git patch-id --stable` of the code diff (all paths except `tracker/**` and the generated `docs/TASKS.md`, `docs/TODO.md`, `docs/pr-suggestions.md`) plus the **normalised** `tracker/**` diff (front-matter `status`/`pr`/`owner`/`updated`, dated note lines `- YYYY-MM-DD…` at column 0 and blank lines dropped) — computed only by `python scripts/review_gate.py --patch-id origin/dev`, exactly what `review-gate` checks. Your approval therefore covers the task/TODO content in the diff (review it); later bookkeeping-only tracker edits keep it valid.
+
+**Caveat — PRs that edit `scripts/review_gate.py`:** CI runs the **base** copy of the script (from `origin/dev`), not the PR's. For such PRs compute the marker's id with the base copy:
+```bash
+git show origin/dev:scripts/review_gate.py > /tmp/review_gate_base.py && python /tmp/review_gate_base.py --patch-id origin/dev
+```
 
 ## Check, in order
 1. **Scope & acceptance** — every acceptance criterion in the task file is actually met by code + tests (not just ticked). Nothing out of scope slipped in.

@@ -8,12 +8,19 @@ containing exactly:
     KERP-REVIEW: APPROVED patch-id=<id>
     KERP-REVIEW: CHANGES_REQUESTED patch-id=<id>
 
-`patch-id` is `git patch-id --stable` of the PR's code diff against its merge
-base with the base branch, **excluding tracker paths** (tracker/**, docs/TASKS.md,
-docs/TODO.md, docs/pr-suggestions.md — all generated bookkeeping). That makes the approval:
-  * stable across rebases and tracker re-renders (coordinator bookkeeping),
-  * invalidated by any real code change after review.
-If the PR changes only tracker paths, the full diff is used instead.
+`patch-id` is `git patch-id --stable` of the PR's diff against its merge base with the
+base branch (T-0029, TD-013), built from two parts:
+  1. the code diff — every path except tracker/**, docs/TASKS.md, docs/TODO.md and
+     docs/pr-suggestions.md (the last three are generated and never part of the id);
+  2. a diff of every changed tracker/** file after `normalise_tracker_text`, which drops
+     bookkeeping only: front-matter `status`, `pr`, `owner`, `updated`, dated note lines
+     (`- YYYY-MM-DD...`) and blank-line layout.
+That makes the approval:
+  * stable across rebases, board re-renders and coordinator bookkeeping
+    (`tracker.py set --status/--pr/--owner/--note`),
+  * invalidated by any code change and by any tracker *content* change (goal, acceptance
+    criteria, title, deps, undated text, new/deleted tracker files) after review.
+If both parts are empty (a bookkeeping-only PR), the full raw diff is used instead.
 
 Only PR reviews count. Issue comments are ignored: posting one does not re-run this
 workflow (no `issue_comment` trigger, whose check would attach to the default branch, not
@@ -32,6 +39,7 @@ Env: GITHUB_TOKEN, GITHUB_REPOSITORY, PR_NUMBER, BASE_REF, HEAD_SHA,
 """
 from __future__ import annotations
 
+import difflib
 import json
 import os
 import re
@@ -49,6 +57,10 @@ TRACKER_EXCLUDES = [
     ":(exclude)docs/TODO.md",
     ":(exclude)docs/pr-suggestions.md",
 ]
+# Front-matter keys that are pure bookkeeping (set by tracker.py / the coordinator).
+BOOKKEEPING_KEYS = frozenset({"status", "pr", "owner", "updated"})
+# Column 0 only: indented dated sub-bullets (e.g. under an acceptance criterion) are content.
+DATED_NOTE_RE = re.compile(r"^- \d{4}-\d{2}-\d{2}\b")
 
 
 @dataclass(frozen=True)
@@ -90,10 +102,56 @@ def git(*args: str) -> str:
     return subprocess.run(["git", *args], check=True, capture_output=True, text=True).stdout
 
 
+def normalise_tracker_text(text: str) -> str:
+    """Tracker file content with bookkeeping removed (see module docstring).
+
+    Drops front-matter lines whose key is in BOOKKEEPING_KEYS, every dated note line
+    (``- YYYY-MM-DD...``), and blank lines (so the blank line ``set --note`` adds before
+    a note does not count). Everything else is review-relevant content.
+    """
+    lines = text.splitlines()
+    out: list[str] = []
+    in_front = bool(lines) and lines[0].strip() == "---"
+    for i, line in enumerate(lines):
+        if in_front and i > 0 and line.strip() == "---":
+            in_front = False
+            out.append(line)
+            continue
+        if in_front and i > 0:
+            key = line.split(":", 1)[0].strip()
+            if ":" in line and not line[:1].isspace() and key in BOOKKEEPING_KEYS:
+                continue
+        elif DATED_NOTE_RE.match(line) or not line.strip():
+            continue
+        out.append(line.rstrip())
+    return "\n".join(out) + "\n" if out else ""
+
+
+def _show(rev: str, path: str) -> str:
+    try:
+        return git("show", f"{rev}:{path}")
+    except subprocess.CalledProcessError:  # path absent at rev (added / deleted file)
+        return ""
+
+
+def tracker_diff(mb: str, head: str) -> str:
+    """Unified git-style diff of the normalised tracker/** files changed in mb..head."""
+    paths = git("diff", "--name-only", "--no-renames", mb, head, "--", "tracker").split()
+    chunks: list[str] = []
+    for path in sorted(paths):
+        a = normalise_tracker_text(_show(mb, path)).splitlines(keepends=True)
+        b = normalise_tracker_text(_show(head, path)).splitlines(keepends=True)
+        if a == b:
+            continue
+        hunks = "".join(difflib.unified_diff(a, b, f"a/{path}", f"b/{path}", n=3))
+        chunks.append(f"diff --git a/{path} b/{path}\n{hunks}")
+    return "".join(chunks)
+
+
 def compute_patch_id(base: str, head: str = "HEAD") -> str:
-    """Patch-id of the code diff (tracker paths excluded) between merge-base and head."""
+    """Patch-id of code diff + normalised tracker diff (boards excluded), merge-base..head."""
     mb = git("merge-base", base, head).strip()
-    diff = git("diff", mb, head, "--", ".", *TRACKER_EXCLUDES)
+    diff = git("diff", mb, head, "--", ".", *TRACKER_EXCLUDES) + tracker_diff(mb, head)
     if not diff.strip():
         diff = git("diff", mb, head)
     if not diff.strip():

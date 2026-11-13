@@ -452,6 +452,15 @@ def check_id_collisions(base: str, head: str | None, local: list[Item], run: Run
     return todo_id_collisions(head_titles, _titles_at(base, candidates, run), ancestor)
 
 
+ISO_DATE_PREFIX_RE = re.compile(r"\d{4}-\d{2}-\d{2}\b")
+
+
+def note_line(note: str, today: str) -> str:
+    """Markdown note line for ``set --note``; keeps a note's own leading ISO date instead of doubling it."""
+    note = note.strip()
+    return f"- {note}" if ISO_DATE_PREFIX_RE.match(note) else f"- {today}: {note}"
+
+
 def _report(errs: list[str]) -> None:
     for e in errs:
         print("ERROR", e)
@@ -553,7 +562,7 @@ def main(argv: list[str] | None = None) -> int:
                 it.meta["resolution"] = args.resolution
             it.meta["updated"] = _dt.date.today().isoformat()
             if args.note:
-                it.body = it.body.rstrip("\n") + f"\n\n- {_dt.date.today().isoformat()}: {args.note}\n"
+                it.body = it.body.rstrip("\n") + f"\n\n{note_line(args.note, _dt.date.today().isoformat())}\n"
             it.path.write_text(dump(it), encoding="utf-8")
             errs = validate(load_dir(TASK_DIR), load_dir(TODO_DIR))
             if errs:
