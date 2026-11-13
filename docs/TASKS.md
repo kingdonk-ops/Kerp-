@@ -3,11 +3,11 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 18/83 tasks done (22%) · **ready now:** 11 · **epics awaiting breakdown:** 47
+**Overall:** 19/83 tasks done (23%) · **ready now:** 10 · **epics awaiting breakdown:** 47
 
 | Phase | Tasks done | Progress |
 |---|---|---|
-| 0 · Platform foundations | 18/36 | `█████░░░░░` 50% |
+| 0 · Platform foundations | 19/36 | `█████░░░░░` 53% |
 | 1 · Asset & Quality backbone | 0/38 (+1 epics) | `░░░░░░░░░░` 0% |
 | 2 · Welding quality | 0/9 | `░░░░░░░░░░` 0% |
 | 3 · Logistics | 0/0 (+7 epics) | `░░░░░░░░░░` 0% |
@@ -48,7 +48,7 @@
 | ✅ | [T-0022](../tracker/tasks/T-0022.md) | Lint rule: heavy libs (fitz, cv2, rectpack, celpy, pyhanko) lazily imported | platform | S | T-0001 | #10 |
 | ⬜ | [T-0023](../tracker/tasks/T-0023.md) | onboarding: first-run provisioning (tenant, admin, default project) | onboarding | S | T-0012, T-0014 |  |
 | ✅ | [T-0024](../tracker/tasks/T-0024.md) | Frontend shell: auth, design tokens, 8-group nav (4 pillars + Backbone/Overview/Documents/Admin), project switcher + All-Projects, generated API client | frontend | M | T-0002, T-0008 | #38 |
-| ▶ | [T-0025](../tracker/tasks/T-0025.md) | Reusable UI shells: RegisterPage, DetailPage (gate banner, tabs, audit), Dynamic Form Renderer | frontend | M | T-0024, T-0017 |  |
+| ✅ | [T-0025](../tracker/tasks/T-0025.md) | Reusable UI shells: RegisterPage, DetailPage (gate banner, tabs, audit), Dynamic Form Renderer | frontend | M | T-0024, T-0017 | #42 |
 | ⬜ | [T-0026](../tracker/tasks/T-0026.md) | Admin UI: user manager, personas, project/site scope assignment | frontend | M | T-0024, T-0014 |  |
 | ⬜ | [T-0027](../tracker/tasks/T-0027.md) | Playwright setup + Phase 0 exit journey | e2e | S | T-0023, T-0024, T-0018 |  |
 | ✅ | [T-0028](../tracker/tasks/T-0028.md) | CI hardening: detect in ci-gate needs, least-privilege GHCR publish, SHA-pinned actions, base image digest + Renovate, drop empty postgres extra | platform | S | T-0004 | #18 |
