@@ -102,8 +102,10 @@ LOGIN_POLICY: Final = LockoutPolicy(
 )
 
 # Password login per tenant + e-mail, across all clients (T-0068): a backstop against
-# guessing one account's password from many addresses. Generous, so that locking a user out
-# this way costs an attacker 50+ requests per lock instead of one.
+# guessing one account's password from many addresses. Generous, so that the *first* account
+# lock costs an attacker 51 failures (from 9+ addresses) instead of 6 from one. After that it
+# escalates like every policy, so one request per lock expiry keeps the account locked for
+# every client until the 24 h window ends: a residual lock-out risk, TD-225.
 LOGIN_ACCOUNT_POLICY: Final = LockoutPolicy(
     free_attempts=50,
     base_delay=timedelta(seconds=30),

@@ -13,6 +13,7 @@ from datetime import timedelta
 
 import fakeredis
 import pytest
+import redis
 
 from app.core.auth.field import PIN_TTL_MARGIN
 from app.core.auth.lockout import (
@@ -251,6 +252,37 @@ def test_redis_attempt_retries_when_another_attempt_interleaves() -> None:
         lockout.begin("s")
     counter = next(k for k in client.keys(f"{KEY_PREFIX}lockout:pin:*:n"))
     assert int(client.get(counter)) == 3
+
+
+def test_redis_lock_with_under_half_a_second_left_still_refuses() -> None:
+    client = fakeredis.FakeRedis()
+    lockout = ProgressiveLockout(RedisRevocationStore(client), POLICY, "pin")
+    for _ in range(3):  # the third failure arms the lock
+        lockout.begin("s")
+    lock = next(k for k in client.keys(f"{KEY_PREFIX}lockout:pin:*:lock"))
+    client.pexpire(lock, 300)  # TTL would round this to 0 seconds
+    with pytest.raises(LockedOutError) as locked:
+        lockout.begin("s")
+    assert locked.value.retry_after == 1
+
+
+class AlwaysConflicting(fakeredis.FakeRedis):
+    """Every transaction loses its WATCH (an endless stream of rival attempts)."""
+
+    def pipeline(self, transaction: bool = True, shard_hint: object = None):  # type: ignore[no-untyped-def]
+        pipe = super().pipeline(transaction, shard_hint)  # type: ignore[arg-type]
+
+        def execute(raise_on_error: bool = True) -> list[object]:
+            raise redis.WatchError("watched key changed")
+
+        pipe.execute = execute
+        return pipe
+
+
+def test_redis_attempt_gives_up_after_bounded_retries_and_fails_closed() -> None:
+    lockout = ProgressiveLockout(RedisRevocationStore(AlwaysConflicting()), POLICY, "pin")
+    with pytest.raises(RevocationUnavailableError):
+        lockout.begin("s")
 
 
 def test_a_burst_cannot_pass_the_lock(store: RevocationStore) -> None:

@@ -64,12 +64,18 @@ Redis with `maxmemory-policy noeviction` (TD-142 tracks a token-claim remedy).
 | Password login backstop | tenant + e-mail, any client | 51 per 24 h | 30 s doubling to 15 min | none |
 | Magic-link request | tenant + e-mail | 4 per hour | 1 min doubling to 15 min | none |
 
-Password login is keyed by client (T-0068, TD-191): someone else's failures lock only their
-own client, so they cannot keep a known user out; the per-account backstop caps guessing from
-many addresses. The client is `request.client.host`. Behind a reverse proxy, set uvicorn's
+Password login is keyed by client (T-0068, TD-191): someone else's failures in the
+per-client lock lock only their own client. The per-account backstop caps guessing from many
+addresses, and is the remaining way to lock a known user out: the first backstop lock costs an
+attacker 51 failures (9+ addresses), after which about one request per lock expiry keeps the
+account locked for every client within its 24 h window (TD-225, owner decision pending).
+The client is `request.client.host`. Behind a reverse proxy, set uvicorn's
 `FORWARDED_ALLOW_IPS` to the proxy's address so the real client comes from
 `X-Forwarded-For`; without it every user appears as the proxy and the lock is per account
-again (as before T-0068, never worse).
+again (as before T-0068, never worse). Never set `FORWARDED_ALLOW_IPS=*` on a uvicorn that
+clients reach directly: they could then choose their own `X-Forwarded-For` and get a fresh
+per-client lock on every request (only the backstop would remain). IPv6 clients can rotate
+within their /64 (TD-226).
 
 Unknown addresses lock exactly like real ones. Link delivery is the `MagicLinkSender` seam:
 development logs the token, production logs "not delivered" until e-mail exists (TD-084).

@@ -41,6 +41,10 @@ from typing import Final, Protocol
 import redis
 
 KEY_PREFIX: Final = "kerp:auth:"
+# Optimistic-transaction retries in ``begin_attempt`` before giving up (fail closed). Each
+# retry means another attempt committed in between, and once a lock is armed every attempt is
+# read-only, so a real burst needs about ``free_attempts + 1``; this is defence in depth.
+MAX_ATTEMPT_RETRIES: Final = 32
 
 
 class RevocationUnavailableError(RuntimeError):
@@ -175,13 +179,14 @@ class RedisRevocationStore:
         def transaction() -> tuple[int, int]:
             pipe = self._client.pipeline(transaction=True)
             try:
-                while True:
+                for _ in range(MAX_ATTEMPT_RETRIES):
                     try:
                         pipe.watch(counter, lock)  # type: ignore[no-untyped-call]  # stub gap
                         # -2: no lock. Locks are always written with a TTL (-1 cannot occur).
-                        remaining = int(str(pipe.ttl(lock)))
-                        if remaining > 0:
-                            return 0, remaining
+                        # PTTL rounded up, so a lock with < 0.5 s left still refuses.
+                        left_lock_ms = int(str(pipe.pttl(lock)))
+                        if left_lock_ms > 0:
+                            return 0, math.ceil(left_lock_ms / 1000)
                         current = _as_bytes(pipe.get(counter))
                         left_ms = int(str(pipe.pttl(counter))) if current is not None else -2
                         attempt = int(current) + 1 if current is not None and left_ms > 0 else 1
@@ -197,6 +202,7 @@ class RedisRevocationStore:
                         return attempt, 0
                     except redis.WatchError:
                         continue  # another attempt landed in between: look again
+                raise redis.RedisError("lockout transaction kept conflicting")  # fail closed
             finally:
                 pipe.reset()  # also UNWATCHes
 

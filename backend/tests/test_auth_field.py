@@ -469,9 +469,7 @@ def test_another_clients_failures_do_not_lock_the_user_out(h: Harness) -> None:
     assert _login_from(h, "203.0.113.66") == 429  # and the owner's success did not unlock it
 
 
-def test_account_backstop_locks_across_clients(
-    h: Harness, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_account_backstop_locks_across_clients(h: Harness, monkeypatch: pytest.MonkeyPatch) -> None:
     """Rotating client addresses does not give unlimited guesses at one account."""
     monkeypatch.setattr(
         service_module, "LOGIN_ACCOUNT_POLICY", replace(LOGIN_ACCOUNT_POLICY, free_attempts=8)
