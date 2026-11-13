@@ -1,7 +1,9 @@
 # ADR 0008 — Tenant-level teams and team-derived project access
 
-- **Status:** accepted (approved by the product owner on 2026-11-13, including the storage
-  shape keyed by project, user, source type and source id)
+- **Status:** accepted (approved by the product owner on 2026-11-13, with storage keyed by
+  project, user, source type and source id). One planner refinement is **not yet confirmed by
+  the product owner**: persona and site are also part of the main unique constraint (see
+  "Deviation" below). The coordinator is confirming it separately.
 - **Date:** 2026-11-13
 - **Resolves:** TD-228 (overridden), TD-229, TD-230 / TD-244 (team side), TD-251 (link roles;
   new persona PER-16 Project Viewer)
@@ -95,11 +97,19 @@ membership table** (approved storage shape, product owner 2026-11-13):
     UUID with no FK, because the link belongs to the teams module.
   - CHECK `(source_type = 'direct') = (source_id IS NULL)`: a direct row has no source id, and a
     `team_link` row carries the team link id. Every existing row becomes `direct`.
-  - Persona and site stay columns of the row. A user can still hold several personas on one
-    project from the same source (T-0010). The unique constraint is therefore
+  - **Deviation (planner, pending product-owner confirmation).** The approved key is (project,
+    user, source_type, source_id). The main unique constraint adds persona and site:
     `(tenant_id, member_project_id, user_id, source_type, source_id, persona, site_node_id)`
     with `NULLS NOT DISTINCT`, which PostgreSQL 16 supports and the existing constraint already
-    uses.
+    uses. There are two reasons. A user may hold several personas on one project directly
+    (T-0010 behaviour, e.g. PER-02 + PER-09). And the sync re-roles by soft-deleting the old
+    persona row and inserting a new one, which a four-column key covering soft-deleted rows would
+    reject. If the product owner rejects the deviation, direct rows need another way to hold
+    several personas, and this section changes.
+  - **The approved key holds exactly for team rows.** A partial unique index
+    `(tenant_id, member_project_id, user_id, source_id) WHERE source_type = 'team_link' AND
+    deleted_at IS NULL` means a link can never hold two live personas for one user. The sync
+    soft-deletes the old row before it inserts the new one, in the same flush order.
   - SQLite treats NULLs as distinct, so the constraint alone does not stop a duplicate direct
     row there. The write paths (T-0014 assignment, T-0073 sync) look up an existing row
     (including soft-deleted ones) before inserting, which is idempotent on both engines. The
@@ -128,15 +138,25 @@ membership table** (approved storage shape, product owner 2026-11-13):
 - The teams service is the only writer of derived rows and re-syncs on every change: member
   added or removed, link created, re-roled or removed, team deleted.
 - **Deactivating a user leaves their derived rows in place.** A deactivated account cannot
-  authenticate, so the rows grant nothing, and the teams contract counts only active members.
-  Reactivating the user restores their team access with no re-sync, so nothing is left for
-  someone to remember to run.
+  authenticate, so the rows grant nothing. Reactivating the user restores their team access with
+  no re-sync, so nothing is left for someone to remember to run. For that to hold, **every sync
+  passes all non-deleted members of the team, whatever their account status**. Only the teams
+  *read* contract (`user_team_ids`, `is_member`, `team_member_ids`) filters to active accounts.
+  Otherwise the next sync of a link (say, adding another member) would soft-delete a deactivated
+  member's row.
 - **Reconciliation** (`teams reconcile`, T-0075, also run in tests) recomputes the expected
   derived tuples (user, project, persona, site) of every live link from the teams tables. It
   compares them with `team_link_grants` and reports three kinds of drift: missing tuples,
   excess or mismatched tuples (wrong persona, site or project), and **orphan link ids**
   (derived rows whose link no longer exists in the teams tables). `--fix` re-syncs live links
   and revokes orphans. Excess access is the dangerous direction, and it is always detected.
+  Expected members include deactivated accounts (the same input as the sync). A missing tuple
+  whose re-adding would create an unconfirmed PER-09 + hold combination is reported as
+  `sod_pending` and is fixed only with an explicit `--confirm-sod`. `--fix` never confirms SoD
+  on its own.
+- **Startup check and RLS.** The disabled-teams check (below) runs before any tenant is bound.
+  It calls a `SECURITY DEFINER` function, created by the T-0073 migration with a pinned
+  `search_path`, that returns only the count of live `team_link` rows across all tenants.
 - **Disabling the teams module.** Teams is not toggleable per project. Derived rows must never
   outlive the module that manages them: at startup, core refuses to start when the teams module
   is not loaded and non-deleted `team_link` rows exist (fail closed). The documented way to disable
@@ -160,9 +180,9 @@ membership table** (approved storage shape, product owner 2026-11-13):
    tables, so core RLS would depend on the teams module. Rejected.
 2. **A database view** that unions memberships and team links. Same layering problem, and the
    view would read a module table from a core policy. Rejected.
+3. **Teams only as visibility groups** (the first plan). Contradicts the user's decision.
 4. **A single nullable `via_team_link_id` column** (this ADR's first draft). It works for teams
    only. The product owner chose the general `source_type` + `source_id` shape instead.
-3. **Teams only as visibility groups** (the first plan). Contradicts the user's decision.
 
 ## Consequences
 
