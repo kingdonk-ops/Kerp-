@@ -1,11 +1,11 @@
 # ADR 0008 — Tenant-level teams and team-derived project access
 
-- **Status:** proposed (the product decisions are the user's, 2026-11-13; the storage design
-  below is the planner's and is confirmed when T-0073 is reviewed)
+- **Status:** accepted (approved by the product owner on 2026-11-13, including the storage
+  shape keyed by project, user, source type and source id)
 - **Date:** 2026-11-13
-- **Resolves:** TD-228 (overridden), TD-229, TD-230 / TD-244 (team side)
-- **Open:** TD-251 (which roles a team link may carry)
-- **Affects:** T-0013, T-0073, T-0074, T-0075, T-0014, `app.core.auth` (`load_grants`, `resolve_scope`),
+- **Resolves:** TD-228 (overridden), TD-229, TD-230 / TD-244 (team side), TD-251 (link roles;
+  new persona PER-16 Project Viewer)
+- **Affects:** T-0013, T-0073, T-0074, T-0075, T-0076, T-0014, `app.core.auth` (`load_grants`, `resolve_scope`),
   the `auth_project_membership` core table, saved views (T-0020)
 
 ## Context
@@ -46,9 +46,18 @@ admin screens, and the "active project member" checks in modules.
   `system_admin` reads everything; another user reads a team when they are its member or the team
   is linked to a project in their scope. Cross-tenant ids are 404. Nothing exposes a tenant id.
 - A link carries **one persona** per (team, project), i.e. the role is a persona of the edge spec
-  §5.2 matrix, the same unit as an individual membership. "Editor" and "Viewer" are not personas.
-  Until TD-251 is decided, links allow PER-01 to PER-14 except PER-09, and a PER-07 link
-  names its site.
+  §5.2 matrix, the same unit as an individual membership (TD-251, product owner 2026-11-13):
+  - Links may carry **PER-01 to PER-14 except PER-09, plus PER-16**. A PER-07 link names its
+    site.
+  - **PER-09 and PER-15 are strictly individual assignments**, for auditability and to limit
+    the blast radius of a team change.
+  - **PER-16 "Project Viewer"** is a new persona: Viewer tier (`V` only), single-project scope,
+    read-only across modules, no hold, approval or signing authority, and no SoD implications.
+    It can be linked through teams and assigned individually. It is the "Viewer" of the user's
+    example; "Editor" maps to whichever working persona fits (e.g. PER-04, PER-05). Edge spec §5.2
+    is amended, and T-0076 adds it to the core persona model. This widens the persona CHECK on
+    the core membership table. That is part of this ADR's core-table change and is additive,
+    because no existing row changes.
 
 ### Separation of duties across sources
 
@@ -76,14 +85,30 @@ project, individual and team-derived together:
 ### Team-derived grants live in the membership store (T-0073)
 
 `app.core` must not import a module, and RLS policies cannot read module tables without
-crossing module boundaries. So the derived access is **materialised into the core membership
-store**:
+crossing module boundaries. So the derived access is **materialised into the core project
+membership table** (approved storage shape, product owner 2026-11-13):
 
-- `auth_project_membership` gets an additive nullable column `via_team_link_id` (UUID, no FK:
-  the link belongs to the teams module). `NULL` = individual membership (today's rows).
-  Not null = a grant derived from that team link. The uniqueness constraint includes
-  `via_team_link_id`. A user can then hold the same persona individually and through a team,
-  and removing one leaves the other.
+- `auth_project_membership` rows are keyed by **(project, user, source_type, source_id)**. The
+  project is the table's `member_project_id`, since membership rows are tenant-level.
+  - Two additive columns. `source_type` is NOT NULL, default `'direct'`, CHECK in
+    (`direct`, `team_link`); the set can grow later, e.g. for access requests. `source_id` is a
+    UUID with no FK, because the link belongs to the teams module.
+  - CHECK `(source_type = 'direct') = (source_id IS NULL)`: a direct row has no source id, and a
+    `team_link` row carries the team link id. Every existing row becomes `direct`.
+  - Persona and site stay columns of the row. A user can still hold several personas on one
+    project from the same source (T-0010). The unique constraint is therefore
+    `(tenant_id, member_project_id, user_id, source_type, source_id, persona, site_node_id)`
+    with `NULLS NOT DISTINCT`, which PostgreSQL 16 supports and the existing constraint already
+    uses.
+  - SQLite treats NULLs as distinct, so the constraint alone does not stop a duplicate direct
+    row there. The write paths (T-0014 assignment, T-0073 sync) look up an existing row
+    (including soft-deleted ones) before inserting, which is idempotent on both engines. The
+    duplicate-rejection test runs on PostgreSQL.
+  - Direct and team-derived grants coexist and never overwrite each other. Removing one source
+    leaves the other.
+- **Effective permissions = the union of the active (non-deleted) rows for (project, user)**,
+  whatever their source. `load_grants` reads all of them; nothing filters on `source_type` when
+  deciding access.
 - `app.core.auth` exposes a narrow API that the teams service calls (CLAUDE.md §6: the module
   calls core, it never writes the table itself):
   `sync_team_link_grants(session, link_id, project_id, persona, site_node_id, user_ids,
@@ -91,7 +116,7 @@ store**:
   that are gone and restores a soft-deleted row rather than inserting a duplicate),
   `revoke_team_link_grants(session, link_id)` and a full read for reconciliation,
   `team_link_grants(session) -> {link_id: {(user_id, project_id, persona, site_node_id)}}`,
-  which covers **every** link id that has non-deleted derived rows. The writes are audited on
+  which covers **every** `source_id` of non-deleted `team_link` rows. The writes are audited on
   chain `membership:<project>` with the link id and the actor.
 - `load_grants` keeps reading `auth_project_membership`, so it returns the union without any
   change to its callers. `Grant` stays a value object and duplicate grants collapse.
@@ -114,7 +139,7 @@ store**:
   and revokes orphans. Excess access is the dangerous direction, and it is always detected.
 - **Disabling the teams module.** Teams is not toggleable per project. Derived rows must never
   outlive the module that manages them: at startup, core refuses to start when the teams module
-  is not loaded and non-deleted derived rows exist (fail closed). The documented way to disable
+  is not loaded and non-deleted `team_link` rows exist (fail closed). The documented way to disable
   teams is to unlink every team first (which revokes the rows) or run
   `revoke_team_link_grants` for every link.
 
@@ -135,15 +160,19 @@ store**:
    tables, so core RLS would depend on the teams module. Rejected.
 2. **A database view** that unions memberships and team links. Same layering problem, and the
    view would read a module table from a core policy. Rejected.
+4. **A single nullable `via_team_link_id` column** (this ADR's first draft). It works for teams
+   only. The product owner chose the general `source_type` + `source_id` shape instead.
 3. **Teams only as visibility groups** (the first plan). Contradicts the user's decision.
 
 ## Consequences
 
-- Core-table change (`auth_project_membership`, one additive column + a replaced unique
-  constraint), so this ADR is required (CLAUDE.md §6). The upgrade is additive. The
-  **downgrade is destructive**: it must delete the derived rows before restoring the old unique
-  constraint, because a user may hold the same persona individually and through a team.
-- Status flips to `accepted` in the PR that merges T-0073.
+- Core-table change (`auth_project_membership`: two additive columns, two CHECKs, a replaced
+  unique constraint, and the persona CHECK widened for PER-16 by T-0076), so this ADR is required
+  (CLAUDE.md §6). The upgrade is additive. The **downgrade is destructive**: it must delete the
+  `team_link` rows before restoring the old unique constraint, because a user may hold the same
+  persona directly and through a team.
+- The generalised source columns leave room for other grant sources later (e.g. an access
+  request) without another reshaping. Each new `source_type` value needs its own ADR note.
 - Linking a big team writes one membership row per member and project. That is fine at
   deployment scale (hundreds of users). The sync runs in the same transaction as the team
   change, so access never lags the team. Moving it to an SAQ job is a later optimisation.

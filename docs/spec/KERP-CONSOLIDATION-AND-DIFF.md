@@ -123,7 +123,8 @@ Replaces the duplicated designers spread across `forms`, `asset_management`
   blacklist in Redis. **Field-worker auth:** magic-link + **6-digit PIN** as a *local session
   unlock only*, with progressive lockout throttling.
 - **Persona matrix — 15 roles** (base 13 + **Field Worker** (magic-link) + **Client Portal
-  User**), plus an **Asset-Site scoping** filter for Site Inspectors (visibility limited to
+  User**), **16 since 2026-11-13** with **PER-16 Project Viewer** (read-only; edge spec §5.2,
+  TD-251), plus an **Asset-Site scoping** filter for Site Inspectors (visibility limited to
   their physical site within a multi-site project).
 
 ### 4.1 Access model (user, 2026-11-13; TD-120, TD-184, TD-151)
@@ -186,12 +187,16 @@ Wins over any earlier text on tenant selection, tenant administrators and projec
   manages their members and links them to projects. A team can be linked to several projects.
   **Each team-project link carries one role for that project**, i.e. one persona of edge spec §5.2,
   e.g. a Trade Supervisor role on project A and a different role on project B. Every member of the
-  team gets that access on that project. Which personas a link may carry is TD-251 (default:
-  PER-01 to PER-14 except PER-09; a PER-07 link names its site). **Effective access to a project
+  team gets that access on that project. Links may carry PER-01 to PER-14 except PER-09, plus
+  **PER-16 Project Viewer** (read-only, edge spec §5.2). A PER-07 link names its site. **PER-09 and
+  PER-15 are strictly individual assignments** (user, 2026-11-13; TD-251). **Effective access to a project
   = the user's individual memberships ∪ the grants from teams linked to it.** Team-derived
   grants count everywhere individual ones do: allowed project list, site filter, 404 for
-  non-members, membership-based RLS. They are stored as derived membership rows that only the
-  teams module maintains (ADR 0008). PER-09 still manages the project's individual members. It
+  non-members, membership-based RLS. Grants are stored in the project membership table keyed by
+  project, user, `source_type` (`direct` | `team_link`) and `source_id` (the team link id), so
+  direct and team-derived grants coexist. Effective permissions are the union of the active rows
+  for (project, user). Only the teams module maintains `team_link` rows, and an idempotent
+  reconciliation job heals drift (ADR 0008, accepted). PER-09 still manages the project's individual members. It
   sees team-derived members, marked with their team, but cannot edit or remove them. The
   PER-09 + hold-authority SoD warning above applies to **effective** grants, whatever their
   source: a team link or member add that gives a user with individual PER-09 a hold persona on

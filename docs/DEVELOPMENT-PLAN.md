@@ -127,7 +127,7 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
   tenant-level and grant project access through team-project links (diff §4.1, ADR 0008).
   T-0013 re-scoped to tenant-level teams, members and links (now after T-0014 and T-0073).
   New: T-0073 (team-derived grants in the core membership store) and T-0074 (saved views shared
-  with several teams; absorbs TD-242), T-0075 (teams reconcile, split from T-0013 in review).
+  with several teams; absorbs TD-242), T-0075 (teams reconcile, split from T-0013 in review), T-0076 (PER-16 Project Viewer persona). ADR 0008 accepted with grants keyed by source (`direct` | `team_link`); TD-251 resolved (links: PER-01–PER-14 except PER-09, plus PER-16).
 
 ## Key engineering decisions (baked into the spec — see consolidation diff)
 
@@ -143,11 +143,11 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
 | Calibration | lifecycle + SAQ OCR + supersede-lock + hard CEL gate (expired tool blocked) |
 | Frontend | 8-group IA on 4 pillars (nav mapping diff §6.1); RegisterPage/DetailPage/Dynamic Form Renderer first; **Dexie** offline outbox for web PWA apps |
 | Access (2026-11-13) | One hidden tenant per deployment; System admins appoint Project Admins (`create_projects`); creator gets PER-09; lobby + access requests; project picker; one URL; admin roles never confer hold/sign-off (diff §4.1) |
-| Teams (2026-11-13) | Tenant-level teams, managed by System admins; a team links to several projects with one role (persona) per project; effective access = individual memberships ∪ team-derived grants, stored as derived membership rows (diff §4.1, ADR 0008); teams are not planner crews; saved views share to several linked teams |
+| Teams (2026-11-13) | Tenant-level teams, managed by System admins; a team links to several projects with one role (persona) per project; effective access = individual memberships ∪ team-derived grants, stored as membership rows keyed by source type/id (diff §4.1, ADR 0008); new PER-16 Project Viewer; teams are not planner crews; saved views share to several linked teams |
 | Sessions & devices (2026-11-13) | 15 min access, 12 h refresh from sign-in (daily re-login); hybrid device PIN, offline unlock independent of the server session; offline window 7 days default, 14 max; device registry + remote revoke/wipe (diff §4.2–§4.4) |
 | Field client (2026-11-13) | Capacitor Android 11+, SQLCipher SQLite + file-system media, managed Play/MDM; one client storage contract and a client-agnostic sync contract (diff §6.2); NFR budgets warn now, hard gate before Pilot-0 (diff §6.3) |
 | Region (2026-11-13) | Per-deployment setting: AWS `ap-southeast-2` for Australian deployments (diff §4.4) |
 
 ## Open decisions (see `TODO.md`)
 TD-003 (SSO vs local JWT), TD-004 (hosting target), TD-072 (ADR 0004 rule-set defaults per project), TD-073 (handover first-shift trigger),
-TD-039 (dropped AIP-proposal extras), TD-251 (roles a team-project link may carry; default applied). TD-013 (review-gate ignores tracker) is resolved by T-0029. TD-002/005/007/008/009/012 are resolved by this merge; TD-001 by ADR 0001 (`docs/decisions/`). TD-002 is carried into code by ADR 0002 (`docs/decisions/0002-port-one-engine.md`). TD-034 (remaining Inspection-ERP core packages) is resolved by ADR 0007.
+TD-039 (dropped AIP-proposal extras). TD-013 (review-gate ignores tracker) is resolved by T-0029. TD-002/005/007/008/009/012 are resolved by this merge; TD-001 by ADR 0001 (`docs/decisions/`). TD-002 is carried into code by ADR 0002 (`docs/decisions/0002-port-one-engine.md`). TD-034 (remaining Inspection-ERP core packages) is resolved by ADR 0007.

@@ -3,9 +3,9 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 153 · **Closed:** 97
+**Open:** 152 · **Closed:** 98
 
-## decision (5)
+## decision (4)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -13,7 +13,6 @@
 | [TD-213](../tracker/todo/TD-213.md) | Object key layout: confirm {tenant}/{project}/{module}/{sha256} (no extension) instead of the master spec's {hash}.ext, plus transient staging/ and quarantine/ prefixes | T-0016 | implementer |
 | [TD-223](../tracker/todo/TD-223.md) | Who may open PRs to dev? If any account other than KERP_ALLOWED_REVIEWERS (or forks) can, require a human approval as well as review-gate | T-0067 | reviewer |
 | [TD-224](../tracker/todo/TD-224.md) | Magic-link request lockout is still per tenant+email: anyone can keep a known field worker from getting a link (4/hour, then doubling delay); decide per-client keying vs mailbox-flood protection | T-0068 | reviewer |
-| [TD-251](../tracker/todo/TD-251.md) | Team-to-project link role: the persona matrix has no read-only 'Viewer' or generic 'Editor' role - which roles may a team link carry? | T-0013, T-0073 | planner |
 
 ## spec-gap (36)
 
@@ -294,3 +293,4 @@
 | ✅ | [TD-237](../tracker/todo/TD-237.md) | Who may send a notification through the API: T-0019 allows only the admin capability (PER-09) and no pins; modules notify through service.notify. Confirm or widen (e.g. PER-02/PER-03 broadcasts) | Confirmed (user, 2026-11-13): only the Project Administrator (PER-09) may send manual notifications through the API; modules notify through service.notify (diff 4.1) |
 | ✅ | [TD-242](../tracker/todo/TD-242.md) | saved_views: team visibility needs the teams module (T-0013) - pass the caller's team ids into Viewer and validate team_id | Scheduled as T-0074 (user decision TD-230, 2026-11-13): saved_views team visibility wired to the teams contract and widened from a single team_id to several linked teams |
 | ✅ | [TD-244](../tracker/todo/TD-244.md) | register-views spec 3: oe_saved_view lists no team reference and one is_default for two kinds of default | Team part decided (user, 2026-11-13): several teams per view via a view-team link, all linked to the view's project (register-views 3, T-0074); the is_default reading of T-0020 stands as built |
+| ✅ | [TD-251](../tracker/todo/TD-251.md) | Team-to-project link role: the persona matrix has no read-only 'Viewer' or generic 'Editor' role - which roles may a team link carry? | Decided (product owner, 2026-11-13): team-project links may grant PER-01..PER-14 excluding PER-09, plus the new PER-16 Project Viewer (Viewer tier, V only, single project, no hold/approval/sign authority, no SoD implications; linkable and individually assignable); PER-09 and PER-15 remain strictly individual (auditability, blast-radius control). Edge 5.2 amended; PER-16 built by T-0076 |
