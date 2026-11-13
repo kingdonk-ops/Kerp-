@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 147 · **Closed:** 90
+**Open:** 153 · **Closed:** 90
 
 ## decision (7)
 
@@ -17,7 +17,7 @@
 | [TD-229](../tracker/todo/TD-229.md) | Teams module vs planner crews and roster teams (TD-073/TD-083) and the handover 'project team' | T-0013 | planner |
 | [TD-237](../tracker/todo/TD-237.md) | Who may send a notification through the API: T-0019 allows only the admin capability (PER-09) and no pins; modules notify through service.notify. Confirm or widen (e.g. PER-02/PER-03 broadcasts) | T-0019 | implementer |
 
-## spec-gap (36)
+## spec-gap (37)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -57,6 +57,7 @@
 | [TD-220](../tracker/todo/TD-220.md) | Client QR co-sign (mode ii): judge 'key active at occurred_at' by the tablet's reconstructed scan time, not the client device clock | T-0163 | reviewer |
 | [TD-221](../tracker/todo/TD-221.md) | Client wet signature (mode iii): outcome when the client rejects after the inspection is already approved (INSPECTED_PASSED/INSPECTED_FAILED) or LOCKED_FOR_TURNOVER | T-0174 | reviewer |
 | [TD-230](../tracker/todo/TD-230.md) | Saved view visibility 'team' names no team: oe_saved_view (register-views 3) has no team reference | T-0013 | planner |
+| [TD-244](../tracker/todo/TD-244.md) | register-views spec 3: oe_saved_view lists no team reference and one is_default for two kinds of default | T-0020 | implementer |
 
 ## missed (4)
 
@@ -67,7 +68,7 @@
 | [TD-131](../tracker/todo/TD-131.md) | Add a root .env.example for the dev stack (the implementer agent's permission rules block writing .env* files) | T-0003 | implementer |
 | [TD-208](../tracker/todo/TD-208.md) | Uploads infra: provision the kerp-vault bucket (CORS for browser PUT/GET, lifecycle on staging/), wire KERP_S3_* in compose, add MinIO to CI for the gated round-trip test | T-0016 | implementer |
 
-## deferred (26)
+## deferred (28)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -97,8 +98,10 @@
 | [TD-217](../tracker/todo/TD-217.md) | Inspection scheduling after Pilot-0: calendar view, general recurrence (beyond scaffolds), light work-order grouping (TD-165 remainder) | T-0152 | planner |
 | [TD-231](../tracker/todo/TD-231.md) | Teams admin screen in the Backbone nav group (list, create, rename, delete, add/remove members) | T-0013 | planner |
 | [TD-238](../tracker/todo/TD-238.md) | Notifications: run non-in-app channels (FCM T-0144, e-mail TD-084) as an SAQ job after commit, with a persisted per-channel delivery log and retry; T-0019 calls them synchronously inside the caller's transaction | T-0019 | implementer |
+| [TD-242](../tracker/todo/TD-242.md) | saved_views: team visibility needs the teams module (T-0013) - pass the caller's team ids into Viewer and validate team_id | T-0020 | implementer |
+| [TD-243](../tracker/todo/TD-243.md) | saved_views: expose portal views through the client portal layout | T-0020 | implementer |
 
-## later (58)
+## later (61)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -160,6 +163,9 @@
 | [TD-239](../tracker/todo/TD-239.md) | Notifications inbox in the web/field client (list, unread badge, mark read, t() keys per kind/label) plus unread-count and mark-all-read endpoints and a retention purge; no task schedules it yet | T-0019 | implementer |
 | [TD-240](../tracker/todo/TD-240.md) | Jobs: bound the stored result size and apply the payload byte cap in service.create_job (internal callers bypass the POST /jobs 64 KiB check) | T-0060 | implementer |
 | [TD-241](../tracker/todo/TD-241.md) | Per-route override of KERP_MAX_BODY_BYTES for a future endpoint that needs a larger JSON body (bulk import); today one app-wide limit | T-0060 | implementer |
+| [TD-245](../tracker/todo/TD-245.md) | saved_views: enforce one default per owner/register and one project default in the database | T-0020 | implementer |
+| [TD-246](../tracker/todo/TD-246.md) | saved_views: validate register_key against register descriptors once modules declare them (E-01-01) | T-0020 | implementer |
+| [TD-247](../tracker/todo/TD-247.md) | saved_views: degrade gracefully when a stored view config no longer validates | T-0020 | implementer |
 
 ## bug (1)
 

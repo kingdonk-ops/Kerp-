@@ -937,6 +937,364 @@
         }
       }
     },
+    "/api/v1/saved-views/projects/{project_id}/views": {
+      "get": {
+        "tags": [
+          "saved_views"
+        ],
+        "summary": "List Views",
+        "operationId": "list_views_api_v1_saved_views_projects__project_id__views_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "register_key",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_.]{1,63}$",
+              "title": "Register Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SavedViewRead"
+                  },
+                  "title": "Response List Views Api V1 Saved Views Projects  Project Id  Views Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "saved_views"
+        ],
+        "summary": "Create View",
+        "operationId": "create_view_api_v1_saved_views_projects__project_id__views_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Project Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SavedViewCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedViewRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/saved-views/projects/{project_id}/views/default": {
+      "get": {
+        "tags": [
+          "saved_views"
+        ],
+        "summary": "Default View",
+        "description": "The caller's default view of the register, else the project default, else ``null``.",
+        "operationId": "default_view_api_v1_saved_views_projects__project_id__views_default_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "register_key",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_.]{1,63}$",
+              "title": "Register Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/SavedViewRead"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Default View Api V1 Saved Views Projects  Project Id  Views Default Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/saved-views/projects/{project_id}/views/{view_id}": {
+      "get": {
+        "tags": [
+          "saved_views"
+        ],
+        "summary": "Read View",
+        "operationId": "read_view_api_v1_saved_views_projects__project_id__views__view_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "view_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "View Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedViewRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "saved_views"
+        ],
+        "summary": "Update View",
+        "operationId": "update_view_api_v1_saved_views_projects__project_id__views__view_id__patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "view_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "View Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SavedViewUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedViewRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "saved_views"
+        ],
+        "summary": "Delete View",
+        "operationId": "delete_view_api_v1_saved_views_projects__project_id__views__view_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "view_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "View Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/uploads/projects/{project_id}/files": {
       "post": {
         "tags": [
@@ -1173,6 +1531,34 @@
   },
   "components": {
     "schemas": {
+      "Aggregate": {
+        "properties": {
+          "column": {
+            "type": "string",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]{0,127}$",
+            "title": "Column"
+          },
+          "fn": {
+            "type": "string",
+            "enum": [
+              "sum",
+              "avg",
+              "min",
+              "max",
+              "count",
+              "count-distinct"
+            ],
+            "title": "Fn"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "column",
+          "fn"
+        ],
+        "title": "Aggregate"
+      },
       "DeliveryRead": {
         "properties": {
           "channel": {
@@ -1315,6 +1701,201 @@
           "updated_at"
         ],
         "title": "FileRead"
+      },
+      "FilterCondition": {
+        "properties": {
+          "column": {
+            "type": "string",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]{0,127}$",
+            "title": "Column"
+          },
+          "op": {
+            "type": "string",
+            "enum": [
+              "eq",
+              "neq",
+              "in",
+              "not_in",
+              "contains",
+              "starts_with",
+              "is_empty",
+              "between",
+              "gt",
+              "lt",
+              "within_next",
+              "overdue",
+              "me",
+              "my_teams",
+              "subtree_of"
+            ],
+            "title": "Op"
+          },
+          "value": {
+            "title": "Value"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "column",
+          "op"
+        ],
+        "title": "FilterCondition",
+        "description": "One condition ``{column, op, value}``; the value shape depends on the op."
+      },
+      "FilterGroup-Input": {
+        "properties": {
+          "op": {
+            "type": "string",
+            "enum": [
+              "and",
+              "or"
+            ],
+            "title": "Op"
+          },
+          "conditions": {
+            "items": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/FilterGroup-Input"
+                },
+                {
+                  "$ref": "#/components/schemas/FilterCondition"
+                }
+              ]
+            },
+            "type": "array",
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Conditions"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "op",
+          "conditions"
+        ],
+        "title": "FilterGroup",
+        "description": "``{op: and|or, conditions: [...]}``; conditions are conditions or nested groups."
+      },
+      "FilterGroup-Output": {
+        "properties": {
+          "op": {
+            "type": "string",
+            "enum": [
+              "and",
+              "or"
+            ],
+            "title": "Op"
+          },
+          "conditions": {
+            "items": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/FilterGroup-Output"
+                },
+                {
+                  "$ref": "#/components/schemas/FilterCondition"
+                }
+              ]
+            },
+            "type": "array",
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Conditions"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "op",
+          "conditions"
+        ],
+        "title": "FilterGroup",
+        "description": "``{op: and|or, conditions: [...]}``; conditions are conditions or nested groups."
+      },
+      "FormatRule": {
+        "properties": {
+          "condition": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Condition"
+          },
+          "style": {
+            "$ref": "#/components/schemas/FormatStyle"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "condition",
+          "style"
+        ],
+        "title": "FormatRule",
+        "description": "``condition`` (CEL over the row, e.g. ``Scoped == \"No\"``) -> ``style``."
+      },
+      "FormatStyle": {
+        "properties": {
+          "tone": {
+            "type": "string",
+            "enum": [
+              "grey",
+              "blue",
+              "green",
+              "amber",
+              "red"
+            ],
+            "title": "Tone"
+          },
+          "bold": {
+            "type": "boolean",
+            "title": "Bold",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "tone"
+        ],
+        "title": "FormatStyle",
+        "description": "Presentation tokens only (the client maps them to theme colours), never raw CSS."
+      },
+      "GroupBy": {
+        "properties": {
+          "columns": {
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]{0,127}$"
+            },
+            "type": "array",
+            "maxItems": 5,
+            "minItems": 1,
+            "title": "Columns"
+          },
+          "aggregates": {
+            "items": {
+              "$ref": "#/components/schemas/Aggregate"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "title": "Aggregates"
+          },
+          "totals": {
+            "type": "boolean",
+            "title": "Totals",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "columns"
+        ],
+        "title": "GroupBy",
+        "description": "Group rows by ``columns`` (outermost first), with aggregates and a totals row."
       },
       "HTTPValidationError": {
         "properties": {
@@ -2328,6 +2909,507 @@
         ],
         "title": "RefreshRequest"
       },
+      "ResolvedColumn": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]{0,127}$",
+            "title": "Id"
+          },
+          "width": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 2000.0,
+                "minimum": 24.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Width"
+          },
+          "pinned": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "left",
+                  "right"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pinned"
+          },
+          "visible": {
+            "type": "boolean",
+            "title": "Visible",
+            "default": true
+          },
+          "missing": {
+            "type": "boolean",
+            "title": "Missing",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "title": "ResolvedColumn",
+        "description": "A saved column as the register shows it; ``missing``: no longer in the catalogue."
+      },
+      "SavedViewCreate": {
+        "properties": {
+          "columns": {
+            "items": {
+              "$ref": "#/components/schemas/ViewColumn"
+            },
+            "type": "array",
+            "maxItems": 200,
+            "title": "Columns"
+          },
+          "filter": {
+            "anyOf": [
+              {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/FilterGroup-Input"
+                  },
+                  {
+                    "$ref": "#/components/schemas/FilterCondition"
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filter"
+          },
+          "sort": {
+            "items": {
+              "$ref": "#/components/schemas/SortKey"
+            },
+            "type": "array",
+            "maxItems": 10,
+            "title": "Sort"
+          },
+          "group_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GroupBy"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "conditional_format": {
+            "items": {
+              "$ref": "#/components/schemas/FormatRule"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "title": "Conditional Format"
+          },
+          "density": {
+            "type": "string",
+            "enum": [
+              "compact",
+              "standard",
+              "comfortable"
+            ],
+            "title": "Density",
+            "default": "standard"
+          },
+          "register_key": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_.]{1,63}$",
+            "title": "Register Key"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "private",
+              "team",
+              "project",
+              "portal"
+            ],
+            "title": "Visibility",
+            "default": "private"
+          },
+          "team_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Team Id"
+          },
+          "is_default": {
+            "type": "boolean",
+            "title": "Is Default",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "register_key",
+          "name"
+        ],
+        "title": "SavedViewCreate",
+        "description": "``POST .../views`` (also \"save as\"). The owner is the caller; the project is the path's.\n\n``team_id`` names the team of a ``team`` view and is given for no other visibility.\n``is_default`` is allowed on ``private`` (the caller's default) and ``project`` (the\nproject default, Project Administrator only) views."
+      },
+      "SavedViewRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "project_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Project Id"
+          },
+          "register_key": {
+            "type": "string",
+            "title": "Register Key"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "owner_user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Owner User Id"
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "private",
+              "team",
+              "project",
+              "portal"
+            ],
+            "title": "Visibility"
+          },
+          "team_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Team Id"
+          },
+          "is_default": {
+            "type": "boolean",
+            "title": "Is Default"
+          },
+          "columns": {
+            "items": {
+              "$ref": "#/components/schemas/ResolvedColumn"
+            },
+            "type": "array",
+            "title": "Columns"
+          },
+          "filter": {
+            "anyOf": [
+              {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/FilterGroup-Output"
+                  },
+                  {
+                    "$ref": "#/components/schemas/FilterCondition"
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filter"
+          },
+          "sort": {
+            "items": {
+              "$ref": "#/components/schemas/SortKey"
+            },
+            "type": "array",
+            "title": "Sort"
+          },
+          "group_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GroupBy"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "conditional_format": {
+            "items": {
+              "$ref": "#/components/schemas/FormatRule"
+            },
+            "type": "array",
+            "title": "Conditional Format"
+          },
+          "density": {
+            "type": "string",
+            "enum": [
+              "compact",
+              "standard",
+              "comfortable"
+            ],
+            "title": "Density"
+          },
+          "schema_version": {
+            "type": "integer",
+            "title": "Schema Version"
+          },
+          "missing_columns": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missing Columns"
+          },
+          "revision": {
+            "type": "integer",
+            "title": "Revision"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "project_id",
+          "register_key",
+          "name",
+          "owner_user_id",
+          "visibility",
+          "team_id",
+          "is_default",
+          "columns",
+          "filter",
+          "sort",
+          "group_by",
+          "conditional_format",
+          "density",
+          "schema_version",
+          "missing_columns",
+          "revision",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "SavedViewRead",
+        "description": "A view as loaded: its configuration plus which referenced columns are missing.\n\n``missing_columns`` lists every id (from columns, filter, sort, group-by) the register's\ncatalogue no longer has; the register skips them. It is empty when the register has\nno catalogue registered (nothing can be checked)."
+      },
+      "SavedViewUpdate": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "visibility": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "private",
+                  "team",
+                  "project",
+                  "portal"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visibility"
+          },
+          "team_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Team Id"
+          },
+          "is_default": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Default"
+          },
+          "columns": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ViewColumn"
+                },
+                "type": "array",
+                "maxItems": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Columns"
+          },
+          "filter": {
+            "anyOf": [
+              {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/FilterGroup-Input"
+                  },
+                  {
+                    "$ref": "#/components/schemas/FilterCondition"
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filter"
+          },
+          "sort": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SortKey"
+                },
+                "type": "array",
+                "maxItems": 10
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sort"
+          },
+          "group_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GroupBy"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "conditional_format": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/FormatRule"
+                },
+                "type": "array",
+                "maxItems": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conditional Format"
+          },
+          "density": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "compact",
+                  "standard",
+                  "comfortable"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Density"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "SavedViewUpdate",
+        "description": "``PATCH .../views/{id}``: edit, rename, share, make default; only given fields change.\n\n``filter``, ``group_by`` and ``team_id`` may be ``null`` (clears them). The register\nof a view never changes."
+      },
+      "SortKey": {
+        "properties": {
+          "column": {
+            "type": "string",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]{0,127}$",
+            "title": "Column"
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "title": "Direction",
+            "default": "asc"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "column"
+        ],
+        "title": "SortKey"
+      },
       "TokenResponse": {
         "properties": {
           "access_token": {
@@ -2461,6 +3543,54 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "ViewColumn": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]{0,127}$",
+            "title": "Id"
+          },
+          "width": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 2000.0,
+                "minimum": 24.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Width"
+          },
+          "pinned": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "left",
+                  "right"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pinned"
+          },
+          "visible": {
+            "type": "boolean",
+            "title": "Visible",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "title": "ViewColumn"
       }
     },
     "securitySchemes": {
