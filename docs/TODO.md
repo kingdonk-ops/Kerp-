@@ -15,7 +15,7 @@
 | [TD-171](../tracker/todo/TD-171.md) | Production AWS region / data residency: EU (clean-room NFR-10, GDPR) vs Australia; TD-004 settled AWS but not the region | — | clean-room-gap-analysis |
 | [TD-172](../tracker/todo/TD-172.md) | Per-business-unit theming (logo/palette) vs one tenant per deploy (TD-007); German translations at launch (clean-room NFR-16) | T-0136 | clean-room-gap-analysis |
 | [TD-173](../tracker/todo/TD-173.md) | Pilot-0 (8 inspectors, one project, Android only, no P6 / Phase 2) ahead of the M2 cut line resolved in TD-009 | — | clean-room-gap-analysis |
-| [TD-177](../tracker/todo/TD-177.md) | Who may create a project and how the creator gets a membership: POST /projects is gated on the admin capability in any project until T-0014's tenant administrator | T-0012 | implementer |
+| [TD-184](../tracker/todo/TD-184.md) | Who may create a project and how the creator gets a membership: POST /projects is gated on the admin capability in any project until T-0014's tenant administrator | T-0012 | implementer |
 
 ## spec-gap (47)
 
@@ -67,7 +67,7 @@
 | [TD-167](../tracker/todo/TD-167.md) | Defect close-out loop: open -> action assigned (owner, due) -> rectified -> verified closed by a re-inspection (closed_by_inspection link); extends TD-066 | T-0117 | clean-room-gap-analysis |
 | [TD-168](../tracker/todo/TD-168.md) | Push notification channel (FCM via the Capacitor build) for assignment and return; T-0019 is in-app only and email is TD-084 | T-0019 | clean-room-gap-analysis |
 | [TD-174](../tracker/todo/TD-174.md) | NFR budgets: 300-question form opens < 1.5 s, 1,000-record delta sync < 30 s on 4G, glove targets >= 48 dp and outdoor high-contrast tokens | T-0024 | clean-room-gap-analysis |
-| [TD-178](../tracker/todo/TD-178.md) | Project status values (ACTIVE/ON_HOLD/CLOSED chosen) and currency/locale defaults (AUD/en-AU) are not in the spec | T-0012 | implementer |
+| [TD-185](../tracker/todo/TD-185.md) | Project status values (ACTIVE/ON_HOLD/CLOSED chosen) and currency/locale defaults (AUD/en-AU) are not in the spec | T-0012 | implementer |
 
 ## missed (4)
 
@@ -137,7 +137,7 @@
 | [TD-157](../tracker/todo/TD-157.md) | Jobs worker: liveness healthcheck for the worker container, and re-queue (not fail) jobs interrupted by a worker shutdown | T-0015 | implementer |
 | [TD-160](../tracker/todo/TD-160.md) | Test that revoking (soft-deleting) a project membership removes that project from the resolved scope; extend TD-150 to bulk ORM update/delete | T-0010 | reviewer |
 | [TD-175](../tracker/todo/TD-175.md) | Record retention rules + legal hold per project | — | clean-room-gap-analysis |
-| [TD-179](../tracker/todo/TD-179.md) | spatial_bounds: GiST index and ST_IsValid check (self-intersecting polygons are accepted today); project code stays taken after soft delete | T-0012 | implementer |
+| [TD-186](../tracker/todo/TD-186.md) | spatial_bounds: GiST index and ST_IsValid check (self-intersecting polygons are accepted today); project code stays taken after soft delete | T-0012 | implementer |
 
 ## bug (1)
 

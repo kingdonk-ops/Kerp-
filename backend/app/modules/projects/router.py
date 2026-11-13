@@ -8,7 +8,7 @@ project is the one in the path:
   a non-member's, a deleted one) is 404.
 * edit / delete: the ``admin`` capability on that project (Project Administrator), else 403.
 * create: the ``admin`` capability on at least one project of the tenant, until T-0014 adds
-  the tenant administrator (TD-177).
+  the tenant administrator (TD-184).
 """
 
 from __future__ import annotations
