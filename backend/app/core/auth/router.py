@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated, Any, Final
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 
 from app.core.auth.bearer import AUTH_UNAVAILABLE
 from app.core.auth.deps import CurrentPrincipal, get_auth_service, unauthorized
@@ -78,12 +78,21 @@ _LOCKED_RESPONSE: Final[dict[int | str, dict[str, Any]]] = {
 
 @router.post(f"{PREFIX}/login", response_model=TokenResponse, responses=_LOCKED_RESPONSE)
 def login(
-    body: LoginRequest, session: DbSession, service: AuthServiceDep, response: Response
+    body: LoginRequest,
+    session: DbSession,
+    service: AuthServiceDep,
+    request: Request,
+    response: Response,
 ) -> TokenResponse:
     """Exchange email + password for an access token (15 min) and a refresh token."""
     credentials = PasswordCredentials(email=body.email, password=body.password)
+    # Behind a proxy, uvicorn sets this from X-Forwarded-For only for peers listed in
+    # FORWARDED_ALLOW_IPS; otherwise it is the direct peer (the proxy itself).
+    client = request.client.host if request.client else None
     try:
-        pair = service.login(session, tenant_id=body.tenant_id, credentials=credentials)
+        pair = service.login(
+            session, tenant_id=body.tenant_id, credentials=credentials, client=client
+        )
     except AuthenticationError as exc:
         raise unauthorized() from exc
     except LockedOutError as exc:
