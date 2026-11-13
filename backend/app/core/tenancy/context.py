@@ -52,20 +52,6 @@ current_project_id: ContextVar[uuid.UUID | None] = ContextVar("current_project_i
 current_user_id: ContextVar[uuid.UUID | None] = ContextVar("current_user_id", default=None)
 
 
-def require_tenant_id() -> uuid.UUID:
-    tenant_id = current_tenant_id.get()
-    if tenant_id is None:
-        raise RuntimeError("no tenant in context: the caller is missing the auth dependency")
-    return tenant_id
-
-
-def require_project_id() -> uuid.UUID:
-    project_id = current_project_id.get()
-    if project_id is None:
-        raise RuntimeError("no project in context: the caller is not bound to a project")
-    return project_id
-
-
 @contextmanager
 def use_tenancy(context: TenancyContext) -> Iterator[TenancyContext]:
     """Set the context variables for the duration of a block (workers, scripts)."""

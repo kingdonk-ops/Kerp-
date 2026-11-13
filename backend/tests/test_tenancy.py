@@ -25,8 +25,6 @@ from app.core.tenancy.context import (
     current_project_id,
     current_tenant_id,
     get_tenancy_context,
-    require_project_id,
-    require_tenant_id,
     use_tenancy,
 )
 from app.core.tenancy.rls import (
@@ -75,15 +73,14 @@ def _names(db: Database, ctx: TenancyContext, **options: object) -> set[str]:
 
 
 def test_use_tenancy_sets_and_resets_context_vars() -> None:
-    with pytest.raises(RuntimeError, match="no tenant"):
-        require_tenant_id()
+    assert current_tenant_id.get() is None
     with use_tenancy(CTX_A):
-        assert require_tenant_id() == T1
-        assert require_project_id() == PA
+        assert current_tenant_id.get() == T1
+        assert current_project_id.get() == PA
     assert current_tenant_id.get() is None
     assert current_project_id.get() is None
-    with use_tenancy(CTX_T1), pytest.raises(RuntimeError, match="no project"):
-        require_project_id()
+    with use_tenancy(CTX_T1):
+        assert current_project_id.get() is None
 
 
 def test_tenancy_seam_comes_from_the_verified_token_only() -> None:
