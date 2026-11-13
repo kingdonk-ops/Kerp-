@@ -1,4 +1,5 @@
-# KERP local dev stack (T-0003): PostgreSQL 16 + PostGIS + ltree, Redis 7, MinIO.
+# KERP local dev stack (T-0003): PostgreSQL 16 + PostGIS + ltree, Redis 7, MinIO,
+# and the SAQ job worker (T-0015, profile "worker").
 # Dev only: fixed throwaway credentials, ports bound to localhost. Use `make up` / `make test-pg`
 # (see Makefile and backend/README.md "Local PostgreSQL stack").
 #
@@ -53,6 +54,27 @@ services:
       interval: 5s
       timeout: 5s
       retries: 15
+
+  # SAQ worker (T-0015): the backend image running both job queues (interactive + batch).
+  # Opt-in profile, so `make up` stays fast: `make worker` builds and starts it.
+  # Run the migrations first (`alembic upgrade head`) so oe_jobs_job exists.
+  worker:
+    profiles: ["worker"]
+    build: ./backend
+    command: ["python", "-m", "app.modules.jobs.worker"]
+    environment:
+      KERP_ENVIRONMENT: development
+      KERP_DATABASE_URL: postgresql+psycopg://kerp_app:kerp_app@postgres:5432/kerp_test
+      KERP_REDIS_URL: redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    # The image's HEALTHCHECK probes the API's /health; the worker serves no HTTP.
+    healthcheck:
+      disable: true
+    restart: unless-stopped
 
 volumes:
   kerp-pg-data:

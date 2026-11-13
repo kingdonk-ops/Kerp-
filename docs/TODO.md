@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 90 · **Closed:** 56
+**Open:** 93 · **Closed:** 56
 
 ## decision (2)
 
@@ -61,7 +61,7 @@
 | [TD-125](../tracker/todo/TD-125.md) | Booking modules must call work_anchor_for and return 422 when the path has no work anchor (progress, time lines against a work anchor, completion gate) | T-0101, T-0116, T-0124, E-04-03, E-04-05 | reviewer |
 | [TD-131](../tracker/todo/TD-131.md) | Add a root .env.example for the dev stack (the implementer agent's permission rules block writing .env* files) | T-0003 | implementer |
 
-## deferred (12)
+## deferred (14)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -77,8 +77,10 @@
 | [TD-145](../tracker/todo/TD-145.md) | Wire the project switcher to the projects/membership API and gate All-Projects on the allowed project list | T-0024 | implementer |
 | [TD-146](../tracker/todo/TD-146.md) | Send the selected project scope with API requests and key cached queries by scope | T-0024 | implementer |
 | [TD-147](../tracker/todo/TD-147.md) | Field-worker sign-in screens: magic-link request/redeem and 6-digit PIN unlock in the SPA | T-0024 | implementer |
+| [TD-155](../tracker/todo/TD-155.md) | Schedule the jobs sweep: enumerate tenant/project scopes under RLS (no BYPASSRLS) and run service.sweep from an SAQ cron | T-0015 | implementer |
+| [TD-156](../tracker/todo/TD-156.md) | Jobs API: per-kind capability check on POST /jobs and GET /jobs/{id} once RBAC lands (T-0010) | T-0015 | implementer |
 
-## later (30)
+## later (31)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -112,6 +114,7 @@
 | [TD-138](../tracker/todo/TD-138.md) | Per-client-IP throttling for login and magic-link requests (needs trusted-proxy config for the real client address) | T-0009 | implementer |
 | [TD-143](../tracker/todo/TD-143.md) | run_checks persist=False dry-run flag (evaluate without logging findings) | T-0018 | implementer |
 | [TD-144](../tracker/todo/TD-144.md) | run_checks: translate an uncommitted-rule-set ForeignKeyViolation into a clear RuleStoreError | T-0018 | implementer |
+| [TD-157](../tracker/todo/TD-157.md) | Jobs worker: liveness healthcheck for the worker container, and re-queue (not fail) jobs interrupted by a worker shutdown | T-0015 | implementer |
 
 ## risk (7)
 

@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 16/83 tasks done (19%) · **ready now:** 11 · **epics awaiting breakdown:** 47
+**Overall:** 16/83 tasks done (19%) · **ready now:** 10 · **epics awaiting breakdown:** 47
 
 | Phase | Tasks done | Progress |
 |---|---|---|
@@ -35,7 +35,7 @@
 | ⬜ | [T-0012](../tracker/tasks/T-0012.md) | projects module: CRUD + settings (IANA timezone, spatial_bounds, currency/locale) | projects | S | T-0010, T-0011 |  |
 | ⬜ | [T-0013](../tracker/tasks/T-0013.md) | teams module: teams, membership, entity visibility | teams | S | T-0012 |  |
 | ⬜ | [T-0014](../tracker/tasks/T-0014.md) | admin module: tenant/user/role administration API + membership-based RLS on projects and tenant-level tables | admin | M | T-0010, T-0011, T-0012 |  |
-| ▶ | [T-0015](../tracker/tasks/T-0015.md) | SAQ worker + Redis + jobs module (enqueue/status/poll), interactive+batch priority queues | jobs | M | T-0003, T-0011 |  |
+| 🟦 | [T-0015](../tracker/tasks/T-0015.md) | SAQ worker + Redis + jobs module (enqueue/status/poll), interactive+batch priority queues | jobs | M | T-0003, T-0011 |  |
 | ⬜ | [T-0016](../tracker/tasks/T-0016.md) | Storage service + presigned uploads (presign/complete, sha256 verify, scan stub, orphan sweep) | uploads | M | T-0015 |  |
 | ✅ | [T-0017](../tracker/tasks/T-0017.md) | CEL runtime substrate: celpy (server) + JS CEL (client) + shared conformance_fixtures.json harness | platform | M | T-0001, T-0002 | #15 |
 | ✅ | [T-0018](../tracker/tasks/T-0018.md) | Verification engine shell + single rule store: run_checks(context, rule_set), oe_validation_rule_set/rule (kinds, engines), compile-on-save, findings log | validation | M | T-0006, T-0017 | #36 |

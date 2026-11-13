@@ -54,6 +54,9 @@ class Settings(BaseSettings):
     migration_database_url: str | None = Field(default=None, repr=False)
     # Redis (job queue, auth token revocation).
     redis_url: str | None = Field(default=None, repr=False)
+    # SAQ worker (T-0015): concurrent jobs per queue in one worker process.
+    jobs_interactive_concurrency: int = Field(default=4, ge=1, le=64)
+    jobs_batch_concurrency: int = Field(default=1, ge=1, le=16)
 
     # Auth tokens (T-0008, diff §4). Asymmetric JWTs, public keys served as JWKS.
     # ``jwt_private_key`` is a PEM (RSA for RS256, Ed25519 for EdDSA); ``jwt_private_key_file``
