@@ -203,7 +203,13 @@ def finish_job(
     result: dict[str, Any] | None = None,
     error: str | None = None,
 ) -> None:
-    """Store the outcome: ``succeeded`` with ``result``, or ``failed`` with ``error``."""
+    """Store the outcome: ``succeeded`` with ``result``, or ``failed`` with ``error``.
+
+    ``result`` must be a JSON object or ``None`` (``JobRead.result``); anything else raises
+    ``TypeError`` before the row changes, and the worker fails the job instead (T-0060).
+    """
+    if result is not None and not isinstance(result, dict):
+        raise TypeError(f"a job result must be a JSON object or None, not {type(result).__name__}")
     job = get_or_404(session, Job, job_id)
     job.finished_at = utcnow()
     if error is None:

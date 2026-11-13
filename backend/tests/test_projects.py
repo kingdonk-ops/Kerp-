@@ -28,7 +28,12 @@ from app.core.tenancy.rls import RLS_EXEMPT, bind_connection, rls_tables
 from app.core.tenancy.scope import OutOfScopeError
 from app.modules.projects import service
 from app.modules.projects.models import TABLE
-from app.modules.projects.schemas import ProjectCreate, ProjectUpdate
+from app.modules.projects.schemas import (
+    MAX_RINGS,
+    MAX_TOTAL_POSITIONS,
+    ProjectCreate,
+    ProjectUpdate,
+)
 from tests.audit_support import migrated_database
 from tests.auth_support import ALICE, BOB, PASSWORD, T1, T2, auth_app, make_settings, seed_user
 from tests.db_support import ON_POSTGRES, database_url
@@ -182,6 +187,33 @@ def _ring(*points: tuple[float, float]) -> dict[str, Any]:
 def test_invalid_polygons_are_rejected(bounds: dict[str, Any], message: str) -> None:
     with pytest.raises(ValidationError, match=message):
         _create(spatial_bounds=bounds)
+
+
+def _square_ring(n: int, offset: float = 0.0) -> list[list[float]]:
+    """A closed ring of ``n`` positions (schema-valid; geometric validity is not checked)."""
+    side = (n - 1) // 4 + 1
+    step = 1.0 / side
+    points = [[offset + i * step, 0.0] for i in range(n - 1)]
+    return [*points, points[0]]
+
+
+def test_spatial_bounds_cap_the_total_positions_across_all_rings() -> None:
+    # T-0060: each ring may hold MAX_RING_POSITIONS, but all rings together at most
+    # MAX_TOTAL_POSITIONS, so a body cannot ask for 100 x 10,000 positions.
+    assert MAX_TOTAL_POSITIONS == 10_000
+    half = MAX_TOTAL_POSITIONS // 2
+    at_cap = {"type": "Polygon", "coordinates": [_square_ring(half), _square_ring(half, 0.001)]}
+    body = _create(spatial_bounds=at_cap)
+    assert body.spatial_bounds is not None
+    assert sum(len(r) for r in body.spatial_bounds.coordinates) == MAX_TOTAL_POSITIONS
+    over = {"type": "Polygon", "coordinates": [_square_ring(half), _square_ring(half + 1)]}
+    with pytest.raises(ValidationError, match="at most 10000 positions in total"):
+        _create(spatial_bounds=over)
+    many_rings = {"type": "Polygon", "coordinates": [_square_ring(4)] * MAX_RINGS}
+    assert _create(spatial_bounds=many_rings).spatial_bounds is not None
+    too_many = {"type": "Polygon", "coordinates": [_square_ring(101)] * MAX_RINGS}
+    with pytest.raises(ValidationError, match="in total"):
+        _create(spatial_bounds=too_many)
 
 
 def test_non_finite_coordinates_are_rejected() -> None:
@@ -444,6 +476,18 @@ def test_invalid_settings_are_422_and_a_duplicate_code_is_409(api: Api) -> None:
     url = f"{PROJECTS}/{second.json()['id']}"
     _grant(api.db, api.users[ALICE], uuid.UUID(second.json()["id"]), Persona.PROJECT_ADMINISTRATOR)
     assert api.client.patch(url, json={"code": "HOME"}, headers=headers).status_code == 409
+
+
+def test_spatial_bounds_over_the_total_position_cap_are_422(api: Api) -> None:
+    rings = [_square_ring(5_000), _square_ring(5_001, 0.001)]
+    body = {
+        "code": "BIG",
+        "name": "Big",
+        "spatial_bounds": {"type": "Polygon", "coordinates": rings},
+    }
+    response = api.client.post(PROJECTS, json=body, headers=api.headers(ALICE))
+    assert response.status_code == 422
+    assert "in total" in response.text
 
 
 def test_members_list_and_read_only_their_projects(api: Api) -> None:

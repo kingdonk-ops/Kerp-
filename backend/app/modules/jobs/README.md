@@ -44,6 +44,11 @@ async def ocr_page(job: JobContext) -> dict[str, object]:
   `job.db.unit_of_work(job.tenancy)` and keep slow I/O (storage, HTTP) outside them.
 - Any other exception is stored as `Internal error (<ClassName>)`; the traceback goes to the
   JSON log with the request id of the request that enqueued the job (rule 5).
+- A handler returns a JSON object or `None`. Anything else (a list, a string) fails the job
+  with `Internal error (TypeError)`, so `GET /jobs/{id}` never sees a malformed `result`.
+- The `payload` names what to work on (ids, options), not the data: `POST /jobs` refuses a
+  payload above 64 KiB as compact JSON with 422 (`MAX_PAYLOAD_BYTES`). Scope never comes from
+  the body or the payload: a `tenant_id` in either is ignored or refused (T-0060).
 
 ## Worker (rule 1)
 
@@ -64,3 +69,5 @@ scopes, which no module provides yet (TD-155).
 
 `tests/test_jobs.py` (SQLite and PostgreSQL, no Redis: a recording broker) and
 `tests/test_jobs_saq.py` (real SAQ on Redis; needs `KERP_REDIS_URL`, set in CI's PostgreSQL step).
+`tests/test_rls_bypass.py` runs jobs through the real SAQ workers under PostgreSQL RLS and
+proves the handler is bound to the job's own scope and cannot read or write another's.

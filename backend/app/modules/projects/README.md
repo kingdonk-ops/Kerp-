@@ -19,7 +19,7 @@ modules carries the project's `id` as its `project_id`.
 | `code`, `name` | `code` unique per tenant (409 on a clash), `[A-Za-z0-9][A-Za-z0-9._-]{0,31}` |
 | `status` | `ACTIVE` (default), `ON_HOLD`, `CLOSED` (TD-185) |
 | `site_timezone` | an IANA zone from the `tzdata` package (not the host's zoneinfo: no `localtime`, `posixrules`, `Factory`), default `Australia/Perth` |
-| `spatial_bounds` | GeoJSON `Polygon`, 2D `[lon, lat]`, closed rings, or `null` |
+| `spatial_bounds` | GeoJSON `Polygon`, 2D `[lon, lat]`, closed rings, at most 10,000 positions across all rings, or `null` |
 | `currency_code` | active ISO 4217 code, default `AUD` |
 | `locale` | BCP 47 `ll[-Ssss][-RR|-nnn]`, default `en-AU` |
 

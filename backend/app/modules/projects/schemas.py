@@ -2,7 +2,8 @@
 
 * ``site_timezone``: an IANA zone name from the ``tzdata`` package (e.g. ``Australia/Perth``).
 * ``currency_code``: an active ISO 4217 code. ``locale``: a BCP 47 tag ``ll[-Ssss][-RR|-nnn]``.
-* ``spatial_bounds``: a GeoJSON (RFC 7946, WGS84) ``Polygon``, 2D positions, closed rings.
+* ``spatial_bounds``: a GeoJSON (RFC 7946, WGS84) ``Polygon``, 2D positions, closed rings,
+  at most ``MAX_TOTAL_POSITIONS`` positions across all rings.
 """
 
 from __future__ import annotations
@@ -41,6 +42,9 @@ ISO_4217: Final = frozenset(_ISO_4217_CODES.split())
 _LOCALE: Final = re.compile(r"^[a-z]{2,3}(-[A-Z][a-z]{3})?(-([A-Z]{2}|[0-9]{3}))?$")
 MAX_RINGS: Final = 100
 MAX_RING_POSITIONS: Final = 10_000
+# All rings together (T-0060): a site boundary fits easily, and a body can no longer ask for
+# MAX_RINGS x MAX_RING_POSITIONS (1M positions, ~22 MB) of validation work.
+MAX_TOTAL_POSITIONS: Final = 10_000
 
 
 # In the tzdata zone list but not a real location; browsers' Intl rejects it.
@@ -97,6 +101,19 @@ class PolygonGeoJSON(BaseModel):
     coordinates: list[
         Annotated[list[tuple[Coordinate, Coordinate]], Field(max_length=MAX_RING_POSITIONS)]
     ] = Field(min_length=1, max_length=MAX_RINGS)
+
+    @field_validator("coordinates", mode="before")
+    @classmethod
+    def _total_positions(cls, rings: object) -> object:
+        """Count the positions before validating any of them, so the cap bounds the cost."""
+        if isinstance(rings, list) and len(rings) <= MAX_RINGS:
+            total = sum(len(ring) for ring in rings if isinstance(ring, list))
+            if total > MAX_TOTAL_POSITIONS:
+                raise ValueError(
+                    f"a polygon may have at most {MAX_TOTAL_POSITIONS} positions in total"
+                    f" ({total} given)"
+                )
+        return rings
 
     @field_validator("coordinates")
     @classmethod
