@@ -3,6 +3,7 @@
 Run with: ``uvicorn app.main:create_app --factory``.
 """
 
+import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -19,6 +20,8 @@ from app.core.module_loader.loader import DEFAULT_PACKAGE, install_modules
 from app.core.request_context import RequestContextMiddleware
 from app.core.security_headers import SecurityHeadersMiddleware
 from app.core.tenancy.scope import OutOfScopeError
+from app.modules.jobs.broker import LoopDispatcher, SaqBroker
+from app.modules.jobs.service import set_dispatcher
 
 
 async def _out_of_scope_handler(_request: Request, _exc: Exception) -> JSONResponse:
@@ -41,7 +44,16 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+        # Jobs (T-0015): rows committed by requests are enqueued on SAQ after the commit.
+        broker = SaqBroker(settings.redis_url) if settings.redis_url else None
+        dispatcher = LoopDispatcher(broker, asyncio.get_running_loop()) if broker else None
+        if dispatcher is not None:
+            set_dispatcher(dispatcher)
         yield
+        if broker is not None and dispatcher is not None:
+            set_dispatcher(None)
+            await dispatcher.drain()
+            await broker.close()
         close_auth_runtime(_app)
         if database is not None:
             database.dispose()

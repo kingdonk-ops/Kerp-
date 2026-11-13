@@ -35,7 +35,7 @@ PYTHON ?= python
 COMPOSE ?= docker compose
 PG_TESTS ?= tests/test_rls_bypass.py tests/test_audit_ledger_pg.py tests/test_pg_extensions.py
 
-.PHONY: help up down reset ps logs test-pg test-pg-all
+.PHONY: help up down reset ps logs test-pg test-pg-all worker
 
 help:
 	@echo "KERP dev stack (PostgreSQL 16 + PostGIS + ltree, Redis 7, MinIO)"
@@ -45,6 +45,7 @@ help:
 	@echo "  make ps | logs    service status | follow the logs"
 	@echo "  make test-pg      up + run the RLS-bypass and audit-ledger tests; any skip fails"
 	@echo "  make test-pg-all  up + run the whole backend suite on PostgreSQL, as CI's PG step"
+	@echo "  make worker       build and start the SAQ job worker container (both queues)"
 
 up:
 	$(COMPOSE) up -d --wait
@@ -66,3 +67,6 @@ test-pg: up
 
 test-pg-all: up
 	cd backend && $(PYTHON) -m pytest --no-cov
+
+worker: up
+	$(COMPOSE) --profile worker up -d --build worker

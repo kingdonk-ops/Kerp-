@@ -166,7 +166,7 @@ class RedisRevocationStore:
     def lock_remaining(self, key: str) -> int:
         remaining = self._call(lambda: self._client.ttl(_lock_key(key)))
         # -2: no lock. Locks are always written with a TTL, so -1 does not occur.
-        return max(int(remaining), 0)
+        return max(int(str(remaining)), 0)  # str(): redis-py 7 types ttl() as Awaitable | Any
 
     def count_failure(self, key: str, window: timedelta) -> int:
         counter = _failures_key(key)

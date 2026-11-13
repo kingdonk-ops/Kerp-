@@ -96,6 +96,22 @@ def test_compose_services_have_healthchecks(compose: dict[str, Any]) -> None:
         assert "healthcheck" in compose[name], name
 
 
+def test_compose_worker_runs_the_saq_worker_from_the_backend_image(
+    compose: dict[str, Any],
+) -> None:
+    # T-0015: same image as the API, worker entry point, after postgres and redis are healthy.
+    worker = compose["worker"]
+    assert worker["build"] == "./backend"
+    assert worker["command"] == ["python", "-m", "app.modules.jobs.worker"]
+    assert {name: dep["condition"] for name, dep in worker["depends_on"].items()} == {
+        "postgres": "service_healthy",
+        "redis": "service_healthy",
+    }
+    assert worker["environment"]["KERP_REDIS_URL"] == "redis://redis:6379/0"
+    assert "kerp_app:" in worker["environment"]["KERP_DATABASE_URL"]  # RLS applies
+    assert worker["healthcheck"] == {"disable": True}  # the image's check probes the API
+
+
 def test_postgres_healthcheck_uses_tcp_not_the_init_socket(compose: dict[str, Any]) -> None:
     # During initdb the entrypoint's temporary server listens on the Unix socket only, so a
     # socket check would report "ready" before the init script (kerp_app) has run.
