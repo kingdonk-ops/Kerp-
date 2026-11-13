@@ -408,11 +408,9 @@ def test_a_result_that_cannot_be_stored_fails_the_job_with_a_sanitised_error(
     with caplog.at_level(logging.ERROR, "kerp.jobs"):
         run(db, dispatched[0])
     job = load(db, CTX_A, job_id)
-    assert (job.status, job.error, job.result) == (
-        "failed",
-        "Internal error (StatementError)",
-        None,
-    )
+    assert (job.status, job.result) == ("failed", None)
+    # SQLite's JSON type raises StatementError; psycopg's JSON dumper raises TypeError.
+    assert job.error in ("Internal error (StatementError)", "Internal error (TypeError)")
     record = next(r for r in caplog.records if r.__dict__.get("job_id") == str(job_id))
     assert record.exc_info is not None
 

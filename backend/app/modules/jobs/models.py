@@ -1,7 +1,7 @@
 """The job record ``oe_jobs_job`` (T-0015, ADR 0007).
 
 The row is the source of truth for a job; clients poll it through ``GET /jobs/{id}``. It
-uses ``BaseRecordMixin`` and is under project RLS (migration ``0006``) with no exemption:
+uses ``BaseRecordMixin`` and is under project RLS (migration ``0007``) with no exemption:
 the worker binds the tenant and project from the SAQ job kwargs before it reads the row.
 """
 

@@ -7,7 +7,7 @@ contract, `update(progress, message)` and the sanitised error (ADR 0007).
 
 | File | What |
 |---|---|
-| `models.py` | `oe_jobs_job` (`BaseRecordMixin`, project RLS, no exemption; migration `0006`) |
+| `models.py` | `oe_jobs_job` (`BaseRecordMixin`, project RLS, no exemption; migration `0007`) |
 | `registry.py` | `register_job(kind, queue=...)`, `JobKind`, `JobContext`, `JobRegistry`, `JOB_REGISTRY` |
 | `broker.py` | `JobBroker` seam, `SaqBroker` (two SAQ `RedisQueue`s), `LoopDispatcher` (post-commit enqueue) |
 | `service.py` | `create_job`, `get_job`, `start_job`/`report_progress`/`finish_job`, `sanitise_error`, `sweep` |
