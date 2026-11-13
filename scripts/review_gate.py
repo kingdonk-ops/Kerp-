@@ -9,7 +9,7 @@ Reviewer agents post a PR review/comment containing exactly:
 
 `patch-id` is `git patch-id --stable` of the PR's code diff against its merge
 base with the base branch, **excluding tracker paths** (tracker/**, docs/TASKS.md,
-docs/TODO.md). That makes the approval:
+docs/TODO.md, docs/pr-suggestions.md — all generated bookkeeping). That makes the approval:
   * stable across rebases and tracker re-renders (coordinator bookkeeping),
   * invalidated by any real code change after review.
 If the PR changes only tracker paths, the full diff is used instead.
@@ -34,7 +34,12 @@ from dataclasses import dataclass
 MARKER_RE = re.compile(
     r"KERP-REVIEW:\s*(APPROVED|CHANGES_REQUESTED)\s+patch-id=([0-9a-f]{7,40}|none)", re.I
 )
-TRACKER_EXCLUDES = [":(exclude)tracker/**", ":(exclude)docs/TASKS.md", ":(exclude)docs/TODO.md"]
+TRACKER_EXCLUDES = [
+    ":(exclude)tracker/**",
+    ":(exclude)docs/TASKS.md",
+    ":(exclude)docs/TODO.md",
+    ":(exclude)docs/pr-suggestions.md",
+]
 
 
 @dataclass(frozen=True)

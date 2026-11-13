@@ -1,0 +1,64 @@
+name: PR suggestions digest
+
+# Harvest notes / TODOs / suggestions / ideas surfaced on merged PRs into
+# docs/pr-suggestions.md and publish it to the unprotected `pr-suggestions`
+# branch. dev has no bypass actors (a workflow cannot push to it), so the
+# always-live copy lives on its own branch; the pipeline keeps dev's copy
+# current through normal task PRs (scripts/pr_suggestions.py, run by /kerp-run).
+on:
+  pull_request:
+    types: [closed]
+    branches: [dev]
+  workflow_dispatch:
+  schedule:
+    - cron: "17 6 * * *" # nightly catch-up for anything merged outside the pipeline
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pr-suggestions
+  cancel-in-progress: false
+
+jobs:
+  digest:
+    # On merge only (not on PRs that close without merging). Manual/scheduled always run.
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: dev
+          fetch-depth: 0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+      - name: Rebuild digest from merged PRs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          KERP_REPO: ${{ github.repository }}
+        run: python scripts/pr_suggestions.py rebuild --base dev --out docs/pr-suggestions.md
+      - name: Publish to pr-suggestions branch
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/pr-suggestions.md
+          if git diff --cached --quiet; then
+            echo "No change to docs/pr-suggestions.md"
+          else
+            git commit -m "chore: refresh pr-suggestions digest [skip ci]"
+          fi
+          # pr-suggestions = latest dev + the refreshed digest. Force so it
+          # always tracks dev cleanly; the branch is unprotected by design.
+          git push --force origin HEAD:pr-suggestions
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### PR suggestions digest"
+            echo "Published to branch \`pr-suggestions\` → \`docs/pr-suggestions.md\`."
+            echo "Read it: \`git show pr-suggestions:docs/pr-suggestions.md\`"
+          } >> "$GITHUB_STEP_SUMMARY"

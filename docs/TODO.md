@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 81 · **Closed:** 56
+**Open:** 86 · **Closed:** 56
 
 ## decision (2)
 
@@ -12,7 +12,7 @@
 | [TD-096](../tracker/todo/TD-096.md) | Approved coating ITR dropped the residual-dust rating row the ITP requires; Grating and Gridmesh ITR has no approved version: confirm with the client before shipping default templates | T-0113 | planner |
 | [TD-141](../tracker/todo/TD-141.md) | Rule store: explicit per-rule version column, findings log only non-passing rules | T-0018 | implementer |
 
-## spec-gap (34)
+## spec-gap (35)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -49,6 +49,7 @@
 | [TD-117](../tracker/todo/TD-117.md) | Findings register (TD-106 decision) has no spec section or task: assessment step, configurable name/types per project, follow-up work, priority derivation | T-0116, T-0117 | planner |
 | [TD-120](../tracker/todo/TD-120.md) | Login tenant resolution: how a user picks the tenant at sign-in (multi-tenant accounts, MOD-01 cross-tenant collaboration) | T-0008 | implementer |
 | [TD-121](../tracker/todo/TD-121.md) | Refresh-token lifetime, absolute session lifetime and SPA refresh-token transport are unspecified | T-0008 | implementer |
+| [TD-135](../tracker/todo/TD-135.md) | Field-worker PIN semantics: confirm server-checked PIN per session that gates every refresh, and the lockout/magic-link numbers | T-0009 | implementer |
 | [TD-139](../tracker/todo/TD-139.md) | Confirm per-kind rule context schemas and action vocabularies (validation compiler) | T-0018 | implementer |
 
 ## missed (3)
@@ -59,7 +60,7 @@
 | [TD-125](../tracker/todo/TD-125.md) | Booking modules must call work_anchor_for and return 422 when the path has no work anchor (progress, time lines against a work anchor, completion gate) | T-0101, T-0116, T-0124, E-04-03, E-04-05 | reviewer |
 | [TD-131](../tracker/todo/TD-131.md) | Add a root .env.example for the dev stack (the implementer agent's permission rules block writing .env* files) | T-0003 | implementer |
 
-## deferred (8)
+## deferred (9)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -70,9 +71,10 @@
 | [TD-074](../tracker/todo/TD-074.md) | Handover: offline drafting on tablets via the Dexie outbox | E-04-11 | planner |
 | [TD-122](../tracker/todo/TD-122.md) | Bind the request's project scope from the authorised project (tenancy context is tenant-level after T-0008) | T-0008 | implementer |
 | [TD-129](../tracker/todo/TD-129.md) | Guard the module toggle API (PUT /api/v1/modules/{name}) with the admin capability tier once RBAC lands (T-0010/T-0014) | T-0011 | implementer |
+| [TD-136](../tracker/todo/TD-136.md) | Restrict magic-link sign-in to the Field Worker persona (PER-14) once T-0010 personas exist | T-0009 | implementer |
 | [TD-140](../tracker/todo/TD-140.md) | Compile-on-save checks CEL rules only at top-level variables; field-level type checking against kind context schemas | T-0018 | implementer |
 
-## later (28)
+## later (30)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -102,10 +104,12 @@
 | [TD-130](../tracker/todo/TD-130.md) | Module loader: require CurrentPrincipal on every mounted module router by default (opt-out for public routes) | T-0011 | implementer |
 | [TD-133](../tracker/todo/TD-133.md) | Dev stack: separate dev database from kerp_test, and create the kerp-vault MinIO bucket + backend storage settings | T-0003 | implementer |
 | [TD-134](../tracker/todo/TD-134.md) | Dev infra follow-ups from PR #33 review: .gitattributes eol=lf for Makefile/*.sql/*.yml/*.sh, explicit pyyaml dev dep, test_pg_extensions.py in PG_TESTS guard | T-0003 | reviewer |
+| [TD-137](../tracker/todo/TD-137.md) | Field-worker sign-in UI: magic-link landing page, PIN set, PIN unlock screen with 429 Retry-After handling | T-0009 | implementer |
+| [TD-138](../tracker/todo/TD-138.md) | Per-client-IP throttling for login and magic-link requests (needs trusted-proxy config for the real client address) | T-0009 | implementer |
 | [TD-143](../tracker/todo/TD-143.md) | run_checks persist=False dry-run flag (evaluate without logging findings) | T-0018 | implementer |
 | [TD-144](../tracker/todo/TD-144.md) | run_checks: translate an uncommitted-rule-set ForeignKeyViolation into a clear RuleStoreError | T-0018 | implementer |
 
-## risk (6)
+## risk (7)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -115,6 +119,7 @@
 | [TD-102](../tracker/todo/TD-102.md) | Eligibility API is frozen at M1 (T-0131) but must accept a requirement set (role baseline + client/site overlays + task-bound rules) | T-0131, T-0118 | planner |
 | [TD-111](../tracker/todo/TD-111.md) | All coastal input files (planning, comm matrix, registers, reports, templates) contain real client and personal data: extend TD-069 beyond the inspection exports | T-0113, T-0107 | planner |
 | [TD-132](../tracker/todo/TD-132.md) | docker-compose dev stack never run end to end (no Docker on the T-0003 implementer machine): verify make test-pg once | T-0003 | implementer |
+| [TD-142](../tracker/todo/TD-142.md) | PIN gating fails open if Redis evicts the pin:<sid> key: add an amr=["pin"] token claim or require maxmemory-policy noeviction | T-0009 | implementer |
 
 ## Closed
 
