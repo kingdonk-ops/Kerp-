@@ -3,7 +3,108 @@
 > **Generated — do not hand-edit.** Rebuild with `python scripts/pr_suggestions.py rebuild`.
 > A running digest of everything agents surfaced on merged PRs — review notes, must-fix items, suggestions, nits, follow-ups and ideas — so nothing is lost after a squash-merge. Formal follow-ups also live as `TD-xxx` in `tracker/todo/` and on [TODO.md](TODO.md); this file is the readable skim. Each item links back to its PR or review for full context.
 
-_Repo `kingdonk-ops/Kerp-`, base `dev` · 65 merged PRs · 64 with surfaced notes._
+_Repo `kingdonk-ops/Kerp-`, base `dev` · 67 merged PRs · 66 with surfaced notes._
+
+---
+
+## PR #69 — T-0037: Auth sessions: hidden deployment tenant at login, 12-hour refresh from sign-in (daily re-login) + same-second password-change token rejection
+task `T-0037` · merged 2026-11-13 · by `kingdonk-ops` · [PR](https://github.com/kingdonk-ops/Kerp-/pull/69)
+
+**TODOs raised**
+
+- TD-248 (deferred) — startup check that `KERP_DEFAULT_TENANT_ID` names an existing tenant row (needs T-0023's tenant table).
+- TD-249 (spec-gap) — `GET /auth/me` still returns `tenant_id`, and the JWT `tid` claim is script-readable.
+(Re-raised from TD-242/243, which collided with PR #65.)
+
+**Review by `kingdonk-ops` — KERP-REVIEW: APPROVED patch-id=5d30112e2287d43dcc29c1b5d4fec31edb108bd1** · [full review](https://github.com/kingdonk-ops/Kerp-/pull/69#pullrequestreview-5894528921)
+
+- _Must fix_
+  None.
+
+- _Suggestions (non-blocking)_
+  - **Origin fallback behind a proxy (`router.py:85-86`).** With `KERP_WEB_ORIGIN` unset, a typical production deployment breaks. TLS terminates at a proxy, and uvicorn's `FORWARDED_ALLOW_IPS` does not include the proxy (and/or the proxy rewrites `Host`). Every `/auth/refresh` then returns 403, and users are effectively signed out 15 min after login. This is safe because it fails closed, but it is a silent outage. Two options:
+    - Fail fast in `check_startup_config` when `environment == "production"` and `web_origin` is unset, the same way it does for the tenant.
+    - Validate and normalise `web_origin` in `Settings` to `scheme://host[:port]`, lowercase, with no path.
+    Either fits naturally in T-0043 (native-origin allow-list). Consider a `risk`/`later` TODO.
+  - **403 from refresh in the SPA (`frontend/src/lib/api/client.ts`).** The client treats 403 as transient, so it keeps the session marker and retries on every 401. A 403 from `/auth/refresh` is a permanent Origin mismatch, so clearing the session (as for 400/401/422) would be better UX.
+  - **Tests.** Add `"null"` to the cross-origin parametrisations in `test_auth_api.py` (`test_refresh_rejects_a_cross_origin_request`) and `test_auth_field.py` (`test_unlock_rejects_a_cross_origin_request`). The code already handles it; the test would just document it.
+  - **TD-248.** TD-248 is linked only to T-0037. Ask the planner to add the tenant-row startup check as a criterion on T-0023 so it is not lost.
+  - **Login CSRF.** Login and magic-link redeem set the cookie without an Origin check, so a cross-site form could log a victim into an 
+
+**Review by `kingdonk-ops` — KERP-REVIEW: CHANGES_REQUESTED patch-id=bc46201bde1c61cf4f3071b82f6c6b1e07e97926** · [full review](https://github.com/kingdonk-ops/Kerp-/pull/69#pullrequestreview-5894604141)
+
+- _Must fix_
+  1. `.github/workflows/ci.yml:149` — the image smoke test starts `kerp-backend:ci` with no environment. The image defaults to `KERP_ENVIRONMENT=production` (`backend/Dockerfile:45`). The new `check_startup_config` (`backend/app/core/auth/runtime.py:80-81`, called from `backend/app/main.py:48`) then raises `AuthConfigError: KERP_DEFAULT_TENANT_ID must be set in production`, so the container never becomes healthy and `backend-image` fails.
+     - **Fixed looks like this:** the smoke `docker run` passes a synthetic, fixed `-e KERP_DEFAULT_TENANT_ID=<uuid>`, and the test still runs in **production** mode. Switching the smoke test to `development` to get green would weaken the gate (HSTS and the production-only checks would no longer be tested). Also add a small regression check, for example in `backend/tests/test_dev_infra.py` next to the existing CI/compose pins, that the smoke `docker run` sets `KERP_DEFAULT_TENANT_ID`, so the two cannot drift apart. `backend-image` must be green on the new head.
+  2. `backend/README.md:149` (container section) — this paragraph says the image defaults to production, but it does not say what a production container now needs to start. Since this PR, a production container will not start without `KERP_DEFAULT_TENANT_ID`.
+     - **Fixed looks like this:** the container/deploy section lists the variables a production run must set, at least `KERP_DEFAULT_TENANT_ID` (plus the existing JWT key and `KERP_REDIS_URL` requirements, and `KERP_WEB_ORIGIN` when the SPA is on a different origin). It also says that startup fails fast without the tenant ID. The `-e K
+
+- _Suggestions (non-blocking)_
+  - Optional: a negative smoke step that runs the production image without `KERP_DEFAULT_TENANT_ID` and checks that it exits non-zero, to show the fail-fast in the real image.
+  - The round-1 suggestions still apply.
+  KERP-REVIEW: CHANGES_REQUESTED patch-id=bc46201bde1c61cf4f3071b82f6c6b1e07e97926
+  ---
+  _Generated by [Claude Code](https://claude.ai/code)_
+
+**Review by `kingdonk-ops` — KERP-REVIEW: APPROVED patch-id=727d0ff5bba45aa8f4c2388cc8721449f5cf0be0** · [full review](https://github.com/kingdonk-ops/Kerp-/pull/69#pullrequestreview-5894878561)
+
+- _Must fix_
+  None.
+
+- _Suggestions (non-blocking)_
+  - `ci.yml:169`: under `bash -e`, a failing *first* test in an `&&` list does not stop the step. If the image ever exited with code 0 and printed the message, `rc=0` would get through. That is unlikely, and the grep still has to match. Separate lines (`[ "$rc" -ne 0 ]` then `[ "$rc" -ne 124 ]`) would make it strict.
+  - `ci.yml:167`: when `timeout` fires, it kills the docker client, not the container. Adding `docker rm -f kerp-no-tenant || true` in the logs step (or `--stop-timeout`) would clean up after a hang. This is cosmetic because runners are ephemeral.
+  KERP-REVIEW: APPROVED patch-id=727d0ff5bba45aa8f4c2388cc8721449f5cf0be0
+  ---
+  _Generated by [Claude Code](https://claude.ai/code)_
+
+**Review by `kingdonk-ops` — KERP-REVIEW: APPROVED patch-id=33ce76ed02b56975cc6d72926c01998edd791a64** · [full review](https://github.com/kingdonk-ops/Kerp-/pull/69#pullrequestreview-5895021164)
+
+- _Must fix_
+  None.
+
+- _Suggestions (non-blocking)_
+  None.
+  KERP-REVIEW: APPROVED patch-id=33ce76ed02b56975cc6d72926c01998edd791a64
+  ---
+  _Generated by [Claude Code](https://claude.ai/code)_
+
+---
+
+## PR #65 — T-0020: saved_views module
+task `T-0020` · merged 2026-11-13 · by `kingdonk-ops` · [PR](https://github.com/kingdonk-ops/Kerp-/pull/65)
+
+**TODOs raised**
+
+- TD-232 — team visibility via teams.service once T-0013 lands
+- TD-233 — portal visibility pending portal layout
+- TD-234 — spec-gap: team reference + is_default semantics
+- TD-235 — DB-level uniqueness of defaults
+- TD-236 — validate register_key against register descriptors (E-01-01)
+
+Note: migration is `0010`; T-0019 also adds `0010` — whichever merges second is renumbered.
+
+**Review by `kingdonk-ops` — KERP-REVIEW: CHANGES_REQUESTED patch-id=43d708b3c7976675d1a96b7556afeeecab44f798** · [full review](https://github.com/kingdonk-ops/Kerp-/pull/65#pullrequestreview-5894270563)
+
+- _Must fix_
+  1. `backend/app/modules/saved_views/service.py:294` (with `:301`, `:316-319`) — when `visibility` changes and `is_default` is not in the PATCH body, the old `is_default` is carried over, but its meaning flips with visibility (owner's personal default <-> project default, TD-234). Confirmed by probe:
+     - A Project Administrator sharing their own **personal** default (`PATCH {visibility: "project"}`) silently makes it the **project default** and `_clear_other_defaults` un-sets the existing project default for every member (PEER's default became "Admin personal").
+     - A member with `C` sharing their personal default (`PATCH {visibility: "project"}`) gets **403** "only a Project Administrator changes the project default"; to `team`/`portal` it is a 422 — the ordinary "share my view" path fails unless the client knows to send `is_default: false`.
+     - Reverse: an admin un-sharing a project default to `private` turns it into the owner's personal default and clears the owner's existing personal default.
+     **Fixed looks like:** when visibility changes and `is_default` is not given, reset `is_default` to `False` (a default never crosses kinds implicitly; an explicit `is_default: true` alongside the visibility change keeps today's checks). Add service tests for all three cases above (admin shares personal default -> project default unchanged; member shares personal default -> 200, not default; admin un-shares project default -> owner's personal default unchanged).
+
+- _Suggestions (non-blocking)_
+  - `service.py` `load_config`/`present`: a stored config that stops validating (CEL engine change, lowered caps) would 500 on load. Consider catching `ValidationError` there and degrading (or a `later` TODO), in line with spec §3 "never an error".
+  - `models.py:180` `_in()` builds CHECK SQL by f-string from module constants — safe today; a comment saying "constants only" would stop someone feeding it input later.
+  - `ruff format --check` flags 5 files (Markdown code blocks incl. this README); not a CI gate, ignore unless the team wants it.
+
+**Review by `kingdonk-ops` — KERP-REVIEW: APPROVED patch-id=e5d0324763d293ffb3ec9d43dcf674732569a2a5** · [full review](https://github.com/kingdonk-ops/Kerp-/pull/65#pullrequestreview-5894760083)
+
+- _Must fix_
+  None.
+
+- _Suggestions (non-blocking)_
+  - None new.
 
 ---
 
