@@ -37,7 +37,8 @@ changed field names). Delete is a soft delete; the code stays taken (TD-186).
 ## Access
 
 The request binds no project yet (TD-122), so the router authorises against the project in
-the path using the caller's memberships (`app.core.auth.access.load_grants`):
+the path using the caller's memberships (`app.core.auth.access.CallerGrants`: the grants the
+request's scope was resolved from, so they are read once per request, T-0071):
 
 - list and read: projects the caller is a member of; everything else is 404;
 - edit and delete: the `admin` capability (Project Administrator, PER-09) on that project, else 403;
