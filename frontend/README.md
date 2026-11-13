@@ -52,8 +52,9 @@ src/
 ## Shell (T-0024)
 
 - **Auth.** `/login` posts to `/api/v1/auth/login`. The access token is memory-only; the
-  rotating refresh token is in `sessionStorage` (TD-121), so a reload resumes the session
-  via `/api/v1/auth/refresh`. Every other route sits behind `RequireAuth`. Sign-out calls
+  rotating refresh token is an `httpOnly` cookie the browser alone holds (T-0037, TD-203);
+  `sessionStorage` keeps only a "signed in" marker, so a reload resumes the session via
+  `/api/v1/auth/refresh` (same origin). A session ends 12 hours after sign-in. Every other route sits behind `RequireAuth`. Sign-out calls
   `/api/v1/auth/logout` and clears the session even when the server is unreachable.
 - **Navigation (diff §6).** 8 groups in `src/app/nav.ts`: Overview, the 4 pillars
   (Logistics, Execution, Defense & Claims, Controls & Insights), Backbone, Documents,

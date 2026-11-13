@@ -42,7 +42,7 @@ hardcoded config, no `.env` file is read).
 | `KERP_MIGRATION_DATABASE_URL` | unset (= `KERP_DATABASE_URL`) | Schema-owner URL Alembic runs as |
 | `KERP_MAX_BODY_BYTES` | `1048576` (1 MiB) | Largest request body any endpoint accepts (413 above it; min 1024). File bytes go to object storage by presigned URL and are not capped by it (`app/core/body_limit.py`) |
 | `KERP_REDIS_URL` | unset | Redis URL (auth token revocation; job queue later). Required in production |
-| `KERP_JWT_*`, `KERP_ACCESS_TOKEN_MINUTES`, `KERP_REFRESH_TOKEN_DAYS`, `KERP_DEFAULT_TENANT_ID` | see `app/core/auth/README.md` | Token signing keys and lifetimes |
+| `KERP_JWT_*`, `KERP_ACCESS_TOKEN_MINUTES`, `KERP_REFRESH_TOKEN_HOURS`, `KERP_DEFAULT_TENANT_ID`, `KERP_WEB_ORIGIN` | see `app/core/auth/README.md` | Token signing keys and lifetimes, the deployment tenant (required in production: the app does not start without it), refresh-cookie origin (optional; set it behind a proxy, see Container image) |
 | `KERP_STORAGE_BUCKET`, `KERP_S3_ENDPOINT_URL`, `KERP_S3_PUBLIC_ENDPOINT_URL`, `KERP_S3_ACCESS_KEY_ID`, `KERP_S3_SECRET_ACCESS_KEY`, `KERP_UPLOAD_*`, `KERP_DOWNLOAD_URL_SECONDS` | see `app/modules/uploads/README.md` | Object storage (S3 / MinIO) and upload limits |
 | `KERP_S3_REGION` | `ap-southeast-2` | S3 region, set per deployment (TD-171 decision 13a, diff §4.4); MinIO ignores it |
 | `KERP_LOG_LEVEL` | `INFO` | Root log level (`DEBUG`…`CRITICAL`, case-insensitive) |
@@ -145,6 +145,25 @@ docker run --rm -p 8000:8000 -e KERP_ENVIRONMENT=development kerp-backend
 
 Behind a reverse proxy, also set `FORWARDED_ALLOW_IPS=<proxy address>` (read by uvicorn) so the
 login lockout sees the real client address (`app/core/auth/README.md`, T-0068).
+
+A production container (the image default) needs:
+
+- `KERP_DEFAULT_TENANT_ID`: the deployment's one tenant (T-0037). **Startup fails fast without
+  it**: the app exits before serving `/health`. CI's smoke test checks both that and a start with
+  a synthetic tenant id.
+- A JWT signing key (`KERP_JWT_PRIVATE_KEY` or `KERP_JWT_PRIVATE_KEY_FILE`) and
+  `KERP_REDIS_URL`: checked when auth is first used, not at startup (`/health` needs neither).
+- `KERP_WEB_ORIGIN` when the SPA is served from a different origin than the API. Unset, the
+  refresh-cookie endpoints accept only the API's own origin as the request sees it; behind a
+  TLS-terminating proxy that is `http://<internal host>` unless uvicorn trusts the proxy's
+  forwarded headers (`FORWARDED_ALLOW_IPS`), so trust the proxy or set `KERP_WEB_ORIGIN` to the
+  public origin (e.g. `https://kerp.example.com`).
+- `KERP_DATABASE_URL` for anything beyond `/health`.
+
+```bash
+docker run --rm -p 8000:8000 -e KERP_DEFAULT_TENANT_ID=<tenant uuid> \
+  -e KERP_REDIS_URL=redis://… -e KERP_JWT_PRIVATE_KEY_FILE=/run/secrets/jwt.pem kerp-backend
+```
 
 The image defaults to `KERP_ENVIRONMENT=production` (HSTS on); it listens on port 8000
 (`uvicorn app.main:create_app --factory`) and has a `HEALTHCHECK` against `/health` using the

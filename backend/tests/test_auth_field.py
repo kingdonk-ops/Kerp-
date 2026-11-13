@@ -27,6 +27,7 @@ from app.core.auth.field import (
 )
 from app.core.auth.lockout import LOGIN_ACCOUNT_POLICY
 from app.core.auth.revocation import InMemoryRevocationStore, RedisRevocationStore
+from app.core.auth.router import REFRESH_COOKIE
 from app.core.auth.runtime import AuthRuntime
 from app.core.auth.service import AuthService
 from app.core.db import Database
@@ -35,14 +36,18 @@ from tests.audit_support import migrated_database
 from tests.auth_support import (
     ALICE,
     BOB,
+    ORIGIN,
     PASSWORD,
     T1,
     T2,
     CapturingSender,
     auth_app,
+    cookie_headers,
     fake_store,
     make_settings,
+    refresh,
     seed_user,
+    token_body,
 )
 from tests.db_support import database_url
 from tests.test_auth_revocation import BrokenRedis, FakeClock
@@ -67,24 +72,24 @@ class Harness:
         self.sender = sender
         self.clock = clock
 
-    def request_link(self, email: str = ALICE, tenant: uuid.UUID = T1) -> str:
+    def request_link(self, email: str = ALICE) -> str:
         before = len(self.sender.sent)
-        response = self.client.post(MAGIC, json={"email": email, "tenant_id": str(tenant)})
+        response = self.client.post(MAGIC, json={"email": email})
         assert response.status_code == 202, response.text
         assert len(self.sender.sent) == before + 1
         return self.sender.sent[-1].token
 
     def redeem(self, token: str, pin: str = PIN) -> dict[str, str]:
-        response = self.client.post(REDEEM, json={"token": token, "pin": pin})
-        assert response.status_code == 200, response.text
-        tokens: dict[str, str] = response.json()
-        return tokens
+        return token_body(self.client.post(REDEEM, json={"token": token, "pin": pin}))
 
     def field_session(self) -> dict[str, str]:
         return self.redeem(self.request_link())
 
-    def unlock(self, refresh_token: str, pin: str = PIN) -> httpx.Response:
-        return self.client.post(UNLOCK, json={"refresh_token": refresh_token, "pin": pin})
+    def unlock(
+        self, refresh_token: str, pin: str = PIN, origin: str | None = ORIGIN
+    ) -> httpx.Response:
+        headers = cookie_headers(refresh_token, origin)
+        return self.client.post(UNLOCK, json={"pin": pin}, headers=headers)
 
 
 @pytest.fixture
@@ -163,10 +168,9 @@ def test_only_the_token_digest_is_stored(h: Harness) -> None:
 @pytest.mark.parametrize(
     "body",
     [
-        {"email": "nobody@example.test", "tenant_id": str(T1)},
-        {"email": "inactive@example.test", "tenant_id": str(T1)},
-        {"email": BOB, "tenant_id": str(T1)},  # Bob lives in T2
-        {"email": ALICE},  # no tenant and no default tenant
+        {"email": "nobody@example.test"},
+        {"email": "inactive@example.test"},
+        {"email": BOB},  # Bob lives in T2
     ],
 )
 def test_magic_link_request_is_202_and_silent_for_anyone_else(
@@ -177,17 +181,26 @@ def test_magic_link_request_is_202_and_silent_for_anyone_else(
     assert h.sender.sent == []
 
 
-def test_magic_link_uses_the_default_tenant(
+def test_magic_link_uses_the_deployments_tenant(h: Harness, users: dict[str, uuid.UUID]) -> None:
+    assert h.client.post(MAGIC, json={"email": ALICE.upper()}).status_code == 202
+    assert [link.user_id for link in h.sender.sent] == [users["alice"]]
+    # No tenant field (diff §4.1): sending one is a 422 and sends nothing.
+    named = h.client.post(MAGIC, json={"email": ALICE, "tenant_id": str(T1)})
+    assert named.status_code == 422
+    assert len(h.sender.sent) == 1
+
+
+def test_magic_link_without_a_deployment_tenant_sends_nothing(
     tmp_path: Path, db: Database, users: dict[str, uuid.UUID]
 ) -> None:
     sender = CapturingSender()
     app, _ = auth_app(
-        make_settings(database_url=database_url(tmp_path), default_tenant_id=T1),
+        make_settings(database_url=database_url(tmp_path), default_tenant_id=None),
         magic_links=sender,
     )
     with TestClient(app) as client:
-        assert client.post(MAGIC, json={"email": ALICE.upper()}).status_code == 202
-    assert [link.user_id for link in sender.sent] == [users["alice"]]
+        assert client.post(MAGIC, json={"email": ALICE}).status_code == 202
+    assert sender.sent == []
 
 
 def test_magic_link_expires(h: Harness) -> None:
@@ -243,13 +256,13 @@ def test_weak_pin_rule() -> None:
 def test_magic_link_requests_are_throttled_per_address(h: Harness) -> None:
     for _ in range(4):  # 3 free, the 4th is sent but arms a 1-minute lock
         h.request_link()
-    locked = h.client.post(MAGIC, json={"email": ALICE, "tenant_id": str(T1)})
+    locked = h.client.post(MAGIC, json={"email": ALICE})
     assert locked.status_code == 429
     assert locked.headers["retry-after"] == "60"
     # An unknown address is throttled the same way (no enumeration through the 429).
     for _ in range(4):
-        h.client.post(MAGIC, json={"email": "nobody@example.test", "tenant_id": str(T1)})
-    unknown = h.client.post(MAGIC, json={"email": "nobody@example.test", "tenant_id": str(T1)})
+        h.client.post(MAGIC, json={"email": "nobody@example.test"})
+    unknown = h.client.post(MAGIC, json={"email": "nobody@example.test"})
     assert unknown.status_code == 429
     h.clock.now += 60
     h.request_link()
@@ -260,7 +273,7 @@ def test_magic_link_requests_are_throttled_per_address(h: Harness) -> None:
 
 def test_field_session_cannot_be_refreshed_without_the_pin(h: Harness) -> None:
     tokens = h.field_session()
-    response = h.client.post(REFRESH, json={"refresh_token": tokens["refresh_token"]})
+    response = refresh(h.client, tokens["refresh_token"])
     assert response.status_code == 401
     # Not consumed: the device can still unlock with it.
     assert h.unlock(tokens["refresh_token"]).status_code == 200
@@ -272,27 +285,38 @@ def test_unlock_rotates_the_session_with_refresh_token_and_pin(h: Harness) -> No
     response = h.unlock(tokens["refresh_token"])
     assert response.status_code == 200
     assert response.headers["cache-control"] == "no-store"
-    new = response.json()
+    new = token_body(response)
     claims = h.runtime.tokens.verify(new["refresh_token"], "refresh")
     assert claims.session_id == old.session_id
     assert h.client.get(ME, headers=_bearer(new["access_token"])).status_code == 200
     # The next unlock needs the new refresh token; the new one is still PIN-gated.
-    assert h.client.post(REFRESH, json={"refresh_token": new["refresh_token"]}).status_code == 401
+    assert refresh(h.client, new["refresh_token"]).status_code == 401
     assert h.unlock(new["refresh_token"]).status_code == 200
 
 
 def test_replayed_refresh_token_on_unlock_revokes_the_session(h: Harness) -> None:
     tokens = h.field_session()
-    new = h.unlock(tokens["refresh_token"]).json()
+    new = token_body(h.unlock(tokens["refresh_token"]))
     assert h.unlock(tokens["refresh_token"]).status_code == 401
     assert h.unlock(new["refresh_token"]).status_code == 401
 
 
 def test_pin_without_a_refresh_token_is_rejected(h: Harness) -> None:
-    h.field_session()
-    assert h.client.post(UNLOCK, json={"pin": PIN}).status_code == 422
-    assert h.client.post(UNLOCK, json={"pin": PIN, "refresh_token": ""}).status_code == 422
+    tokens = h.field_session()
+    assert h.client.post(UNLOCK, json={"pin": PIN}, headers={"Origin": ORIGIN}).status_code == 401
+    # The refresh token travels only in the cookie, never in a body.
+    body = {"pin": PIN, "refresh_token": tokens["refresh_token"]}
+    assert h.client.post(UNLOCK, json=body, headers={"Origin": ORIGIN}).status_code == 401
+    with_cookie = cookie_headers(tokens["refresh_token"])
+    assert h.client.post(UNLOCK, json=body, headers=with_cookie).status_code == 422
     assert h.unlock("not.a.token").status_code == 401
+
+
+@pytest.mark.parametrize("origin", [None, "https://evil.example"])
+def test_unlock_rejects_a_cross_origin_request(h: Harness, origin: str | None) -> None:
+    tokens = h.field_session()
+    assert h.unlock(tokens["refresh_token"], origin=origin).status_code == 403
+    assert h.unlock(tokens["refresh_token"]).status_code == 200
 
 
 def test_pin_cannot_unlock_with_an_access_token(h: Harness) -> None:
@@ -302,11 +326,11 @@ def test_pin_cannot_unlock_with_an_access_token(h: Harness) -> None:
 
 def test_pin_cannot_unlock_a_password_session(h: Harness) -> None:
     h.field_session()  # Alice has a PIN on another session ...
-    login = h.client.post(LOGIN, json={"email": ALICE, "password": PASSWORD, "tenant_id": str(T1)})
-    refresh_token = login.json()["refresh_token"]
+    login = h.client.post(LOGIN, json={"email": ALICE, "password": PASSWORD})
+    refresh_token = token_body(login)["refresh_token"]
     # ... but it does not open her password session, which has no PIN gate.
     assert h.unlock(refresh_token).status_code == 401
-    assert h.client.post(REFRESH, json={"refresh_token": refresh_token}).status_code == 200
+    assert refresh(h.client, refresh_token).status_code == 200
 
 
 def test_pin_is_bound_to_its_own_session(h: Harness) -> None:
@@ -323,16 +347,18 @@ def test_logged_out_field_session_cannot_be_unlocked(h: Harness) -> None:
 
 
 def test_no_endpoint_accepts_a_pin_without_a_session_credential() -> None:
-    """Contract: every request body with a ``pin`` also requires a token that only a
-    magic link (``token``) or an existing session (``refresh_token``) can provide."""
+    """Contract: every request with a ``pin`` also carries a token that only a magic link
+    (``token`` in the body) or an existing session (the refresh cookie) can provide."""
     spec = openapi_schema()
     schemas = spec["components"]["schemas"]
     with_pin = {name: s for name, s in schemas.items() if "pin" in s.get("properties", {})}
     assert set(with_pin) == {"MagicLinkRedeemRequest", "PinUnlockRequest"}
-    for schema in with_pin.values():
-        required = set(schema["required"])
-        assert "pin" in required
-        assert required & {"token", "refresh_token"}
+    assert {"pin", "token"} <= set(with_pin["MagicLinkRedeemRequest"]["required"])
+    assert with_pin["PinUnlockRequest"]["required"] == ["pin"]
+    unlock = spec["paths"][UNLOCK]["post"]
+    assert {"in": "cookie", "name": REFRESH_COOKIE} in [
+        {"in": p["in"], "name": p["name"]} for p in unlock["parameters"]
+    ]
 
 
 # --- progressive lockout on the PIN ---------------------------------------------------------
@@ -360,7 +386,7 @@ def test_right_pin_resets_the_count(h: Harness) -> None:
     tokens = h.field_session()
     for _ in range(3):
         h.unlock(tokens["refresh_token"], WRONG)
-    new = h.unlock(tokens["refresh_token"]).json()
+    new = token_body(h.unlock(tokens["refresh_token"]))
     for _ in range(3):  # three free attempts again
         assert h.unlock(new["refresh_token"], WRONG).status_code == 401
     assert h.unlock(new["refresh_token"]).status_code == 200
@@ -424,7 +450,7 @@ def test_pin_lockout_is_per_session(h: Harness) -> None:
 
 def _login(h: Harness, email: str = ALICE, password: str = PASSWORD) -> int:
     response = h.client.post(
-        LOGIN, json={"email": email, "password": password, "tenant_id": str(T1)}
+        LOGIN, json={"email": email, "password": password}
     )
     return response.status_code
 
@@ -433,7 +459,7 @@ def test_password_login_locks_progressively(h: Harness) -> None:
     for _ in range(6):  # 5 free, the 6th arms the lock
         assert _login(h, password="wrong") == 401
     response = h.client.post(
-        LOGIN, json={"email": ALICE, "password": PASSWORD, "tenant_id": str(T1)}
+        LOGIN, json={"email": ALICE, "password": PASSWORD}
     )
     assert response.status_code == 429
     assert response.headers["retry-after"] == "30"
@@ -456,7 +482,7 @@ def _login_from(h: Harness, client: str, password: str = PASSWORD) -> int:
     """A login from another client address (as uvicorn reports it in ``request.client``)."""
     other = TestClient(h.client.app, client=(client, 40000))
     return other.post(
-        LOGIN, json={"email": ALICE, "password": password, "tenant_id": str(T1)}
+        LOGIN, json={"email": ALICE, "password": password}
     ).status_code
 
 
@@ -517,12 +543,12 @@ def test_full_flow_on_redis(tmp_path: Path, db: Database, users: dict[str, uuid.
         make_settings(database_url=database_url(tmp_path)), store=fake_store(), magic_links=sender
     )
     with TestClient(app) as client:
-        client.post(MAGIC, json={"email": ALICE, "tenant_id": str(T1)})
-        tokens = client.post(REDEEM, json={"token": sender.sent[0].token, "pin": PIN}).json()
+        client.post(MAGIC, json={"email": ALICE})
+        redeemed = client.post(REDEEM, json={"token": sender.sent[0].token, "pin": PIN})
+        headers = cookie_headers(token_body(redeemed)["refresh_token"])
         for _ in range(4):
-            client.post(UNLOCK, json={"refresh_token": tokens["refresh_token"], "pin": WRONG})
-        body = {"refresh_token": tokens["refresh_token"], "pin": PIN}
-        assert client.post(UNLOCK, json=body).status_code == 429
+            client.post(UNLOCK, json={"pin": WRONG}, headers=headers)
+        assert client.post(UNLOCK, json={"pin": PIN}, headers=headers).status_code == 429
 
 
 def test_store_outage_is_503(tmp_path: Path, db: Database, users: dict[str, uuid.UUID]) -> None:
@@ -531,14 +557,14 @@ def test_store_outage_is_503(tmp_path: Path, db: Database, users: dict[str, uuid
         store=RedisRevocationStore(BrokenRedis()),
         magic_links=CapturingSender(),
     )
-    refresh = runtime.tokens.issue(
+    minted = runtime.tokens.issue(
         "refresh", user_id=users["alice"], tenant_id=T1, session_id=uuid.uuid4()
     )
     with TestClient(app) as client:
-        assert client.post(MAGIC, json={"email": ALICE, "tenant_id": str(T1)}).status_code == 503
+        assert client.post(MAGIC, json={"email": ALICE}).status_code == 503
         assert client.post(REDEEM, json={"token": "x" * 43, "pin": PIN}).status_code == 503
-        body = {"refresh_token": refresh.token, "pin": PIN}
-        assert client.post(UNLOCK, json=body).status_code == 503
+        unlock = client.post(UNLOCK, json={"pin": PIN}, headers=cookie_headers(minted.token))
+        assert unlock.status_code == 503
 
 
 # --- delivery -------------------------------------------------------------------------------

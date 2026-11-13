@@ -32,12 +32,16 @@ from tests.audit_support import migrated_database
 from tests.auth_support import (
     ALICE,
     BOB,
+    ORIGIN,
     PASSWORD,
     T1,
     T2,
     auth_app,
+    cookie_headers,
     make_settings,
+    refresh,
     seed_user,
+    token_body,
 )
 from tests.db_support import database_url
 from tests.test_auth_revocation import BrokenRedis
@@ -103,14 +107,8 @@ def runtime(app_runtime: tuple[FastAPI, AuthRuntime]) -> AuthRuntime:
     return app_runtime[1]
 
 
-def _login(client: TestClient, email: str = ALICE, tenant: uuid.UUID | None = T1) -> dict[str, str]:
-    body: dict[str, str] = {"email": email, "password": PASSWORD}
-    if tenant is not None:
-        body["tenant_id"] = str(tenant)
-    response = client.post(LOGIN, json=body)
-    assert response.status_code == 200, response.text
-    tokens: dict[str, str] = response.json()
-    return tokens
+def _login(client: TestClient, email: str = ALICE) -> dict[str, str]:
+    return token_body(client.post(LOGIN, json={"email": email, "password": PASSWORD}))
 
 
 def _bearer(token: str) -> dict[str, str]:
@@ -169,18 +167,29 @@ def test_rs256_deployment_publishes_rsa_key(tmp_path: Path) -> None:
 def test_login_issues_a_15_minute_access_token_and_a_refresh_token(
     client: TestClient, runtime: AuthRuntime, users: dict[str, uuid.UUID]
 ) -> None:
-    response = client.post(LOGIN, json={"email": ALICE, "password": PASSWORD, "tenant_id": str(T1)})
+    response = client.post(LOGIN, json={"email": ALICE, "password": PASSWORD})
     assert response.status_code == 200
     assert response.headers["cache-control"] == "no-store"
-    body = response.json()
+    body = token_body(response)
     assert body["token_type"] == "bearer"
     assert body["expires_in"] == 15 * 60
-    assert body["refresh_expires_in"] == 14 * 86400
+    assert body["refresh_expires_in"] == 12 * 3600
     access = runtime.tokens.verify(body["access_token"], "access")
-    refresh = runtime.tokens.verify(body["refresh_token"], "refresh")
+    refresh_claims = runtime.tokens.verify(body["refresh_token"], "refresh")
     assert access.user_id == users["alice"]
     assert access.tenant_id == T1
-    assert access.session_id == refresh.session_id
+    assert access.session_id == refresh_claims.session_id
+
+
+def test_refresh_cookie_is_httponly_secure_strict_and_scoped_to_auth(client: TestClient) -> None:
+    response = client.post(LOGIN, json={"email": ALICE, "password": PASSWORD})
+    cookie = response.headers["set-cookie"]
+    attributes = {part.strip().split("=")[0].lower() for part in cookie.split(";")}
+    assert cookie.startswith("kerp_refresh=")
+    assert {"httponly", "secure", "path", "max-age", "samesite"} <= attributes
+    assert "Path=/api/v1/auth" in cookie
+    assert "SameSite=strict" in cookie
+    assert "Max-Age=43200" in cookie
 
 
 def test_login_email_is_case_insensitive(client: TestClient) -> None:
@@ -201,42 +210,61 @@ def test_login_email_is_case_insensitive(client: TestClient) -> None:
 def test_login_failures_are_indistinguishable_401s(
     client: TestClient, body: dict[str, str]
 ) -> None:
-    response = client.post(LOGIN, json={**body, "tenant_id": str(T1)})
+    response = client.post(LOGIN, json=body)
     assert response.status_code == 401
     assert response.json() == {"detail": "Not authenticated"}
     assert response.headers["www-authenticate"] == "Bearer"
 
 
-def test_login_to_the_other_tenant(client: TestClient) -> None:
-    tokens = _login(client, email=BOB, tenant=T2)
-    assert client.get(ME, headers=_bearer(tokens["access_token"])).json()["tenant_id"] == str(T2)
+def test_login_signs_in_to_the_deployments_tenant(
+    tmp_path: Path, db: Database, users: dict[str, uuid.UUID]
+) -> None:
+    # Another company is another deployment (diff §4.1): Bob's deployment is T2's.
+    app, _ = auth_app(make_settings(database_url=database_url(tmp_path), default_tenant_id=T2))
+    with TestClient(app) as c:
+        tokens = _login(c, email=BOB)
+        assert c.get(ME, headers=_bearer(tokens["access_token"])).json()["id"] == str(
+            users["bob_t2"]
+        )
+        assert c.post(LOGIN, json={"email": ALICE, "password": PASSWORD}).status_code == 401
 
 
-def test_login_without_tenant_and_without_default_is_401(client: TestClient) -> None:
-    response = client.post(LOGIN, json={"email": ALICE, "password": PASSWORD})
+def test_login_without_a_deployment_tenant_is_401(
+    tmp_path: Path, db: Database, users: dict[str, uuid.UUID]
+) -> None:
+    app, _ = auth_app(make_settings(database_url=database_url(tmp_path), default_tenant_id=None))
+    with TestClient(app) as c:
+        response = c.post(LOGIN, json={"email": ALICE, "password": PASSWORD})
     assert response.status_code == 401
 
 
-def test_login_without_tenant_uses_the_default_tenant(
-    tmp_path: Path, db: Database, users: dict[str, uuid.UUID]
+@pytest.mark.parametrize("tenant", [T1, T2])
+def test_login_with_a_tenant_field_is_422_and_never_names_the_tenant(
+    client: TestClient, tenant: uuid.UUID
 ) -> None:
-    app, _ = auth_app(make_settings(database_url=database_url(tmp_path), default_tenant_id=T1))
-    with TestClient(app) as c:
-        tokens = _login(c, tenant=None)
-        assert c.get(ME, headers=_bearer(tokens["access_token"])).json()["email"] == ALICE
+    body = {"email": ALICE, "password": PASSWORD, "tenant_id": str(tenant)}
+    response = client.post(LOGIN, json=body)
+    assert response.status_code == 422
+    # The error echoes the caller's own input at most, never the deployment's tenant.
+    other = T2 if tenant == T1 else T1
+    assert str(other) not in response.text
+    assert "set-cookie" not in response.headers
+    ok = client.post(LOGIN, json={"email": ALICE, "password": PASSWORD})
+    assert str(T1) not in ok.text
+    assert str(T1) not in client.post(LOGIN, json={"email": ALICE, "password": "no"}).text
 
 
 def test_login_rejects_unknown_fields_and_oversized_passwords(client: TestClient) -> None:
-    extra = {"email": ALICE, "password": PASSWORD, "tenant_id": str(T1), "role": "admin"}
+    extra = {"email": ALICE, "password": PASSWORD, "role": "admin"}
     assert client.post(LOGIN, json=extra).status_code == 422
-    huge = {"email": ALICE, "password": "x" * 1025, "tenant_id": str(T1)}
+    huge = {"email": ALICE, "password": "x" * 1025}
     assert client.post(LOGIN, json=huge).status_code == 422
 
 
 def test_login_ignores_a_stale_bearer_header(client: TestClient) -> None:
     response = client.post(
         LOGIN,
-        json={"email": ALICE, "password": PASSWORD, "tenant_id": str(T1)},
+        json={"email": ALICE, "password": PASSWORD},
         headers=_bearer("stale.invalid.token"),
     )
     assert response.status_code == 200
@@ -302,10 +330,14 @@ def test_request_session_is_bound_to_the_token_tenant(
     }
 
 
-def test_tenant_comes_from_the_token_only(client: TestClient) -> None:
+def test_tenant_comes_from_the_token_only(
+    client: TestClient, runtime: AuthRuntime, users: dict[str, uuid.UUID]
+) -> None:
     # T1's users are visible to a T1 token; T2's are not, and no parameter changes that.
     t1 = _login(client)["access_token"]
-    t2 = _login(client, email=BOB, tenant=T2)["access_token"]
+    t2 = runtime.tokens.issue(
+        "access", user_id=users["bob_t2"], tenant_id=T2, session_id=uuid.uuid4()
+    ).token
     t1_users = client.get("/_users", headers=_bearer(t1)).json()
     assert ALICE in t1_users
     assert BOB not in t1_users
@@ -318,7 +350,7 @@ def test_deactivated_user_is_locked_out_immediately(client: TestClient, db: Data
     with db.unit_of_work(TenancyContext(tenant_id=T1)) as s:
         s.scalars(select(User).where(User.email == ALICE)).one().is_active = False
     assert client.get(ME, headers=_bearer(tokens["access_token"])).status_code == 401
-    assert client.post(REFRESH, json={"refresh_token": tokens["refresh_token"]}).status_code == 401
+    assert refresh(client, tokens["refresh_token"]).status_code == 401
 
 
 def test_password_change_invalidates_earlier_tokens(
@@ -374,7 +406,7 @@ def test_logout_revokes_access_and_refresh_tokens(client: TestClient) -> None:
     headers = _bearer(tokens["access_token"])
     assert client.post(LOGOUT, headers=headers).status_code == 204
     assert client.get(ME, headers=headers).status_code == 401
-    assert client.post(REFRESH, json={"refresh_token": tokens["refresh_token"]}).status_code == 401
+    assert refresh(client, tokens["refresh_token"]).status_code == 401
     assert client.post(LOGOUT, headers=headers).status_code == 401
 
 
@@ -397,12 +429,12 @@ def test_refresh_rotates_both_tokens_in_the_same_session(
     tokens = _login(client)
     response = client.post(
         REFRESH,
-        json={"refresh_token": tokens["refresh_token"]},
-        headers=_bearer("expired-or-garbage"),  # clients often send the stale access token
+        # Clients often send the stale access token along.
+        headers={**cookie_headers(tokens["refresh_token"]), **_bearer("expired-or-garbage")},
     )
     assert response.status_code == 200
     assert response.headers["cache-control"] == "no-store"
-    rotated = response.json()
+    rotated = token_body(response)
     assert rotated["refresh_token"] != tokens["refresh_token"]
     assert rotated["access_token"] != tokens["access_token"]
     old = runtime.tokens.verify(tokens["refresh_token"], "refresh")
@@ -410,28 +442,68 @@ def test_refresh_rotates_both_tokens_in_the_same_session(
     assert new.session_id == old.session_id
     assert client.get(ME, headers=_bearer(rotated["access_token"])).status_code == 200
     # The rotated token can be used again (once).
-    assert client.post(REFRESH, json={"refresh_token": rotated["refresh_token"]}).status_code == 200
+    assert refresh(client, rotated["refresh_token"]).status_code == 200
 
 
 def test_refresh_token_reuse_revokes_the_whole_session(client: TestClient) -> None:
     tokens = _login(client)
-    rotated = client.post(REFRESH, json={"refresh_token": tokens["refresh_token"]}).json()
+    rotated = token_body(refresh(client, tokens["refresh_token"]))
     # The old refresh token is replayed (stolen copy): rejected, and the session is killed.
-    replay = client.post(REFRESH, json={"refresh_token": tokens["refresh_token"]})
+    replay = refresh(client, tokens["refresh_token"])
     assert replay.status_code == 401
     assert client.get(ME, headers=_bearer(rotated["access_token"])).status_code == 401
-    assert client.post(REFRESH, json={"refresh_token": rotated["refresh_token"]}).status_code == 401
+    assert refresh(client, rotated["refresh_token"]).status_code == 401
 
 
 def test_access_token_cannot_be_used_to_refresh(client: TestClient) -> None:
     tokens = _login(client)
-    response = client.post(REFRESH, json={"refresh_token": tokens["access_token"]})
+    response = refresh(client, tokens["access_token"])
     assert response.status_code == 401
     assert response.headers["www-authenticate"] == 'Bearer error="invalid_token"'
 
 
 def test_refresh_with_garbage_is_401(client: TestClient) -> None:
-    assert client.post(REFRESH, json={"refresh_token": "garbage"}).status_code == 401
+    assert refresh(client, "garbage").status_code == 401
+    assert refresh(client, "x" * 4097).status_code == 401
+
+
+def test_refresh_without_the_cookie_is_401(client: TestClient) -> None:
+    assert client.post(REFRESH, headers={"Origin": ORIGIN}).status_code == 401
+    # A body is no transport for the refresh token (cookie only, diff §4.2).
+    token = _login(client)["refresh_token"]
+    body = client.post(REFRESH, headers={"Origin": ORIGIN}, json={"refresh_token": token})
+    assert body.status_code == 401
+
+
+@pytest.mark.parametrize("origin", [None, "https://evil.example", "http://testserver.evil"])
+def test_refresh_rejects_a_cross_origin_request(client: TestClient, origin: str | None) -> None:
+    tokens = _login(client)
+    response = refresh(client, tokens["refresh_token"], origin=origin)
+    assert response.status_code == 403
+    assert "set-cookie" not in response.headers
+    # Refused before the token was looked at: it still rotates from the real origin.
+    assert refresh(client, tokens["refresh_token"]).status_code == 200
+
+
+def test_refresh_accepts_the_configured_web_origin(
+    tmp_path: Path, db: Database, users: dict[str, uuid.UUID]
+) -> None:
+    web = "https://kerp.example.test"
+    app, _ = auth_app(make_settings(database_url=database_url(tmp_path), web_origin=web))
+    with TestClient(app) as c:
+        token = _login(c)["refresh_token"]
+        assert refresh(c, token, origin=ORIGIN).status_code == 403
+        assert refresh(c, token, origin=web).status_code == 200
+
+
+def test_logout_clears_the_refresh_cookie(client: TestClient) -> None:
+    tokens = _login(client)
+    response = client.post(LOGOUT, headers=_bearer(tokens["access_token"]))
+    assert response.status_code == 204
+    cookie = response.headers["set-cookie"]
+    assert cookie.startswith('kerp_refresh="";') or cookie.startswith("kerp_refresh=;")
+    assert "Max-Age=0" in cookie
+    assert "Path=/api/v1/auth" in cookie
 
 
 def test_unregistered_refresh_token_is_rejected(
@@ -442,7 +514,7 @@ def test_unregistered_refresh_token_is_rejected(
     minted = runtime.tokens.issue(
         "refresh", user_id=users["alice"], tenant_id=T1, session_id=session
     )
-    assert client.post(REFRESH, json={"refresh_token": minted.token}).status_code == 401
+    assert refresh(client, minted.token).status_code == 401
     assert runtime.store.is_revoked("anything", session)
 
 
@@ -461,14 +533,14 @@ def test_revocation_store_outage_is_503_not_access(
     token = runtime.tokens.issue(
         "access", user_id=users["alice"], tenant_id=T1, session_id=uuid.uuid4()
     )
-    refresh = runtime.tokens.issue(
+    minted = runtime.tokens.issue(
         "refresh", user_id=users["alice"], tenant_id=T1, session_id=uuid.uuid4()
     )
     with TestClient(app) as c:
         assert c.get(ME, headers=_bearer(token.token)).status_code == 503
-        login = c.post(LOGIN, json={"email": ALICE, "password": PASSWORD, "tenant_id": str(T1)})
+        login = c.post(LOGIN, json={"email": ALICE, "password": PASSWORD})
         assert login.status_code == 503
-        assert c.post(REFRESH, json={"refresh_token": refresh.token}).status_code == 503
+        assert refresh(c, minted.token).status_code == 503
 
 
 class RevokeFails(InMemoryRevocationStore):

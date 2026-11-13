@@ -1,10 +1,13 @@
 """Login, refresh rotation, logout and user helpers (T-0008, diff §4).
 
-* **Login**: an ``AuthProvider`` proves the identity inside the chosen tenant; a new login
-  session (``sid``) starts with a 15-minute access token and a refresh token.
+* **Login**: an ``AuthProvider`` proves the identity inside the deployment's one tenant
+  (``KERP_DEFAULT_TENANT_ID``, diff §4.1); a new login session (``sid``) starts with a
+  15-minute access token and a refresh token that expires at sign-in + 12 h.
 * **Refresh**: the refresh token is verified, then consumed atomically from the store and
-  replaced by a new pair in the same session. Presenting an already-used refresh token is
-  treated as theft: the whole session is revoked (rotation with reuse detection).
+  replaced by a new pair in the same session, expiring when the session ends: rotation
+  never extends a session past sign-in + ``KERP_REFRESH_TOKEN_HOURS`` (diff §4.2).
+  Presenting an already-used refresh token is treated as theft: the whole session is
+  revoked (rotation with reuse detection).
 * **Logout**: revokes the access token's ``jti`` and its session, so every token of that
   login (including the refresh token) stops working at once.
 * **Field workers** (T-0009, ``field.py``): a magic link starts a PIN-gated session; only
@@ -96,11 +99,12 @@ def _aware(moment: datetime) -> datetime:
 
 
 def token_predates_password_change(user: User, claims: TokenClaims) -> bool:
+    """Exact, with no fail-closed window (T-0061): ``iat`` and ``password_changed_at`` both
+    carry microseconds, so a token issued before the change is rejected and one issued after
+    it (e.g. the login right after ``set_password``) is accepted, even within one second."""
     if user.password_changed_at is None:
         return False
-    # ``iat`` has whole-second precision.
-    changed = _aware(user.password_changed_at).replace(microsecond=0)
-    return claims.issued_at < changed
+    return claims.issued_at < _aware(user.password_changed_at)
 
 
 def load_active_user(session: Session, claims: TokenClaims) -> User:
@@ -138,12 +142,11 @@ class AuthService:
         self,
         session: Session,
         *,
-        tenant_id: uuid.UUID | None,
         credentials: PasswordCredentials,
         client: str | None = None,
     ) -> TokenPair:
         """``client`` is the caller's address (``request.client.host``), the lockout key."""
-        tenant = tenant_id or self.runtime.settings.default_tenant_id
+        tenant = self.runtime.settings.default_tenant_id
         if tenant is None:
             raise AuthenticationError("no tenant")
         # Keyed by tenant + e-mail whether or not the account exists: an unknown address
@@ -170,11 +173,9 @@ class AuthService:
             raise AuthenticationError("PIN unlock required")
         return self._rotate(session, claims)
 
-    def request_magic_link(
-        self, session: Session, *, tenant_id: uuid.UUID | None, email: str
-    ) -> None:
+    def request_magic_link(self, session: Session, *, email: str) -> None:
         """Send a one-time sign-in link to an active user. Silent for anyone else."""
-        tenant = tenant_id or self.runtime.settings.default_tenant_id
+        tenant = self.runtime.settings.default_tenant_id
         if tenant is None:
             return
         self.magic_link_lockout.begin(_subject(tenant, email))
@@ -249,6 +250,9 @@ class AuthService:
             claims = self.runtime.tokens.verify(refresh_token, "refresh")
         except InvalidTokenError as exc:
             raise AuthenticationError("invalid refresh token") from exc
+        if claims.expires_at <= self.runtime.tokens.now():
+            # The session's end is exact: no clock leeway for a token only we consume.
+            raise AuthenticationError("session ended")
         if self.runtime.store.is_revoked(claims.jti, claims.session_id):
             raise AuthenticationError("session revoked")
         return claims
@@ -265,7 +269,9 @@ class AuthService:
         except AuthenticationError:
             self._revoke_session(claims.session_id)
             raise
-        return self._issue_pair(claims.user_id, claims.tenant_id, claims.session_id)
+        return self._issue_pair(
+            claims.user_id, claims.tenant_id, claims.session_id, not_after=claims.expires_at
+        )
 
     def _pin_ttl(self) -> timedelta:
         return self.runtime.tokens.ttl["refresh"] + PIN_TTL_MARGIN
@@ -278,12 +284,30 @@ class AuthService:
         self.runtime.store.revoke_session(session_id, self.runtime.tokens.ttl["refresh"])
 
     def _issue_pair(
-        self, user_id: uuid.UUID, tenant_id: uuid.UUID, session_id: uuid.UUID
+        self,
+        user_id: uuid.UUID,
+        tenant_id: uuid.UUID,
+        session_id: uuid.UUID,
+        *,
+        not_after: datetime | None = None,
     ) -> TokenPair:
+        """A new pair. A new session ends at now + refresh TTL; a rotation passes the
+        session's end as ``not_after``, so neither token outlives it."""
         tokens = self.runtime.tokens
-        ids = {"user_id": user_id, "tenant_id": tenant_id, "session_id": session_id}
-        access = tokens.issue("access", **ids)
-        refresh = tokens.issue("refresh", **ids)
+        refresh = tokens.issue(
+            "refresh",
+            user_id=user_id,
+            tenant_id=tenant_id,
+            session_id=session_id,
+            not_after=not_after,
+        )
+        access = tokens.issue(
+            "access",
+            user_id=user_id,
+            tenant_id=tenant_id,
+            session_id=session_id,
+            not_after=refresh.claims.expires_at,
+        )
         self.runtime.store.register_refresh(
             refresh.claims.jti, session_id, refresh.claims.remaining()
         )

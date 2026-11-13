@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { memoryStorage, REFRESH_STORAGE_KEY } from "../../auth/tokenStore";
+import {
+  LEGACY_REFRESH_STORAGE_KEY,
+  memoryStorage,
+  SESSION_STORAGE_KEY,
+  TokenStore,
+} from "../../auth/tokenStore";
 import { FAKE_USER, json, makeServices, tokens } from "../../test/fakeApi";
 
 describe("createApiClient", () => {
@@ -37,8 +42,9 @@ describe("createApiClient", () => {
       "/api/v1/auth/refresh",
       "/api/v1/auth/me",
     ]);
-    expect(calls[1]?.body).toEqual({ refresh_token: "refresh-0" });
-    expect(store.refresh).toBe("refresh-1");
+    // The refresh token is the httpOnly cookie: the browser sends it, never the script.
+    expect(calls[1]?.body).toBeNull();
+    expect(store.access).toBe("access-1");
   });
 
   it("shares one refresh between concurrent 401s", async () => {
@@ -54,9 +60,10 @@ describe("createApiClient", () => {
   });
 
   it("resumes a stored session by refreshing before the first request", async () => {
-    // After a reload only the refresh token survives (the access token is memory-only).
+    // After a reload only the session marker survives (the access token is memory-only);
+    // the refresh cookie does the rest.
     const storage = memoryStorage();
-    storage.setItem(REFRESH_STORAGE_KEY, "refresh-0");
+    storage.setItem(SESSION_STORAGE_KEY, "1");
     const { api, calls } = makeServices({}, storage);
 
     const { data } = await api.GET("/api/v1/auth/me");
@@ -82,14 +89,14 @@ describe("createApiClient", () => {
 
     expect(first.response.status).toBe(401);
     expect(store.hasSession).toBe(true);
-    expect(store.refresh).toBe("refresh-0");
+    expect(store.access).toBe("access-0");
 
     refreshUp = true;
     const second = await api.GET("/api/v1/auth/me");
 
     expect(second.data).toEqual(FAKE_USER);
     expect(calls.filter((c) => c.path === "/api/v1/auth/refresh")).toHaveLength(2);
-    expect(store.refresh).toBe("refresh-1");
+    expect(store.access).toBe("access-1");
   });
 
   it("retries without a second refresh when another request rotated the tokens meanwhile", async () => {
@@ -158,5 +165,31 @@ describe("createApiClient", () => {
 
     expect(response.status).toBe(401);
     expect(calls.map((c) => c.path)).toEqual(["/api/v1/auth/me"]);
+  });
+});
+
+describe("TokenStore", () => {
+  it("never puts a refresh token in storage, only a session marker", () => {
+    const storage = memoryStorage();
+    const store = new TokenStore(storage);
+
+    store.set({ ...tokens(3), refresh_token: "must-not-be-kept" } as ReturnType<typeof tokens>);
+
+    expect(store.access).toBe("access-3");
+    expect(storage.getItem(SESSION_STORAGE_KEY)).toBe("1");
+    expect(storage.getItem(LEGACY_REFRESH_STORAGE_KEY)).toBeNull();
+    store.clear();
+    expect(storage.getItem(SESSION_STORAGE_KEY)).toBeNull();
+    expect(store.hasSession).toBe(false);
+  });
+
+  it("drops a refresh token stored by an earlier build", () => {
+    const storage = memoryStorage();
+    storage.setItem(LEGACY_REFRESH_STORAGE_KEY, "old-refresh");
+
+    const store = new TokenStore(storage);
+
+    expect(storage.getItem(LEGACY_REFRESH_STORAGE_KEY)).toBeNull();
+    expect(store.hasSession).toBe(false);
   });
 });

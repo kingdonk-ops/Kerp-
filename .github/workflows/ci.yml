@@ -146,7 +146,10 @@ jobs:
         run: |
           uid="$(docker run --rm --entrypoint id kerp-backend:ci -u)"
           echo "uid=$uid"; [ "$uid" != "0" ]
-          docker run -d --name kerp-smoke -p 8000:8000 kerp-backend:ci
+          # Production startup requires the deployment tenant (T-0037, diff §4.1); a synthetic
+          # UUID, not a real tenant. /health needs no signing key or Redis (auth builds lazily).
+          docker run -d --name kerp-smoke -p 8000:8000 \
+            -e KERP_DEFAULT_TENANT_ID=00000000-0000-4000-8000-00000000c1c1 kerp-backend:ci
           for _ in $(seq 1 30); do
             if body="$(curl -fsS http://127.0.0.1:8000/health)"; then break; fi
             sleep 1
@@ -159,6 +162,12 @@ jobs:
             sleep 2
           done
           echo "docker health: $health"; [ "$health" = "healthy" ]
+          # Negative check: production without the tenant must fail fast, not serve.
+          rc=0
+          out="$(timeout 60 docker run --rm --name kerp-no-tenant kerp-backend:ci 2>&1)" || rc=$?
+          echo "no-tenant exit: $rc"
+          [ "$rc" -ne 0 ] && [ "$rc" -ne 124 ]
+          echo "$out" | grep -q 'KERP_DEFAULT_TENANT_ID must be set'
           # The same image runs the SAQ job worker (T-0015, compose service "worker").
           docker run --rm kerp-backend:ci python -c "import app.modules.jobs.worker"
       - name: Container logs

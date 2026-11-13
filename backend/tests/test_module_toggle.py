@@ -363,7 +363,7 @@ def auth_client(tmp_path: Path, db: Database) -> Iterator[TestClient]:
 def _token(client: TestClient) -> dict[str, str]:
     response = client.post(
         f"{API_PREFIX}/auth/login",
-        json={"email": ALICE, "password": PASSWORD, "tenant_id": str(AUTH_T1)},
+        json={"email": ALICE, "password": PASSWORD},
     )
     assert response.status_code == 200, response.text
     return {"Authorization": f"Bearer {response.json()['access_token']}"}

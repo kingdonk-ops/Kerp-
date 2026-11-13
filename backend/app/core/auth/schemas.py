@@ -16,21 +16,13 @@ class LoginRequest(BaseModel):
     email: str = Field(min_length=3, max_length=320)
     # Bounded so a huge body cannot make scrypt hash megabytes.
     password: str = Field(min_length=1, max_length=1024)
-    # Omitted: the deployment's default tenant (KERP_DEFAULT_TENANT_ID).
-    tenant_id: uuid.UUID | None = None
-
-
-class RefreshRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    refresh_token: str = Field(min_length=1, max_length=4096)
+    # No tenant field (diff §4.1): the deployment's hidden tenant; ``tenant_id`` is a 422.
 
 
 class MagicLinkRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     email: str = Field(min_length=3, max_length=320)
-    tenant_id: uuid.UUID | None = None
 
 
 def _strong_pin(pin: str) -> str:
@@ -55,21 +47,24 @@ class MagicLinkRedeemRequest(BaseModel):
 
 
 class PinUnlockRequest(BaseModel):
-    """The device's refresh token and the PIN. Both are required: a PIN alone is never a
-    credential."""
+    """The PIN. The device's refresh token comes from the refresh cookie: both are
+    required, a PIN alone is never a credential."""
 
     model_config = ConfigDict(extra="forbid")
 
-    refresh_token: str = Field(min_length=1, max_length=4096)
     pin: Pin
 
 
 class TokenResponse(BaseModel):
+    """The access token. The refresh token is never in a body: it is the ``httpOnly``
+    refresh cookie (diff §4.2, TD-203)."""
+
     access_token: str
-    refresh_token: str
     token_type: Literal["bearer"] = "bearer"
     expires_in: int = Field(description="Access token lifetime in seconds")
-    refresh_expires_in: int = Field(description="Refresh token lifetime in seconds")
+    refresh_expires_in: int = Field(
+        description="Seconds until the login session ends (sign-in + 12 h); then sign in again"
+    )
 
 
 class MeResponse(BaseModel):

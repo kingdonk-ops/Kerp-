@@ -3,11 +3,11 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 31/145 tasks done (21%) · **ready now:** 18 · **epics awaiting breakdown:** 47
+**Overall:** 32/145 tasks done (22%) · **ready now:** 18 · **epics awaiting breakdown:** 47
 
 | Phase | Tasks done | Progress |
 |---|---|---|
-| 0 · Platform foundations | 31/61 | `█████░░░░░` 51% |
+| 0 · Platform foundations | 32/61 | `█████░░░░░` 52% |
 | 1 · Asset & Quality backbone | 0/75 (+1 epics) | `░░░░░░░░░░` 0% |
 | 2 · Welding quality | 0/9 | `░░░░░░░░░░` 0% |
 | 3 · Logistics | 0/0 (+7 epics) | `░░░░░░░░░░` 0% |
@@ -29,7 +29,7 @@
 | ✅ | [T-0006](../tracker/tasks/T-0006.md) | Hash-chain audit ledger: append-only (seq, chain_key, prev_hash, content_hash, payload) + REVOKE UPDATE/DELETE | audit | M | T-0005 | #20 |
 | ✅ | [T-0007](../tracker/tasks/T-0007.md) | Project-scoped RLS: project_id context, policy helper, cross-project→404, 4 RLS-bypass contract tests | tenancy | M | T-0005 | #19 |
 | ✅ | [T-0008](../tracker/tasks/T-0008.md) | Auth: users, RS256/EdDSA JWT + JWKS endpoint, 15-min access + rotating refresh, jti revocation in Redis | identity | M | T-0007 | #31 |
-| ▶ | [T-0037](../tracker/tasks/T-0037.md) | Auth sessions: hidden deployment tenant at login, 12-hour refresh from sign-in (daily re-login) + same-second password-change token rejection | identity | M | T-0009 |  |
+| ✅ | [T-0037](../tracker/tasks/T-0037.md) | Auth sessions: hidden deployment tenant at login, 12-hour refresh from sign-in (daily re-login) + same-second password-change token rejection | identity | M | T-0009 | #69 |
 | ✅ | [T-0009](../tracker/tasks/T-0009.md) | Field-worker auth: magic-link + 6-digit PIN local unlock + progressive lockout | identity | M | T-0008 | #35 |
 | ⬜ | [T-0038](../tracker/tasks/T-0038.md) | Field PIN hybrid rework: PIN per enrolled device, server PIN only on renewal after idle, lockout counter per device | identity | M | T-0043 |  |
 | ⬜ | [T-0043](../tracker/tasks/T-0043.md) | Device registry: enrolment, remote revoke with wipe signal, device_id on sessions and in the audit ledger (Pilot-0) | identity | M | T-0037, T-0014 |  |
@@ -81,7 +81,7 @@
 | ✅ | [T-0069](../tracker/tasks/T-0069.md) | Drop unused tenancy helpers require_tenant_id / require_project_id | platform | S | — | #56 |
 | ✅ | [T-0070](../tracker/tasks/T-0070.md) | Default KERP_ENVIRONMENT to production; development opts in | platform | S | — | #58 |
 | ✅ | [T-0071](../tracker/tasks/T-0071.md) | Load the caller's memberships once per request | projects | S | — | #57 |
-| ⬜ | [T-0072](../tracker/tasks/T-0072.md) | Duplicated tab keeps its session: cross-tab refresh lock and token hand-off | frontend | M | T-0037 |  |
+| ▶ | [T-0072](../tracker/tasks/T-0072.md) | Duplicated tab keeps its session: cross-tab refresh lock and token hand-off | frontend | M | T-0037 |  |
 
 ## Phase 1 — Asset & Quality backbone
 

@@ -3,45 +3,46 @@ import type { components } from "../api/schema";
 export type TokenResponse = components["schemas"]["TokenResponse"];
 export type KeyValueStorage = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 
-export const REFRESH_STORAGE_KEY = "kerp.auth.refresh";
+/** Marks that this tab signed in, so a reload resumes the session. Holds no secret. */
+export const SESSION_STORAGE_KEY = "kerp.auth.session";
+/** Where builds before T-0037 kept the refresh token; removed on start. */
+export const LEGACY_REFRESH_STORAGE_KEY = "kerp.auth.refresh";
 
 type Listener = () => void;
 
 /**
- * Holds the session's tokens. The 15-minute access token lives in memory only; the
- * rotating refresh token is kept in `sessionStorage` (per tab, gone when the tab closes)
- * so a reload resumes the session. Refresh-token transport (body vs. httpOnly cookie) is
- * open in TD-121.
+ * Holds the session's tokens. The 15-minute access token lives in memory only. The
+ * rotating refresh token is an `httpOnly` cookie the server sets on the auth endpoints
+ * (diff §4.2, TD-203): script never sees it, and nothing here stores it. `storage`
+ * (`sessionStorage`) keeps only a marker that this tab has a session to resume.
  */
 export class TokenStore {
   private accessToken: string | null = null;
   private readonly listeners = new Set<Listener>();
 
-  constructor(private readonly storage: KeyValueStorage) {}
+  constructor(private readonly storage: KeyValueStorage) {
+    storage.removeItem(LEGACY_REFRESH_STORAGE_KEY);
+  }
 
   get access(): string | null {
     return this.accessToken;
   }
 
-  get refresh(): string | null {
-    return this.storage.getItem(REFRESH_STORAGE_KEY);
-  }
-
-  /** True while a refresh token is held, i.e. the session can be resumed. */
+  /** True while the tab is signed in, i.e. the session can be resumed with the cookie. */
   get hasSession(): boolean {
-    return this.refresh !== null;
+    return this.storage.getItem(SESSION_STORAGE_KEY) !== null;
   }
 
-  set(tokens: Pick<TokenResponse, "access_token" | "refresh_token">): void {
+  set(tokens: Pick<TokenResponse, "access_token">): void {
     this.accessToken = tokens.access_token;
-    this.storage.setItem(REFRESH_STORAGE_KEY, tokens.refresh_token);
+    this.storage.setItem(SESSION_STORAGE_KEY, "1");
     this.emit();
   }
 
   clear(): void {
     const had = this.accessToken !== null || this.hasSession;
     this.accessToken = null;
-    this.storage.removeItem(REFRESH_STORAGE_KEY);
+    this.storage.removeItem(SESSION_STORAGE_KEY);
     if (had) this.emit();
   }
 

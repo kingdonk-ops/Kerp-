@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 153 · **Closed:** 90
+**Open:** 155 · **Closed:** 90
 
 ## decision (7)
 
@@ -17,7 +17,7 @@
 | [TD-229](../tracker/todo/TD-229.md) | Teams module vs planner crews and roster teams (TD-073/TD-083) and the handover 'project team' | T-0013 | planner |
 | [TD-237](../tracker/todo/TD-237.md) | Who may send a notification through the API: T-0019 allows only the admin capability (PER-09) and no pins; modules notify through service.notify. Confirm or widen (e.g. PER-02/PER-03 broadcasts) | T-0019 | implementer |
 
-## spec-gap (37)
+## spec-gap (38)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -58,6 +58,7 @@
 | [TD-221](../tracker/todo/TD-221.md) | Client wet signature (mode iii): outcome when the client rejects after the inspection is already approved (INSPECTED_PASSED/INSPECTED_FAILED) or LOCKED_FOR_TURNOVER | T-0174 | reviewer |
 | [TD-230](../tracker/todo/TD-230.md) | Saved view visibility 'team' names no team: oe_saved_view (register-views 3) has no team reference | T-0013 | planner |
 | [TD-244](../tracker/todo/TD-244.md) | register-views spec 3: oe_saved_view lists no team reference and one is_default for two kinds of default | T-0020 | implementer |
+| [TD-249](../tracker/todo/TD-249.md) | GET /auth/me (and the JWT tid claim) still expose the tenant id to the SPA: confirm diff 4.1 'never see the tenant' allows it or drop tenant_id from MeResponse | T-0037 | implementer |
 
 ## missed (4)
 
@@ -68,7 +69,7 @@
 | [TD-131](../tracker/todo/TD-131.md) | Add a root .env.example for the dev stack (the implementer agent's permission rules block writing .env* files) | T-0003 | implementer |
 | [TD-208](../tracker/todo/TD-208.md) | Uploads infra: provision the kerp-vault bucket (CORS for browser PUT/GET, lifecycle on staging/), wire KERP_S3_* in compose, add MinIO to CI for the gated round-trip test | T-0016 | implementer |
 
-## deferred (28)
+## deferred (29)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -100,6 +101,7 @@
 | [TD-238](../tracker/todo/TD-238.md) | Notifications: run non-in-app channels (FCM T-0144, e-mail TD-084) as an SAQ job after commit, with a persisted per-channel delivery log and retry; T-0019 calls them synchronously inside the caller's transaction | T-0019 | implementer |
 | [TD-242](../tracker/todo/TD-242.md) | saved_views: team visibility needs the teams module (T-0013) - pass the caller's team ids into Viewer and validate team_id | T-0020 | implementer |
 | [TD-243](../tracker/todo/TD-243.md) | saved_views: expose portal views through the client portal layout | T-0020 | implementer |
+| [TD-248](../tracker/todo/TD-248.md) | Startup check that KERP_DEFAULT_TENANT_ID names an existing tenant row (needs the tenant table from T-0023) | T-0037 | implementer |
 
 ## later (61)
 

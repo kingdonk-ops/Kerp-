@@ -1,10 +1,15 @@
-"""Auth endpoints: login, refresh, logout, me, JWKS (T-0008); magic link + PIN (T-0009)."""
+"""Auth endpoints: login, refresh, logout, me, JWKS (T-0008); magic link + PIN (T-0009).
+
+The refresh token travels only in the ``httpOnly`` refresh cookie (T-0037, diff §4.2,
+TD-203): set by every endpoint that issues tokens, read by ``/refresh`` and
+``/pin/unlock`` behind an Origin check, cleared by ``/logout``. No body carries it.
+"""
 
 from __future__ import annotations
 
 from typing import Annotated, Any, Final
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
 
 from app.core.auth.bearer import AUTH_UNAVAILABLE
 from app.core.auth.deps import CurrentPrincipal, get_auth_service, unauthorized
@@ -19,7 +24,6 @@ from app.core.auth.schemas import (
     MagicLinkRequest,
     MeResponse,
     PinUnlockRequest,
-    RefreshRequest,
     TokenResponse,
 )
 from app.core.auth.service import AuthenticationError, AuthService, TokenPair
@@ -29,6 +33,11 @@ PREFIX: Final = "/api/v1/auth"
 JWKS_PATH: Final = "/.well-known/jwks.json"
 JWKS_MAX_AGE: Final = 300
 TOO_MANY_ATTEMPTS: Final = "Too many attempts"
+REFRESH_COOKIE: Final = "kerp_refresh"
+# Scoped to the auth endpoints: the cookie never rides along on any other API request.
+REFRESH_COOKIE_PATH: Final = PREFIX
+REFRESH_COOKIE_MAX_LENGTH: Final = 4096
+CROSS_ORIGIN: Final = "Cross-origin request refused"
 
 router = APIRouter(tags=["auth"])
 
@@ -40,12 +49,55 @@ def _token_response(pair: TokenPair, response: Response) -> TokenResponse:
     response.headers["Cache-Control"] = "no-store"
     response.headers["Pragma"] = "no-cache"
     access, refresh = pair.access.claims, pair.refresh.claims
+    refresh_seconds = int((refresh.expires_at - refresh.issued_at).total_seconds())
+    response.set_cookie(
+        REFRESH_COOKIE,
+        pair.refresh.token,
+        max_age=refresh_seconds,
+        path=REFRESH_COOKIE_PATH,
+        secure=True,
+        httponly=True,
+        samesite="strict",
+    )
     return TokenResponse(
         access_token=pair.access.token,
-        refresh_token=pair.refresh.token,
         expires_in=int((access.expires_at - access.issued_at).total_seconds()),
-        refresh_expires_in=int((refresh.expires_at - refresh.issued_at).total_seconds()),
+        refresh_expires_in=refresh_seconds,
     )
+
+
+def _clear_refresh_cookie(response: Response) -> None:
+    response.delete_cookie(
+        REFRESH_COOKIE, path=REFRESH_COOKIE_PATH, secure=True, httponly=True, samesite="strict"
+    )
+
+
+def refresh_cookie(
+    request: Request,
+    runtime: Annotated[AuthRuntime, Depends(get_auth_runtime)],
+    kerp_refresh: Annotated[
+        str | None, Cookie(description="The refresh token (httpOnly cookie, never JS)")
+    ] = None,
+) -> str:
+    """The refresh cookie of a same-origin request (CSRF: ``SameSite=Strict`` + Origin).
+
+    The ``Origin`` header must be the web SPA's origin (``KERP_WEB_ORIGIN``, else the API's
+    own origin); a missing or foreign one is ``403`` before the cookie is looked at.
+    """
+    own = f"{request.url.scheme}://{request.url.netloc}"
+    allowed = (runtime.settings.web_origin or own).rstrip("/")
+    if request.headers.get("origin") != allowed:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, CROSS_ORIGIN)
+    if not kerp_refresh or len(kerp_refresh) > REFRESH_COOKIE_MAX_LENGTH:
+        raise unauthorized(invalid_token=True)
+    return kerp_refresh
+
+
+RefreshCookie = Annotated[str, Depends(refresh_cookie)]
+
+_COOKIE_RESPONSES: Final[dict[int | str, dict[str, Any]]] = {
+    status.HTTP_403_FORBIDDEN: {"description": "`Origin` is not the web app's origin"}
+}
 
 
 def _unavailable() -> HTTPException:
@@ -90,9 +142,7 @@ def login(
     # FORWARDED_ALLOW_IPS; otherwise it is the direct peer (the proxy itself).
     client = request.client.host if request.client else None
     try:
-        pair = service.login(
-            session, tenant_id=body.tenant_id, credentials=credentials, client=client
-        )
+        pair = service.login(session, credentials=credentials, client=client)
     except AuthenticationError as exc:
         raise unauthorized() from exc
     except LockedOutError as exc:
@@ -114,7 +164,7 @@ def request_magic_link(body: MagicLinkRequest, session: DbSession, service: Auth
     reveals no accounts.
     """
     try:
-        service.request_magic_link(session, tenant_id=body.tenant_id, email=body.email)
+        service.request_magic_link(session, email=body.email)
     except LockedOutError as exc:
         raise _locked(exc) from exc
     except RevocationUnavailableError as exc:
@@ -138,16 +188,24 @@ def redeem_magic_link(
     return _token_response(pair, response)
 
 
-@router.post(f"{PREFIX}/pin/unlock", response_model=TokenResponse, responses=_LOCKED_RESPONSE)
+@router.post(
+    f"{PREFIX}/pin/unlock",
+    response_model=TokenResponse,
+    responses={**_LOCKED_RESPONSE, **_COOKIE_RESPONSES},
+)
 def pin_unlock(
-    body: PinUnlockRequest, session: DbSession, service: AuthServiceDep, response: Response
+    body: PinUnlockRequest,
+    refresh_token: RefreshCookie,
+    session: DbSession,
+    service: AuthServiceDep,
+    response: Response,
 ) -> TokenResponse:
-    """Unlock a PIN-gated session: the device's refresh token + the PIN rotate the tokens.
+    """Unlock a PIN-gated session: the device's refresh cookie + the PIN rotate the tokens.
 
     Wrong PINs lock the session progressively; the 10th wrong PIN revokes it.
     """
     try:
-        pair = service.unlock(session, refresh_token=body.refresh_token, pin=body.pin)
+        pair = service.unlock(session, refresh_token=refresh_token, pin=body.pin)
     except AuthenticationError as exc:
         raise unauthorized(invalid_token=True) from exc
     except LockedOutError as exc:
@@ -157,13 +215,16 @@ def pin_unlock(
     return _token_response(pair, response)
 
 
-@router.post(f"{PREFIX}/refresh", response_model=TokenResponse)
+@router.post(f"{PREFIX}/refresh", response_model=TokenResponse, responses=_COOKIE_RESPONSES)
 def refresh(
-    body: RefreshRequest, session: DbSession, service: AuthServiceDep, response: Response
+    refresh_token: RefreshCookie, session: DbSession, service: AuthServiceDep, response: Response
 ) -> TokenResponse:
-    """Rotate: the refresh token is spent and a new pair is issued. Reuse revokes the session."""
+    """Rotate: the refresh cookie is spent and a new pair is issued. Reuse revokes the session.
+
+    The new refresh token keeps the session's end (sign-in + 12 h); after it, sign in again.
+    """
     try:
-        pair = service.refresh(session, body.refresh_token)
+        pair = service.refresh(session, refresh_token)
     except AuthenticationError as exc:
         raise unauthorized(invalid_token=True) from exc
     except RevocationUnavailableError as exc:
@@ -172,12 +233,13 @@ def refresh(
 
 
 @router.post(f"{PREFIX}/logout", status_code=status.HTTP_204_NO_CONTENT)
-def logout(principal: CurrentPrincipal, service: AuthServiceDep) -> None:
-    """Revoke this access token and every token of its login session."""
+def logout(principal: CurrentPrincipal, service: AuthServiceDep, response: Response) -> None:
+    """Revoke this access token and every token of its login session; clear the cookie."""
     try:
         service.logout(principal.claims)
     except RevocationUnavailableError as exc:
         raise _unavailable() from exc
+    _clear_refresh_cookie(response)
 
 
 @router.get(f"{PREFIX}/me", response_model=MeResponse)

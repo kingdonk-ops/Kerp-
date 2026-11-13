@@ -94,9 +94,14 @@ class Settings(BaseSettings):
     jwt_issuer: str = "kerp"
     jwt_audience: str = "kerp-api"
     access_token_minutes: int = Field(default=15, ge=1, le=15)
-    refresh_token_days: int = Field(default=14, ge=1, le=90)
-    # Tenant a login without an explicit ``tenant_id`` signs in to (single-company deployment).
+    # A login session ends this long after sign-in; rotation never extends it (diff §4.2).
+    refresh_token_hours: int = Field(default=12, ge=1, le=24)
+    # The deployment's one hidden tenant (diff §4.1, TD-120): every login signs in to it.
+    # Required in production (checked at startup).
     default_tenant_id: uuid.UUID | None = None
+    # Origin of the web SPA allowed to use the refresh cookie (CSRF Origin check on
+    # ``/auth/refresh`` and ``/auth/pin/unlock``). Unset: the API's own origin (one URL).
+    web_origin: str | None = None
 
     # Notification channels (T-0019, TD-168): the registered channel names every notification
     # goes to (JSON list in the environment). ``in_app`` is the inbox record and always on;

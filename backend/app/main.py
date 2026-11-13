@@ -12,7 +12,7 @@ from fastapi.responses import JSONResponse
 
 from app.api.health import router as health_router
 from app.core.auth.router import router as auth_router
-from app.core.auth.runtime import close_auth_runtime
+from app.core.auth.runtime import check_startup_config, close_auth_runtime
 from app.core.body_limit import BodyLimitMiddleware
 from app.core.config import Settings, get_settings
 from app.core.db import Database
@@ -45,6 +45,7 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+        check_startup_config(settings)
         # Jobs (T-0015): rows committed by requests are enqueued on SAQ after the commit.
         broker = SaqBroker(settings.redis_url) if settings.redis_url else None
         dispatcher = LoopDispatcher(broker, asyncio.get_running_loop()) if broker else None
