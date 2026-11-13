@@ -1,5 +1,6 @@
 """Request id propagation, access log and unhandled-error handling (T-0021)."""
 
+import asyncio
 import logging
 import uuid
 from collections.abc import Iterator
@@ -8,11 +9,14 @@ import pytest
 from fastapi import FastAPI, WebSocket
 from fastapi.responses import StreamingResponse
 from fastapi.testclient import TestClient
+from starlette.types import Message, Receive, Scope, Send
 
 from app.core.config import Settings
 from app.core.request_context import (
     ACCESS_LOGGER_NAME,
+    CLIENT_CLOSED_REQUEST,
     REQUEST_ID_HEADER,
+    RequestContextMiddleware,
     get_request_id,
     is_valid_request_id,
 )
@@ -216,3 +220,64 @@ def test_error_after_response_started_is_reraised_and_logged(
         probe_client.get("/_probe/stream-boom")
     (access,) = _access_records(caplog)
     assert access.__dict__["status"] == 200
+
+
+# --- client disconnect (T-0030) ---------------------------------------------
+
+
+def _run_cancelled(*, start_response: bool) -> list[Message]:
+    """Drive the middleware with an app that is cancelled (client went away)."""
+    sent: list[Message] = []
+
+    async def app(_scope: Scope, _receive: Receive, send: Send) -> None:
+        if start_response:
+            await send({"type": "http.response.start", "status": 200, "headers": []})
+        raise asyncio.CancelledError
+
+    async def receive() -> Message:
+        return {"type": "http.disconnect"}
+
+    async def send(message: Message) -> None:
+        sent.append(message)
+
+    scope: Scope = {
+        "type": "http",
+        "method": "GET",
+        "path": "/_probe/slow",
+        "headers": [(b"x-request-id", b"synthetic-gone")],
+    }
+    with pytest.raises(asyncio.CancelledError):
+        asyncio.run(RequestContextMiddleware(app)(scope, receive, send))
+    return sent
+
+
+def test_client_closed_request_status_is_499() -> None:
+    assert CLIENT_CLOSED_REQUEST == 499
+
+
+@pytest.mark.parametrize("start_response", [False, True])
+def test_client_disconnect_is_logged_as_499_not_500(
+    caplog: pytest.LogCaptureFixture, start_response: bool
+) -> None:
+    caplog.set_level(logging.INFO)
+    sent = _run_cancelled(start_response=start_response)
+
+    (access,) = _access_records(caplog)
+    assert access.__dict__["status"] == 499
+    assert access.__dict__["disconnected"] is True
+    assert access.__dict__["request_id"] == "synthetic-gone"
+    assert access.getMessage() == "GET /_probe/slow 499"
+    # Not an error: no traceback line, no 500 body sent to a client that is gone.
+    assert [r for r in caplog.records if r.name == "kerp.error"] == []
+    assert all(m.get("status") != 500 for m in sent)
+    assert get_request_id() is None
+
+
+def test_completed_request_is_not_marked_disconnected(
+    client: TestClient, caplog: pytest.LogCaptureFixture
+) -> None:
+    caplog.set_level(logging.INFO, logger=ACCESS_LOGGER_NAME)
+    client.get("/health")
+    (access,) = _access_records(caplog)
+    assert access.__dict__["status"] == 200
+    assert "disconnected" not in access.__dict__

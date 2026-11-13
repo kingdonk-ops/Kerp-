@@ -4,6 +4,7 @@ Pure ASGI middleware (not ``BaseHTTPMiddleware``) so streaming responses, backgr
 tasks and context variables behave normally.
 """
 
+import asyncio
 import logging
 import re
 import time
@@ -15,6 +16,8 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 REQUEST_ID_HEADER = "X-Request-ID"
 ACCESS_LOGGER_NAME = "kerp.access"
+# Logged status when the client went away before the request finished (nginx convention).
+CLIENT_CLOSED_REQUEST = 499
 
 _REQUEST_ID_HEADER_KEY = REQUEST_ID_HEADER.lower().encode("latin-1")
 _REQUEST_ID_RE = re.compile(r"[A-Za-z0-9._-]{1,128}")
@@ -52,6 +55,9 @@ class RequestContextMiddleware:
     An exception raised before the response has started is logged with its traceback
     and answered with a generic JSON 500 that still carries the request id. In debug
     mode it is re-raised instead so Starlette's traceback page is shown.
+
+    A cancelled request (``asyncio.CancelledError``: the client disconnected) is logged
+    with status 499 and ``disconnected=true``, never as a 500, and the cancellation propagates.
     """
 
     def __init__(self, app: ASGIApp, *, debug: bool = False) -> None:
@@ -68,6 +74,7 @@ class RequestContextMiddleware:
         started = time.perf_counter()
         status = 500
         response_started = False
+        disconnected = False
 
         async def send_with_request_id(message: Message) -> None:
             nonlocal status, response_started
@@ -85,6 +92,10 @@ class RequestContextMiddleware:
 
         try:
             await self.app(scope, receive, send_with_request_id)
+        except asyncio.CancelledError:
+            # The client disconnected (or the server is shutting down): not a server error.
+            disconnected = True
+            raise
         except Exception:
             error_logger.exception("unhandled exception", extra={"request_id": request_id})
             if response_started or self.debug:
@@ -95,6 +106,10 @@ class RequestContextMiddleware:
             duration_ms = round((time.perf_counter() - started) * 1000, 3)
             method = scope.get("method", "")
             path = scope.get("path", "")
+            extra: dict[str, object] = {}
+            if disconnected:
+                status = CLIENT_CLOSED_REQUEST
+                extra["disconnected"] = True
             access_logger.info(
                 "%s %s %s",
                 method,
@@ -106,6 +121,7 @@ class RequestContextMiddleware:
                     "path": path,
                     "status": status,
                     "duration_ms": duration_ms,
+                    **extra,
                 },
             )
             request_id_var.reset(token)

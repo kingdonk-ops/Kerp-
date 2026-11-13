@@ -23,6 +23,7 @@ def test_create_app_returns_independent_instances(settings: Settings) -> None:
 def test_create_app_without_args_uses_env_settings(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("KERP_APP_NAME", "KERP Env")
     monkeypatch.setenv("KERP_VERSION", "7.7.7")
+    monkeypatch.setenv("KERP_ENVIRONMENT", "development")  # debug is refused in production
     monkeypatch.setenv("KERP_DEBUG", "true")
     app = create_app()
     assert app.title == "KERP Env"

@@ -41,7 +41,7 @@ def test_version_defaults_to_installed_package_version(clean_env: pytest.MonkeyP
 
 def test_values_are_read_from_kerp_prefixed_env(clean_env: pytest.MonkeyPatch) -> None:
     clean_env.setenv("KERP_APP_NAME", "KERP Synthetic")
-    clean_env.setenv("KERP_ENVIRONMENT", "production")
+    clean_env.setenv("KERP_ENVIRONMENT", "development")  # debug is refused in production (T-0030)
     clean_env.setenv("KERP_DEBUG", "true")
     clean_env.setenv("KERP_VERSION", "1.2.3")
     clean_env.setenv("KERP_DATABASE_URL", "postgresql+psycopg://u:p@db.invalid:5432/kerp")
@@ -50,7 +50,7 @@ def test_values_are_read_from_kerp_prefixed_env(clean_env: pytest.MonkeyPatch) -
     s = Settings()
 
     assert s.app_name == "KERP Synthetic"
-    assert s.environment == "production"
+    assert s.environment == "development"
     assert s.debug is True
     assert s.version == "1.2.3"
     assert s.database_url == "postgresql+psycopg://u:p@db.invalid:5432/kerp"
@@ -98,3 +98,36 @@ def test_the_default_refuses_to_issue_tokens_without_a_key(clean_env: pytest.Mon
         clean_env.delenv(name, raising=False)
     with pytest.raises(AuthConfigError, match="KERP_JWT_PRIVATE_KEY"):
         build_auth_runtime(Settings(redis_url="redis://cache.invalid:6379/0"))
+
+
+# --- debug in production (T-0030) -----------------------------------------
+
+
+def test_debug_is_refused_in_production() -> None:
+    with pytest.raises(ValidationError, match="KERP_DEBUG"):
+        Settings(environment="production", debug=True)
+
+
+def test_debug_from_env_is_refused_with_the_production_default(
+    clean_env: pytest.MonkeyPatch,
+) -> None:
+    clean_env.setenv("KERP_DEBUG", "true")  # KERP_ENVIRONMENT unset = production
+    with pytest.raises(ValidationError, match="KERP_DEBUG"):
+        Settings()
+
+
+def test_create_app_refuses_debug_in_production(clean_env: pytest.MonkeyPatch) -> None:
+    from app.main import create_app
+
+    clean_env.setenv("KERP_DEBUG", "true")
+    with pytest.raises(ValidationError):
+        create_app()
+
+
+@pytest.mark.parametrize("environment", ["development", "test"])
+def test_debug_is_allowed_outside_production(environment: str) -> None:
+    assert Settings(environment=environment, debug=True).debug is True  # type: ignore[arg-type]
+
+
+def test_production_without_debug_is_fine() -> None:
+    assert Settings(environment="production", debug=False).debug is False

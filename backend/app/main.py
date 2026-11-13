@@ -60,11 +60,18 @@ def create_app(
         if database is not None:
             database.dispose()
 
+    # API docs and schema are not served in production (TD-022); KERP_API_DOCS_ENABLED overrides.
+    # ``app.openapi()`` (used by ``npm run gen:api``) works either way.
+    docs = settings.api_docs_active
     app = FastAPI(
         title=settings.app_name,
         version=settings.version,
         debug=settings.debug,
         lifespan=lifespan,
+        openapi_url="/openapi.json" if docs else None,
+        docs_url="/docs" if docs else None,
+        redoc_url="/redoc" if docs else None,
+        swagger_ui_oauth2_redirect_url="/docs/oauth2-redirect" if docs else None,
     )
     app.state.settings = settings
     app.state.db = database

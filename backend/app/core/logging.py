@@ -16,6 +16,10 @@ from app.core.request_context import request_id_var
 
 _CORE_FIELDS = ("timestamp", "level", "logger", "message", "request_id")
 
+# HTTP client libraries log every outbound request URL (query string included, which can
+# carry tokens) at INFO; only their warnings and errors are let through (TD-024).
+_QUIET_LOGGERS = ("httpx", "httpcore")
+
 # Attributes every LogRecord has; anything else on a record came from ``extra=``.
 _BLANK_RECORD = logging.LogRecord("", logging.INFO, "", 0, "", (), None)
 _RECORD_ATTRS = frozenset(vars(_BLANK_RECORD)) | {"message", "asctime", "taskName"}
@@ -42,7 +46,8 @@ class JsonFormatter(logging.Formatter):
             payload["exc_info"] = self.formatException(record.exc_info)
         if record.stack_info:
             payload["stack_info"] = self.formatStack(record.stack_info)
-        return json.dumps(payload, default=str, ensure_ascii=False)
+        # ASCII-only (non-ASCII escaped) so a non-UTF-8 console can never fail to write a line.
+        return json.dumps(payload, default=str, ensure_ascii=True)
 
 
 class _KerpJsonHandler(logging.StreamHandler):  # type: ignore[type-arg]
@@ -55,6 +60,7 @@ def configure_logging(settings: Settings, *, stream: IO[str] | None = None) -> N
     Idempotent; handlers installed by others (e.g. pytest's caplog) are left alone.
     uvicorn's loggers are routed through the root logger, and uvicorn's own access log
     is disabled because it prints raw query strings; ``kerp.access`` replaces it.
+    ``httpx``/``httpcore`` are capped at WARNING so outbound URLs are never logged (TD-024).
     """
     root = logging.getLogger()
     for handler in [h for h in root.handlers if isinstance(h, _KerpJsonHandler)]:
@@ -72,3 +78,6 @@ def configure_logging(settings: Settings, *, stream: IO[str] | None = None) -> N
     uvicorn_access.handlers.clear()
     uvicorn_access.propagate = False
     uvicorn_access.disabled = True
+
+    for name in _QUIET_LOGGERS:
+        logging.getLogger(name).setLevel(logging.WARNING)
