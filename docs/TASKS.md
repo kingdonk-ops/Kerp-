@@ -70,7 +70,7 @@
 | ▶ | [T-0030](../tracker/tasks/T-0030.md) | Backend hardening: httpx/httpcore loggers at WARNING; hide /docs, /redoc, /openapi.json in production | platform | S | T-0021 |  |
 | ▶ | [T-0031](../tracker/tasks/T-0031.md) | Frontend ESLint (typescript-eslint, react-hooks) + npm run lint in the CLAUDE.md §4 gate and CI | platform | S | T-0002 |  |
 | ▶ | [T-0060](../tracker/tasks/T-0060.md) | Request size bounds: app-wide body limit, total-position cap on spatial_bounds, jobs payload cap, list-safe job result + jobs scope tests | platform | S | T-0012, T-0015 |  |
-| 🟦 | [T-0067](../tracker/tasks/T-0067.md) | Review gate runs from base; SHA-pin write-token workflow actions | platform | S | — |  |
+| 🟪 | [T-0067](../tracker/tasks/T-0067.md) | Review gate runs from base; SHA-pin write-token workflow actions | platform | S | — | #54 |
 | ▶ | [T-0061](../tracker/tasks/T-0061.md) | Auth: reject tokens issued in the same second as a password change (sub-second iat vs password_changed_at) | identity | S | T-0008 |  |
 | ▶ | [T-0068](../tracker/tasks/T-0068.md) | Login lockout per client IP with a per-account backstop; drop test-only lockout API | identity | M | — |  |
 | ▶ | [T-0062](../tracker/tasks/T-0062.md) | UI shells hardening: hidden-all-columns guard, encoded storage keys, required_if a11y, tab keyboard/aria, reserved audit tab id check | frontend | S | T-0025 |  |
