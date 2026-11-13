@@ -369,7 +369,8 @@ otherwise; they refine master spec §4.3 and ADR 0005 and keep the sync contract
   `GET /api/v1/sync/pull-deltas?project_id=&since_version=&limit=`. In scope are the device's
   picks (records, answers, answer comments, attachment metadata, linked open defects) and the
   project reference data the client needs offline: level definitions, terminology, item types and
-  field definitions, the template revisions pinned by the picks or allowed on picked anchors, the
+  field definitions, the template revisions (with their reference images) pinned by the picks or
+  allowed on picked anchors, client signer verifiers (quality-and-inspection.md §Client co-sign), the
   equipment register with calibration state, the project's rule sets and member display names.
   Records outside the scope are never sent. A newly added pick is back-filled in full on the next
   pull, whatever `since_version` is.

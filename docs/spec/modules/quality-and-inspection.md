@@ -77,8 +77,34 @@ are planner defaults unless marked otherwise. A `photo` answer is a list of capt
   overlay on screen; it is **burned in only on export** (inspection PDF, §Inspection report).
 - Annotations can be edited until the inspection is submitted and are read-only after that, like
   the other answers. The server validates the annotation against its schema (422 for that path).
-- Video and audio notes, barcode/QR answer fields and reference images on questions are not in
-  the Pilot-0 palette (deferred, see `docs/TODO.md`).
+- Video and audio notes, barcode/QR answer fields and reference images on questions are in
+  Pilot-0 too (user, 2026-11-13, R4b): §Media, barcode fields and reference images below.
+
+**Media, barcode fields and reference images (Pilot-0; user, 2026-11-13, R4b; TD-212).** The user
+brought these into Pilot-0; limits, formats and the processing split are planner defaults.
+- **`video` field.** Value: a list of `{attachment_id, sha256, captured_at, geo, duration_s,
+  poster_attachment_id}`. Recorded on the device as MP4 (H.264 video, AAC audio), at most 720p,
+  at most 60 s and 100 MB per clip, at most 3 clips per answer. The client makes the poster frame
+  (JPEG) and uploads it with the clip.
+- **`audio` field.** Value: a list of `{attachment_id, sha256, captured_at, duration_s}`. AAC in
+  M4A, at most 5 minutes and 10 MB per note, at most 3 notes per answer. No transcription.
+- **`barcode` field.** Value: `{value, kind (barcode | qr), source (scanned | manual)}`. Scanned
+  with the same scanner adapter as scan-to-locate (`asset-and-tagging.md`); manual entry is always
+  allowed and recorded as `manual`. An optional CEL rule can check the value like any other field.
+- **Reference images on questions.** A template question may carry up to 3 reference images (JPEG
+  or PNG, at most 5 MB each) with an optional caption (localised like other template strings).
+  They are uploaded through T-0016 presigned uploads when the template is authored, their sha256
+  is part of the frozen template revision, and they are downloaded with the template revision
+  (`KERP-CONSOLIDATION-AND-DIFF.md` §6.4 reference data). Changing an image makes a new revision.
+- **Storage and processing.** All media go through T-0016 presigned uploads with sha256
+  verification and count against the device media budget (diff §6.2). After upload, a SAQ `batch`
+  job probes each video and audio file (container, codec, duration, size) with a permissively
+  licensed library imported lazily (no GPL); a file outside the limits is marked `rejected` with a
+  reason, and until the probe passes the attachment is not `complete`, so submit waits for it
+  (`ATTACHMENTS_INCOMPLETE`). No server transcoding.
+- **On the PDF.** Video and audio answers print the poster or an audio icon, duration, capture
+  time and sha256 (not embedded); barcode answers print value, kind and source; reference images
+  are not printed.
 
 ## Unified inspection record — `oe_inspections_inspection`
 Single store across all kinds: **`kind IN (inspection, itp)`**. TD-045 (decided 2026-11-10)
@@ -166,8 +192,10 @@ planner defaults unless marked otherwise.
   entry carries both `signed_at` (device UTC time when the inspector signed) and `received_at`
   (server UTC time when the submit reached the server); `signed_at` is the sign-off time shown on
   the record and the PDF, `received_at` sits next to it, and a `signed_at` later than
-  `received_at` by more than 5 minutes, or earlier than the inspection was downloaded, is kept but
-  flagged `clock_suspect` on the record and the PDF (never rejected, so signed work is not lost). The submit's geolocation is
+  `received_at` by more than 5 minutes, or earlier than the lower bound, is kept but flagged
+  `clock_suspect` on the record and the PDF (never rejected, so signed work is not lost). The lower
+  bound is the checkout time of the device's pick, read through the `sync` service; for a record
+  created offline it is the record's client create time. The submit's geolocation is
   the signature's geolocation that master spec §4.2 requires for `INSPECTED_PASSED`. An offline
   submit is authorised by the local PIN unlock of the hybrid model
   (`KERP-CONSOLIDATION-AND-DIFF.md` §4.2), not by a live session: the mutation carries the user
@@ -184,13 +212,41 @@ planner defaults unless marked otherwise.
   editable again and the inspector is notified (in-app, and push on Android, T-0144). The earlier
   submit signature stays in the ledger; the next submit starts a new review round
   (`review_round` 1, 2, …). The return reason and round are in the record history and on the PDF.
-- **Who reviews.** A user with quality hold authority (`A`) on the project — PER-06 or PER-07 in
-  the persona matrix — who is not the performer unless `allow_self_approval` is on (TD-070,
-  T-0140). PER-07's scope is "Site Node Only": a PER-07 approves or returns only inspections
-  anchored inside their site node(s); PER-06 covers the whole project. Approve and return are
-  online actions in the web app (planner defaults).
+- **Who reviews (user, 2026-11-13, R3a).** PER-06 or PER-07 on the project may approve or
+  return; a PER-07 only inspections anchored inside their site node(s) ("Site Node Only"), a PER-06
+  the whole project; never the inspector who performed and submitted it. For review this holds
+  whatever `allow_self_approval` says (TD-070 and T-0140 keep the setting for other approvals).
+  Approve and return are online actions in the web app (planner default).
 - **Notifications.** Submit notifies the project's reviewers; return and approve notify the
   inspector.
+
+## Client co-sign on the inspector's device (Pilot-0; user, 2026-11-13, R1a; TD-213)
+
+The client representative signs on the inspector's device with **their own KERP account (PER-15)
+and PIN** (user decision). How it works is planner default unless marked otherwise:
+- **Signing PIN.** A PER-15 sets a 6-digit signing PIN on their account online (web), separate
+  from any device PIN. The server stores only a slow salted hash (Argon2id).
+- **Hand-over.** On the inspector's device the inspector chooses "Hand to client". The app locks
+  the inspector's work behind the inspector's PIN and opens a co-sign screen that shows only the
+  inspection being signed, read-only. The client signs in with username (or e-mail) and signing
+  PIN; the client never gets the inspector's session, other records or navigation.
+- **Verification.** Online: the server checks the PIN and returns a single-use co-sign token for
+  that inspection, valid 5 minutes. Offline: the device checks the PIN against a signer verifier
+  (Argon2id hash + parameters) delivered in the pull scope for PER-15 members of the project whose
+  granted subtree covers a picked anchor, kept only in the encrypted store and deleted by `wipe()`
+  and when the pick is purged. Five wrong PINs on a device block co-sign for that signer on that
+  device until an online sign-in; failures are reported to the server on the next contact.
+- **Ledger entry.** The client signature is its own sign-off ledger entry (T-0119): signer user id
+  and name, persona PER-15, `signed_at` and `received_at` (as for submit), geolocation, the
+  inspector's `device_id`, verification mode `online | offline`, and the drawn signature image.
+  On sync the server re-checks that the signer was an active PER-15 member of the project, with
+  the anchor inside their granted subtree, at `signed_at`; otherwise that mutation fails and the
+  inspector is notified. A template may set `requires_client_signature`; then submit checks
+  `CLIENT_SIGNATURE_MISSING`.
+- **Hand-back.** After signing (or cancelling) the app clears everything the client entered except
+  the signature mutation, shows a hand-back screen and returns to the inspector only after the
+  inspector's PIN (T-0143 local unlock). The PDF prints the client signature next to the
+  inspector's and reviewer's.
 
 ## Planning fields (Pilot-0, planner spec 2026-11-13; TD-165)
 

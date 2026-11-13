@@ -67,7 +67,7 @@ The current spec does not guarantee that:
 Accepted as proposed. Office edits to field-owned values of a checked-out record are
 **blocked** (not queued) until the lease is returned or released.
 
-## Addendum A — `node` checkout scope and lease length (planner, 2026-11-13; TD-162, Pilot-0)
+## Addendum A — `node` checkout scope and lease length (planner defaults, pending user confirmation (TD-162); 2026-11-13, Pilot-0)
 
 Planner defaults, recorded with the Pilot-0 sync scope (`docs/spec/KERP-CONSOLIDATION-AND-DIFF.md`
 §6.4); the accepted decision above is unchanged.
