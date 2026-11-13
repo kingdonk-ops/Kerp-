@@ -33,6 +33,7 @@ from app.modules.jobs.registry import JOB_REGISTRY, JobContext, JobRegistry
 logger = logging.getLogger("kerp.jobs")
 STOP_SIGNALS: Final = (signal.SIGINT, signal.SIGTERM)
 SHUTDOWN_GRACE_S: Final = 8  # running jobs may finish before cancellation (compose stops at 10s)
+CANCELLED: Final = "Job timed out or was cancelled"
 
 
 class WorkerContext(Context, total=False):
@@ -56,7 +57,21 @@ async def run_job(
     )
     token = request_id_var.set(request_id)
     try:
-        started = await asyncio.to_thread(_start, db, tenancy, row_id)
+        # The start commit is shielded: a cancellation (SAQ's job timeout) that arrives while
+        # it runs or returns waits for it, then fails the row it may have made ``running``.
+        start = asyncio.ensure_future(asyncio.to_thread(_start, db, tenancy, row_id))
+        try:
+            started = await asyncio.shield(start)
+        except asyncio.CancelledError:
+            if (begun := await _settle(start)) is not None:
+                logger.exception(
+                    "job cancelled while starting",
+                    extra={"job_id": job_id, "kind": begun[0], "request_id": request_id},
+                )
+                await asyncio.shield(
+                    asyncio.to_thread(_finish, db, tenancy, row_id, None, CANCELLED)
+                )
+            raise
         if started is None:
             logger.warning("job not in its scope or already finished", extra={"job_id": job_id})
             return
@@ -69,14 +84,14 @@ async def run_job(
             handler = registry.get(kind).handler
             with use_tenancy(tenancy):
                 result = await handler(
-                    JobContext(row_id, kind, tenancy, payload, request_id, update)
+                    JobContext(row_id, kind, tenancy, payload, request_id, update, db)
                 )
         except (Exception, asyncio.CancelledError) as exc:
             logger.exception(
                 "job failed", extra={"job_id": job_id, "kind": kind, "request_id": request_id}
             )
             error = (
-                "Job timed out or was cancelled"
+                CANCELLED
                 if isinstance(exc, asyncio.CancelledError)
                 else service.sanitise_error(exc)
             )
@@ -95,6 +110,21 @@ async def run_job(
             await asyncio.to_thread(_finish, db, tenancy, row_id, None, error)
     finally:
         request_id_var.reset(token)
+
+
+async def _settle(
+    start: asyncio.Future[tuple[str, dict[str, Any]] | None],
+) -> tuple[str, dict[str, Any]] | None:
+    """Wait for the start thread despite further cancellations; ``None`` unless it started."""
+    while not start.done():
+        try:
+            await asyncio.wait([start])
+        except asyncio.CancelledError:
+            continue  # the caller re-raises the first cancellation once the start has landed
+    if (exc := start.exception()) is not None:
+        logger.error("starting the cancelled job failed", exc_info=exc)
+        return None  # nothing was committed: the unit of work rolled back
+    return start.result()
 
 
 def _start(

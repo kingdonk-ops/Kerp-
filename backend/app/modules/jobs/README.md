@@ -40,6 +40,8 @@ async def ocr_page(job: JobContext) -> dict[str, object]:
 - Enqueue from a service: `create_job(session, JOB_REGISTRY.get(kind), payload)` inside the
   caller's unit of work. The SAQ job is enqueued **after the commit** (`after_commit` hook);
   a rollback discards it (rule 2).
+- `job.db` is the worker's `Database`: open short units of work with
+  `job.db.unit_of_work(job.tenancy)` and keep slow I/O (storage, HTTP) outside them.
 - Any other exception is stored as `Internal error (<ClassName>)`; the traceback goes to the
   JSON log with the request id of the request that enqueued the job (rule 5).
 

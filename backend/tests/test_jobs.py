@@ -30,6 +30,7 @@ from app.core.tenancy.rls import RLS_EXEMPT, rls_tables
 from app.main import create_app
 from app.modules.jobs import registry as registry_module
 from app.modules.jobs import service
+from app.modules.jobs import worker as worker_module
 from app.modules.jobs.broker import JobRef, LoopDispatcher, SaqBroker
 from app.modules.jobs.models import MAX_TEXT, TABLE, Job
 from app.modules.jobs.registry import JobContext, JobKind, JobRegistry
@@ -388,10 +389,18 @@ def test_a_cancelled_or_timed_out_job_is_marked_failed(
     job_id = create(db, CTX_A, "demo.slow")
 
     async def scenario() -> None:
-        ctx: Any = {"db": db, "registry": REGISTRY}
+        handler_running = asyncio.Event()
+
+        async def slow_signalling(job: JobContext) -> None:
+            handler_running.set()
+            await asyncio.sleep(60)
+
+        registry = JobRegistry()
+        registry.add(JobKind("demo.slow", "batch", slow_signalling))
+        ctx: Any = {"db": db, "registry": registry}
         task = asyncio.create_task(run_job(ctx, **dispatched[0].kwargs()))  # type: ignore[arg-type]
-        while load(db, CTX_A, job_id).status != "running":
-            await asyncio.sleep(0.01)
+        await asyncio.wait_for(handler_running.wait(), timeout=10)
+        assert load(db, CTX_A, job_id).status == "running"
         task.cancel()  # what SAQ does when the job's timeout expires
         with pytest.raises(asyncio.CancelledError):
             await task
@@ -399,6 +408,120 @@ def test_a_cancelled_or_timed_out_job_is_marked_failed(
     asyncio.run(scenario())
     job = load(db, CTX_A, job_id)
     assert (job.status, job.error) == ("failed", "Job timed out or was cancelled")
+
+
+@pytest.mark.parametrize("commit_first", [True, False], ids=["after-commit", "before-commit"])
+def test_a_job_cancelled_while_starting_is_marked_failed_not_left_running(
+    db: Database,
+    dispatched: list[JobRef],
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    commit_first: bool,
+) -> None:
+    """TD-187: the cancel lands while the ``running`` commit is in flight in its thread."""
+    job_id = create(db, CTX_A, "demo.slow")
+    real_start = worker_module._start
+    handler_calls: list[str] = []
+
+    async def scenario() -> None:
+        loop = asyncio.get_running_loop()
+        task: asyncio.Task[None] | None = None
+
+        def cancel_soon() -> None:
+            assert task is not None
+            loop.call_soon_threadsafe(task.cancel)
+
+        def start_then_cancel(*args: Any) -> Any:
+            if commit_first:  # committed; cancelled before the coroutine resumes
+                started = real_start(*args)
+                cancel_soon()
+                return started
+            cancel_soon()  # cancelled while the commit is still running in its thread
+            return real_start(*args)
+
+        async def never(job: JobContext) -> None:
+            handler_calls.append(job.kind)
+
+        registry = JobRegistry()
+        registry.add(JobKind("demo.slow", "batch", never))
+        monkeypatch.setattr(worker_module, "_start", start_then_cancel)
+        ctx: Any = {"db": db, "registry": registry}
+        task = asyncio.create_task(run_job(ctx, **dispatched[0].kwargs()))  # type: ignore[arg-type]
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+    with caplog.at_level(logging.ERROR, "kerp.jobs"):
+        asyncio.run(scenario())
+    job = load(db, CTX_A, job_id)
+    assert (job.status, job.error) == ("failed", "Job timed out or was cancelled")
+    assert job.finished_at is not None
+    assert handler_calls == []
+    record = next(r for r in caplog.records if r.__dict__.get("job_id") == str(job_id))
+    assert record.__dict__["request_id"] == dispatched[0].request_id
+
+
+def test_repeated_cancels_while_starting_still_wait_for_the_start_and_fail_the_row(
+    db: Database, dispatched: list[JobRef], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    job_id = create(db, CTX_A, "demo.slow")
+    real_start = worker_module._start
+    release = threading.Event()
+
+    async def scenario() -> None:
+        def held_start(*args: Any) -> Any:
+            assert release.wait(10)
+            return real_start(*args)
+
+        monkeypatch.setattr(worker_module, "_start", held_start)
+        ctx: Any = {"db": db, "registry": REGISTRY}
+        task = asyncio.create_task(run_job(ctx, **dispatched[0].kwargs()))  # type: ignore[arg-type]
+        for _ in range(3):  # SAQ's timeout, then a shutdown: each must wait for the start
+            await asyncio.sleep(0)
+            task.cancel()
+        await asyncio.sleep(0)
+        assert not task.done()
+        release.set()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+    asyncio.run(scenario())
+    job = load(db, CTX_A, job_id)
+    assert (job.status, job.error) == ("failed", "Job timed out or was cancelled")
+
+
+@pytest.mark.parametrize("outcome", ["not-started", "start-failed"])
+def test_a_cancel_while_starting_leaves_a_row_that_never_started_alone(
+    db: Database,
+    dispatched: list[JobRef],
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    outcome: str,
+) -> None:
+    job_id = create(db, CTX_A, "demo.slow")
+
+    async def scenario() -> None:
+        loop = asyncio.get_running_loop()
+        task: asyncio.Task[None] | None = None
+
+        def start_that_does_not_start(*args: Any) -> Any:
+            assert task is not None
+            loop.call_soon_threadsafe(task.cancel)
+            if outcome == "start-failed":
+                raise RuntimeError("database went away")
+            return None  # e.g. already finished or outside the kwargs scope
+
+        monkeypatch.setattr(worker_module, "_start", start_that_does_not_start)
+        ctx: Any = {"db": db, "registry": REGISTRY}
+        task = asyncio.create_task(run_job(ctx, **dispatched[0].kwargs()))  # type: ignore[arg-type]
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+    with caplog.at_level(logging.ERROR, "kerp.jobs"):
+        asyncio.run(scenario())
+    job = load(db, CTX_A, job_id)
+    assert (job.status, job.error, job.finished_at) == ("queued", None, None)
+    failures = [r for r in caplog.records if r.exc_info]
+    assert len(failures) == (1 if outcome == "start-failed" else 0)
 
 
 def test_a_result_that_cannot_be_stored_fails_the_job_with_a_sanitised_error(

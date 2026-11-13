@@ -145,3 +145,32 @@ the report.
 ### E. P6 rule kinds (TD-079)
 The store gains `p6_grammar` (RE2 regex, activity-name grammar) and `p6_eligibility` (CEL)
 kinds, replacing the separate P6 mapping-profile rules.
+
+## Addendum F. Rule context schemas and action vocabularies (user, 2026-11-13, TD-139)
+
+Confirmed as built in T-0018 (`backend/app/modules/validation/compiler.py`). Rules are compiled
+on save against these; a rule that references another top-level variable, or uses an action
+outside its kind's vocabulary, is refused.
+
+**Top-level CEL variables per kind**
+
+| Kind | Engine | Variables |
+|---|---|---|
+| `check` | `cel` | `record`, `fields`, `actor`, `project`, `now`, `params` |
+| `digest` | `cel` | `event`, `actor`, `project`, `now`, `params` |
+| `notify` | `cel` | `event`, `actor`, `project`, `now`, `params` |
+| `p6_eligibility` | `cel` | `task_code`, `task_name`, `task_type`, `wbs_path`, the grammar groups below, `params` |
+| `autolink` | `regex` | none (RE2 pattern) |
+| `p6_grammar` | `regex` | none (RE2 pattern; named groups below) |
+
+`params` is the rule's own `params` object, so a project can tune a threshold without editing
+the expression.
+
+**`p6_grammar` named groups:** `asset`, `activity_type`, `anchor_code` (required), `suffix`,
+`window`. Any other named group is refused.
+
+**Actions:** `check` → `block` | `warn`; `p6_eligibility` → `placeholder` | `no_placeholder`;
+other kinds accept any snake_case action.
+
+**Freeze.** These schemas, the grammar groups and the two closed vocabularies are part of the M1
+freeze (T-0131). Adding a variable or an action after the freeze needs an amendment here.

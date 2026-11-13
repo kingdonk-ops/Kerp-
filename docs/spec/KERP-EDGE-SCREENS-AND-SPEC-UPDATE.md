@@ -52,6 +52,12 @@ The Tier-1 edge screens represent the highest-frequency operational touchpoints 
 +-----------------------------------------------------------------------------------+
 ```
 
+**Amendment (user, 2026-11-13; TD-161).** The Dexie/IndexedDB outbox above is the web-only PWA
+build. The Capacitor Android build implements the same client storage contract with
+SQLCipher-encrypted SQLite and file-system media (`KERP-CONSOLIDATION-AND-DIFF.md` §6.2). The
+budgets for these screens (form open, delta sync, 48 dp glove targets, outdoor high contrast)
+are in §6.3 of the same document.
+
 ---
 
 ### 1.1 Edge Screen 1: Gate Delivery & OS&D Capture (`site_logistics` & `procurement`)
@@ -351,6 +357,15 @@ CEL expressions are stored directly in the versioned JSON definition of the form
 }
 ```
 
+**Localised template strings (user, 2026-11-13; TD-183).** Every user-facing string in a
+template — `label`, option labels, `validation.error_message`, help and section titles — is
+either a plain string or a per-locale map keyed by BCP 47 tag, e.g.
+`"label": {"en": "Pull-off adhesion (PSI)", "de": "Haftabzugsprüfung (PSI)"}`. The template
+declares `default_language` (default `en`). The renderer picks the user's locale, then its
+language (`de-AT` → `de`), then `default_language`, then the first entry; a plain string is used
+as is. Keys (`field_key`, option values) and CEL expressions are never localised. Only English
+is used for now (TD-172). UI chrome stays on i18n `t()`.
+
 ---
 
 ## 3. Equipment Calibration Hard Quality Gates (Item 12)
@@ -512,6 +527,21 @@ The enterprise access model formalizes 15 distinct operational roles with explic
 | **PER-14** | Field Worker (Mobile) | Editor | Single Project (Module Grant)| None | Direct timesheet | Field Diary, Deliveries, Workpack |
 | **PER-15** | Client Representative | Portal | Granted Subtree Only | **Witness / Co-sign (`S`)**| Claim verification | Client Portal, RFI, ITP Witness |
 
+**Tier mapping (user, 2026-11-13; TD-151, decision 2a — confirms T-0010).** The default-tier
+labels map to capability tiers: Manager and Editor → `V`, `C`, `E`; Admin → `V`, `C`, `E` +
+administer the project; Portal → `V`. `A` is added where the matrix gives hold or commercial
+authority (PER-02, PER-06, PER-07, PER-11) and `S` for PER-15. PER-03 "Progress sign-off" is
+not `A`. Separation of duties is per persona: PER-09 contributes no hold authority.
+
+**Admins (user, 2026-11-13; TD-120, TD-184).** Two tenant-level admin grants sit outside this
+matrix: `system_admin` (runs the deployment, appoints Project Admins) and `create_projects`
+("Project Admin": creates projects and receives PER-09 on each one it creates). PER-09 is the
+per-project admin persona. No admin grant or persona ever confers hold release, inspection
+sign-off, `A` or `S`: those need a qualified persona on the project plus the required
+credentials (TD-099/TD-100). PER-09 together with a hold-authority persona (PER-02, PER-06,
+PER-07, PER-11) on the same project is allowed, but warns at assignment and is written to the
+audit ledger. Full model: `KERP-CONSOLIDATION-AND-DIFF.md` §4.1.
+
 ---
 
 ## 6. Project-Scoped Row-Level Security Architecture (Item 8)
@@ -545,6 +575,27 @@ CREATE POLICY project_isolation_policy ON functional_tags
   tenant-level tables that describe a project (e.g. memberships) use a stricter policy: a row is
   visible only when its project is in the session's allowed list (or the session is a tenant
   administrator). A client-portal user bound to project A cannot list project B.
+- **Tenant administrator = System admin (user, 2026-11-13; TD-120).** The "tenant administrator"
+  above is a user holding the `system_admin` grant (`KERP-CONSOLIDATION-AND-DIFF.md` §4.1).
+  - **How the flag reaches the session.** At authentication the server loads the caller's
+    `system_admin` grant from the admin-grants table (in the same short tenant-level unit of work
+    that derives `app.allowed_project_ids` from memberships) and binds it as the session setting
+    `app.is_system_admin` (`true` or unset). It is never read from token claims, request
+    parameters or headers.
+  - **Projects and memberships** use the membership-based policy: a row is visible when its
+    project is in `app.allowed_project_ids` or `app.is_system_admin` is true. Project-scoped
+    records still need a membership, also for a System admin.
+  - **Admin grants** are tenant-level rows with no project, so they have their own policy: a user
+    reads their own grant rows (`user_id = app.current_user_id`, a new session setting bound from
+    the verified token's `sub` alongside the tenant); a session with
+    `app.is_system_admin` reads and writes all of them. Only a System admin session may insert,
+    update or delete grants. The auth-time lookup runs in a narrow system path (security-definer
+    function returning only the caller's own grants), so deciding `app.is_system_admin` does not
+    depend on the flag itself.
+  - **Access requests** (T-0040) are visible to the requester, to the PER-09 holders of the
+    request's project, and to `app.is_system_admin` sessions; nobody else.
+  - **Lobby listing and project-code lookup** use a narrow read (id, code, name of lobby-visible
+    or code-matched projects) and do not widen the `projects` policy.
 
 ### Session Initialization Handshake
 Every API request and background job sets the runtime project identifier within the database transaction:

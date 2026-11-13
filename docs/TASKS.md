@@ -3,12 +3,12 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 18/83 tasks done (22%) · **ready now:** 11 · **epics awaiting breakdown:** 47
+**Overall:** 21/108 tasks done (19%) · **ready now:** 27 · **epics awaiting breakdown:** 47
 
 | Phase | Tasks done | Progress |
 |---|---|---|
-| 0 · Platform foundations | 18/36 | `█████░░░░░` 50% |
-| 1 · Asset & Quality backbone | 0/38 (+1 epics) | `░░░░░░░░░░` 0% |
+| 0 · Platform foundations | 21/55 | `███░░░░░░░` 38% |
+| 1 · Asset & Quality backbone | 0/44 (+1 epics) | `░░░░░░░░░░` 0% |
 | 2 · Welding quality | 0/9 | `░░░░░░░░░░` 0% |
 | 3 · Logistics | 0/0 (+7 epics) | `░░░░░░░░░░` 0% |
 | 4 · Execution | 0/0 (+14 epics) | `░░░░░░░░░░` 0% |
@@ -29,27 +29,39 @@
 | ✅ | [T-0006](../tracker/tasks/T-0006.md) | Hash-chain audit ledger: append-only (seq, chain_key, prev_hash, content_hash, payload) + REVOKE UPDATE/DELETE | audit | M | T-0005 | #20 |
 | ✅ | [T-0007](../tracker/tasks/T-0007.md) | Project-scoped RLS: project_id context, policy helper, cross-project→404, 4 RLS-bypass contract tests | tenancy | M | T-0005 | #19 |
 | ✅ | [T-0008](../tracker/tasks/T-0008.md) | Auth: users, RS256/EdDSA JWT + JWKS endpoint, 15-min access + rotating refresh, jti revocation in Redis | identity | M | T-0007 | #31 |
+| ▶ | [T-0037](../tracker/tasks/T-0037.md) | Auth sessions: hidden deployment tenant at login, 12-hour refresh from sign-in (daily re-login) | identity | S | T-0009 |  |
 | ✅ | [T-0009](../tracker/tasks/T-0009.md) | Field-worker auth: magic-link + 6-digit PIN local unlock + progressive lockout | identity | M | T-0008 | #35 |
+| ⬜ | [T-0038](../tracker/tasks/T-0038.md) | Field PIN hybrid rework: PIN per enrolled device, server PIN only on renewal after idle, lockout counter per device | identity | M | T-0043 |  |
+| ⬜ | [T-0043](../tracker/tasks/T-0043.md) | Device registry: enrolment, remote revoke with wipe signal, device_id on sessions and in the audit ledger (Pilot-0) | identity | M | T-0037, T-0014 |  |
 | ✅ | [T-0010](../tracker/tasks/T-0010.md) | Three-tier RBAC/ABAC: capability tiers × 15 personas × project/site scope (Asset-Site filter) + explicit multi-project read scope | identity | M | T-0008 | #39 |
 | ✅ | [T-0011](../tracker/tasks/T-0011.md) | Module loader + manifest contract + per-project enable/disable | platform | M | T-0005 | #32 |
-| ▶ | [T-0012](../tracker/tasks/T-0012.md) | projects module: CRUD + settings (IANA timezone, spatial_bounds, currency/locale) | projects | S | T-0010, T-0011 |  |
-| ⬜ | [T-0013](../tracker/tasks/T-0013.md) | teams module: teams, membership, entity visibility | teams | S | T-0012 |  |
-| ⬜ | [T-0014](../tracker/tasks/T-0014.md) | admin module: tenant/user/role administration API + membership-based RLS on projects and tenant-level tables | admin | M | T-0010, T-0011, T-0012 |  |
+| ✅ | [T-0012](../tracker/tasks/T-0012.md) | projects module: CRUD + settings (IANA timezone, spatial_bounds, currency/locale) | projects | M | T-0010, T-0011 | #43 |
+| ▶ | [T-0013](../tracker/tasks/T-0013.md) | teams module: teams, membership, entity visibility | teams | S | T-0012 |  |
+| ▶ | [T-0014](../tracker/tasks/T-0014.md) | admin module: user + project-membership administration API (PER-09 on its projects), admin grants table, membership-based RLS on projects and tenant-level tables | admin | M | T-0010, T-0011, T-0012 |  |
+| ⬜ | [T-0039](../tracker/tasks/T-0039.md) | System admin appoints Project Admins: system_admin/create_projects grant API, project creation gated on create_projects, creator gets PER-09 | admin | S | T-0014 |  |
+| ⬜ | [T-0044](../tracker/tasks/T-0044.md) | Deployment (tenant) settings: offline window (default 7, max 14 days) and new-project defaults (status, timezone, currency, locale) | admin | S | T-0039 |  |
 | ✅ | [T-0015](../tracker/tasks/T-0015.md) | SAQ worker + Redis + jobs module (enqueue/status/poll), interactive+batch priority queues | jobs | M | T-0003, T-0011 | #40 |
-| ▶ | [T-0016](../tracker/tasks/T-0016.md) | Storage service + presigned uploads (presign/complete, sha256 verify, scan stub, orphan sweep) | uploads | M | T-0015 |  |
+| ✅ | [T-0016](../tracker/tasks/T-0016.md) | Storage service + presigned uploads (presign/complete, sha256 verify, scan stub, orphan sweep) | uploads | M | T-0015 | #49 |
 | ✅ | [T-0017](../tracker/tasks/T-0017.md) | CEL runtime substrate: celpy (server) + JS CEL (client) + shared conformance_fixtures.json harness | platform | M | T-0001, T-0002 | #15 |
 | ✅ | [T-0018](../tracker/tasks/T-0018.md) | Verification engine shell + single rule store: run_checks(context, rule_set), oe_validation_rule_set/rule (kinds, engines), compile-on-save, findings log | validation | M | T-0006, T-0017 | #36 |
-| ⬜ | [T-0034](../tracker/tasks/T-0034.md) | Rule store layers: system defaults → tenant seed → project copy, project edit/disable/delete/add/reset, locked rules + two-person unlock | validation | M | T-0018, T-0010, T-0011, T-0012 |  |
+| ▶ | [T-0034](../tracker/tasks/T-0034.md) | Rule store layers: system defaults → tenant seed → project copy, project edit/disable/delete/add/reset, locked rules + two-person unlock | validation | M | T-0018, T-0010, T-0011, T-0012 |  |
 | ⬜ | [T-0036](../tracker/tasks/T-0036.md) | Rule store: default-upgrade offers with per-rule diff, tenant drift report, 'Try it' evaluation | validation | S | T-0034 |  |
-| ⬜ | [T-0019](../tracker/tasks/T-0019.md) | notifications module (in-app) | notifications | S | T-0012 |  |
+| ▶ | [T-0019](../tracker/tasks/T-0019.md) | notifications module (in-app) behind a pluggable channel interface | notifications | S | T-0012 |  |
 | ⬜ | [T-0035](../tracker/tasks/T-0035.md) | Per-record override of a blocked check: reasoned request, routed approver (never self), notifications, audit, bound to the checked values | validation | M | T-0018, T-0010, T-0019 |  |
-| ⬜ | [T-0020](../tracker/tasks/T-0020.md) | saved_views module | saved_views | S | T-0012 |  |
+| ⬜ | [T-0040](../tracker/tasks/T-0040.md) | Lobby and access requests API: visible-in-lobby flag, lobby listing, project-code lookup, request/approve/reject by the project's admins | admin | M | T-0014, T-0019 |  |
+| ▶ | [T-0020](../tracker/tasks/T-0020.md) | saved_views module | saved_views | S | T-0012 |  |
 | ✅ | [T-0021](../tracker/tasks/T-0021.md) | Observability + security headers (request id, structured logs, CSP/HSTS) | platform | S | T-0001 | #9 |
 | ✅ | [T-0022](../tracker/tasks/T-0022.md) | Lint rule: heavy libs (fitz, cv2, rectpack, celpy, pyhanko) lazily imported | platform | S | T-0001 | #10 |
-| ⬜ | [T-0023](../tracker/tasks/T-0023.md) | onboarding: first-run provisioning (tenant, admin, default project) | onboarding | S | T-0012, T-0014 |  |
+| ⬜ | [T-0023](../tracker/tasks/T-0023.md) | onboarding: first-run provisioning (the deployment's hidden tenant, first System admin, deployment settings) | onboarding | S | T-0012, T-0014, T-0044 |  |
 | ✅ | [T-0024](../tracker/tasks/T-0024.md) | Frontend shell: auth, design tokens, 8-group nav (4 pillars + Backbone/Overview/Documents/Admin), project switcher + All-Projects, generated API client | frontend | M | T-0002, T-0008 | #38 |
-| ▶ | [T-0025](../tracker/tasks/T-0025.md) | Reusable UI shells: RegisterPage, DetailPage (gate banner, tabs, audit), Dynamic Form Renderer | frontend | M | T-0024, T-0017 |  |
-| ⬜ | [T-0026](../tracker/tasks/T-0026.md) | Admin UI: user manager, personas, project/site scope assignment | frontend | M | T-0024, T-0014 |  |
+| ▶ | [T-0046](../tracker/tasks/T-0046.md) | Field ergonomics tokens: 48 dp glove touch targets and an outdoor high-contrast theme (WCAG 2.1 AA) | frontend | S | T-0024 |  |
+| ✅ | [T-0025](../tracker/tasks/T-0025.md) | Reusable UI shells: RegisterPage, DetailPage (gate banner, tabs, audit), Dynamic Form Renderer | frontend | M | T-0024, T-0017 | #42 |
+| ▶ | [T-0045](../tracker/tasks/T-0045.md) | NFR budget harness: warn-only CI performance job + 300-question form-open budget (< 1.5 s) | frontend | S | T-0025 |  |
+| ▶ | [T-0047](../tracker/tasks/T-0047.md) | Dynamic Form Renderer: localised template strings (plain string or per-locale map, fallback to the template default language) | frontend | S | T-0025 |  |
+| ⬜ | [T-0026](../tracker/tasks/T-0026.md) | Admin UI: System admin grants (appoint Project Admins), user manager, project creation, persona + site scope assignment with SoD warning | frontend | M | T-0024, T-0014, T-0039 |  |
+| ⬜ | [T-0041](../tracker/tasks/T-0041.md) | Lobby and access-request screens: lobby list, project-code entry, request status; admin access-request inbox | frontend | M | T-0040, T-0042 |  |
+| ⬜ | [T-0042](../tracker/tasks/T-0042.md) | Top-bar project picker wired to memberships + post-login landing (one project -> in, several -> last used, none -> lobby) | frontend | S | T-0014, T-0024 |  |
+| ⬜ | [T-0048](../tracker/tasks/T-0048.md) | Devices screen: list enrolled devices, revoke with wipe warning (admin and own devices) | frontend | S | T-0043, T-0024 |  |
 | ⬜ | [T-0027](../tracker/tasks/T-0027.md) | Playwright setup + Phase 0 exit journey | e2e | S | T-0023, T-0024, T-0018 |  |
 | ✅ | [T-0028](../tracker/tasks/T-0028.md) | CI hardening: detect in ci-gate needs, least-privilege GHCR publish, SHA-pinned actions, base image digest + Renovate, drop empty postgres extra | platform | S | T-0004 | #18 |
 | ▶ | [T-0032](../tracker/tasks/T-0032.md) | CI hardening 2: weekly uv lock refresh PR, SHA-pinned promote/review-gate actions, digest-pinned service images, publish the smoke-tested image by digest | platform | S | T-0028 |  |
@@ -57,12 +69,19 @@
 | ▶ | [T-0029](../tracker/tasks/T-0029.md) | review-gate: include tracker/ in the patch-id (normalise bookkeeping fields, exclude generated boards) | platform | S | — |  |
 | ▶ | [T-0030](../tracker/tasks/T-0030.md) | Backend hardening: httpx/httpcore loggers at WARNING; hide /docs, /redoc, /openapi.json in production | platform | S | T-0021 |  |
 | ▶ | [T-0031](../tracker/tasks/T-0031.md) | Frontend ESLint (typescript-eslint, react-hooks) + npm run lint in the CLAUDE.md §4 gate and CI | platform | S | T-0002 |  |
+| ▶ | [T-0060](../tracker/tasks/T-0060.md) | Request size bounds: app-wide body limit, total-position cap on spatial_bounds, jobs payload cap, list-safe job result + jobs scope tests | platform | S | T-0012, T-0015 |  |
+| ▶ | [T-0061](../tracker/tasks/T-0061.md) | Auth: reject tokens issued in the same second as a password change (sub-second iat vs password_changed_at) | identity | S | T-0008 |  |
+| ▶ | [T-0062](../tracker/tasks/T-0062.md) | UI shells hardening: hidden-all-columns guard, encoded storage keys, required_if a11y, tab keyboard/aria, reserved audit tab id check | frontend | S | T-0025 |  |
+| ▶ | [T-0063](../tracker/tasks/T-0063.md) | Projects follow-ups: constraint-name duplicate detection, missing authorisation tests, GeoJSON precision, DB-side defaults | projects | S | T-0012 |  |
+| ▶ | [T-0064](../tracker/tasks/T-0064.md) | Logging and config safety: ASCII-safe JSON logs, client disconnect not logged as 500, refuse debug in production | platform | S | T-0021 |  |
+| ▶ | [T-0065](../tracker/tasks/T-0065.md) | Worker RLS binding test uses the real asyncio/SAQ worker path instead of threading.Thread | jobs | S | T-0015 |  |
+| ▶ | [T-0066](../tracker/tasks/T-0066.md) | tracker.py set --note: do not double the date when the note already starts with one; clean existing doubled notes | platform | S | — |  |
 
 ## Phase 1 — Asset & Quality backbone
 
 | | ID | Title | Module | Size | Depends on | PR |
 |---|---|---|---|---|---|---|
-| ⬜ | [T-0101](../tracker/tasks/T-0101.md) | Asset hierarchy: oe_asset_level_def (roles) + oe_asset_node ltree tree (GiST, parent_id source of truth, display_path, PostGIS), per-path work-anchor invariant, code uniqueness, subtree move, tree API | asset_management | M | T-0012, T-0018 |  |
+| ▶ | [T-0101](../tracker/tasks/T-0101.md) | Asset hierarchy: oe_asset_level_def (roles) + oe_asset_node ltree tree (GiST, parent_id source of truth, display_path, PostGIS), per-path work-anchor invariant, code uniqueness, subtree move, tree API | asset_management | M | T-0012, T-0018 |  |
 | ⬜ | [T-0134](../tracker/tasks/T-0134.md) | Asset restructure with lineage: split / merge / retire, invariant re-checks, roll-up through superseded_by / derived_from | asset_management | M | T-0101 |  |
 | ⬜ | [T-0135](../tracker/tasks/T-0135.md) | Collections: job packs, shutdown windows, test packs, work plans linked to nodes many-to-many | asset_management | S | T-0101 |  |
 | ⬜ | [T-0136](../tracker/tasks/T-0136.md) | Terminology layer: per-locale, plural-aware terminology packs (project → client pack → default) + frontend t() resolver | asset_management | M | T-0101, T-0024 |  |
@@ -84,7 +103,7 @@
 | 🟥 | [T-0115](../tracker/tasks/T-0115.md) | inspection_requests: RFI/call-out workflow (draft→requested→confirmed→witnessed\|waived\|no_show\|failed) + client delay attribution *(blocked by TD-045)* | inspection_requests | M | T-0111 |  |
 | ⬜ | [T-0116](../tracker/tasks/T-0116.md) | ncr: Non-Conformance Reports + dispositions (scrap/rework/repair/use-as-is) anchored to any node or Item (anchor_role recorded) | ncr | S | T-0111 |  |
 | ⬜ | [T-0117](../tracker/tasks/T-0117.md) | punchlist: Cat A/B/C punch items + spatial pins on drawings | punchlist | S | T-0111 |  |
-| ⬜ | [T-0118](../tracker/tasks/T-0118.md) | credentials: qualification-type catalogue + credential records with certificate/VOC uploads + expiry (feeds eligibility) | credentials | M | T-0012, T-0016 |  |
+| ▶ | [T-0118](../tracker/tasks/T-0118.md) | credentials: qualification-type catalogue + credential records with certificate/VOC uploads + expiry (feeds eligibility) | credentials | M | T-0012, T-0016 |  |
 | ⬜ | [T-0139](../tracker/tasks/T-0139.md) | eligibility: stateless as-of-date validity service over credentials, calibration, WPS and materials registers (fail closed) | eligibility | M | T-0118 |  |
 | ▶ | [T-0119](../tracker/tasks/T-0119.md) | signing: append-only hash-chained sign-off ledger (internal now; pyHanko PAdES seam later) | signing | M | T-0006 |  |
 | ⬜ | [T-0120](../tracker/tasks/T-0120.md) | requirements / source_data: requirements & prerequisite-documents register | requirements | S | T-0101 |  |
@@ -93,13 +112,19 @@
 | ⬜ | [T-0124](../tracker/tasks/T-0124.md) | Rule sets A — completion gates: inspection.close, work_anchor.complete, asset.status_change (open Cat A/NCR blocks) as locked defaults | validation | M | T-0111, T-0114, T-0116, T-0034, T-0139 |  |
 | ⬜ | [T-0125](../tracker/tasks/T-0125.md) | Rule sets B — P6 sync: asset.p6_fields, schedule.p6_import/export | validation | S | T-0104, T-0106 |  |
 | ⬜ | [T-0126](../tracker/tasks/T-0126.md) | Offline sync core: outbox_mutations, client_op_id idempotency, vector clock, conflict resolution (immutable approvals, per-field apply per ADR 0005) | sync | M | T-0006, T-0110 |  |
-| ⬜ | [T-0127](../tracker/tasks/T-0127.md) | Frontend: useOfflineSync tier-1 (Dexie IndexedDB outbox) + offline indicator | frontend | M | T-0126, T-0024 |  |
+| ⬜ | [T-0127](../tracker/tasks/T-0127.md) | Frontend: client storage contract + Dexie (web PWA) adapter, useOfflineSync tier-1 outbox + offline indicator | frontend | M | T-0126, T-0024 |  |
+| ▶ | [T-0141](../tracker/tasks/T-0141.md) | Capacitor Android build: Android 11+ (API 30) shell, signed release for managed Google Play / MDM, CI build job | frontend | M | T-0024 |  |
+| ⬜ | [T-0142](../tracker/tasks/T-0142.md) | Android storage adapter: SQLCipher SQLite records + outbox and file-system media behind the client storage contract | frontend | M | T-0141, T-0127 |  |
+| ⬜ | [T-0143](../tracker/tasks/T-0143.md) | Field device session: enrolment, offline PIN unlock against the keystore, offline-window enforcement, wipe on DEVICE_REVOKED | frontend | M | T-0142, T-0038, T-0043, T-0044 |  |
+| ⬜ | [T-0144](../tracker/tasks/T-0144.md) | FCM push channel for the Android build: device push tokens, assignment/return pushes through the pluggable channel interface | notifications | S | T-0019, T-0043, T-0141 |  |
+| ⬜ | [T-0145](../tracker/tasks/T-0145.md) | Delta-sync budget: 1,000 records pulled and applied in < 30 s on simulated 4G (warn-only in the NFR job) | sync | S | T-0126, T-0045 |  |
 | ⬜ | [T-0128](../tracker/tasks/T-0128.md) | Frontend: asset tree + Asset-Details (attributes, items, inspections over descendants) | frontend | M | T-0101, T-0103, T-0025 |  |
 | ⬜ | [T-0129](../tracker/tasks/T-0129.md) | Frontend: P6 import wizard UI (upload, map, unmatched-row linking, commit) | frontend | M | T-0104, T-0128 |  |
 | ⬜ | [T-0130](../tracker/tasks/T-0130.md) | Frontend: inspections register + raise/close + calibration-gated tool pick + gate findings | frontend | M | T-0111, T-0112, T-0124, T-0128 |  |
 | ⬜ | [T-0132](../tracker/tasks/T-0132.md) | Phase 1 exit journey: P6→hierarchy→inspection gates→completion blocked by open NCR; expired tool blocked | e2e | S | T-0129, T-0130 |  |
 | ⬜ | [T-0133](../tracker/tasks/T-0133.md) | Field checkout lease + per-field sync-back contract: P6 re-import during checkout never loses tablet changes | sync | M | T-0126, T-0104 |  |
 | 🧩 | [E-01-01](../tracker/tasks/E-01-01.md) | register views: column catalogue (level/item-type fields, ancestors, rollups, cross-module providers), filter AST, shared saved views, grouped totals, bulk actions | saved_views | L | T-0020, T-0025, T-0102 |  |
+| ⬜ | [T-0146](../tracker/tasks/T-0146.md) | [Pilot-0] readiness gate: NFR budgets become hard CI gates; pilot scope checklist green | platform | S | T-0045, T-0145, T-0046, T-0142, T-0143, T-0144, T-0111, T-0119, T-0126, T-0127, T-0048, T-0037, T-0038, T-0039, T-0040, T-0041, T-0042, T-0043, T-0044, T-0047 |  |
 | ⬜ | [T-0131](../tracker/tasks/T-0131.md) | [M1] Phase 1 backbone-freeze contract gate: freeze core tables, level-def shape + role names, rule-store shape, override record, field ownership, seam sigs; CEL parity | platform | M | T-0005, T-0016, T-0018, T-0101, T-0103, T-0110, T-0111, T-0112, T-0124, T-0132, T-0035, T-0139 |  |
 
 ## Phase 2 — Welding quality

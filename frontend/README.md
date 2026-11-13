@@ -43,6 +43,7 @@ src/
   lib/cel/    offline CEL rule evaluation (@marcbachmann/cel-js), parity with the server
   pages/      route components
   projects/   project scope: ProjectDirectory seam, ProjectScopeProvider, top-bar ProjectSwitcher
+  shells/     RegisterPage, DetailPage (gate banner, tabs, audit), Dynamic Form Renderer (README.md)
   test/       Vitest setup, fake backend (`fakeApi.ts`)
 ```
 
@@ -65,6 +66,11 @@ src/
   those utilities, not raw palette colours.
 - **Services.** `AppServices` (`src/app/services.tsx`: api, tokens, projects, preferences)
   is injected through `AppRoot` so tests use the fake backend in `src/test/fakeApi.ts`.
+
+## Shells (T-0025)
+
+Module pages are built on the reusable shells in `src/shells/` (consolidation §6):
+`RegisterPage`, `DetailPage` and `DynamicForm`. Details and usage: `src/shells/README.md`.
 
 ## Rules
 

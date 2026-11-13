@@ -35,6 +35,6 @@ Batch pipeline (**SAQ `batch`** queue, heavy libs lazy):
 **pyHanko** (ETSI **PAdES-B-LTA** + **RFC 3161** timestamp).
 
 ## Related registers (epics)
-`transmittals` (purpose-coded, recipients + ack), `correspondence`, `rfi`/`submittals`,
+`transmittals` (purpose-coded, recipients + ack), `correspondence`, `tq` (Technical Query — Request for Information)/`submittals`,
 `meetings` (feeds portal v3 visit scheduling), `file_search` (tsvector OCR of dockets for the
 claims/search layer).

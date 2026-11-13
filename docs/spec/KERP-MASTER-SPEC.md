@@ -42,6 +42,7 @@ In accordance with strict operational domain boundaries, generic back-office fun
   SET LOCAL app.current_tenant_id = '018f3a20-4e3b-7221-9ac4-b1c098675df1';
   ```
 * **Storage Isolation**: Object storage (S3-compatible / MinIO) applies tenant prefix partitioning (`s3://kerp-vault/{tenant_id}/{project_id}/{module_namespace}/{hash}.ext`) with short-lived presigned URLs for viewing and uploading.
+* **Amendment (user, 2026-11-13; TD-120).** One tenant per deployment, hidden from users: login resolves it from deployment configuration and no screen or request names it. Admin grants, project creation, the lobby and the project picker: `KERP-CONSOLIDATION-AND-DIFF.md` §4.1. Hosting region is a per-deployment setting (§4.4 there, TD-171).
 
 ### 1.2 Timezone & Spatial Anchoring Standards
 * **Timestamp Storage**: All database entities store temporal values strictly in UTC using `TIMESTAMPTZ`.
@@ -51,6 +52,7 @@ In accordance with strict operational domain boundaries, generic back-office fun
 ### 1.3 Offline-First SiteSync Engine
 Field operations frequently occur in remote mine sites, offshore vessels, tank interiors, and industrial plant structures lacking cellular/Wi-Fi connectivity.
 * **Local Storage Layer**: Mobile clients maintain an embedded, schema-mirrored SQLite database (via WASM/OPFS on web or native SQLite via Capacitor/Tauri on tablets).
+  **Amended (user, 2026-11-13; TD-161):** the Capacitor Android build (Android 11+, managed Play/MDM) uses SQLCipher-encrypted SQLite with media on the device file system; web-only PWA apps use Dexie (IndexedDB). Both implement one client storage contract and the same HTTP sync contract (`KERP-CONSOLIDATION-AND-DIFF.md` §6.2). Tauri is not a target.
 * **Sync Log Queue**: Every mutation initiated offline generates an immutable event envelope in the local `outbox_mutations` table:
   ```json
   {
@@ -102,6 +104,7 @@ The foundational security, enterprise directory, and contextual authentication b
 #### 2. What It Does
 * Enforces role-based and attribute-based access control (RBAC & ABAC).
 * Isolates enterprise tenants while allowing cross-tenant collaboration (e.g., a Client Inspector holding accounts across multiple EPC contractors).
+  **Amended (user, 2026-11-13; TD-120):** one tenant per deployment, invisible to users; such a person holds one account per deployment. Within a deployment, System admins appoint Project Admins, who create projects and assign users to one or several of them (`KERP-CONSOLIDATION-AND-DIFF.md` §4.1).
 * Manages biometric/digital cryptographic signatures for official sign-offs (21 CFR Part 11 and ISO 9001 compliance standards).
 * Enforces site-level worker competency and ticket verification (e.g., Working at Heights, Confined Space, NDT Level II certification) prior to assigning field tasks.
 
@@ -293,6 +296,8 @@ The industrial supply chain, material control, and positive material identificat
 
 #### 1. What It Is & Purpose
 The quality assurance and quality control (QA/QC) verification engine. It translates static Inspection and Test Plans (ITPs) into living digital execution workflows, enforcing witness, hold, surveillance, and review check points across fabrication and construction.
+
+**ITP vs Request for Inspection vs ITR:** the ITP is the plan (*what* must be checked, approved once), the RFI (Request for Inspection) is the trigger (*when* an ITP activity is ready, raised per inspection event), and the ITR (Inspection & Test Record) is the evidence (*proof* it was done, feeds the MDR). They are one linked chain, not three separate documents — see `docs/spec/modules/quality-and-inspection.md` §ITP, Request for Inspection and ITR.
 
 #### 2. What It Does
 * Digital ITP library: manages standardized quality plans for structural, mechanical, piping, electrical, instrumentation, civil, coatings, and insulation.
@@ -495,12 +500,17 @@ CREATE TABLE projects (
     name VARCHAR(255) NOT NULL,
     site_timezone VARCHAR(64) NOT NULL DEFAULT 'Australia/Perth',
     spatial_bounds GEOMETRY(Polygon, 4326),
-    status VARCHAR(32) NOT NULL DEFAULT 'ACTIVE',
+    status VARCHAR(32) NOT NULL DEFAULT 'ACTIVE', -- ACTIVE | ON_HOLD | CLOSED (TD-185)
     metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT uq_project_tenant_code UNIQUE (tenant_id, code)
 );
+-- Amendment (user, 2026-11-13; TD-185, TD-120): the project also holds currency_code (ISO 4217)
+-- and locale (BCP 47) as built in T-0012 (oe_projects_project), and visible_in_lobby BOOLEAN
+-- NOT NULL DEFAULT false. Defaults for status, site_timezone (Australia/Perth), currency_code
+-- (AUD) and locale (en-AU) come from the tenant (deployment) settings
+-- (KERP-CONSOLIDATION-AND-DIFF.md §4.4); the literals here are the shipped defaults.
 
 CREATE INDEX idx_projects_tenant ON projects(tenant_id);
 
@@ -655,7 +665,7 @@ ITP Hold Point Lifecycle:
 #### 2. ITP Step & Quality Hold Point State Machine
 * `PENDING`: Step awaiting preceding execution completion.
 * `RFI_ISSUED`: Formal inspection call-out dispatched to Client Inspector / Verifier with minimum required contractual notice (e.g., 24 hours).
-* **Amended (TD-045, decided 2026-11-10):** "RFI" means Request for Information, so `RFI_ISSUED` is renamed — `INSPECTION_REQUESTED` (name confirmed by the user on TD-045) — and the call-out itself is a separate `inspection_request` record. See `docs/spec/modules/quality-and-inspection.md` §Unified inspection record.
+* **Amended (TD-045, decided 2026-11-10; terminology amended 2026-11-13):** `RFI_ISSUED` is renamed — `INSPECTION_REQUESTED` (name confirmed by the user on TD-045) — and the call-out itself is a separate `inspection_request` record. See `docs/spec/modules/quality-and-inspection.md` §Unified inspection record. In KERP, RFI = Request for Inspection; a Request for Information is a TQ (Technical Query).
 * `INSPECTED_PASSED`: Verifier signs off the physical check point. Requires authenticated digital signature, current UTC timestamp, and geographic coordinates.
 * `INSPECTED_FAILED`: Inspection fails to meet technical criteria. The engine automatically forces creation of an associated `punch_items` record (Category A) or formal `non_conformance_reports` record.
 * `LOCKED_FOR_TURNOVER`: Record verified and immutable. No modifications permitted; queued for MDR document collation.
@@ -861,5 +871,6 @@ To ensure system integrity across design, deployment, and testing, every impleme
 
 1. **Security & Boundary Enforcement**: RLS context is validated across all multi-tenant queries; no single-tenant query executes without an authenticated `tenant_id` session variable.
 2. **Offline-First Resilience**: Mobile workers can conduct inspections, record readings, and capture photographs for up to 7 consecutive days offline. Upon reconnection, all operations sync through the deterministic delta engine without data loss.
+   **Amended (user, 2026-11-13; TD-170):** the offline window is a tenant setting, default 7 days, maximum 14; sync and sessions are built and tested for 14. Offline work continues on local PIN unlock, independent of the 12-hour server session (`KERP-CONSOLIDATION-AND-DIFF.md` §4.2).
 3. **Quality & Commercial Immutability**: No commercial progress claim milestone can be unlocked without its corresponding ITP hold point holding an `INSPECTED_PASSED` status verified by cryptographic signature.
 4. **Turnover Readiness**: The MDR collation engine generates bookmarked, numbered, and fully indexed client data dossiers directly from verified operational records without manual desktop collation.
