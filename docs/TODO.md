@@ -3,17 +3,21 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 105 · **Closed:** 56
+**Open:** 121 · **Closed:** 56
 
-## decision (3)
+## decision (7)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
 | [TD-096](../tracker/todo/TD-096.md) | Approved coating ITR dropped the residual-dust rating row the ITP requires; Grating and Gridmesh ITR has no approved version: confirm with the client before shipping default templates | T-0113 | planner |
 | [TD-141](../tracker/todo/TD-141.md) | Rule store: explicit per-rule version column, findings log only non-passing rules | T-0018 | implementer |
+| [TD-170](../tracker/todo/TD-170.md) | Offline window: 14 days (clean-room FR-02) vs up to 7 days (master §6); tenant setting and default | T-0126 | clean-room-gap-analysis |
+| [TD-171](../tracker/todo/TD-171.md) | Production AWS region / data residency: EU (clean-room NFR-10, GDPR) vs Australia; TD-004 settled AWS but not the region | — | clean-room-gap-analysis |
+| [TD-172](../tracker/todo/TD-172.md) | Per-business-unit theming (logo/palette) vs one tenant per deploy (TD-007); German translations at launch (clean-room NFR-16) | T-0136 | clean-room-gap-analysis |
+| [TD-173](../tracker/todo/TD-173.md) | Pilot-0 (8 inspectors, one project, Android only, no P6 / Phase 2) ahead of the M2 cut line resolved in TD-009 | — | clean-room-gap-analysis |
 | [TD-177](../tracker/todo/TD-177.md) | Who may create a project and how the creator gets a membership: POST /projects is gated on the admin capability in any project until T-0014's tenant administrator | T-0012 | implementer |
 
-## spec-gap (38)
+## spec-gap (47)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -54,15 +58,25 @@
 | [TD-139](../tracker/todo/TD-139.md) | Confirm per-kind rule context schemas and action vocabularies (validation compiler) | T-0018 | implementer |
 | [TD-148](../tracker/todo/TD-148.md) | Module-to-navigation-group mapping for the 8-group IA is unspecified | T-0024 | implementer |
 | [TD-151](../tracker/todo/TD-151.md) | Persona matrix interpretation: default-tier labels vs V/C/E/A/S, PER-03 progress sign-off, PER-09 combined with a hold-authority persona | T-0010 | implementer |
+| [TD-161](../tracker/todo/TD-161.md) | Field client local store: Dexie/IndexedDB (edge spec, T-0127) vs embedded SQLite (master §1); clean-room needs 500 inspections + 10 GB media, SQLCipher-grade encryption at rest, Android 11+ minimum and managed-Play/MDM distribution | T-0127 | clean-room-gap-analysis |
+| [TD-162](../tracker/todo/TD-162.md) | Sync pull scope: per-device/per-project pull-deltas scope, has-more paging, download-for-offline selection with size, local purge, client-generated record ids, stale-base flag on answers, submit blocked until attachments complete | T-0126 | clean-room-gap-analysis |
+| [TD-163](../tracker/todo/TD-163.md) | Barcode/QR/NFC identifiers on Items + scan-to-locate lookup (master user story exists; no columns, endpoint, or NFC path for PWA vs Capacitor) | T-0103 | clean-room-gap-analysis |
+| [TD-164](../tracker/todo/TD-164.md) | Device registry: enrolled devices, remote revoke/wipe, device_id in audit (T-0006) with before/after diff, biometric unlock, certificate pinning (Capacitor), per-device sync health | T-0009 | clean-room-gap-analysis |
+| [TD-165](../tracker/todo/TD-165.md) | Inspection scheduling and review: planned start/duration, calendar, general recurrence, light work-order grouping, explicit returned state, comments addressable to a single answer | T-0111 | clean-room-gap-analysis |
+| [TD-166](../tracker/todo/TD-166.md) | Field-type palette additions: video, audio, barcode/QR fields, annotation on captured photos (stored JSON, burned in on export), reference images on questions | T-0110 | clean-room-gap-analysis |
+| [TD-167](../tracker/todo/TD-167.md) | Defect close-out loop: open -> action assigned (owner, due) -> rectified -> verified closed by a re-inspection (closed_by_inspection link); extends TD-066 | T-0117 | clean-room-gap-analysis |
+| [TD-168](../tracker/todo/TD-168.md) | Push notification channel (FCM via the Capacitor build) for assignment and return; T-0019 is in-app only and email is TD-084 | T-0019 | clean-room-gap-analysis |
+| [TD-174](../tracker/todo/TD-174.md) | NFR budgets: 300-question form opens < 1.5 s, 1,000-record delta sync < 30 s on 4G, glove targets >= 48 dp and outdoor high-contrast tokens | T-0024 | clean-room-gap-analysis |
 | [TD-178](../tracker/todo/TD-178.md) | Project status values (ACTIVE/ON_HOLD/CLOSED chosen) and currency/locale defaults (AUD/en-AU) are not in the spec | T-0012 | implementer |
 
-## missed (3)
+## missed (4)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
 | [TD-094](../tracker/todo/TD-094.md) | Per-RSW area handover sheet required by the ITP closeout (not the shift handover module) | T-0113, E-04-10 | planner |
 | [TD-125](../tracker/todo/TD-125.md) | Booking modules must call work_anchor_for and return 422 when the path has no work anchor (progress, time lines against a work anchor, completion gate) | T-0101, T-0116, T-0124, E-04-03, E-04-05 | reviewer |
 | [TD-131](../tracker/todo/TD-131.md) | Add a root .env.example for the dev stack (the implementer agent's permission rules block writing .env* files) | T-0003 | implementer |
+| [TD-169](../tracker/todo/TD-169.md) | M2 Documents-Lite 'batch inspection PDF export' (consolidation diff §7) has no task | — | clean-room-gap-analysis |
 
 ## deferred (16)
 
@@ -85,7 +99,7 @@
 | [TD-155](../tracker/todo/TD-155.md) | Schedule the jobs sweep: enumerate tenant/project scopes under RLS (no BYPASSRLS) and run service.sweep from an SAQ cron | T-0015 | implementer |
 | [TD-156](../tracker/todo/TD-156.md) | Jobs API: per-kind capability check on POST /jobs and GET /jobs/{id} once RBAC lands (T-0010) | T-0015 | implementer |
 
-## later (34)
+## later (35)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -122,6 +136,7 @@
 | [TD-153](../tracker/todo/TD-153.md) | Membership lookup adds a DB round-trip per authenticated request | T-0010 | implementer |
 | [TD-157](../tracker/todo/TD-157.md) | Jobs worker: liveness healthcheck for the worker container, and re-queue (not fail) jobs interrupted by a worker shutdown | T-0015 | implementer |
 | [TD-160](../tracker/todo/TD-160.md) | Test that revoking (soft-deleting) a project membership removes that project from the resolved scope; extend TD-150 to bulk ORM update/delete | T-0010 | reviewer |
+| [TD-175](../tracker/todo/TD-175.md) | Record retention rules + legal hold per project | — | clean-room-gap-analysis |
 | [TD-179](../tracker/todo/TD-179.md) | spatial_bounds: GiST index and ST_IsValid check (self-intersecting polygons are accepted today); project code stays taken after soft delete | T-0012 | implementer |
 
 ## bug (1)
@@ -130,7 +145,7 @@
 |---|---|---|---|
 | [TD-159](../tracker/todo/TD-159.md) | Site filter from the bound project is applied to all site-scoped rows: a PER-07 on A who is PER-01 on B loses B's site-scoped rows (over-restrictive) | T-0010 | reviewer |
 
-## risk (10)
+## risk (11)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -144,6 +159,7 @@
 | [TD-152](../tracker/todo/TD-152.md) | T-0014 membership-based policy must keep the caller's own memberships readable by the scope resolver | T-0010 | implementer |
 | [TD-154](../tracker/todo/TD-154.md) | Migrations 0002-0005 call the live rls_policy_sql, so changing it rewrites history | T-0010 | implementer |
 | [TD-158](../tracker/todo/TD-158.md) | require_hold_release passes a PER-07 for any site; endpoints must also check can_release_hold against the hold's site (add a load-and-check helper) | T-0010 | reviewer |
+| [TD-176](../tracker/todo/TD-176.md) | No availability target or HA design for the production API (clean-room asks 99.5 %; offline client tolerates outages) | — | clean-room-gap-analysis |
 
 ## Closed
 
