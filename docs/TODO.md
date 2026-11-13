@@ -3,20 +3,17 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 128 · **Closed:** 59
+**Open:** 116 · **Closed:** 75
 
-## decision (6)
+## decision (3)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
 | [TD-096](../tracker/todo/TD-096.md) | Approved coating ITR dropped the residual-dust rating row the ITP requires; Grating and Gridmesh ITR has no approved version: confirm with the client before shipping default templates | T-0113 | planner |
-| [TD-170](../tracker/todo/TD-170.md) | Offline window: 14 days (clean-room FR-02) vs up to 7 days (master §6); tenant setting and default | T-0126 | clean-room-gap-analysis |
-| [TD-171](../tracker/todo/TD-171.md) | Production AWS region / data residency: EU (clean-room NFR-10, GDPR) vs Australia; TD-004 settled AWS but not the region | — | clean-room-gap-analysis |
-| [TD-173](../tracker/todo/TD-173.md) | Pilot-0 (8 inspectors, one project, Android only, no P6 / Phase 2) ahead of the M2 cut line resolved in TD-009 | — | clean-room-gap-analysis |
-| [TD-183](../tracker/todo/TD-183.md) | Localisation of form template content (labels, option labels, error messages) | T-0025 | implementer |
-| [TD-184](../tracker/todo/TD-184.md) | Who may create a project and how the creator gets a membership: POST /projects is gated on the admin capability in any project until T-0014's tenant administrator | T-0012 | implementer |
+| [TD-191](../tracker/todo/TD-191.md) | Lobby details: a project code only finds the project and files an access request (never grants access); the lobby is also reachable from the project picker for users who already have projects | T-0040, T-0041 | planner |
+| [TD-192](../tracker/todo/TD-192.md) | SPA refresh-token transport: keep the JSON body (sessionStorage) or move to an httpOnly SameSite cookie | T-0037 | planner |
 
-## spec-gap (47)
+## spec-gap (37)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -51,22 +48,12 @@
 | [TD-109](../tracker/todo/TD-109.md) | Equipment availability (onsite / in use) and required operator credential per equipment type; resource demand counts equipment units | E-03-07, T-0112, E-04-08 | planner |
 | [TD-114](../tracker/todo/TD-114.md) | P6 open points left by TD-079: run_checks rule-set names for import-commit and link-approval, and link behaviour when schedule_link and work_anchor sit on different levels | T-0104, T-0105, T-0125 | planner |
 | [TD-117](../tracker/todo/TD-117.md) | Findings register (TD-106 decision) has no spec section or task: assessment step, configurable name/types per project, follow-up work, priority derivation | T-0116, T-0117 | planner |
-| [TD-120](../tracker/todo/TD-120.md) | Login tenant resolution: how a user picks the tenant at sign-in (multi-tenant accounts, MOD-01 cross-tenant collaboration) | T-0008 | implementer |
-| [TD-121](../tracker/todo/TD-121.md) | Refresh-token lifetime, absolute session lifetime and SPA refresh-token transport are unspecified | T-0008 | implementer |
-| [TD-135](../tracker/todo/TD-135.md) | Field-worker PIN semantics: confirm server-checked PIN per session that gates every refresh, and the lockout/magic-link numbers | T-0009 | implementer |
-| [TD-139](../tracker/todo/TD-139.md) | Confirm per-kind rule context schemas and action vocabularies (validation compiler) | T-0018 | implementer |
-| [TD-148](../tracker/todo/TD-148.md) | Module-to-navigation-group mapping for the 8-group IA is unspecified | T-0024 | implementer |
-| [TD-151](../tracker/todo/TD-151.md) | Persona matrix interpretation: default-tier labels vs V/C/E/A/S, PER-03 progress sign-off, PER-09 combined with a hold-authority persona | T-0010 | implementer |
-| [TD-161](../tracker/todo/TD-161.md) | Field client local store: Dexie/IndexedDB (edge spec, T-0127) vs embedded SQLite (master §1); clean-room needs 500 inspections + 10 GB media, SQLCipher-grade encryption at rest, Android 11+ minimum and managed-Play/MDM distribution | T-0127 | clean-room-gap-analysis |
 | [TD-162](../tracker/todo/TD-162.md) | Sync pull scope: per-device/per-project pull-deltas scope, has-more paging, download-for-offline selection with size, local purge, client-generated record ids, stale-base flag on answers, submit blocked until attachments complete | T-0126 | clean-room-gap-analysis |
 | [TD-163](../tracker/todo/TD-163.md) | Barcode/QR/NFC identifiers on Items + scan-to-locate lookup (master user story exists; no columns, endpoint, or NFC path for PWA vs Capacitor) | T-0103 | clean-room-gap-analysis |
-| [TD-164](../tracker/todo/TD-164.md) | Device registry: enrolled devices, remote revoke/wipe, device_id in audit (T-0006) with before/after diff, biometric unlock, certificate pinning (Capacitor), per-device sync health | T-0009 | clean-room-gap-analysis |
 | [TD-165](../tracker/todo/TD-165.md) | Inspection scheduling and review: planned start/duration, calendar, general recurrence, light work-order grouping, explicit returned state, comments addressable to a single answer | T-0111 | clean-room-gap-analysis |
 | [TD-166](../tracker/todo/TD-166.md) | Field-type palette additions: video, audio, barcode/QR fields, annotation on captured photos (stored JSON, burned in on export), reference images on questions | T-0110 | clean-room-gap-analysis |
 | [TD-167](../tracker/todo/TD-167.md) | Defect close-out loop: open -> action assigned (owner, due) -> rectified -> verified closed by a re-inspection (closed_by_inspection link); extends TD-066 | T-0117 | clean-room-gap-analysis |
-| [TD-168](../tracker/todo/TD-168.md) | Push notification channel (FCM via the Capacitor build) for assignment and return; T-0019 is in-app only and email is TD-084 | T-0019 | clean-room-gap-analysis |
-| [TD-174](../tracker/todo/TD-174.md) | NFR budgets: 300-question form opens < 1.5 s, 1,000-record delta sync < 30 s on 4G, glove targets >= 48 dp and outdoor high-contrast tokens | T-0024 | clean-room-gap-analysis |
-| [TD-185](../tracker/todo/TD-185.md) | Project status values (ACTIVE/ON_HOLD/CLOSED chosen) and currency/locale defaults (AUD/en-AU) are not in the spec | T-0012 | implementer |
+| [TD-194](../tracker/todo/TD-194.md) | NFR budgets need a reference device and a 4G network profile before they become a hard gate for Pilot-0 | T-0045, T-0146 | planner |
 
 ## missed (4)
 
@@ -103,7 +90,7 @@
 | [TD-181](../tracker/todo/TD-181.md) | DetailPage: audit log and gate-status endpoints | T-0025 | implementer |
 | [TD-182](../tracker/todo/TD-182.md) | RegisterPage: server-side filtering, sorting and paging | T-0025 | implementer |
 
-## later (38)
+## later (39)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -145,6 +132,7 @@
 | [TD-186](../tracker/todo/TD-186.md) | spatial_bounds: GiST index and ST_IsValid check (self-intersecting polygons are accepted today); project code stays taken after soft delete | T-0012 | implementer |
 | [TD-189](../tracker/todo/TD-189.md) | Set a psycopg connect_timeout on the worker's DB engine so _settle/_start are bounded when the DB is unreachable | T-0015 | reviewer |
 | [TD-190](../tracker/todo/TD-190.md) | Client-side co-branding (client logo on client-facing pages/reports): decide later | T-0136 | user |
+| [TD-193](../tracker/todo/TD-193.md) | After Pilot-0: biometric unlock, certificate pinning (Capacitor) and per-device sync-health views | T-0043 | planner |
 
 ## bug (1)
 
@@ -228,6 +216,22 @@
 | ✅ | [TD-116](../tracker/todo/TD-116.md) | ADR 0004 Amendment B: two-person unlock of a locked rule names approval_routes (E-06-07, Phase 6) - who is the second approver until then? | Interim default approved: until approval_routes (E-06-07) exists, a second, different PER-13 or PER-01 user approves an unlock of a locked rule (user, 2026-11-10) |
 | ✅ | [TD-118](../tracker/todo/TD-118.md) | Qualification-type catalogue (TD-101): who is the 'super admin', and may a project-scoped PER-09 edit a tenant-wide (global) catalogue? | No super admin: the tenant administrator edits the tenant-wide qualification catalogue; PER-09 Project Administrator may add project-level types (user, 2026-11-10) |
 | ✅ | [TD-119](../tracker/todo/TD-119.md) | CLAUDE.md section 6 anchor bullet still says 'work anchors to an RSW': apply the ADR 0003 amended wording (human edit; agents may not change CLAUDE.md) | CLAUDE.md section 6 anchor bullet updated to the ADR 0003 wording with 'at most one per root-to-leaf path' (TD-113) (user, 2026-11-10) |
+| ✅ | [TD-120](../tracker/todo/TD-120.md) | Login tenant resolution: how a user picks the tenant at sign-in (multi-tenant accounts, MOD-01 cross-tenant collaboration) | 3a: tenant_id + RLS kept but hidden (one tenant per deployment); System admins appoint Project Admins (create_projects grant) who create projects and get PER-09 on them; PER-09 assigns users to its projects; admin roles never confer hold release or sign-off; one URL, top-bar project picker (one project -> in, several -> last used), lobby of visible-in-lobby projects with access requests decided by the project's admins, other projects by invite or project code. Spec diff §4.1, edge §5/§6, master §1.1/MOD-01; tasks T-0014, T-0023, T-0026, T-0037, T-0039..T-0042 (user, 2026-11-13) |
+| ✅ | [TD-121](../tracker/todo/TD-121.md) | Refresh-token lifetime, absolute session lifetime and SPA refresh-token transport are unspecified | 4c: access 15 min, refresh 12 h from sign-in (rotation never extends it, KERP_REFRESH_TOKEN_HOURS=12), daily re-login; offline local PIN unlock does not depend on a valid refresh token, so the 7-14 day offline window still works. Spec diff §4.2; task T-0037. Cookie transport left open as TD-192 (user, 2026-11-13) |
+| ✅ | [TD-135](../tracker/todo/TD-135.md) | Field-worker PIN semantics: confirm server-checked PIN per session that gates every refresh, and the lockout/magic-link numbers | 8a: hybrid PIN per enrolled device: local unlock against a keystore key (offline, no token needed); server asks for the PIN only on renewal after idle (KERP_PIN_IDLE_MINUTES, default 30); lockout numbers and server-side per-device counter kept. Spec diff §4.2; rework in T-0038 (server) and T-0143 (client) (user, 2026-11-13) |
+| ✅ | [TD-139](../tracker/todo/TD-139.md) | Confirm per-kind rule context schemas and action vocabularies (validation compiler) | 9a: rule context schemas, p6_grammar groups and action vocabularies confirmed as built and recorded in ADR 0004 Addendum F; frozen by T-0131 (user, 2026-11-13) |
 | ✅ | [TD-141](../tracker/todo/TD-141.md) | Rule store: explicit per-rule version column, findings log only non-passing rules | per-rule version column; findings log only failed/errored rules. (user, 2026-11-13) |
+| ✅ | [TD-148](../tracker/todo/TD-148.md) | Module-to-navigation-group mapping for the 8-group IA is unspecified | 6a: module -> nav group mapping written into diff §6.1 (items may move later) (user, 2026-11-13) |
+| ✅ | [TD-151](../tracker/todo/TD-151.md) | Persona matrix interpretation: default-tier labels vs V/C/E/A/S, PER-03 progress sign-off, PER-09 combined with a hold-authority persona | 2a: T-0010 tier mapping confirmed (edge §5.2 amendment); PER-09 + hold-authority persona allowed with a warning at assignment and an audit-ledger entry; no admin role confers hold release or sign-off without a qualified persona and credentials (TD-099/TD-100). Spec diff §4.1, edge §5; tasks T-0014, T-0026, T-0039 (user, 2026-11-13) |
+| ✅ | [TD-161](../tracker/todo/TD-161.md) | Field client local store: Dexie/IndexedDB (edge spec, T-0127) vs embedded SQLite (master §1); clean-room needs 500 inspections + 10 GB media, SQLCipher-grade encryption at rest, Android 11+ minimum and managed-Play/MDM distribution | 16a + d: Capacitor Android build uses SQLCipher SQLite + file-system media behind one client storage contract; web-only PWA apps keep Dexie; Android 11+, managed Play/MDM; storage and sync contract client-agnostic. Spec diff §6.2, master §1.3, edge §1; tasks T-0127, T-0141, T-0142 (user, 2026-11-13) |
+| ✅ | [TD-164](../tracker/todo/TD-164.md) | Device registry: enrolled devices, remote revoke/wipe, device_id in audit (T-0006) with before/after diff, biometric unlock, certificate pinning (Capacitor), per-device sync health | 17a: device registry, remote revoke (sessions killed, local wipe on next contact) and device_id in the audit ledger for Pilot-0. Spec diff §4.3; tasks T-0043, T-0048, T-0143, T-0126. Biometric unlock, certificate pinning and sync-health views after the pilot: TD-193 (user, 2026-11-13) |
+| ✅ | [TD-168](../tracker/todo/TD-168.md) | Push notification channel (FCM via the Capacitor build) for assignment and return; T-0019 is in-app only and email is TD-084 | 5a: T-0019 stays in-app only behind a pluggable channel interface; FCM push is T-0144 in the Android build work (user, 2026-11-13) |
+| ✅ | [TD-170](../tracker/todo/TD-170.md) | Offline window: 14 days (clean-room FR-02) vs up to 7 days (master §6); tenant setting and default | 14a: offline window is a tenant setting, default 7 days, maximum 14; sync and sessions built for 14. Spec diff §4.2/§4.4, master §6; tasks T-0044, T-0126, T-0127, T-0143 (user, 2026-11-13) |
+| ✅ | [TD-171](../tracker/todo/TD-171.md) | Production AWS region / data residency: EU (clean-room NFR-10, GDPR) vs Australia; TD-004 settled AWS but not the region | 13a: region is a per-deployment setting: AWS ap-southeast-2 (Sydney) for Australian deployments, eu-central-1 only for an EU deployment. Spec diff §4.4; T-0016 (user, 2026-11-13) |
 | ✅ | [TD-172](../tracker/todo/TD-172.md) | Per-business-unit theming (logo/palette) vs one tenant per deploy (TD-007); German translations at launch (clean-room NFR-16) | English only for now; no per-BU theming or branding (main site logo/colours). Client logo co-branding: TD-190 (later). (user, 2026-11-13) |
+| ✅ | [TD-173](../tracker/todo/TD-173.md) | Pilot-0 (8 inspectors, one project, Android only, no P6 / Phase 2) ahead of the M2 cut line resolved in TD-009 | 12a: Pilot-0 (8 inspectors, one project, Android only; core inspection, offline, signing, review/return, PDF) is the first pilot milestone; M2 stays the next milestone. docs/DEVELOPMENT-PLAN.md Milestones and diff §7; gate T-0146 (user, 2026-11-13) |
+| ✅ | [TD-174](../tracker/todo/TD-174.md) | NFR budgets: 300-question form opens < 1.5 s, 1,000-record delta sync < 30 s on 4G, glove targets >= 48 dp and outdoor high-contrast tokens | 18a: budgets adopted as NFRs (diff §6.3); performance tests warn in CI now (T-0045, T-0145) and become a hard gate before Pilot-0 (T-0146); glove/high-contrast tokens T-0046. Reference device and 4G profile: TD-194 (user, 2026-11-13) |
+| ✅ | [TD-183](../tracker/todo/TD-183.md) | Localisation of form template content (labels, option labels, error messages) | 11a: template strings accept a plain string or a per-locale map with fallback to the template's default language; English only for now. Spec edge §2.2; tasks T-0110 (schema), T-0047 (renderer) (user, 2026-11-13) |
+| ✅ | [TD-184](../tracker/todo/TD-184.md) | Who may create a project and how the creator gets a membership: POST /projects is gated on the admin capability in any project until T-0014's tenant administrator | 1a + 3a: projects are created by Project Admins (create_projects grant, appointed by a System admin); the creator gets PER-09 automatically; memberships on soft-deleted projects are ignored. Spec diff §4.1; tasks T-0014, T-0039 (user, 2026-11-13) |
+| ✅ | [TD-185](../tracker/todo/TD-185.md) | Project status values (ACTIVE/ON_HOLD/CLOSED chosen) and currency/locale defaults (AUD/en-AU) are not in the spec | 7a: project status ACTIVE/ON_HOLD/CLOSED and AUD/en-AU confirmed; defaults (status, timezone, currency, locale) move to tenant (deployment) settings. Spec master §4.1, diff §4.4; task T-0044 (user, 2026-11-13) |
 | ✅ | [TD-187](../tracker/todo/TD-187.md) | jobs worker: a cancellation/timeout while _start is returning leaves the row 'running' forever (flaky test_a_cancelled_or_timed_out_job_is_marked_failed) | run_job shields the _start thread; a cancel during start waits for it, then fails a started row with 'Job timed out or was cancelled' (shielded) and re-raises (fix/jobs-cancel-during-start) |

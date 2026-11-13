@@ -126,6 +126,112 @@ Replaces the duplicated designers spread across `forms`, `asset_management`
   User**), plus an **Asset-Site scoping** filter for Site Inspectors (visibility limited to
   their physical site within a multi-site project).
 
+### 4.1 Access model (user, 2026-11-13; TD-120, TD-184, TD-151)
+
+Wins over any earlier text on tenant selection, tenant administrators and project creation.
+
+- **One hidden tenant per deployment.** `tenant_id` and RLS stay on every table (TD-007), but
+  a deployment serves exactly one tenant and users never see, pick or type it. Login resolves
+  the tenant from deployment configuration (`KERP_DEFAULT_TENANT_ID`, set by first-run
+  provisioning); the login request carries no tenant field. Another company is another
+  deployment. A person who works for several companies (MOD-01 "client inspector across EPC
+  contractors") holds one account per deployment.
+- **Two tenant-level admin grants**, stored per user in the admin module (not personas, not
+  project memberships):
+  - **`system_admin`** — a few people who run the deployment: appoint and remove System admins
+    and Project Admins, create and deactivate user accounts, revoke devices (§4.3), edit
+    deployment settings (§4.4), and grant PER-09 on any project (e.g. to recover a project whose
+    admins left). The last System admin cannot be removed. System admins can list every project
+    row and every membership (the "tenant administrator" of edge spec §6) but read no
+    project-scoped records without a membership like any other user.
+  - **`create_projects`** ("Project Admin") — granted and revoked by a System admin only. Allows
+    `POST /api/v1/projects`. The creator is granted **PER-09 Project Administrator** on the new
+    project automatically, in the same transaction. Revoking `create_projects` removes no
+    existing PER-09 membership.
+- **PER-09 is the per-project admin persona.** A Project Admin "controls" exactly the projects
+  where they hold PER-09; one person can hold PER-09 on several projects, and a project can have
+  several PER-09 holders. PER-09 on a project may: edit its settings, toggle *visible in lobby*,
+  assign and remove users on that project (any persona, including PER-09, with site scope),
+  invite a user by e-mail (creates the account if none exists), and decide its access requests.
+  It may not grant tenant-level grants. Memberships on soft-deleted projects are ignored
+  everywhere (`load_grants`, allowed project list, admin checks).
+- **Admin never confers quality or signing authority.** Neither `system_admin`,
+  `create_projects` nor PER-09 gives hold release, inspection sign-off or any `A`/`S` capability.
+  Those come only from a qualified persona on that project (edge spec §5.2) **and** the
+  credentials the action requires (TD-099/TD-100), checked at the action. An admin who also holds
+  such a persona acts under that persona.
+- **PER-09 combined with a hold-authority persona** (PER-02, PER-06, PER-07, PER-11) on the same
+  project is allowed. The assignment API returns a warning the UI must show before saving, and
+  the assignment is written to the audit ledger with `sod_warning: true` (TD-151).
+- **One URL, no subdomains.** Every project is reached under the same origin; the active project
+  is chosen in the app, never by host name.
+- **Landing after sign-in.** One project → straight into it. Several → the project last used by
+  this user on this client (falls back to the first by name if it is no longer allowed), with a
+  **project picker in the top bar** to switch; portfolio personas keep the All-Projects scope
+  (§6). No project → the **lobby**. Users with projects reach the lobby from the picker
+  ("Find a project").
+- **Lobby and access requests.** The lobby lists only projects whose PER-09 holders set
+  *visible in lobby* (default off): code and name only. A user requests access with an optional
+  message; the request goes to that project's PER-09 holders (in-app notification), who approve
+  it — choosing the persona(s) and site scope — or reject it. One open request per user per
+  project; the requester may withdraw it. Approval creates the membership; request, decision and
+  decider go to the audit ledger. Projects not visible in the lobby are reached only by an
+  **invite** (a PER-09 assigns the user) or by **project code**: entering an exact project code
+  finds that one project and lets the user file an access request; a code never grants access
+  by itself (TD-191). The lobby and code lookup read through a narrow path (code, name, id of
+  matching projects only); the membership-based `projects` policy is not widened.
+
+### 4.2 Sessions (user, 2026-11-13; TD-121, TD-135, TD-170)
+
+- **Access token** 15 minutes (unchanged). **Refresh token** lifetime **12 hours from sign-in**
+  (`KERP_REFRESH_TOKEN_HOURS=12`): rotation issues a new single-use token but never extends the
+  session past sign-in + 12 h. Users sign in again daily. Refresh-token transport stays in the
+  JSON body (T-0008); a cookie transport for the SPA is open (TD-192).
+- **Field PIN, hybrid (TD-135, decision 8a).** The PIN belongs to the enrolled device (§4.3),
+  not to a server session:
+  - **Local unlock.** The app unlocks on the device with the 6-digit PIN against a key held in
+    the platform keystore. It needs no network and **does not depend on a valid access or
+    refresh token**: an expired or revoked-by-expiry session does not stop a worker opening the
+    app, reading downloaded work and queueing changes offline.
+  - **Renewal after idle.** Online, the server asks for the PIN only when a session is renewed
+    after it was idle longer than `KERP_PIN_IDLE_MINUTES` (default 30). Ordinary rotation inside
+    the idle limit needs no PIN. A PIN alone never starts a session.
+  - **Lockout** numbers unchanged from T-0009 (4 immediate tries, then 30 s doubling to 15 min;
+    the 10th wrong PIN ends PIN unlock until an online sign-in), with the attempt counter kept on
+    the server per device. Failures made offline are counted locally with the same numbers and
+    reported on the next contact. PIN failures never delete local data (only a remote wipe does).
+- **Offline window (TD-170).** A tenant setting (§4.4), default **7 days**, maximum **14**. While
+  inside the window the device works offline with local unlock. Once the window passes without a
+  successful server contact, the app keeps all queued data but allows no new edits until the user
+  signs in online. Sync and the outbox are built for 14 days of queued work.
+- **Daily re-login vs offline.** The 12-hour session limit applies only to server calls. Offline
+  work continues on local unlock for the whole offline window; on reconnect the user signs in
+  (password, SSO, or magic link) and the outbox drains under the new session. Queued mutations
+  carry their author; the server accepts them only from a session of the same user and device.
+
+### 4.3 Devices (user, 2026-11-13; TD-164, decision 17a — Pilot-0 scope)
+
+- **Device registry.** Every field client (Capacitor Android build, field PWA) enrols on first
+  sign-in: a client-generated `device_id` (UUID), platform, OS and app version, enrolled and
+  last-seen/last-sync times, status `active | revoked`. Sessions are bound to the device.
+- **Remote revoke and wipe.** A System admin, a PER-09 holder of a project the device's user
+  belongs to, or the user may revoke a device. Revoke kills every session of the device at once;
+  on its next contact the server answers `401` with `code: DEVICE_REVOKED` and the client wipes
+  its local store (records, outbox, media, keys) and confirms the wipe. Unsynced work on a
+  revoked device is lost; the admin UI shows the last-sync time before confirming.
+- **Audit.** Ledger entries made through a device carry its `device_id`.
+- **After the pilot:** biometric unlock, certificate pinning and per-device sync-health views
+  (TD-193).
+
+### 4.4 Deployment settings and region (user, 2026-11-13; TD-170, TD-171, TD-185)
+
+- **Tenant (deployment) settings**, edited by System admins: offline window (days, default 7,
+  1–14), and the defaults for new projects: status `ACTIVE`, site timezone `Australia/Perth`,
+  currency `AUD`, locale `en-AU`. Project status values are `ACTIVE`, `ON_HOLD`, `CLOSED`.
+- **Region is a per-deployment setting**, not code: AWS `ap-southeast-2` (Sydney) for Australian
+  deployments; `eu-central-1` (Frankfurt) only if an EU deployment is ever needed. S3, SES and
+  any other regional AWS client read the deployment's region; nothing hard-codes a region.
+
 ---
 
 ## 5. Equipment calibration lifecycle & hard quality gate
@@ -162,6 +268,55 @@ Replaces the duplicated designers spread across `forms`, `asset_management`
   `client_op_id`; optimistic UI, idempotent drain/replay on reconnect. (TanStack Query alone
   is no longer the write path.)
 
+### 6.1 Navigation mapping and project picker (user, 2026-11-13; TD-148, TD-120)
+
+Module screens register their nav items in these groups. Individual items may move later.
+
+| Group | Items |
+|---|---|
+| **Overview** | dashboards, my work |
+| **Backbone** | projects, asset hierarchy, items, teams |
+| **Execution** | inspections / QMS, ITPs, field time, progress, look-ahead |
+| **Logistics** | materials, equipment, storeman |
+| **Documents** | documents, transmittals, CDRL, drawings |
+| **Defense & Claims** | TQs, variations, NOD / EOT, claims |
+| **Controls & Insights** | P6 schedule, reporting, money mirror |
+| **Admin** | users, personas, system (deployment settings, admin grants, devices), access requests |
+
+The top-bar **Project Switcher** is the project picker of §4.1: it lists the user's projects
+(from memberships), remembers the last project per user, offers All-Projects to portfolio
+personas, and links to the lobby ("Find a project").
+
+### 6.2 Field client storage (user, 2026-11-13; TD-161, decision 16a + d)
+
+- **Per build.** The **Capacitor Android build** stores records and the outbox in
+  **SQLCipher-encrypted SQLite**, and media on the device file system (app-private storage,
+  encrypted with a key held in the Android Keystore). **Web-only PWA apps keep Dexie**
+  (IndexedDB) as above. Sized for 500 inspections + 10 GB media per device on Android.
+- **Android 11+** (API level 30) minimum; distributed only through **managed Google Play / MDM**.
+- **One client storage contract**, implemented once per build: `RecordStore` (project-scoped
+  records by entity and id, query by anchor), `OutboxStore` (append a mutation envelope keyed on
+  `client_op_id` atomically with the record write, list pending, mark acknowledged),
+  `MediaStore` (put a blob → local reference + sha256, read, delete, usage), and `wipe()`
+  (records, outbox, media and keys; used by remote revoke, §4.3). App code depends only on the
+  contract, never on Dexie or SQLite directly.
+- **Client-agnostic sync contract.** The HTTP endpoints (master spec §4.3 `push-mutations` /
+  `pull-deltas`, presigned media uploads, device enrolment) are the only client–server contract.
+  There are no endpoints specific to one client, so a separate native Android app (TD-044) could
+  implement the same storage and sync contract later.
+
+### 6.3 Non-functional budgets (user, 2026-11-13; TD-174, decision 18a)
+
+| NFR | Budget | Measured |
+|---|---|---|
+| Form open | A 300-question form opens (first interactive render) in **< 1.5 s** | CI: headless Chromium, 4× CPU throttle |
+| Delta sync | **1,000 records** pulled and applied in **< 30 s on 4G** | CI: simulated 4G (9 Mbit/s down, 3 Mbit/s up, 85 ms RTT) |
+| Glove use | Touch targets **≥ 48 dp** (48 CSS px) on field screens | CI: component tests + axe |
+| Outdoor | A **high-contrast** theme (design tokens) for field screens; WCAG 2.1 AA everywhere | CI: axe contrast checks |
+
+Automated performance tests **warn in CI now** and become a **hard gate before Pilot-0** (§7).
+The reference device and network profile are confirmed before the gate flips (TD-194).
+
 ---
 
 ## 7. Task tracker & phasing
@@ -172,6 +327,10 @@ Replaces the duplicated designers spread across `forms`, `asset_management`
     formal ADR.
   - **M2 — MVP cut line:** Phase 0 + 1 + 2 + **Documents-Lite** (VFS tree, presigned uploads,
     batch inspection PDF export) + **P6 schedule round-trip** (~85–95 tasks).
+  - **Pilot-0 (user, 2026-11-13; TD-173)** — the **first pilot milestone**, ahead of M2: 8
+    inspectors, one project, Android only. Core inspection, offline, signing, review/return and
+    the inspection PDF; no P6 import/export, no Phase 2. M2 stays the next milestone after it.
+    Scope and gate: `docs/DEVELOPMENT-PLAN.md` §Milestones.
 - **Re-ordering:** `resource_summary` → **Phase 4** (depends on look-ahead + weekly
   commitments); **`procurement` pulled to the front of Phase 3** (before `site_inventory` and
   `site_logistics`); overloaded `T-0124` **split into 2–3** tasks (completion gates vs P6
