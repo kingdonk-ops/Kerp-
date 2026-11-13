@@ -23,7 +23,7 @@
 |---|---|---|---|
 | [TD-021](../tracker/todo/TD-021.md) | Outbox envelope: align frontend db field created_at_utc with master spec 1.3 timestamp_utc (decide in T-0126/T-0127 before the table is used; Dexie still at version 1) | T-0002 | reviewer |
 | [TD-044](../tracker/todo/TD-044.md) | Spec the PWA-first client strategy: web-only PWA apps (supervisor, storeman, field report) vs the Android/tablet app, and re-check the frontend tech stack | T-0127 | user |
-| [TD-045](../tracker/todo/TD-045.md) | Spec the Request for Inspection (inspection notification / booking) record; RFI means Request for Information | T-0115, T-0111 | user |
+| [TD-045](../tracker/todo/TD-045.md) | Spec the Request for Inspection (RFI) record; Request for Information is a TQ (Technical Query) | T-0115, T-0111 | user |
 | [TD-046](../tracker/todo/TD-046.md) | Admin side: where security and observability settings (headers/CSP, HSTS, API docs exposure, log retention) are shown or configured | T-0021 | user |
 | [TD-062](../tracker/todo/TD-062.md) | Form template check layouts (list / form / grid) and check-level settings are not specified | T-0110 | planner |
 | [TD-063](../tracker/todo/TD-063.md) | Hold / witness / review points should be first-class signed ITP steps, not signature cells | T-0113, T-0114, T-0119 | planner |
