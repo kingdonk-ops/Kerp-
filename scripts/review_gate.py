@@ -2,7 +2,8 @@
 """Review gate — a PR into `dev` may merge only when an allowed reviewer has
 posted an approval marker for *this* change.
 
-Reviewer agents post a PR review/comment containing exactly:
+Reviewer agents post a PR *review* (`pulls/<n>/reviews`, `event=COMMENT` on own PRs)
+containing exactly:
 
     KERP-REVIEW: APPROVED patch-id=<id>
     KERP-REVIEW: CHANGES_REQUESTED patch-id=<id>
@@ -13,6 +14,14 @@ docs/TODO.md, docs/pr-suggestions.md — all generated bookkeeping). That makes 
   * stable across rebases and tracker re-renders (coordinator bookkeeping),
   * invalidated by any real code change after review.
 If the PR changes only tracker paths, the full diff is used instead.
+
+Only PR reviews count. Issue comments are ignored: posting one does not re-run this
+workflow (no `issue_comment` trigger, whose check would attach to the default branch, not
+the PR), so a marker there would leave the gate stale.
+
+The workflow runs this file from the PR's *base* checkout, inside the PR head checkout, so a
+PR's edits to this script do not apply to its own run. (GitHub still runs the PR's version of
+the workflow file itself; closing that needs a GitHub-level control, TD-223.)
 
 Compute it locally with:  python scripts/review_gate.py --patch-id [base]
 
@@ -51,7 +60,7 @@ class Verdict:
 
 
 def parse_markers(entries: list[dict[str, str]], allowed: set[str]) -> list[Verdict]:
-    """entries: [{author, body, at}] gathered from PR reviews + issue comments."""
+    """entries: [{author, body, at}] gathered from the PR's reviews."""
     out: list[Verdict] = []
     for e in entries:
         author = (e.get("author") or "").lower()
@@ -109,6 +118,14 @@ def _get(url: str, token: str) -> list[dict]:
     return items
 
 
+def review_entries(api: str, pr: str, token: str, get=_get) -> list[dict[str, str]]:
+    """``{author, body, at}`` of every review on the PR (issue comments are not read)."""
+    return [
+        {"author": r["user"]["login"], "body": r.get("body") or "", "at": r.get("submitted_at") or ""}
+        for r in get(f"{api}/pulls/{pr}/reviews?per_page=100", token)
+    ]
+
+
 def main(argv: list[str]) -> int:
     if argv[:1] == ["--patch-id"]:
         print(compute_patch_id(argv[1] if len(argv) > 1 else "origin/dev"))
@@ -118,14 +135,7 @@ def main(argv: list[str]) -> int:
     base, head = env.get("BASE_REF", "dev"), env.get("HEAD_SHA", "HEAD")
     allowed = {a.strip().lower() for a in env.get("ALLOWED_REVIEWERS", "").split(",") if a.strip()}
     api = f"https://api.github.com/repos/{repo}"
-    entries = [
-        {"author": r["user"]["login"], "body": r.get("body") or "", "at": r.get("submitted_at") or ""}
-        for r in _get(f"{api}/pulls/{pr}/reviews?per_page=100", token)
-    ]
-    entries += [
-        {"author": c["user"]["login"], "body": c.get("body") or "", "at": c.get("created_at") or ""}
-        for c in _get(f"{api}/issues/{pr}/comments?per_page=100", token)
-    ]
+    entries = review_entries(api, pr, token)
     patch_id = compute_patch_id(f"origin/{base}", head)
     ok, why = decide(parse_markers(entries, allowed), patch_id)
     print(f"patch-id={patch_id}")
