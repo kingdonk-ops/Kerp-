@@ -9,11 +9,17 @@ manifest's ``default_enabled``; always on for a module that cannot be disabled) 
 every module it depends on is enabled. ``set_enabled`` keeps settings consistent: it will
 not enable a module whose dependencies are off, nor disable one that an enabled module
 depends on.
+
+Modules that must act when a module is switched on for a project (the validation module
+copies the module's default rule sets into the project, ADR 0004 §2.3) register an
+**enable listener**; ``set_enabled`` calls it, in the same session and transaction, with the
+modules that the change made effectively enabled. Core code never imports a module.
 """
 
 from __future__ import annotations
 
 import uuid
+from collections.abc import Callable
 from typing import Final
 
 from sqlalchemy import select
@@ -27,6 +33,21 @@ from app.core.tenancy.rls import session_tenancy
 
 # Audit chain (per project) recording every change of a module setting.
 AUDIT_CHAIN: Final = "project_modules"
+
+# ``listener(session, newly_enabled_module_names)``; the session is bound to the project.
+EnableListener = Callable[[Session, frozenset[str]], None]
+_ENABLE_LISTENERS: list[EnableListener] = []
+
+
+def add_enable_listener(listener: EnableListener) -> None:
+    """Call ``listener`` whenever ``set_enabled`` switches modules on (idempotent)."""
+    if listener not in _ENABLE_LISTENERS:
+        _ENABLE_LISTENERS.append(listener)
+
+
+def default_states(registry: ModuleRegistry) -> dict[str, bool]:
+    """Whether each module is enabled for a project that never toggled any (registry order)."""
+    return _effective(registry, {})
 
 
 class UnknownModuleError(LookupError):
@@ -134,4 +155,9 @@ def set_enabled(
         session, AUDIT_CHAIN, {"module": name, "enabled": enabled}, source=source, actor_id=actor
     )
     session.flush()
-    return _effective(registry, stored)
+    new_states = _effective(registry, stored)
+    switched_on = frozenset(m for m, on in new_states.items() if on and not states[m])
+    if switched_on:
+        for listener in list(_ENABLE_LISTENERS):
+            listener(session, switched_on)
+    return new_states

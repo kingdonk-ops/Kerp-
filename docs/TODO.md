@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 157 · **Closed:** 104
+**Open:** 161 · **Closed:** 104
 
 ## decision (5)
 
@@ -15,7 +15,7 @@
 | [TD-224](../tracker/todo/TD-224.md) | Magic-link request lockout is still per tenant+email: anyone can keep a known field worker from getting a link (4/hour, then doubling delay); decide per-client keying vs mailbox-flood protection | T-0068 | reviewer |
 | [TD-261](../tracker/todo/TD-261.md) | Client Portal Users (PER-15, phase-7 portal) and magic links: confirm PER-15 signs in by password/SSO only after the PER-14-only magic-link decision | T-0057 | planner |
 
-## spec-gap (35)
+## spec-gap (36)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -54,6 +54,7 @@
 | [TD-220](../tracker/todo/TD-220.md) | Client QR co-sign (mode ii): judge 'key active at occurred_at' by the tablet's reconstructed scan time, not the client device clock | T-0163 | reviewer |
 | [TD-221](../tracker/todo/TD-221.md) | Client wet signature (mode iii): outcome when the client rejects after the inspection is already approved (INSPECTED_PASSED/INSPECTED_FAILED) or LOCKED_FOR_TURNOVER | T-0174 | reviewer |
 | [TD-249](../tracker/todo/TD-249.md) | GET /auth/me (and the JWT tid claim) still expose the tenant id to the SPA: confirm diff 4.1 'never see the tenant' allows it or drop tenant_id from MeResponse | T-0037 | implementer |
+| [TD-268](../tracker/todo/TD-268.md) | Confirm T-0034 rule-store interpretations: tenant persona = held on any project (no tenant roles yet), reset allowed on locked rules, projects cannot lock own rules, tenant edits a locked rule only after unlock | T-0034 | implementer |
 
 ## missed (4)
 
@@ -64,7 +65,7 @@
 | [TD-131](../tracker/todo/TD-131.md) | Add a root .env.example for the dev stack (the implementer agent's permission rules block writing .env* files) | T-0003 | implementer |
 | [TD-208](../tracker/todo/TD-208.md) | Uploads infra: provision the kerp-vault bucket (CORS for browser PUT/GET, lifecycle on staging/), wire KERP_S3_* in compose, add MinIO to CI for the gated round-trip test | T-0016 | implementer |
 
-## deferred (31)
+## deferred (33)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -99,8 +100,10 @@
 | [TD-255](../tracker/todo/TD-255.md) | Dynamic Form Renderer: render section titles through localise() once the template schema has sections (T-0110) | T-0047 | implementer |
 | [TD-258](../tracker/todo/TD-258.md) | Server-side user preferences: the outdoor theme choice is remembered per user in this browser's localStorage only (kerp.theme.<userId>); roaming to another device needs a preferences API | T-0046 | implementer |
 | [TD-265](../tracker/todo/TD-265.md) | T-0014 user create/update schemas must reject is_internal, entra_oid and entra_tid with 422 and the admin user list must show is_internal read-only (T-0049 criterion; those schemas do not exist yet) | T-0049 | implementer |
+| [TD-266](../tracker/todo/TD-266.md) | Call validation seed_tenant at tenant creation and sync_system_defaults on deploy: no tenant registry or tenant-creation flow exists yet, so system default seed files are not loaded automatically | T-0034 | implementer |
+| [TD-269](../tracker/todo/TD-269.md) | Store a project's chosen client pack so rule sets of a module enabled later are copied from that pack (T-0034 copies only base sets on module enable) | T-0108 | implementer |
 
-## later (63)
+## later (64)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -167,6 +170,7 @@
 | [TD-256](../tracker/todo/TD-256.md) | T-0014 membership admin API: accept PER-16 in its persona schema/enum and derive the PER-09 sod_warning hold-authority set from access.PERSONAS (A capability), so PER-16 never triggers it | T-0076 | implementer |
 | [TD-259](../tracker/todo/TD-259.md) | Outdoor theme default: switch the outdoor high-contrast theme on automatically when the OS asks for more contrast (prefers-contrast: more / forced-colors) and the user has no stored choice | T-0046 | implementer |
 | [TD-263](../tracker/todo/TD-263.md) | Harden .claude/settings.json and scripts/gemini_review.sh against agent edits via Bash (CODEOWNERS, CI check or PreToolUse hook) | — | planner |
+| [TD-267](../tracker/todo/TD-267.md) | Frontend Project Settings -> Rules screen (ADR 0004 §7) on the T-0034 Rules API: tabs by kind/module, same component for the tenant default layer, unlock request/approve | T-0034 | implementer |
 
 ## bug (2)
 

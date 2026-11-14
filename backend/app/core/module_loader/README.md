@@ -60,6 +60,13 @@ to change first), and to touch a module that cannot be disabled. Repeating the c
 setting writes nothing; every change is appended to the project's `project_modules` audit
 chain (T-0006).
 
+**Enable listeners.** A module that must act when another is switched on for a project
+registers `add_enable_listener(listener)`; `set_enabled` calls `listener(session, names)`
+in the same session and transaction with the modules the change made effectively enabled
+(a dependant that follows its dependency on is included). The validation module uses it to
+copy the module's default rule sets into the project (ADR 0004 §2.3). `default_states()`
+gives the states of a project that never toggled anything.
+
 The tenant and project come from the session's tenancy binding (T-0007), never from
 arguments or the URL. `project_module_setting` has `project_id NOT NULL` and is under
 project RLS, so a project can only see and change its own settings.

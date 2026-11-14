@@ -19,6 +19,7 @@ dependencies = [
     "pyjwt[crypto]>=2.10",  # RS256/EdDSA access + refresh tokens (app/core/auth)
     "pydantic-settings>=2.3",
     "psycopg[binary]>=3.2",
+    "pyyaml>=6.0",  # system default rule-set seed files (app/modules/validation, ADR 0004 §2.1)
     "redis>=5.2",  # jti / session revocation store (app/core/auth); SAQ caps it below 8
     "saq[redis]>=0.26,<0.27",  # job queue over Redis: interactive + batch queues (app/modules/jobs)
     "sqlalchemy>=2.0.36",
@@ -36,6 +37,7 @@ dev = [
     "pytest>=8.2",
     "pytest-cov>=5.0",
     "ruff>=0.6",
+    "types-pyyaml>=6.0",  # mypy --strict types for pyyaml (rule-set seed files)
 ]
 
 [tool.hatch.build.targets.wheel]

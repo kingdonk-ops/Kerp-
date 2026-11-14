@@ -1,4 +1,4 @@
-# validation — verification engine and the single rule store (T-0018)
+# validation — verification engine and the single rule store (T-0018, T-0034)
 
 Verification is configuration (CLAUDE.md §6): every verifiable transition calls
 `run_checks(context, rule_set)`, and the rules it runs are **data** in one rule store shared by
@@ -8,11 +8,12 @@ Built fresh; Inspection-ERP's `Finding(key, severity, message)` shape was a refe
 
 | File | What |
 |---|---|
-| `models.py` | `oe_validation_rule_set`, `oe_validation_rule`, `oe_validation_finding` (`BaseRecordMixin`, RLS, migration `0005`) |
+| `models.py` | `oe_validation_rule_set`, `oe_validation_rule`, `oe_validation_finding` (migration `0005`), `oe_validation_unlock_request` (migration `0013`); all `BaseRecordMixin` + RLS |
 | `compiler.py` | compile-on-save: kind/engine rules, per-kind CEL context schema, RE2 regex compile |
-| `service.py` | `create_rule_set`, `save_rule`, `delete_rule`, `resolve_rule_set`, `run_checks` |
-| `schemas.py` | `RuleSpec` (input), `CheckResult` / `CheckFinding` (output) |
-| `router.py` | no routes yet (the Rules settings API is T-0034) |
+| `defaults.py` | system default seed files `app/modules/<m>/rules/defaults/*.yaml`: `load_defaults()` |
+| `service.py` | rule store (`create_rule_set`, `save_rule`, `set_rule_enabled`, `delete_rule`, `reset_rule`, `reset_rule_set`), layers (`sync_system_layer`, `sync_system_defaults`, `seed_tenant`, `seed_project`, `copy_module_defaults`), unlock (`request_unlock`, `approve_unlock`, `reject_unlock`), `resolve_rule_set`, `run_checks` |
+| `schemas.py` | `RuleSpec` (input), `CheckResult` / `CheckFinding` (output), the Rules API shapes |
+| `router.py` | Rules settings API (ADR 0004 §7), see below |
 
 ## Calling a gate
 
@@ -94,16 +95,98 @@ confirmation (spec-gap TD-139).
 
 ### Versions and audit (ADR 0004 §3)
 
-Each rule has a `version` (1 on add, +1 on every edit or delete) and each set a `version` (+1
-on every change to one of its rules). Every change is appended to the set's audit chain
-`validation.rule_set:<set id>` (T-0006) with the full rule snapshot (`params` as canonical
-JSON text, because the ledger refuses floats). Saving identical values writes nothing.
-Deleting is a soft delete that keeps the `rule_key`; a deleted key cannot be saved again
-(reset is T-0034). Changes with `source="ai"` are refused until a human-confirmation flow
-exists (CLAUDE.md §6).
+Each rule has a `version` (1 on add, +1 on every edit, enable/disable, delete, reset or
+unlock) and each set a `version` (+1 on every change to one of its rules). Every change is
+appended to the set's audit chain `validation.rule_set:<set id>` (T-0006) with the full rule
+snapshot (`params` as canonical JSON text, because the ledger refuses floats). Saving
+identical values writes nothing. Deleting is a soft delete that keeps the `rule_key`; a
+deleted key cannot be saved again, only **reset** to its default. Changes with
+`source="ai"` are refused until a human-confirmation flow exists (CLAUDE.md §6).
+
+A rule has an optional `label` (shown in the Rules screen). `origin_rule_key` +
+`origin_version` name the default a rule was copied from; they are set by copies and resets
+only (an added rule has `origin_rule_key` NULL; an edit keeps the origin).
+
+## Layers: system → tenant → project, copied (ADR 0004 §2, T-0034)
+
+1. **System defaults** are seed files shipped with each module,
+   `app/modules/<module>/rules/defaults/*.yaml`, one rule set per file (format in
+   `defaults.py`; `key`, `kind`, `version`, optional `source_pack`, `rules`). Every rule is
+   compiled when the files load; a broken file or a key used by two modules is a
+   `DefaultsError` naming the file. Bump `version` on every change.
+2. The `system` layer is stored as **per-tenant copies** (`tenant_id` = the tenant,
+   `project_id` NULL, `layer = system`, `module`, `seed_version`). There are no tenant-less
+   rows, so the T-0007 tenant RLS policies apply unchanged: tenant B never reads tenant A's
+   system rows. `sync_system_layer(session)` writes the seeds into the session's tenant;
+   reloading the same `version` writes nothing, a newer version rewrites the set (changed,
+   added, removed and restored rules, one `system_defaults_upgraded` ledger entry), an older
+   one is ignored. `sync_system_defaults(database, tenant_ids)` does it for every tenant, one
+   unit of work each.
+3. **Tenant creation** calls `seed_tenant(session)`: the system layer, then a copy of every
+   system set into the `tenant` layer (idempotent).
+4. **Project creation** copies the tenant layer into the new project's `project` layer
+   (`seed_project`, called through the projects module's created listener in the creating
+   transaction): the sets of modules enabled by default and sets owned by no module; with
+   a chosen client pack (`source_pack`), that pack's sets too, never another pack's.
+   **Enabling a module** on a project for the first time copies that module's tenant sets
+   (`copy_module_defaults`, through the module loader's enable listener). An existing copy
+   is never replaced: a later change to a default does not reach a running project (the
+   upgrade offer is T-0036).
+
+A copied rule keeps `locked`, `label`, `enabled` and everything else of its source and names
+it in `origin_rule_key`/`origin_version`.
+
+## What a project (or the tenant layer) can do (ADR 0004 §3)
+
+Edit (expression, params, severity, label, sort order, action), disable/enable, soft-delete,
+add (`origin_rule_key` NULL), and **reset** one rule or the whole set to the **current**
+default of the parent layer (project → tenant, tenant → system). Reset brings a deleted
+default back and adds a default the set lacks; resetting the whole set also soft-deletes
+the rules the layer added. A rule the layer added itself has no default to reset to.
+
+## Locked rules and the two-person unlock (ADR 0004 §5, Amendment B, TD-116)
+
+A `locked` rule cannot be changed, disabled or deleted on the project layer
+(`RuleLockedError`, API 409); the project can still **add** rules to the same set, but not
+locked ones (only defaults are locked). On the tenant layer a locked rule is changed only
+after an unlock: `request_unlock` (PER-13, with an ADR reference, bound to the rule
+version) and `approve_unlock` by a **second, different** user (PER-13 or PER-01 until
+`approval_routes`, E-06-07). The requester can never approve their own request
+(`UnlockPermissionError`, and a CHECK constraint on `oe_validation_unlock_request`). The
+approval records the ADR reference on the rule (`unlock_adr_reference`). Request, approval,
+rejection or cancellation and the unlock itself are each a ledger entry. A rule changed after
+the request cannot be unlocked by it. Unlocking the tenant default does not touch project
+copies; a project picks the unlocked default up by resetting the rule. Resetting never
+loosens beyond the default, so it is allowed on locked rules.
+
+## Rules settings API (`/api/v1/validation`, ADR 0004 §7)
+
+| Route | What |
+|---|---|
+| `GET /rule-sets` | tenant default sets with their rules (deleted rules included) |
+| `PUT /rule-sets/{set}/rules/{key}` | add or edit (`RuleInput`) |
+| `POST /rule-sets/{set}/rules/{key}/disable`, `/enable` | disable / enable |
+| `DELETE /rule-sets/{set}/rules/{key}` | soft delete |
+| `POST /rule-sets/{set}/rules/{key}/reset`, `POST /rule-sets/{set}/reset` | reset one / all |
+| `POST /rule-sets/{set}/rules/{key}/unlock-requests` | request an unlock (`adr_reference`, `reason`) |
+| `GET /unlock-requests?status=`, `POST /unlock-requests/{id}/approve`, `/reject` | decide |
+| `GET /projects/{p}/rule-sets` and `/projects/{p}/rule-sets/{set}/...` | the same rule operations on the project copy |
+
+| Layer | `check` sets | other kinds |
+|---|---|---|
+| Tenant defaults (read: PER-13 or PER-01) | PER-13 | PER-01 |
+| Project set (read: any member) | PER-06 | PER-09 |
+| Unlock | PER-13 requests; another PER-13 or PER-01 approves or rejects (the requester may withdraw) | |
+
+So PER-09 can never change, disable, delete or reset a `check` rule (SoD). Everyone else is
+403; a non-member of the project, or a set outside the path's layer/project, is 404. Locked
+→ 409, compile errors → 422. Interim until T-0014's tenant roles: a "tenant" persona is one
+the caller holds on any project of the tenant (as for project creation, TD-184). The
+request binds no project yet (TD-122): project routes bind the path's project.
 
 ## Not here
 
-Layers, copy-on-create, reset, locked rules and unlock: **T-0034** (`locked` and
-`origin_*` are stored but not enforced yet). Upgrade offers, drift report, "Try it":
-**T-0036**. Per-record override of a blocked check (Amendment A): **T-0035**.
+Upgrade offers, drift report, "Try it": **T-0036**. Per-record override of a blocked check
+(Amendment A): **T-0035**. Storing the project's chosen client pack (so a module enabled
+later copies that pack's sets): **T-0108**. The Rules settings screen (frontend): see the
+TODO raised by T-0034.
