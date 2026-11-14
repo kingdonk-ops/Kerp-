@@ -48,8 +48,9 @@ class User(Base, BaseRecordMixin):
 
 
 MEMBERSHIP_TABLE: Final = "auth_project_membership"
-# PER-01 ... PER-15 (edge spec §5.2). The capability matrix lives in ``access.py``.
-PERSONA_CODES: Final = tuple(f"PER-{n:02d}" for n in range(1, 16))
+# PER-01 ... PER-16 (edge spec §5.2; PER-16 Project Viewer since migration 0012, T-0076).
+# The capability matrix lives in ``access.py``.
+PERSONA_CODES: Final = tuple(f"PER-{n:02d}" for n in range(1, 17))
 SITE_INSPECTOR: Final = "PER-07"
 
 

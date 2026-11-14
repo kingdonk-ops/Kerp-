@@ -1,4 +1,4 @@
-"""Three-tier RBAC/ABAC (T-0010): capability tiers x 15 personas x project/site scope.
+"""Three-tier RBAC/ABAC (T-0010): capability tiers x 16 personas x project/site scope.
 
 Edge spec §5 (persona matrix, capability tiers, separation of duties), diff §4 (Asset-Site
 scoping), edge spec §6 amendments (explicit multi-project read scope, TD-053). Guard shape
@@ -7,7 +7,8 @@ endpoints only declare what they need.
 
 * **Tier** (edge spec §5.1): a persona's capabilities are V/C/E from its default tier,
   plus ``A`` (Approver / Gate Authority) where the matrix gives hold or commercial
-  authority, and ``S`` (Signatory) for the client representative.
+  authority, and ``S`` (Signatory) for the client representative. The Project Viewer
+  (PER-16, Viewer tier, T-0076) has ``V`` only.
 * **Scope**: ``portfolio`` personas (PER-01/10/11/12/13) read every project they are a
   member of in one session (``app.allowed_project_ids``); every other persona reads only
   the bound project. A Site Inspector (PER-07) sees only their site's rows.
@@ -54,6 +55,7 @@ class Tier(StrEnum):
     EDITOR = "editor"
     ADMIN = "admin"
     PORTAL = "portal"
+    VIEWER = "viewer"  # PER-16 Project Viewer (edge spec §5.2 amendment, TD-251)
 
 
 class Scope(StrEnum):
@@ -76,6 +78,7 @@ TIER_CAPABILITIES: Final[Mapping[Tier, frozenset[Capability]]] = {
     Tier.EDITOR: frozenset({_V, _C, _E}),
     Tier.ADMIN: frozenset({_V, _C, _E, Capability.ADMINISTER}),
     Tier.PORTAL: frozenset({_V}),
+    Tier.VIEWER: frozenset({_V}),
 }
 
 
@@ -95,6 +98,7 @@ class Persona(StrEnum):
     QUALITY_DIRECTOR = "PER-13"
     FIELD_WORKER = "PER-14"
     CLIENT_REPRESENTATIVE = "PER-15"
+    PROJECT_VIEWER = "PER-16"
 
 
 @dataclass(frozen=True, slots=True)
@@ -135,6 +139,9 @@ PERSONAS: Final[Mapping[Persona, PersonaSpec]] = {
     P.QUALITY_DIRECTOR: PersonaSpec(Tier.MANAGER, Scope.PORTFOLIO),
     P.FIELD_WORKER: PersonaSpec(Tier.EDITOR, Scope.SINGLE),
     P.CLIENT_REPRESENTATIVE: PersonaSpec(Tier.PORTAL, Scope.SUBTREE, signatory=True),
+    # Read-only across the project's modules; no hold, approval or signing authority, so no
+    # separation-of-duties rule applies to it.
+    P.PROJECT_VIEWER: PersonaSpec(Tier.VIEWER, Scope.SINGLE),
 }
 
 # Separation of duties (edge spec §5.2 PER-09 "None (SoD Block)"): these personas may never

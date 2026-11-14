@@ -17,7 +17,7 @@ rewritten (HS256 → RS256/EdDSA + JWKS + `jti` revocation in Redis).
 | `service.py` | `AuthService` login / refresh / logout / magic link / PIN unlock; `create_user`, `set_password` |
 | `field.py` | Magic-link tokens + delivery seam, PIN rules (T-0009) |
 | `lockout.py` | `ProgressiveLockout` + policies, Redis-backed (T-0009) |
-| `models.py` | `auth_user` table (tenant-level rows, RLS) — migration `0003`; `auth_project_membership` (T-0010) — migration `0006` |
+| `models.py` | `auth_user` table (tenant-level rows, RLS) — migration `0003`; `auth_project_membership` (T-0010) — migration `0006`, persona CHECK widened for PER-16 in `0012` (T-0076) |
 | `access.py` | Persona matrix, capability tiers, SoD, scope resolution, `require_capability` / `require_hold_release` guards (T-0010) |
 | `router.py`, `schemas.py` | HTTP endpoints below |
 
@@ -143,13 +143,38 @@ memberships (below). The write project is not bound from the request yet (TD-122
 ## Personas, tiers and scope (T-0010)
 
 Edge spec §5. A membership (`auth_project_membership`, a tenant-level row) gives a user one
-persona (`PER-01`…`PER-15`) on one project (`member_project_id`); a Site Inspector (`PER-07`)
+persona (`PER-01`…`PER-16`) on one project (`member_project_id`); a Site Inspector (`PER-07`)
 membership also names its `site_node_id`. Revoking soft-deletes the row. `access.py` holds the
 matrix:
 
+| Persona | Role | Tier | Scope | Capabilities | Hold release |
+|---|---|---|---|---|---|
+| PER-01 | Operations Management | Manager | portfolio | V C E | — |
+| PER-02 | Project Manager | Manager | assigned | V C E A (commercial) | — |
+| PER-03 | Site Superintendent | Manager | single | V C E | — |
+| PER-04 | Trade Supervisor | Editor | area (TD-149) | V C E | — |
+| PER-05 | Area Planner | Editor | single | V C E | — |
+| PER-06 | QA/QC Lead | Manager | single | V C E A | quality |
+| PER-07 | Site Inspector | Editor | site | V C E A | quality, own site only |
+| PER-08 | Storekeeper / Yard Lead | Editor | single | V C E | — |
+| PER-09 | Project Administrator | Admin | single | V C E admin | none (SoD block) |
+| PER-10 | Procurement Specialist | Editor | portfolio | V C E | — |
+| PER-11 | HSE Manager | Manager | portfolio | V C E A | safety |
+| PER-12 | Human Resources Master | Editor | portfolio | V C E | — |
+| PER-13 | Quality Director | Manager | portfolio | V C E | — |
+| PER-14 | Field Worker | Editor | single | V C E | — |
+| PER-15 | Client Representative | Portal | subtree (TD-149) | V S | — |
+| PER-16 | Project Viewer | Viewer | single | V | — |
+
 - **Capabilities**: V/C/E from the default tier (Manager, Editor, Admin = V/C/E, Admin adds
-  `administer`; Portal = V), `A` where the matrix gives hold or commercial (A) authority
-  (PER-02, 06, 07, 11), `S` for the client representative (PER-15). Interpretation: TD-151.
+  `administer`; Portal = V; Viewer = V), `A` where the matrix gives hold or commercial (A)
+  authority (PER-02, 06, 07, 11), `S` for the client representative (PER-15).
+  Interpretation: TD-151.
+- **PER-16 Project Viewer** (T-0076, TD-251, ADR 0008): read-only across the project's
+  modules. Every `require_capability` other than `V` and every hold guard answer `403`; it has
+  no SoD implications and is not a portfolio persona. Migration `0012` widens the persona
+  CHECK; its downgrade refuses while an active PER-16 membership exists and purges revoked
+  (soft-deleted) PER-16 rows.
 - **Scope**: portfolio personas (PER-01/10/11/12/13) put their projects in the session's
   allowed list (multi-project reads); every other persona reads only the bound project.
   PER-07 is limited to its sites (`SiteScopedMixin`). Area (PER-04) and subtree (PER-15)

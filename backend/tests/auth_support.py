@@ -4,6 +4,7 @@ Keys are generated at test time; nothing secret is stored in the repository.
 """
 
 import uuid
+from datetime import UTC, datetime
 from functools import cache
 from typing import Any
 
@@ -14,6 +15,7 @@ from fastapi.testclient import TestClient
 
 from app.core.auth.field import MagicLink, MagicLinkSender
 from app.core.auth.keys import KeySet, generate_signing_key
+from app.core.auth.models import ProjectMembership
 from app.core.auth.passwords import hash_password
 from app.core.auth.revocation import RedisRevocationStore
 from app.core.auth.router import REFRESH_COOKIE
@@ -93,6 +95,14 @@ def seed_user(
         for name, value in fields.items():
             setattr(user, name, value)
         return user.id
+
+
+def revoke_project_viewers(db: Database, tenant_id: uuid.UUID = T1) -> None:
+    """Soft-delete the tenant's PER-16 memberships: the ``0012`` downgrade refuses while any
+    is active, so tests that grant PER-16 call this before migrating down to base."""
+    with db.unit_of_work(TenancyContext(tenant_id=tenant_id)) as session:
+        for row in session.query(ProjectMembership).filter_by(persona="PER-16"):
+            row.deleted_at = datetime.now(UTC)
 
 
 def cookie_headers(refresh_token: str, origin: str | None = ORIGIN) -> dict[str, str]:
