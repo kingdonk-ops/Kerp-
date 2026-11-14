@@ -34,7 +34,7 @@ pluggable parser adapter). Money is a **read-only external mirror** only.
 
 | Phase | Scope | Depth | Exit criterion |
 |---|---|---|---|
-| **0** Platform substrate & security core | scaffold, DB + BaseRecordMixin, **project-scoped RLS** (+4 bypass tests), **RS256/EdDSA JWT + JWKS**, field-worker magic-link+PIN, 15-persona RBAC, module loader, **SAQ** jobs, presigned uploads, **CEL runtime substrate**, `run_checks` shell, hash-chain audit, frontend shell (8-group IA) + reusable shells; access model (System admin → Project Admins, lobby, project picker), 12 h sessions, hybrid PIN, device registry, deployment settings (2026-11-13) | **56 tasks** | tenant/project created, user authed & scoped, module toggled, rule set run — CI green |
+| **0** Platform substrate & security core | scaffold, DB + BaseRecordMixin, **project-scoped RLS** (+4 bypass tests), **RS256/EdDSA JWT + JWKS**, field-worker magic-link+PIN, 15-persona RBAC, module loader, **SAQ** jobs, presigned uploads, **CEL runtime substrate**, `run_checks` shell, hash-chain audit, frontend shell (8-group IA) + reusable shells; access model (System admin → Project Admins, lobby, project picker), 12 h sessions, hybrid PIN, device registry, deployment settings (2026-11-13); login & lobby, invites, Entra SSO, outbound e-mail, password reset (2026-11-14) | **78 tasks** | tenant/project created, user authed & scoped, module toggled, rule set run — CI green |
 | **1** Asset backbone, one-engine & quality core | **ltree** hierarchy, **JSONB** field registry (EAV deleted), Items + CML stubs, P6 import/export (idempotent + unmatched-row linking), **one-engine** forms+CEL, **unified inspection record** + **eligibility**, **equipment calibration** register + hard gate, qms/construction_control/inspection_requests, NCR/punch, signing, completion-gate + P6 rule sets, offline sync core (Dexie), UI, **M1 freeze gate (T-0131)**; Capacitor Android build + SQLCipher store, FCM push, Pilot-0 gate (2026-11-13); Pilot-0 slice: sync scope + download, review/return, client co-sign, capture screen, scan-to-locate, photo annotation, video/audio/barcode fields + reference images, inspection PDF, dashboard tiles | **75 tasks** | P6→hierarchy; inspections gated by CEL; expired tool blocked; completion blocked by open NCR; backbone contract frozen |
 | **2** Welding quality & traceability | WPS, welder quals/continuity, welds as Items, NDE, heat/MTR trace, R-WPS rules | **9 tasks** | a weld can't be accepted outside qualification/NDE rules |
 | **3** Logistics & supply chain | **contacts**, **procurement (front)**, materials/MRIR+heat, inventory, **cutting (FFD + rectpack)**, Gate Delivery edge screen, equipment/fleet | 7 epics | delivery → gate receipt + OS&D; cutting plan → inventory |
@@ -60,16 +60,26 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
   - **Phase 0** as planned, including the 2026-11-13 additions: T-0037 (12 h sessions, hidden
     tenant), T-0038 (hybrid PIN), T-0039–T-0042 (Project Admins, lobby, access requests,
     picker), T-0049 (internal staff flag), T-0050/T-0051 (access-request lifecycle and admin
-    inbox), T-0054/T-0055 (Entra ID SSO, identity only; 2026-11-14), T-0043 + T-0048 (device registry, revoke/wipe), T-0044 (deployment settings,
+    inbox), T-0052/T-0053 (project invites; in the gate since 2026-11-14), T-0054/T-0055 (Entra ID SSO, identity only; 2026-11-14), T-0057 (magic links for Field Workers only; product owner confirmed in the gate, 2026-11-14), T-0058 (outbound e-mail, SES), T-0059 (invite e-mail + first-password set), T-0077 (password policy + self-service reset), T-0078 (password screens) (all 2026-11-14), T-0043 + T-0048 (device registry, revoke/wipe), T-0044 (deployment settings,
     offline window), T-0045–T-0047 (NFR harness, glove/high-contrast tokens, localised template
     strings); plus the AWS production deploy in `ap-southeast-2` (TD-004, TD-171).
   - **Daily re-login dependency:** sessions end 12 h after sign-in, so the pilot inspectors
     sign in every day. **Entra ID SSO gates Pilot-0** (product owner, 2026-11-14; diff §4.5;
-    T-0054, T-0055, Android sign-in in T-0143; checked by T-0146); magic-link e-mail delivery
-    (TD-084) is optional for the pilot. Offline, the device PIN keeps working for the offline
-    grace (default 24 h after the session ended, diff §4.2; TD-257).
-  - **Not in the gate (2026-11-14):** project invites (T-0052, T-0053) and the transactional
-    e-mails for access requests and invites (T-0056, blocked by TD-084).
+    T-0054, T-0055, Android sign-in in T-0143; checked by T-0146) for company staff. Internal
+    staff are steered to SSO (primary option on the sign-in screen) but password sign-in stays
+    allowed (product owner, 2026-11-14; diff §4.5). **External users (clients, subcontractors)
+    never use SSO:** they sign in with e-mail + password, set their first password at invite
+    acceptance and reset it by e-mail (product owner, 2026-11-14; diff §4.1, §4.2). Field
+    Workers may also use e-mailed magic links. **Outbound e-mail is a Pilot-0 dependency**
+    (diff §4.6, T-0058; TD-084 resolved).
+    Offline, the device PIN keeps working for the offline grace (default 24 h after the session
+    ended; the grace binds, the 7-day window is only an upper bound; diff §4.2; TD-257 resolved).
+  - **Invites are in the gate (product owner, 2026-11-14; TD-262 resolved):** the invite flow
+    (T-0052, T-0053), the invite e-mail and first-password set at acceptance (T-0059, T-0078)
+    and self-service password reset (T-0077, T-0078) are exercised in the pilot (T-0146
+    runbook). The copyable invite link stays as a fallback but can never set a password.
+  - **Not in the gate (2026-11-14):** the access-request decision e-mails (T-0056; the lobby
+    panel is the authoritative channel).
   - **Phase 1 subset:** T-0101, T-0103 (hierarchy + Items), T-0107 (equipment import; in T-0146's gate since PR #51 round 3), T-0110
     (field registry + CEL), T-0111 (inspection record), T-0116/T-0117 (defects, TD-167), T-0119
     (signing), T-0126/T-0127 (offline sync), T-0133 (field checkout; its P6 tests split to
@@ -144,6 +154,31 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
   (`offline_grace_hours`), T-0143 (offline grace, Android SSO), T-0146 (SSO in the gate).
   TD-043 resolved; TD-257 raised.
 
+- **2026-11-14 — Login decisions, second pass (product owner, binding):** offline grace
+  confirmed (TD-257 resolved: the 24 h grace binds edits, the 7-day window is only an upper
+  bound); invites in the Pilot-0 gate (T-0052, T-0053 added to T-0146); internal staff should
+  use Entra SSO, promoted as the default on the sign-in screen, while password sign-in stays
+  allowed (no SSO-only enforcement; diff §4.5; T-0054, T-0055, T-0143); sign-in magic links
+  limited to Field Workers, PER-14 (TD-136 resolved; diff §4.2). New: T-0057 (identity, S,
+  magic-link eligibility; in the gate). Updated: T-0052 (magic-link carry-through only for
+  PER-14 invites; depends on T-0057), T-0053, T-0146. Raised: TD-261 (PER-15 portal users and
+  magic links, planner reading applied, not blocking).
+
+- **2026-11-14 — PR #79 review round 1 and product-owner decisions (binding):** external users
+  never use Microsoft sign-in; they are invited by e-mail, create their own password at invite
+  acceptance (the `setup_token` only the invite e-mail carries is the proof; planner security
+  rule, not yet confirmed by the product owner) and use self-service password reset by e-mail;
+  local passwords follow NIST SP 800-63B rev. 4 planner defaults (min 15, not yet confirmed by
+  the product owner; blocklist, no composition rules; diff §4.2); outbound e-mail
+  (SES, diff §4.6) is a Pilot-0 dependency. T-0057 confirmed in the gate. New: T-0058 (outbound
+  e-mail, M), T-0059 (invite e-mail + first-password set, S), T-0077 (password policy + reset,
+  M), T-0078 (screens, S). T-0056 restructured to access-request decision e-mails only (outside
+  the gate). Magic-link eligibility read in core (`load_grants`) with a core extension point for
+  invites; magic-link and reset delivery off the request path (diff §4.2). Round 2: invite
+  acceptance after sign-in through a core post-authentication hook (diff §4.1); SNS bounce
+  endpoint pinned to our topic, certificate host checked, deployment tenant from settings
+  (diff §4.6). TD-262 raised and resolved; TD-084 resolved.
+
 ## Key engineering decisions (baked into the spec — see consolidation diff)
 
 | Area | Decision |
@@ -160,10 +195,10 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
 | Access (2026-11-13) | One hidden tenant per deployment; System admins appoint Project Admins (`create_projects`); creator gets PER-09; lobby + access requests; project picker; one URL; admin roles never confer hold/sign-off (diff §4.1) |
 | Teams (2026-11-13) | Tenant-level teams, managed by System admins; a team links to several projects with one role (persona) per project; effective access = individual memberships ∪ team-derived grants, stored as membership rows keyed by source type/id (diff §4.1, ADR 0008); new PER-16 Project Viewer; teams are not planner crews; saved views share to several linked teams |
 | Sessions & devices (2026-11-13) | 15 min access, 12 h refresh from sign-in (daily re-login); hybrid device PIN, offline unlock independent of the server session; offline window 7 days default, 14 max; device registry + remote revoke/wipe (diff §4.2–§4.4) |
-| Login & lobby (2026-11-14) | Access-request lifecycle (`pending/approved/rejected/withdrawn`, reason, 24 h re-request cooldown) shown in the lobby; lobby list for internal staff only (Entra sign-in or `KERP_INTERNAL_EMAIL_DOMAINS`); single-use invite tokens bound to the e-mail; offline grace 24 h after session end; Entra ID SSO identity only (OIDC + PKCE, no group mapping, no auto-create, same 12 h session) (diff §4.1, §4.2, §4.5) |
+| Login & lobby (2026-11-14) | Access-request lifecycle (`pending/approved/rejected/withdrawn`, reason, 24 h re-request cooldown) shown in the lobby; lobby list for internal staff only (Entra sign-in or `KERP_INTERNAL_EMAIL_DOMAINS`); single-use invite tokens bound to the e-mail (invites in the Pilot-0 gate); offline grace 24 h after session end binds edits, 7-day window only an upper bound (TD-257); Entra ID SSO identity only (OIDC + PKCE, no group mapping, no auto-create, same 12 h session), promoted for internal staff with password sign-in kept; magic links for Field Workers (PER-14) only (TD-136); externals never SSO: password set at invite acceptance + self-service reset (NIST 800-63B planner defaults); outbound e-mail via SES in Pilot-0 (diff §4.1, §4.2, §4.5, §4.6) |
 | Field client (2026-11-13) | Capacitor Android 11+, SQLCipher SQLite + file-system media, managed Play/MDM; one client storage contract and a client-agnostic sync contract (diff §6.2); NFR budgets warn now, hard gate before Pilot-0 (diff §6.3) |
 | Region (2026-11-13) | Per-deployment setting: AWS `ap-southeast-2` for Australian deployments (diff §4.4) |
 
 ## Open decisions (see `TODO.md`)
-TD-257 (offline grace vs offline window), TD-004 (hosting target), TD-072 (ADR 0004 rule-set defaults per project), TD-073 (handover first-shift trigger),
-TD-039 (dropped AIP-proposal extras). TD-013 (review-gate ignores tracker) is resolved by T-0029. TD-002/005/007/008/009/012 are resolved by this merge; TD-001 by ADR 0001 (`docs/decisions/`). TD-002 is carried into code by ADR 0002 (`docs/decisions/0002-port-one-engine.md`). TD-034 (remaining Inspection-ERP core packages) is resolved by ADR 0007. TD-003 (SSO vs local JWT) is resolved; the SSO spec is diff §4.5 (TD-043 resolved 2026-11-14).
+TD-261 (PER-15 portal users and magic links; planner reading applied), TD-004 (hosting target), TD-072 (ADR 0004 rule-set defaults per project), TD-073 (handover first-shift trigger),
+TD-039 (dropped AIP-proposal extras). TD-013 (review-gate ignores tracker) is resolved by T-0029. TD-002/005/007/008/009/012 are resolved by this merge; TD-001 by ADR 0001 (`docs/decisions/`). TD-002 is carried into code by ADR 0002 (`docs/decisions/0002-port-one-engine.md`). TD-034 (remaining Inspection-ERP core packages) is resolved by ADR 0007. TD-003 (SSO vs local JWT) is resolved; the SSO spec is diff §4.5 (TD-043 resolved 2026-11-14). Resolved 2026-11-14 by the product owner: TD-257 (offline grace binds; window is an upper bound), TD-136 (magic links PER-14 only, T-0057) and TD-262 (externals create their own password, reset by e-mail); TD-084 (outbound e-mail) resolved by diff §4.6.

@@ -205,9 +205,10 @@ Wins over any earlier text on tenant selection, tenant administrators and projec
   project id alone is not enough. A **new request on a project where the caller already has an
   earlier `rejected` or `withdrawn` request needs no ticket** (the earlier row proves the
   project was found legitimately; coordinator decision, PR #73 review round 2), so
-  "Request again" after the cooldown works without a fresh lookup. Code lookup is rate-limited per user and deployment-wide; per-client-IP limits follow TD-138. In addition, once outbound
-  e-mail exists (TD-084), approve and reject also send a transactional e-mail to the requester
-  (follow-up task; not a Pilot-0 dependency).
+  "Request again" after the cooldown works without a fresh lookup. Code lookup is rate-limited per user and deployment-wide; per-client-IP limits follow TD-138. In addition, approve
+  and reject also send a transactional e-mail to the requester through the outbound e-mail
+  service (§4.6; follow-up task T-0056, not a Pilot-0 dependency: the lobby panel stays the
+  authoritative channel).
 - **Invites (product owner, 2026-11-14).** A PER-09 (or a System admin) invites a person by
   e-mail to one project with persona(s) and site scope; the account is created (no credentials)
   if none exists, but **the membership is created only when the invite is accepted**. An invite
@@ -219,16 +220,42 @@ Wins over any earlier text on tenant selection, tenant administrators and projec
   - **Existing user, signed in:** opening the invite link shows a one-click **"Join project"**
     confirmation; accepting creates the membership and opens the project.
   - **Existing or brand-new user, not signed in:** the token survives the sign-in, the
-    first-time password set and the Entra ID SSO round trip (§4.5); the server grants the
+    first-password set (below), the magic link (only for invites naming PER-14, §4.2) and, for
+    company members only, the Entra ID SSO round trip (§4.5); the server grants the
     membership **immediately after authentication**, in the same request that completes it, and
-    the client opens the project. The lobby is skipped.
+    the client opens the project. The lobby is skipped. Sign-in lives in core auth, so this runs
+    through a core **post-authentication hook** (empty by default; receives the authenticated
+    user and the opaque `invite_token`, returns `joined_project_id` or `invite_error`) that the
+    admin module registers at start-up, like the magic-link eligibility hook (§4.2); core never
+    imports `app.modules` (planner rule, PR #79 review).
+  - **External invitees create their own password (product owner, 2026-11-14).** Clients,
+    subcontractors and other external users **never use Microsoft sign-in** (they are not on the
+    company domain and there is no federation with their tenants, §4.5). They are invited by
+    their e-mail address, and a brand-new account (no credentials yet) **sets its first password
+    as part of accepting the invite**, from the invite link: one request validates the invite,
+    sets the password (policy §4.2 *Local passwords*), accepts the invite (membership) and signs
+    the user in. Afterwards they sign in with e-mail + password (Field Workers may also use a
+    magic link) and use self-service password reset (§4.2). The proof is the single-use invite
+    token **as delivered to the invited mailbox**: the invite e-mail (§4.6) carries the
+    `invite_token` and a second secret, the **`setup_token`** (random, stored only as a hash,
+    single-use, same expiry as the invite, revoked with it), both in the URL fragment; the
+    first-password set needs both. The invite response shown to the inviter contains only the
+    `invite_token`, so an inviter who copies the link can never set the invitee's password
+    (**planner security rule, PR #79 review; not yet confirmed by the product owner**: the
+    inviter must not be able to take over the account). A brand-new invitee who opens a copied link is offered "Send me an e-mail to set
+    my password", which runs the self-service reset (§4.2) and then accepts the invite after
+    sign-in. Accounts that already have credentials ignore the `setup_token` and sign in as
+    usual.
   - The token is a secret in a URL: the invite link carries it in the URL **fragment**
     (`/invite#<token>`, never sent to servers or in `Referer`), the SPA sends it only in POST
     bodies (preview and accept), the invite route sets `Referrer-Policy: no-referrer`, and
     access logs and Sentry scrub `invite_token` fields (planner rule, PR #73 review).
-  - Until e-mail delivery exists (TD-084) the inviter copies the invite link from the invite
-    response and passes it on; e-mail delivery and the first-time password set through an
-    e-mailed invite are the follow-up task.
+  - **Delivery.** Creating an invite e-mails the link to the invited address (§4.6). The
+    inviter also sees the copyable link once (`invite_token` only) as a fallback, e.g. when a
+    mail bounced.
+  - **Pilot-0 (product owner, 2026-11-14; TD-262 resolved):** invites, the invite e-mail, the
+    first-password set at acceptance and self-service password reset are part of the Pilot-0
+    gate (T-0146); outbound e-mail (§4.6) is therefore a Pilot-0 dependency.
   - **Team links need no user action.** A System admin linking a team to a project (or adding a
     user to a linked team) grants access directly (ADR 0008); there is no invite or click.
 - **Internal staff (product owner, 2026-11-14).** Each user account carries a derived
@@ -270,11 +297,44 @@ Wins over any earlier text on tenant selection, tenant administrators and projec
 
 ### 4.2 Sessions (user, 2026-11-13; TD-121, TD-135, TD-170)
 
+- **Who signs in how (product owner, 2026-11-14).** Company staff: Entra ID SSO (promoted) or
+  password (§4.5). External users (clients, subcontractors, other non-members of the company
+  tenant): e-mail + password only, never SSO; first password set at invite acceptance (§4.1).
+  Field Workers (PER-14), internal or external: additionally magic link (below).
+- **Local passwords (planner defaults following NIST SP 800-63B rev. 4, 2026-11-14; no earlier
+  spec rule; not yet confirmed by the product owner).** Minimum length
+  `KERP_PASSWORD_MIN_LENGTH`, **default 15** characters (planner default: the single-factor
+  minimum of 800-63B rev. 4; configurable, never below 8), maximum at least 64
+  (accepted up to 256); all printable ASCII, spaces and Unicode allowed, NFKC-normalised before
+  hashing; **no composition rules, no periodic expiry, no hints or security questions**. Every
+  new password is checked against a bundled blocklist of common and compromised passwords plus
+  context words (the e-mail and its local part, "kerp", the deployment name); a breached-password
+  lookup (k-anonymity range API) is optional and off by default
+  (`KERP_PASSWORD_BREACH_CHECK=false`). Rejections say why (too short, too common). Stored as
+  scrypt (unchanged). Login failures keep the existing per-account and per-client lockout
+  (T-0068). The rules apply to every password set: first password at invite acceptance, reset,
+  change, and admin-created accounts.
+- **Self-service password reset (product owner, 2026-11-14).** `POST
+  /api/v1/auth/password-reset/request` (e-mail) always answers the **same neutral 202**
+  (unknown, deactivated or known e-mail alike), with delivery off the request path and equal
+  work on every path (as for magic links below). For an active account it e-mails a reset link
+  `/reset-password#<token>` (token in the fragment, random >= 256 bits, stored only as a hash,
+  **single-use**, **expiring** `KERP_PASSWORD_RESET_TTL_MINUTES`, default 60, planner default; a
+  new request invalidates earlier tokens). `POST /api/v1/auth/password-reset/confirm` (token, new
+  password) sets the password under the policy above and **revokes every existing session and
+  refresh token of the user** (all devices; device enrolment and PIN stay, §4.3); it does not
+  sign the user in (they sign in with the new password; planner default). A "your password was
+  changed" notice goes to the account's address. Requests are rate-limited per e-mail address
+  (same mailbox-flood cap as magic links, T-0068 / TD-224) and per client (TD-138); confirm
+  attempts per token are limited. An account without a password (brand-new invitee) can use
+  reset to set its first password. Request, confirm and refusals are audited; tokens are scrubbed
+  from logs and Sentry.
+
 - **Access token** 15 minutes (unchanged). **Refresh token** lifetime **12 hours**
   (`KERP_REFRESH_TOKEN_HOURS=12`, user decision). Counted from sign-in: rotation issues a new
   single-use token but never extends the session past sign-in + 12 h (user, 2026-11-13). Users sign in again
-  daily; Entra ID SSO (§4.5) is the Pilot-0 path for this (product owner, 2026-11-14);
-  magic-link e-mail delivery (TD-084) is an additional path once it exists. Every token response (login, magic-link redeem, refresh, PIN
+  daily; Entra ID SSO (§4.5) is the Pilot-0 path for company staff, password for external users,
+  and magic link (e-mailed, §4.6) for Field Workers (product owner, 2026-11-14). Every token response (login, magic-link redeem, refresh, PIN
   unlock, SSO callback) states the session end as `session_expires_at`, so a field client knows
   when its offline grace starts (product owner, 2026-11-14).
 - **Refresh-token transport (user, 2026-11-13; TD-203).** The web SPA receives and sends the
@@ -332,8 +392,29 @@ Wins over any earlier text on tenant selection, tenant administrators and projec
   counter. The server does not reject queued mutations because of the grace (they carry author
   and device and arrive under a fresh session); it **flags** a mutation whose reconstructed
   `occurred_at` (§6.4.1) falls after `session_expires_at + offline_grace_hours` for review
-  (`grace_exceeded`, possible tampered or rooted device) without dropping it. Interaction with
-  the 7-day window: TD-257.
+  (`grace_exceeded`, possible tampered or rooted device) without dropping it. **Interaction with
+  the offline window confirmed (product owner, 2026-11-14; TD-257 resolved):** the grace binds
+  edits; `offline_window_days` stays only as an upper bound (and the sizing of sync and outbox
+  for 14 days). With the defaults about 36 h offline after the last sign-in is enough; the window
+  does not extend the grace for multi-day offline sites.
+- **Magic links for Field Workers only (product owner, 2026-11-14; TD-136).** Sign-in by magic
+  link (`POST /api/v1/auth/magic-link`, redeem) is limited to users who hold **PER-14 Field
+  Worker** on at least one project (effective grants, direct or team-derived, §4.1; memberships
+  on soft-deleted projects ignored), or who carry a valid pending invite (§4.1 Invites) for
+  their e-mail that names PER-14. For anyone else the request gets the **same neutral 202** as
+  an unknown e-mail and no link is issued or sent (no account or persona enumeration; the
+  refusal is logged and audited without the token). Redeem re-checks eligibility, so a link
+  issued before the user lost their last PER-14 grant is refused. In the Pilot-0 gate (product
+  owner confirmed, 2026-11-14; T-0057). **No timing oracle (planner rule, PR #79 review):** link delivery runs off the request path (SAQ job or post-response
+  task), so the 202 never waits for the mail transport, and every path (unknown, inactive,
+  ineligible, eligible) does the same work inside the request, including an equal (dummy)
+  store write or deferring the store write with delivery. Eligibility is read in core auth
+  (`load_grants`); the invite branch is a core extension point that the module owning invites
+  registers, so core never imports a module (CLAUDE.md §6). All other users sign in with
+  password or, for internal staff, Entra ID SSO (§4.5). The rule covers the KERP sign-in magic
+  link only; portal-scoped record links for people without an account
+  (`modules/portal-plan-review.md` §1.1) are a separate mechanism (planner reading; PER-15 and
+  the phase-7 portal: TD-261).
 
 ### 4.3 Devices (user, 2026-11-13; TD-164, decision 17a — Pilot-0 scope)
 
@@ -368,7 +449,10 @@ Wins over any earlier text on tenant selection, tenant administrators and projec
 ### 4.5 Entra ID SSO — identity only (product owner, 2026-11-14; TD-043, TD-003)
 
 Staff sign in with the company Microsoft Entra ID tenant. For the pilot SSO proves **who** the
-user is and nothing else.
+user is and nothing else. **SSO is for company staff only (product owner, 2026-11-14):**
+external users (clients, subcontractors) never use Microsoft sign-in; there is no federation
+with their tenants, and KERP never offers SSO to them as a way in; they sign in with e-mail +
+password (§4.1, §4.2).
 
 - **Protocol.** OpenID Connect authorization-code flow with **PKCE** (S256) against the
   company tenant only: the authority and issuer are pinned to
@@ -403,8 +487,8 @@ user is and nothing else.
   token is treated as a guest, and the sign-in refused ("sign in with the method from your
   invitation"), when the `acct` claim is not `0` (missing counts as not proven) or an `idp`
   claim is present and differs from the pinned issuer. Guests (client representatives,
-  subcontractors added to the company tenant) use password or magic link like other external
-  users and never become internal through Entra. **Deployment prerequisite:** the `acct`
+  subcontractors added to the company tenant) use password (or magic link if they are Field
+  Workers, §4.2) like other external users and never become internal through Entra. **Deployment prerequisite:** the `acct`
   optional claim must be enabled on the app registration; without it **every** SSO sign-in is
   refused. Such refusals are logged with the distinct reason `acct_claim_missing`; the server
   logs a start-up warning naming the required optional claims whenever SSO is enabled, and the
@@ -439,11 +523,62 @@ user is and nothing else.
 - **Session.** SSO is a second `AuthProvider` behind the existing seam (TD-003); on success it
   issues the **same KERP session** as a password sign-in: 15-minute access token, refresh token
   ending 12 h after sign-in (§4.2), cookie or native body transport, device enrolment and PIN
-  set-up for field clients (§4.3). Password and magic-link sign-in stay available (invited
-  external users keep them); whether internal users must use SSO only is not decided for the
-  pilot.
+  set-up for field clients (§4.3).
+- **SSO promoted, password kept (product owner, 2026-11-14).** Internal staff **should** sign in
+  with Entra ID SSO, but SSO is **not enforced**: password sign-in stays allowed for internal
+  users too, and there is no SSO-only mode and no lockout of password login by e-mail domain or
+  `is_internal`. When SSO is enabled the sign-in screen (web and Android) shows "Sign in with
+  Microsoft" as the **primary, default option**, with password sign-in available on the same
+  screen as a secondary option, together with "Forgot password?" (§4.2); the magic-link request
+  stays available for Field Workers (§4.2). External users use password (and magic link if
+  PER-14), never SSO.
 - **Pilot-0.** Live SSO in the pilot deployment satisfies the daily re-login dependency of §4.2
-  and is part of the Pilot-0 gate (T-0146).
+  for company staff and is part of the Pilot-0 gate (T-0146).
+
+### 4.6 Outbound e-mail (user, 2026-11-10, TD-084; Pilot-0 dependency since 2026-11-14)
+
+The user chose AWS SES with the company domain's DKIM, i18n templates, bounce handling and a
+send log (2026-11-10). Since the product owner put invite and password-reset e-mails into the
+Pilot-0 gate (2026-11-14), the transport is a Pilot-0 dependency. Planner defaults:
+
+- **Core service, not a module:** `app/core/mail/` with one `send_mail(template_key, to,
+  context, locale)` entry point usable by core auth (magic links, password reset) and by modules
+  (invites, access-request decisions). Transport behind a protocol: **SES** (region from the
+  deployment, §4.4; sender address and configuration set from deployment configuration;
+  credentials from the instance role / secret store, never the repo) in production, a
+  **fake transport** (in-memory, inspectable) in tests, and a log transport in development
+  that never runs in production. Production start-up fails if mail is not configured.
+- **Always asynchronous:** callers enqueue a send on the SAQ **interactive** queue after commit;
+  no request ever waits for SES (timing, §4.2). The SAQ client lives in the `jobs` module today;
+  core never imports a module, so the enqueue reaches core through a hook the jobs module
+  registers at start-up (or a core-level queue client), never by a core import of `app.modules`.
+  Retries with back-off on transient SES errors;
+  a failed send never rolls back the business action.
+- **Templates** through the i18n layer (`t()` keys, locale of the recipient or the deployment
+  default), plain text plus simple HTML, no remote images or tracking pixels, no project data
+  beyond code and name, secrets only inside link fragments.
+- **Send log** table (`BaseRecordMixin`, tenant RLS; System admins read it): template key,
+  recipient (hashed for lookups plus masked for display), status (`queued | sent | bounced |
+  complained | failed | suppressed`), provider message id, timestamps; never the link or the
+  token. **Bounces and complaints** arrive through SES notifications (an SQS poll job, or SNS
+  to a public HTTPS endpoint) and put the address on a **suppression list** (also
+  `BaseRecordMixin` with RLS); sends to a suppressed address are skipped and logged as
+  `suppressed`. A valid SNS signature alone does not prove the message came from our SES
+  (anyone can sign messages from their own topic), so the SNS endpoint (planner rule, PR #79
+  review): accepts only messages whose `TopicArn` equals the configured topic
+  (`KERP_MAIL_SNS_TOPIC_ARN`); verifies the signature (SignatureVersion 2, SHA-256) with a
+  signing certificate fetched only from an `https://sns.<region>.amazonaws.com/` URL (host
+  checked exactly, region = the deployment's); honours a `SubscriptionConfirmation` only for the
+  configured topic (others are refused and logged, never confirmed); and writes suppression
+  and send-log rows under the deployment's hidden tenant from settings
+  (`KERP_DEFAULT_TENANT_ID`, §4.1), never a tenant or account value from the payload (the
+  endpoint has no JWT). Refusals are logged without the payload body. The magic-link, reset and invite
+  flows still answer neutrally when a send is suppressed.
+- **Deployment prerequisites** (runbook, T-0146): verified sending domain with DKIM (and SPF /
+  DMARC alignment), SES production access (out of the sandbox) in the deployment region, the
+  bounce/complaint notification wiring.
+- Portal extras of TD-084 (PDF attachments, digests: `modules/portal-plan-review.md`) build on
+  this service in their own epics.
 
 ---
 
