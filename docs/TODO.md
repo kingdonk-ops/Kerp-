@@ -3,9 +3,9 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 153 · **Closed:** 98
+**Open:** 153 · **Closed:** 99
 
-## decision (4)
+## decision (5)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -13,6 +13,7 @@
 | [TD-213](../tracker/todo/TD-213.md) | Object key layout: confirm {tenant}/{project}/{module}/{sha256} (no extension) instead of the master spec's {hash}.ext, plus transient staging/ and quarantine/ prefixes | T-0016 | implementer |
 | [TD-223](../tracker/todo/TD-223.md) | Who may open PRs to dev? If any account other than KERP_ALLOWED_REVIEWERS (or forks) can, require a human approval as well as review-gate | T-0067 | reviewer |
 | [TD-224](../tracker/todo/TD-224.md) | Magic-link request lockout is still per tenant+email: anyone can keep a known field worker from getting a link (4/hour, then doubling delay); decide per-client keying vs mailbox-flood protection | T-0068 | reviewer |
+| [TD-257](../tracker/todo/TD-257.md) | Offline grace (24 h after the server session ends) vs the 7-day offline window: confirm the grace binds edits and the window stays only as an upper bound | T-0143, T-0044 | planner |
 
 ## spec-gap (36)
 
@@ -29,7 +30,7 @@
 | [TD-066](../tracker/todo/TD-066.md) | Issue types (defect / observation) as versioned configuration with their own fields and close-out form | T-0111 | planner |
 | [TD-067](../tracker/todo/TD-067.md) | Inspection report layout configuration (header rows from anchor attributes, photo layout) is not specified | T-0113 | planner |
 | [TD-083](../tracker/todo/TD-083.md) | Resource pool for planning (named workers without a login, crews, rosters, availability) vs the HR/payroll cull | E-04-12, T-0118, E-03-01 | planner |
-| [TD-084](../tracker/todo/TD-084.md) | Outbound email transport and templates (send-for-review with PDF attachment, digests, magic links) not specified | E-07-04, E-05-07 | planner |
+| [TD-084](../tracker/todo/TD-084.md) | Outbound email transport and templates (send-for-review with PDF attachment, digests, magic links) not specified | E-07-04, E-05-07, T-0056 | planner |
 | [TD-085](../tracker/todo/TD-085.md) | Distribution / communication matrix as shared project config (formats x contacts, To/Cc, frequency, due rule) reused by reports, transmittals and plan review | E-07-04, E-05-03, E-03-01 | planner |
 | [TD-086](../tracker/todo/TD-086.md) | Per-party intervention codes on ITP steps and inspection-request slots (contractor and client code each; code sets per form with notice/blocking/signature flags) | T-0113, T-0114, T-0115 | planner |
 | [TD-087](../tracker/todo/TD-087.md) | Master ITP vs ITP instance (instance bound to one asset + RSW set, own ITP id, pinned master revision) and generated ITP layout matching the signed reference style | T-0113, E-05-05 | planner |
@@ -99,7 +100,7 @@
 | [TD-250](../tracker/todo/TD-250.md) | Request-context middleware: starlette ClientDisconnect (raised by request.body() after http.disconnect) is still logged as an unhandled 500; map it to 499/disconnected like CancelledError | T-0030 | implementer |
 | [TD-255](../tracker/todo/TD-255.md) | Dynamic Form Renderer: render section titles through localise() once the template schema has sections (T-0110) | T-0047 | implementer |
 
-## later (61)
+## later (60)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -109,7 +110,6 @@
 | [TD-025](../tracker/todo/TD-025.md) | Backend errors: request-context middleware renders unhandled 500s itself, so add_exception_handler(Exception) never runs; document or make the renderer pluggable before an error-format task; move _restore_logging autouse fixture to tests/conftest.py | T-0021 | reviewer |
 | [TD-035](../tracker/todo/TD-035.md) | Optimistic locking on BaseRecordMixin.revision (version_id_col or explicit base_revision check) | T-0005 | reviewer |
 | [TD-038](../tracker/todo/TD-038.md) | Add reportlab (and openpyxl if the Excel renderer is ported) to the heavy-lib lazy-import lint when Inspection-ERP core/reporting is ported | T-0115, T-0119 | kerp-reviewer |
-| [TD-043](../tracker/todo/TD-043.md) | Entra ID SSO for KAEFER staff behind the AuthProvider seam, before the first pilot | T-0008 | user |
 | [TD-048](../tracker/todo/TD-048.md) | SHA-pin actions in promote.yml and review-gate.yml (persist-credentials:false where no push is needed) and digest-pin the CI service images (postgis, redis) | T-0028, T-0032 | implementer |
 | [TD-051](../tracker/todo/TD-051.md) | CI: backend-publish rebuilds the image instead of pushing the smoke-tested one; export/push the tested image by digest | T-0028, T-0032 | reviewer |
 | [TD-055](../tracker/todo/TD-055.md) | Data migrations under FORCE RLS see no rows: add a per-tenant/project backfill helper or a dedicated BYPASSRLS migration role (ADR) | T-0007 | implementer |
@@ -229,6 +229,7 @@
 | ✅ | [TD-039](../tracker/todo/TD-039.md) | Bring back any PROPOSAL-port-from-aip extras dropped in spec consolidation (write-back, type inheritance, migration preview, test-fill, section library, report slots, auto_create_itp, competency assignment, programmes)? | Out of scope for Phase 1. Revisit auto_create_itp and asset write-back as Phase 3 candidates (user, 2026-11-09) |
 | ✅ | [TD-040](../tracker/todo/TD-040.md) | CEL value encoding: plain JSON numbers are CEL double on both runtimes; ints/timestamps need explicit tags | Confirmed: plain JSON numbers are CEL double; int64/timestamp/uint/duration use $-tagged encoding. Binding for sync payloads and form templates (user, 2026-11-09) |
 | ✅ | [TD-042](../tracker/todo/TD-042.md) | EDGE-SCREENS 2.1 hold-gating example uses count(list), which is not standard CEL | Use standard size(); EDGE-SCREENS §2.1 hold-gating example corrected (user, 2026-11-09) |
+| ✅ | [TD-043](../tracker/todo/TD-043.md) | Entra ID SSO for KAEFER staff behind the AuthProvider seam, before the first pilot | Product owner, 2026-11-14: Entra ID SSO is identity only for the pilot: OIDC code + PKCE against the company tenant, ID token verified via the tenant JWKS, match by verified e-mail then oid, no auto-create, no group-to-role mapping, same 12 h KERP session. Spec diff §4.5; tasks T-0054 (backend), T-0055 (web), T-0143 (Android); gates Pilot-0 (T-0146) |
 | ✅ | [TD-052](../tracker/todo/TD-052.md) | PostgreSQL-only RLS tests skip in the SQLite run and on machines without Postgres: add a local Postgres (compose/testcontainers) recipe | T-0003: docker-compose PG16 (CI's postgis image) + shared infra/postgres/initdb/20-kerp-app.sql (kerp_app NOSUPERUSER NOBYPASSRLS, also run by CI) + make test-pg (fails on any skip); documented in backend/README.md. End-to-end local run tracked by TD-132. |
 | ✅ | [TD-053](../tracker/todo/TD-053.md) | Tenant-wide (cross-project) reads under project RLS: portfolio views, admin, and the visibility of tenant-level rows such as the project row | Explicit multi-project scope (session binds a list of allowed project ids) plus a stricter membership-based policy on the projects table and other tenant-level tables.  Implement in T-0010/T-0014. (user, 2026-11-10); follow-up edits in TD-112 |
 | ✅ | [TD-054](../tracker/todo/TD-054.md) | Edge spec §6 policy targets 'TO kerp_app_role'; T-0007 applies it to PUBLIC | Confirm policy without a TO clause (PUBLIC); amend edge spec section 6. (user, 2026-11-10); follow-up edits in TD-112 |

@@ -59,12 +59,17 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
   Phase 2. Gate: **T-0146** (NFR budgets become hard CI gates, checklist below complete).
   - **Phase 0** as planned, including the 2026-11-13 additions: T-0037 (12 h sessions, hidden
     tenant), T-0038 (hybrid PIN), T-0039–T-0042 (Project Admins, lobby, access requests,
-    picker), T-0043 + T-0048 (device registry, revoke/wipe), T-0044 (deployment settings,
+    picker), T-0049 (internal staff flag), T-0050/T-0051 (access-request lifecycle and admin
+    inbox), T-0054/T-0055 (Entra ID SSO, identity only; 2026-11-14), T-0043 + T-0048 (device registry, revoke/wipe), T-0044 (deployment settings,
     offline window), T-0045–T-0047 (NFR harness, glove/high-contrast tokens, localised template
     strings); plus the AWS production deploy in `ap-southeast-2` (TD-004, TD-171).
   - **Daily re-login dependency:** sessions end 12 h after sign-in, so the pilot inspectors
-    sign in every day. Entra ID SSO (TD-043) or magic-link e-mail delivery (TD-084) must be
-    live in the pilot deployment (checked by T-0146).
+    sign in every day. **Entra ID SSO gates Pilot-0** (product owner, 2026-11-14; diff §4.5;
+    T-0054, T-0055, Android sign-in in T-0143; checked by T-0146); magic-link e-mail delivery
+    (TD-084) is optional for the pilot. Offline, the device PIN keeps working for the offline
+    grace (default 24 h after the session ended, diff §4.2; TD-257).
+  - **Not in the gate (2026-11-14):** project invites (T-0052, T-0053) and the transactional
+    e-mails for access requests and invites (T-0056, blocked by TD-084).
   - **Phase 1 subset:** T-0101, T-0103 (hierarchy + Items), T-0107 (equipment import; in T-0146's gate since PR #51 round 3), T-0110
     (field registry + CEL), T-0111 (inspection record), T-0116/T-0117 (defects, TD-167), T-0119
     (signing), T-0126/T-0127 (offline sync), T-0133 (field checkout; its P6 tests split to
@@ -129,6 +134,16 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
   New: T-0073 (team-derived grants in the core membership store) and T-0074 (saved views shared
   with several teams; absorbs TD-242), T-0075 (teams reconcile, split from T-0013 in review), T-0076 (PER-16 Project Viewer persona). ADR 0008 accepted with grants keyed by source (`direct` | `team_link`); TD-251 resolved (links: PER-01–PER-14 except PER-09, plus PER-16).
 
+- **2026-11-14 — Login and lobby (product-owner decisions):** access-request lifecycle with
+  a stateful lobby, "Browse / join another project", token-based invites, offline grace after
+  the session ends, Entra ID SSO identity only, internal staff flag (diff §4.1, §4.2, §4.4,
+  §4.5). T-0040 split (now lobby discovery, S) into T-0040 + T-0050 (lifecycle API); T-0041
+  split into T-0041 (lobby screens) + T-0051 (admin inbox); invites moved from T-0014 to
+  T-0052/T-0053. New: T-0049 (internal flag), T-0054/T-0055 (SSO), T-0056 (e-mails, blocked by
+  TD-084). Updated: T-0038 (`session_expires_at`), T-0042 (picker entry), T-0044
+  (`offline_grace_hours`), T-0143 (offline grace, Android SSO), T-0146 (SSO in the gate).
+  TD-043 resolved; TD-257 raised.
+
 ## Key engineering decisions (baked into the spec — see consolidation diff)
 
 | Area | Decision |
@@ -145,9 +160,10 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
 | Access (2026-11-13) | One hidden tenant per deployment; System admins appoint Project Admins (`create_projects`); creator gets PER-09; lobby + access requests; project picker; one URL; admin roles never confer hold/sign-off (diff §4.1) |
 | Teams (2026-11-13) | Tenant-level teams, managed by System admins; a team links to several projects with one role (persona) per project; effective access = individual memberships ∪ team-derived grants, stored as membership rows keyed by source type/id (diff §4.1, ADR 0008); new PER-16 Project Viewer; teams are not planner crews; saved views share to several linked teams |
 | Sessions & devices (2026-11-13) | 15 min access, 12 h refresh from sign-in (daily re-login); hybrid device PIN, offline unlock independent of the server session; offline window 7 days default, 14 max; device registry + remote revoke/wipe (diff §4.2–§4.4) |
+| Login & lobby (2026-11-14) | Access-request lifecycle (`pending/approved/rejected/withdrawn`, reason, 24 h re-request cooldown) shown in the lobby; lobby list for internal staff only (Entra sign-in or `KERP_INTERNAL_EMAIL_DOMAINS`); single-use invite tokens bound to the e-mail; offline grace 24 h after session end; Entra ID SSO identity only (OIDC + PKCE, no group mapping, no auto-create, same 12 h session) (diff §4.1, §4.2, §4.5) |
 | Field client (2026-11-13) | Capacitor Android 11+, SQLCipher SQLite + file-system media, managed Play/MDM; one client storage contract and a client-agnostic sync contract (diff §6.2); NFR budgets warn now, hard gate before Pilot-0 (diff §6.3) |
 | Region (2026-11-13) | Per-deployment setting: AWS `ap-southeast-2` for Australian deployments (diff §4.4) |
 
 ## Open decisions (see `TODO.md`)
-TD-003 (SSO vs local JWT), TD-004 (hosting target), TD-072 (ADR 0004 rule-set defaults per project), TD-073 (handover first-shift trigger),
-TD-039 (dropped AIP-proposal extras). TD-013 (review-gate ignores tracker) is resolved by T-0029. TD-002/005/007/008/009/012 are resolved by this merge; TD-001 by ADR 0001 (`docs/decisions/`). TD-002 is carried into code by ADR 0002 (`docs/decisions/0002-port-one-engine.md`). TD-034 (remaining Inspection-ERP core packages) is resolved by ADR 0007.
+TD-257 (offline grace vs offline window), TD-004 (hosting target), TD-072 (ADR 0004 rule-set defaults per project), TD-073 (handover first-shift trigger),
+TD-039 (dropped AIP-proposal extras). TD-013 (review-gate ignores tracker) is resolved by T-0029. TD-002/005/007/008/009/012 are resolved by this merge; TD-001 by ADR 0001 (`docs/decisions/`). TD-002 is carried into code by ADR 0002 (`docs/decisions/0002-port-one-engine.md`). TD-034 (remaining Inspection-ERP core packages) is resolved by ADR 0007. TD-003 (SSO vs local JWT) is resolved; the SSO spec is diff §4.5 (TD-043 resolved 2026-11-14).

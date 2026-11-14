@@ -170,18 +170,78 @@ Wins over any earlier text on tenant selection, tenant administrators and projec
   per user on this client (falls back to the first by name if it is no longer allowed), with a
   **project picker in the top bar** to switch; portfolio personas keep the All-Projects scope
   (§6). No project → the **lobby**. Users with projects reach the lobby from the picker
-  ("Find a project").
+  (**"Browse / join another project"**; product owner, 2026-11-14), so joining a further
+  project uses the same lobby, code entry and access-request flow as a first project.
 - **Lobby and access requests.** The lobby lists only projects whose PER-09 holders set
-  *visible in lobby* (default off): code and name only. A user requests access with an optional
+  *visible in lobby* (default off): code and name only, and only to **internal** users (see
+  *Internal staff* below; product owner, 2026-11-14). A user requests access with an optional
   message; the request goes to that project's PER-09 holders (in-app notification), who approve
   it — choosing the persona(s) and site scope — or reject it. One open request per user per
   project; the requester may withdraw it. Approval creates the membership; request, decision and
   decider go to the audit ledger. Projects not visible in the lobby are reached only by an
-  **invite** (a PER-09 assigns the user) or by **project code**: entering an exact project code
+  **invite** (see *Invites* below), a direct assignment by a PER-09, a team link, or by **project code**: entering an exact project code
   finds that one project and lets the user file an access request; a code never grants access
   by itself; users who already have projects can open the lobby from the picker (user,
   2026-11-13; TD-202). The lobby and code lookup read through a narrow path (code, name, id of
   matching projects only); the membership-based `projects` policy is not widened.
+- **Access-request lifecycle (product owner, 2026-11-14).** The lobby is stateful. An
+  `access_requests` row is keyed to user + project and has status
+  `pending | approved | rejected | withdrawn`; `pending → approved | rejected` by a PER-09 of the
+  project (or a System admin), `pending → withdrawn` by the requester; decided and withdrawn rows
+  are kept as history. At most one `pending` request per user per project. The lobby shows an
+  **"Active requests"** panel: every pending request, plus the latest decided request per project
+  from the last 30 days (planner default), each with a status chip. A **rejected** request shows
+  the decider's optional rejection reason (≤ 500 characters, visible to the requester) and a
+  **"Request again"** action that is enabled once the **re-request cooldown** has passed since the
+  rejection: `KERP_ACCESS_REQUEST_COOLDOWN_HOURS`, deployment configuration, **default 24 h**
+  (planner default, 0 disables); earlier attempts get 409 with the time they become allowed. A
+  withdrawn request has no cooldown. An approved request links to the project. This is how a
+  non-member requester learns the outcome: project-scoped notifications cannot reach a user who
+  is not a member, so the lobby panel is the authoritative channel. A request names a project
+  the user found through the lobby list (internal users) or through a code lookup: the code
+  lookup returns a short-lived, user-bound **lookup ticket** (signed, bound to user and
+  project, 15 minutes, planner default). A **first** request for a project needs that ticket
+  when the caller is external, or internal and the project is not lobby-visible, so a leaked
+  project id alone is not enough. A **new request on a project where the caller already has an
+  earlier `rejected` or `withdrawn` request needs no ticket** (the earlier row proves the
+  project was found legitimately; coordinator decision, PR #73 review round 2), so
+  "Request again" after the cooldown works without a fresh lookup. Code lookup is rate-limited per user and deployment-wide; per-client-IP limits follow TD-138. In addition, once outbound
+  e-mail exists (TD-084), approve and reject also send a transactional e-mail to the requester
+  (follow-up task; not a Pilot-0 dependency).
+- **Invites (product owner, 2026-11-14).** A PER-09 (or a System admin) invites a person by
+  e-mail to one project with persona(s) and site scope; the account is created (no credentials)
+  if none exists, but **the membership is created only when the invite is accepted**. An invite
+  carries a random **`invite_token`**: stored only as a hash, **single-use**, **expiring**
+  (`KERP_INVITE_TTL_HOURS`, default 168 = 7 days, planner default), **bound to the invited
+  e-mail** (accepting it from a session whose user e-mail differs is refused), revocable by the
+  inviter's project admins; a re-invite revokes the earlier token. Creation, acceptance, refusal
+  (expired, used, revoked, wrong user) and revocation go to the audit ledger.
+  - **Existing user, signed in:** opening the invite link shows a one-click **"Join project"**
+    confirmation; accepting creates the membership and opens the project.
+  - **Existing or brand-new user, not signed in:** the token survives the sign-in, the
+    first-time password set and the Entra ID SSO round trip (§4.5); the server grants the
+    membership **immediately after authentication**, in the same request that completes it, and
+    the client opens the project. The lobby is skipped.
+  - The token is a secret in a URL: the invite link carries it in the URL **fragment**
+    (`/invite#<token>`, never sent to servers or in `Referer`), the SPA sends it only in POST
+    bodies (preview and accept), the invite route sets `Referrer-Policy: no-referrer`, and
+    access logs and Sentry scrub `invite_token` fields (planner rule, PR #73 review).
+  - Until e-mail delivery exists (TD-084) the inviter copies the invite link from the invite
+    response and passes it on; e-mail delivery and the first-time password set through an
+    e-mailed invite are the follow-up task.
+  - **Team links need no user action.** A System admin linking a team to a project (or adding a
+    user to a linked team) grants access directly (ADR 0008); there is no invite or click.
+- **Internal staff (product owner, 2026-11-14).** Each user account carries a derived
+  `is_internal` flag, recomputed at every sign-in and at account creation: true when the user
+  has signed in through the company Entra ID tenant as a **member** (not a B2B guest) and the
+  account is linked to that member's Entra object id (§4.5; guest tokens are refused and never
+  linked) **or** the account e-mail's domain is on the deployment's list
+  `KERP_INTERNAL_EMAIL_DOMAINS` (comma-separated, exact case-insensitive domain match, no
+  wildcards). It is never set by hand or from request input. Only internal users see the lobby
+  project list. External users (client representatives, subcontractors) reach a project only by
+  **project code** (then an access request) or by **invite**. The flag grants no access by
+  itself and is not a persona. The e-mail-domain rule works without SSO; the Entra half arrives
+  with §4.5.
 - **Teams (user, 2026-11-13; TD-228, TD-229, TD-230, ADR 0008).** A team is a **tenant-level**
   named group of user accounts. Only a `system_admin` creates, renames and deletes teams,
   manages their members and links them to projects. A team can be linked to several projects.
@@ -213,8 +273,10 @@ Wins over any earlier text on tenant selection, tenant administrators and projec
 - **Access token** 15 minutes (unchanged). **Refresh token** lifetime **12 hours**
   (`KERP_REFRESH_TOKEN_HOURS=12`, user decision). Counted from sign-in: rotation issues a new
   single-use token but never extends the session past sign-in + 12 h (user, 2026-11-13). Users sign in again
-  daily; for field workers that needs Entra ID SSO (TD-043) or magic-link e-mail delivery
-  (TD-084) in place before Pilot-0.
+  daily; Entra ID SSO (§4.5) is the Pilot-0 path for this (product owner, 2026-11-14);
+  magic-link e-mail delivery (TD-084) is an additional path once it exists. Every token response (login, magic-link redeem, refresh, PIN
+  unlock, SSO callback) states the session end as `session_expires_at`, so a field client knows
+  when its offline grace starts (product owner, 2026-11-14).
 - **Refresh-token transport (user, 2026-11-13; TD-203).** The web SPA receives and sends the
   refresh token only as an `httpOnly`, `Secure`, `SameSite` cookie scoped to the auth endpoints;
   it never sees it in JavaScript or storage, and `/auth/refresh` is protected against CSRF
@@ -243,10 +305,35 @@ Wins over any earlier text on tenant selection, tenant administrators and projec
   inside the window the device works offline with local unlock. Once the window passes without a
   successful server contact, the app keeps all queued data but allows no new edits until the user
   signs in online (user, 2026-11-13, TD-206; interim until the native Android app with a normal login launches, TD-210). Sync and the outbox are built for 14 days of queued work.
-- **Daily re-login vs offline.** The 12-hour session limit applies only to server calls. Offline
-  work continues on local unlock for the whole offline window; on reconnect the user signs in
-  (password, SSO, or magic link) and the outbox drains under the new session. Queued mutations
-  carry their author; the server accepts them only from a session of the same user and device.
+- **Daily re-login vs offline.** The 12-hour session limit applies only to server calls. On
+  reconnect the user signs in (password, SSO, or magic link) and the outbox drains under the new
+  session. Queued mutations carry their author; the server accepts them only from a session of
+  the same user and device.
+- **Offline grace for field tablets (product owner, 2026-11-14; wins over the "whole offline
+  window" wording that stood here before).** When the 12-hour server session ends while the
+  device is offline, the device PIN keeps unlocking cached work and queueing mutations **until the
+  end of the next shift: the offline grace, default 24 h after the server session ended**
+  (`offline_grace_hours`, deployment setting §4.4, 1 to 24 × `offline_window_days`, planner
+  bounds). After the grace has passed, or as soon as the device is back online with the session
+  ended, a fresh sign-in (magic link, SSO or password) is required before anything syncs. Until
+  then the app allows no new edits (downloaded work stays readable, as for the offline window);
+  queued mutations are **kept** and sync after re-authentication. The effective edit limit while
+  offline is the earlier of *session end + offline grace* and *last successful contact + offline
+  window*; with the defaults (12 h session, 24 h grace, 7-day window) the grace binds, i.e. a
+  worker can keep working offline for at most about 36 h after their last sign-in. The grace is
+  enforced on the device with a **non-decreasing elapsed-time counter that survives reboots**
+  (planner rule, PR #73 review): the device persists `offline_elapsed_ms` (time elapsed since
+  `session_expires_at`, as of the last server time anchor or check) and `last_seen_wall_time`.
+  Within one clock session (§6.4.1) the counter advances by monotonic time; after a reboot
+  (new `clock_session_id`, no anchor) it advances by `max(0, wall_now − last_seen_wall_time)`.
+  Both values are updated at every unlock, every queued action and at least once a minute while
+  the app runs. A clock moved back therefore adds nothing (grace not extended), a clock moved
+  forward only shortens the grace, and a reboot neither blocks field work nor resets the
+  counter. The server does not reject queued mutations because of the grace (they carry author
+  and device and arrive under a fresh session); it **flags** a mutation whose reconstructed
+  `occurred_at` (§6.4.1) falls after `session_expires_at + offline_grace_hours` for review
+  (`grace_exceeded`, possible tampered or rooted device) without dropping it. Interaction with
+  the 7-day window: TD-257.
 
 ### 4.3 Devices (user, 2026-11-13; TD-164, decision 17a — Pilot-0 scope)
 
@@ -270,10 +357,93 @@ Wins over any earlier text on tenant selection, tenant administrators and projec
 - **Tenant (deployment) settings**, edited by System admins: offline window (days, default 7,
   1–14), and the defaults for new projects: status `ACTIVE`, site timezone `Australia/Perth`,
   currency `AUD`, locale `en-AU`. Also `max_checkout_clock_skew_s` (default 5; user, 2026-11-13):
-  the largest device clock skew allowed when taking work offline (§6.4.1). Project status values are `ACTIVE`, `ON_HOLD`, `CLOSED`.
+  the largest device clock skew allowed when taking work offline (§6.4.1). Also
+  `offline_grace_hours` (default 24; product owner, 2026-11-14): how long after the server
+  session ended a device that is still offline may keep unlocking with the PIN and queueing
+  changes (§4.2). Project status values are `ACTIVE`, `ON_HOLD`, `CLOSED`.
 - **Region is a per-deployment setting**, not code: AWS `ap-southeast-2` (Sydney) for Australian
   deployments; `eu-central-1` (Frankfurt) only if an EU deployment is ever needed. S3, SES and
   any other regional AWS client read the deployment's region; nothing hard-codes a region.
+
+### 4.5 Entra ID SSO — identity only (product owner, 2026-11-14; TD-043, TD-003)
+
+Staff sign in with the company Microsoft Entra ID tenant. For the pilot SSO proves **who** the
+user is and nothing else.
+
+- **Protocol.** OpenID Connect authorization-code flow with **PKCE** (S256) against the
+  company tenant only: the authority and issuer are pinned to
+  `https://login.microsoftonline.com/<KERP_ENTRA_TENANT_ID>/v2.0` (never the `common` or
+  `organizations` endpoints). Configuration (deployment, never in the repo):
+  `KERP_ENTRA_TENANT_ID`, `KERP_ENTRA_CLIENT_ID`, the redirect URI(s), and the client secret or
+  certificate from the secret store. Unset tenant or client id → the SSO provider is disabled
+  and the sign-in screen does not offer it.
+- **App registration.** One Entra app registration per deployment, single-tenant, one web
+  redirect URI `https://<deployment>/api/v1/auth/sso/entra/callback` (also used by the Android
+  build, see *Native handoff*), scopes `openid profile email`, and the **optional ID-token
+  claims `email`, `acct` and `xms_edov`** (needed for account matching below). No API
+  permissions, no group or app-role claims are requested. (Security review of PR #73,
+  2026-11-14: the hardening in this section is the planner's implementation of the product
+  owner's identity-only decision.)
+- **Flow.** `GET /api/v1/auth/sso/entra/start` creates `state`, `nonce` and the PKCE verifier,
+  keeps them server-side (Redis, ≤ 10 minutes, single-use) together with the optional
+  `invite_token` (§4.1 Invites) and the device id of an enrolling field client, and redirects to
+  Entra. **Browser binding (login-CSRF protection):** `/start` also sets a random pre-auth
+  cookie (`httpOnly; Secure; SameSite=Lax`, path `/api/v1/auth/sso`, lifetime = the state's)
+  and stores only its hash in the `state` entry; the callback refuses (and consumes the state)
+  when the cookie is missing or its hash does not match, and clears the cookie either way. So a
+  callback URL started and completed by someone else cannot sign a victim's browser in, nor run
+  an `invite_token` under another account. The callback exchanges the code (with the verifier)
+  and **verifies the ID token**: signature against the tenant's JWKS (cached; on an unknown
+  `kid` refetched at most once per minute deployment-wide, so forged `kid`s cannot hammer the
+  Microsoft endpoint), `iss` equal to
+  the pinned issuer, `tid` equal to `KERP_ENTRA_TENANT_ID`, `aud` equal to the client id,
+  `exp`/`nbf`/`iat` with at most 2 minutes of clock leeway, and `nonce` equal to the stored one.
+  Any failure → sign-in refused, nothing created, the attempt logged without token contents.
+- **Members only.** Only **member** accounts of the company tenant may sign in through SSO. A
+  token is treated as a guest, and the sign-in refused ("sign in with the method from your
+  invitation"), when the `acct` claim is not `0` (missing counts as not proven) or an `idp`
+  claim is present and differs from the pinned issuer. Guests (client representatives,
+  subcontractors added to the company tenant) use password or magic link like other external
+  users and never become internal through Entra. **Deployment prerequisite:** the `acct`
+  optional claim must be enabled on the app registration; without it **every** SSO sign-in is
+  refused. Such refusals are logged with the distinct reason `acct_claim_missing`; the server
+  logs a start-up warning naming the required optional claims whenever SSO is enabled, and the
+  health check reports a warning when an SSO sign-in was refused for `acct_claim_missing` in the
+  last 24 h. The deploy docs and the Pilot-0 runbook (T-0146) include a test sign-in that checks
+  the optional claims.
+- **Account matching by verified e-mail.** The first SSO sign-in matches an **existing active**
+  KERP account by the `email` claim (case-insensitive) **only when that e-mail is verified**:
+  `xms_edov` is `true`, or its domain is on `KERP_INTERNAL_EMAIL_DOMAINS` (§4.1). There is
+  **no `preferred_username` fallback** (Microsoft does not support it for authorization) and no
+  match on an unverified or missing `email`; such sign-ins are refused. A match links the
+  account by storing the Entra object id (`oid`, with `tid`); later sign-ins match by `oid`
+  only and ignore the e-mail claim. An account already linked to a different `oid` is refused. **No account → sign-in
+  refused** with "No KERP account for this e-mail, ask your administrator"; KERP never creates
+  accounts from SSO (safer default: accounts come from System admins, invites and provisioning,
+  §4.1). Deactivated account → refused. Link, refusal and sign-in go to the audit ledger.
+- **No group-to-role mapping.** Entra groups and app roles are ignored. Personas, PER-09, the
+  tenant-level grants and team links stay in KERP (§4.1). A successful (member) SSO sign-in sets
+  `is_internal` (§4.1 Internal staff) and nothing else about access.
+- **Native handoff (Capacitor Android build).** The app opens `/start` in the system browser
+  (Custom Tabs) with its `device_id` and the S256 hash of an **app-generated verifier** (kept in
+  the keystore-backed store), both stored in the `state` entry; the pre-auth cookie lives in that
+  browser. After the callback verified everything above, the server never puts tokens in a
+  redirect: it creates a **single-use exchange code** (random, stored hashed, ≤ 60 s, bound to
+  the user, `device_id` and the verifier hash) and redirects to the app's **verified Android
+  App Link** `https://<deployment>/app/sso-return?code=…` (https, `/.well-known/assetlinks.json`
+  with the app's signing-certificate fingerprint; never a custom URL scheme). The app redeems it
+  with `POST /api/v1/auth/sso/entra/exchange` (`code`, `verifier`, `device_id`) from an
+  allow-listed native origin (§4.2, T-0043) and receives the native body transport. A code
+  redeemed twice, after expiry, with a wrong verifier or a different `device_id` is refused,
+  and a reuse attempt is audited.
+- **Session.** SSO is a second `AuthProvider` behind the existing seam (TD-003); on success it
+  issues the **same KERP session** as a password sign-in: 15-minute access token, refresh token
+  ending 12 h after sign-in (§4.2), cookie or native body transport, device enrolment and PIN
+  set-up for field clients (§4.3). Password and magic-link sign-in stay available (invited
+  external users keep them); whether internal users must use SSO only is not decided for the
+  pilot.
+- **Pilot-0.** Live SSO in the pilot deployment satisfies the daily re-login dependency of §4.2
+  and is part of the Pilot-0 gate (T-0146).
 
 ---
 
@@ -328,7 +498,7 @@ Module screens register their nav items in these groups. Individual items may mo
 
 The top-bar **Project Switcher** is the project picker of §4.1: it lists the user's projects
 (from memberships), remembers the last project per user on this client, offers All-Projects to portfolio
-personas, and links to the lobby ("Find a project").
+personas, and links to the lobby ("Browse / join another project"; product owner, 2026-11-14).
 
 ### 6.2 Field client storage (user, 2026-11-13; TD-161, decision 16a + d)
 
