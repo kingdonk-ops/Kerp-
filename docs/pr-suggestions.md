@@ -3,7 +3,78 @@
 > **Generated — do not hand-edit.** Rebuild with `python scripts/pr_suggestions.py rebuild`.
 > A running digest of everything agents surfaced on merged PRs — review notes, must-fix items, suggestions, nits, follow-ups and ideas — so nothing is lost after a squash-merge. Formal follow-ups also live as `TD-xxx` in `tracker/todo/` and on [TODO.md](TODO.md); this file is the readable skim. Each item links back to its PR or review for full context.
 
-_Repo `kingdonk-ops/Kerp-`, base `dev` · 73 merged PRs · 72 with surfaced notes._
+_Repo `kingdonk-ops/Kerp-`, base `dev` · 74 merged PRs · 73 with surfaced notes._
+
+---
+
+## PR #73 — plan: lobby request lifecycle, invites, offline grace, Entra SSO (identity only)
+task `T-0049` · merged 2026-11-14 · by `kingdonk-ops` · [PR](https://github.com/kingdonk-ops/Kerp-/pull/73)
+
+**TODOs raised**
+
+- Resolved: TD-043 (identity-only SSO). Annotated: TD-084 (T-0056)
+- TD-255 — decision: offline grace vs offline window
+
+**Review by `kingdonk-ops` — KERP-REVIEW: CHANGES_REQUESTED patch-id=37f8435f30ab0353c900bffa5fe8254b484101bd** · [full review](https://github.com/kingdonk-ops/Kerp-/pull/73#pullrequestreview-5900657704)
+
+- _Must fix_
+  1. **The Entra e-mail is not verified, and guest accounts become "internal".** Where: `docs/spec/KERP-CONSOLIDATION-AND-DIFF.md:370-373` (§4.5 Account matching), `:232` (§4.1 Internal staff), `tracker/tasks/T-0054.md:190-191`, `tracker/tasks/T-0049.md:21`.
+     - Entra's `email` claim is a mutable attribute and is not guaranteed verified. Microsoft says `preferred_username` must not be used for authorization. So "match by verified e-mail" (the product-owner wording, and the T-0054 title) is not actually implemented by "`email`, else `preferred_username`". That is the nOAuth class of account takeover: first-link by e-mail binds an `oid` to an existing KERP account.
+     - Separately, B2B **guest** users of the company tenant get tokens with `tid` = company tenant. Under §4.1 they would become `is_internal` and see the lobby list, which defeats decision 6 (externals only by code or invite).
+     - Fixed looks like this. §4.5 and T-0054 define "verified": link by e-mail only for **member** accounts (reject or ignore guests via the `acct` optional claim = 0, or an `idp` claim absent or equal to the issuer) and only when the e-mail domain is verified (`xms_edov` = true, or the domain is on `KERP_INTERNAL_EMAIL_DOMAINS`). Drop the `preferred_username` fallback, or restrict it to member UPNs on verified domains. §4.1 and T-0049 say the Entra half of `is_internal` requires a member (non-guest) link. T-0054 tests add guest-token, unverified-email and `preferred_username`-only cases.
+  2. **SSO `state` is not bound to the browser that started the flow, so login CSRF is possible.** Where: dif
+
+- _Suggestions (non-blocking)_
+  - `tracker/tasks/T-0052.md:26`: a "brand-new user" invited by T-0052 has no credentials. So "accepts through password login" cannot happen before T-0056, and the magic link only works through the dev log or a fake transport. Reword it as: existing user without a session via password and magic link (fake transport); brand-new user via SSO.
+  - Invite tokens appear in URL paths (`/invite/<token>`, `GET /api/v1/invites/{token}`). Require access-log and Sentry scrubbing of that path segment and `Referrer-Policy: no-referrer` on the invite route, or move the token to a POST body / fragment.
+  - The lobby narrow path (security-definer function) could check `is_internal` itself, not only the endpoint (defence in depth, edge §6 `:605-608`).
+  - T-0050 `POST /access-requests` accepts any project id. Consider requiring that an external requester's project is code-matched (for example a short-lived lookup ticket from by-code), so a leaked project id is not enough. Add a tenant-wide or IP rate limit for code lookup next to the per-user one (TD-138).
+  - The T-0054 JWKS "refetch once on unknown kid" should be rate-limited globally, so forged-kid tokens cannot hammer the Microsoft endpoint.
+  - Consider a server-side soft check (flag, not reject) when a queued mutation's reconstructed `occurred_at` falls after `session_expires_at + offline_grace_hours`, to detect tampered or rooted devices (T-0177).
+  - `docs/spec/KERP-EDGE-SCREENS-AND-SPEC-UPDATE.md:603` still says "Access requests (T-0040)"; it should be T-0050.
+  - `docs/DEVELOPMENT-PLAN.md` "Open decisions" now lists TD-003 as resolved; move it ou
+
+**Review by `kingdonk-ops` — KERP-REVIEW: CHANGES_REQUESTED patch-id=a10ea12e56812a4ae4c972fd2db9645662fa4879** · [full review](https://github.com/kingdonk-ops/Kerp-/pull/73#pullrequestreview-5900721276)
+
+- _Must fix_
+  1. **The lookup ticket breaks "Request again" after the cooldown.**
+     - Where: diff §4.1 `:200-204`, `tracker/tasks/T-0050.md:19`, `tracker/tasks/T-0041.md:20`, `:24`.
+     - What is wrong:
+       - An access request now needs a 15-minute code-lookup ticket. That applies to external users, and to internal users when the project is not lobby-visible.
+       - The cooldown default is 24 h, so an external user who presses **"Request again"** on a rejected request in the Active-requests panel never has a valid ticket. T-0050 then returns 404.
+       - The "Request again" action is a binding product-owner decision. The e2e journey in T-0041:24 (reject, wait out the cooldown, request again, approve) would fail for any user found by code.
+       - T-0041 also never says that the code-entry "Request access" or "Request again" sends a ticket.
+     - What "fixed" looks like: choose one of these and write it into §4.1, T-0050 and T-0041.
+       - (a) A new request on a project where the caller already has an earlier request row (`rejected` or `withdrawn`) needs no ticket, because the earlier row proves the user found the project legitimately. Add T-0050 tests for re-request without a ticket after rejection and after withdrawal.
+       - (b) Or: "Request again" first repeats the code lookup with the project code shown in the panel to get a fresh ticket, then files the request. T-0041 says so and its tests cover it.
+     - In either case, T-0041 states that code-entry "Request access" sends the ticket from the lookup.
+
+- _Suggestions (non-blocking)_
+  - T-0052:26 says the magic-link carry-through puts the invite token "inside the issued link". The new T-0052 rule says the token never appears in a server-visible URL path or query. Spell out that the server keeps the invite reference next to the magic-link record (hash) rather than in the link URL.
+  - §4.5 Members only: note that tenants must enable the `acct` optional claim. If it is not enabled, every SSO sign-in is refused. Suggest a startup or health-check warning and a line in the deploy docs, as a runbook item for T-0146.
+  KERP-REVIEW: CHANGES_REQUESTED patch-id=a10ea12e56812a4ae4c972fd2db9645662fa4879
+  ---
+  _Generated by [Claude Code](https://claude.ai/code)_
+
+**Review by `kingdonk-ops` — KERP-REVIEW: APPROVED patch-id=1413f40767bbffca7d45deb3874bd383bd980ea6** · [full review](https://github.com/kingdonk-ops/Kerp-/pull/73#pullrequestreview-5900737971)
+
+- _Must fix_
+  None.
+
+- _Suggestions (non-blocking)_
+  - The re-request rule is attributed to a "coordinator decision". It is a planner and review choice inside the product-owner lifecycle decision; consider wording it as a "planner rule (PR #73 review)", consistent with the other hardening notes.
+  - Edge case for T-0050: a user whose earlier request was `approved` and whose membership was later removed needs a fresh ticket to request again. That is acceptable, but worth one line in the module README.
+  KERP-REVIEW: APPROVED patch-id=1413f40767bbffca7d45deb3874bd383bd980ea6
+  ---
+  _Generated by [Claude Code](https://claude.ai/code)_
+
+**Review by `kingdonk-ops` — KERP-REVIEW: APPROVED patch-id=650aba886ac7bb6e3156a0d510076ecea30f9f34** · [full review](https://github.com/kingdonk-ops/Kerp-/pull/73#pullrequestreview-5900907907)
+
+- _Must fix_
+  None.
+  KERP-REVIEW: APPROVED patch-id=650aba886ac7bb6e3156a0d510076ecea30f9f34
+  ---
+  _Generated by [Claude Code](https://claude.ai/code)_
 
 ---
 

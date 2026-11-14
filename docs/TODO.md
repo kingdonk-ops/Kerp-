@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 153 · **Closed:** 99
+**Open:** 154 · **Closed:** 99
 
 ## decision (5)
 
@@ -100,7 +100,7 @@
 | [TD-250](../tracker/todo/TD-250.md) | Request-context middleware: starlette ClientDisconnect (raised by request.body() after http.disconnect) is still logged as an unhandled 500; map it to 499/disconnected like CancelledError | T-0030 | implementer |
 | [TD-255](../tracker/todo/TD-255.md) | Dynamic Form Renderer: render section titles through localise() once the template schema has sections (T-0110) | T-0047 | implementer |
 
-## later (60)
+## later (61)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -164,6 +164,7 @@
 | [TD-245](../tracker/todo/TD-245.md) | saved_views: enforce one default per owner/register and one project default in the database | T-0020 | implementer |
 | [TD-246](../tracker/todo/TD-246.md) | saved_views: validate register_key against register descriptors once modules declare them (E-01-01) | T-0020 | implementer |
 | [TD-247](../tracker/todo/TD-247.md) | saved_views: degrade gracefully when a stored view config no longer validates | T-0020 | implementer |
+| [TD-256](../tracker/todo/TD-256.md) | T-0014 membership admin API: accept PER-16 in its persona schema/enum and derive the PER-09 sod_warning hold-authority set from access.PERSONAS (A capability), so PER-16 never triggers it | T-0076 | implementer |
 
 ## bug (2)
 

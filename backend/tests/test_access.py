@@ -18,6 +18,8 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 from app.core.auth.access import (
     PERSONAS,
+    SOD_BLOCKED,
+    TIER_CAPABILITIES,
     Capability,
     Grant,
     HoldKind,
@@ -40,7 +42,15 @@ from app.core.tenancy.context import TenancyContext, get_tenancy_context
 from app.core.tenancy.rls import apply_rls_policies, session_tenancy
 from app.core.tenancy.scope import OutOfScopeError, SiteScopedMixin, get_or_404
 from tests.audit_support import migrated_database
-from tests.auth_support import ALICE, BOB, PASSWORD, auth_app, make_settings, seed_user
+from tests.auth_support import (
+    ALICE,
+    BOB,
+    PASSWORD,
+    auth_app,
+    make_settings,
+    revoke_project_viewers,
+    seed_user,
+)
 from tests.auth_support import T1 as AUTH_T1
 from tests.db_support import Widget, database_url
 from tests.tenancy_support import CTX_A, PA, PB, PC, T1, seeded_database
@@ -56,8 +66,10 @@ def _access(*grants: tuple[Persona, uuid.UUID | None]) -> ProjectAccess:
 # --- the matrix (edge spec §5) ----------------------------------------------------------------
 
 
-def test_matrix_has_the_fifteen_personas_of_the_store() -> None:
+def test_matrix_has_the_sixteen_personas_of_the_store() -> None:
     assert [p.value for p in PERSONAS] == list(PERSONA_CODES)
+    assert len(PERSONA_CODES) == 16
+    assert PERSONA_CODES[-1] == "PER-16"
     assert PERSONAS[Persona.FIELD_WORKER].scope is Scope.SINGLE
     assert PERSONAS[Persona.CLIENT_REPRESENTATIVE].tier is Tier.PORTAL
     portfolio = {p for p, spec in PERSONAS.items() if spec.scope is Scope.PORTFOLIO}
@@ -76,6 +88,36 @@ def test_capability_tiers() -> None:
     assert {Capability.VIEW, Capability.CREATE, Capability.EDIT} <= PERSONAS[
         Persona.FIELD_WORKER
     ].capabilities
+
+
+def test_project_viewer_is_read_only_on_a_single_project() -> None:
+    """PER-16 (edge spec §5.2 amendment, TD-251): Viewer tier, ``V`` only, no authority."""
+    spec = PERSONAS[Persona.PROJECT_VIEWER]
+    assert Persona.PROJECT_VIEWER.value == "PER-16"
+    assert spec == PersonaSpec(Tier.VIEWER, Scope.SINGLE)
+    assert TIER_CAPABILITIES[Tier.VIEWER] == {Capability.VIEW}
+    assert spec.capabilities == {Capability.VIEW}
+    viewer = _access((Persona.PROJECT_VIEWER, None))
+    assert viewer.capabilities == {Capability.VIEW}
+    for capability in set(Capability) - {Capability.VIEW}:
+        assert not viewer.has(capability)
+    for kind in HoldKind:
+        assert not viewer.can_release_hold(kind)
+    assert viewer.site_node_ids is None  # reads the bound project like other single personas
+    assert Persona.PROJECT_VIEWER not in SOD_BLOCKED
+    assert sod_violations() == []
+
+
+def test_project_viewer_adds_no_allowed_projects() -> None:
+    base = TenancyContext(tenant_id=T1, user_id=uuid.uuid4())
+    grants = [Grant(PA, Persona.PROJECT_VIEWER), Grant(PB, Persona.PROJECT_VIEWER)]
+    assert resolve_scope(grants, base).allowed_project_ids == frozenset()
+    bound = resolve_scope(grants, base, PA)
+    assert bound.project_id == PA
+    assert bound.readable_project_ids == {PA}
+    assert bound.site_node_ids is None
+    with pytest.raises(OutOfScopeError):
+        resolve_scope(grants, base, PC)
 
 
 def test_project_administrator_cannot_release_quality_holds() -> None:
@@ -331,6 +373,14 @@ def _guarded_client(
     def admin() -> dict[str, bool]:
         return {"ok": True}
 
+    for capability in Capability:
+        app.add_api_route(
+            f"/_cap/{capability.value}",
+            lambda: {"ok": True},
+            methods=["POST"],
+            dependencies=[Depends(require_capability(capability))],
+        )
+
     return TestClient(app)
 
 
@@ -348,6 +398,28 @@ def test_guards_answer_403_without_authority_and_404_without_membership(
         assert client.post("/_holds/safety", headers=alice).status_code == 200  # PER-11 on B
         assert client.get("/_admin", headers=alice).status_code == 403
         assert client.post("/_holds/quality").status_code == 401
+
+
+def test_project_viewer_reads_but_every_write_guard_is_forbidden(
+    app_and_users: tuple[FastAPI, AuthRuntime, dict[str, uuid.UUID]], auth_db: Database
+) -> None:
+    """Capability guard matrix row for PER-16: ``V`` → 200, C/E/A/S/admin and holds → 403."""
+    _grant(auth_db, app_and_users[2]["bob"], PB, Persona.PROJECT_VIEWER)
+    try:
+        with _guarded_client(app_and_users, PB) as client:
+            bob = _bearer(client, BOB)
+            statuses = {
+                c.value: client.post(f"/_cap/{c.value}", headers=bob).status_code
+                for c in Capability
+            }
+            assert statuses == {"V": 200, "C": 403, "E": 403, "A": 403, "S": 403, "admin": 403}
+            assert client.get("/_admin", headers=bob).status_code == 403
+            assert client.post("/_holds/quality", headers=bob).status_code == 403
+            assert client.post("/_holds/safety", headers=bob).status_code == 403
+            # Not a portfolio persona: bob's allowed list stays empty.
+            assert client.get("/_scope", headers=bob).json() == {"allowed": []}
+    finally:
+        revoke_project_viewers(auth_db)  # the 0012 downgrade refuses while PER-16 is active
 
 
 def test_guards_hide_a_project_the_caller_is_not_a_member_of(
