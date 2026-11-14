@@ -28,7 +28,7 @@ import re
 import uuid
 from collections.abc import Callable, Collection, Iterable, Mapping
 from functools import cache
-from typing import Any, Final
+from typing import TYPE_CHECKING, Any, Final
 
 from sqlalchemy import ColumnElement, select
 from sqlalchemy.exc import SQLAlchemyError
@@ -43,7 +43,6 @@ from app.core.tenancy.context import TenancyContext
 from app.core.tenancy.rls import SESSION_INFO_KEY, bind_tenancy, session_tenancy
 from app.core.tenancy.scope import OutOfScopeError, get_or_404
 from app.modules.projects import service as projects
-from app.modules.projects.models import Project
 from app.modules.validation.compiler import RuleCompileError, compile_rule
 from app.modules.validation.defaults import SeedRuleSet, load_defaults
 from app.modules.validation.models import (
@@ -55,6 +54,9 @@ from app.modules.validation.models import (
     UnlockRequest,
 )
 from app.modules.validation.schemas import KEY_PATTERN, CheckFinding, CheckResult, RuleSpec
+
+if TYPE_CHECKING:
+    from app.modules.projects.models import Project
 
 __all__ = [
     "RuleCompileError",
@@ -443,7 +445,9 @@ def reset_rule(
     The default is the rule of the same key in the parent layer's set of the same key
     (project -> tenant, tenant -> system). A deleted rule comes back; a default the set does
     not have yet is added. A rule the layer added itself has no default (``RuleStoreError``).
-    Resetting may touch a locked rule: it can only make it equal to the default.
+    Resetting may touch a locked rule: it can only make it equal to the default. On the
+    tenant layer it may not *remove* a lock the default lacks: that would be a one-person
+    unlock (``RuleLockedError``; TD-268).
     """
     context = _context(session)
     _guard_source(source)
@@ -456,6 +460,7 @@ def reset_rule(
     default = _find_rule(session, parent, str(origin_key), include_deleted=False)
     if default is None:
         raise RuleNotFoundError(f"the default set {parent.key!r} has no rule {origin_key!r}")
+    _guard_reset_keeps_locks(rule_set, {default.rule_key: rule} if rule else {}, [default])
     return _reset_to(session, rule_set, rule, default, actor_id or context.user_id, source)
 
 
@@ -467,7 +472,14 @@ def reset_rule_set(
     source: str = "api",
 ) -> RuleSet:
     """Reset the whole set to the current default: every default rule as it is now, and every
-    other rule of the set soft-deleted (its key stays taken). Each change is audited."""
+    other rule of the set soft-deleted (its key stays taken). Each change is audited.
+
+    On the tenant layer a reset that would delete a live **locked** rule the tenant added
+    itself, or unlock one whose default is not locked, would skip the two-person unlock, so
+    the whole reset is refused with ``RuleLockedError`` naming the rules (fail closed, like
+    ``delete_rule``; TD-268). A project cannot add locked rules, and its locked copies only
+    lose their default's lock after a tenant two-person unlock, so the project layer needs
+    no such check."""
     context = _context(session)
     _guard_source(source)
     actor = actor_id or context.user_id
@@ -475,6 +487,7 @@ def reset_rule_set(
     parent = _parent_set(session, rule_set)
     mine = {rule.rule_key: rule for rule in list_rules(session, rule_set)}
     defaults = [rule for rule in list_rules(session, parent) if rule.deleted_at is None]
+    _guard_reset_keeps_locks(rule_set, mine, defaults)
     for default in defaults:
         _reset_to(session, rule_set, mine.pop(default.rule_key, None), default, actor, source)
     for rule in mine.values():
@@ -733,6 +746,25 @@ def _guard_unlocked(rule_set: RuleSet, rule: Rule) -> None:
     raise RuleLockedError(f"rule {rule.rule_key!r} is locked; unlock it first (two-person unlock)")
 
 
+def _guard_reset_keeps_locks(
+    rule_set: RuleSet, mine: Mapping[str, Rule], defaults: Collection[Rule]
+) -> None:
+    """A tenant-layer reset must not delete or unlock a live locked rule (§5, Amendment B)."""
+    if rule_set.layer != "tenant":
+        return
+    locked_defaults = {default.rule_key: default.locked for default in defaults}
+    lost = sorted(
+        key
+        for key, rule in mine.items()
+        if rule.deleted_at is None and rule.locked and not locked_defaults.get(key, False)
+    )
+    if lost:
+        raise RuleLockedError(
+            f"reset would delete or unlock locked rule(s) {', '.join(map(repr, lost))}; "
+            "unlock them first (two-person unlock)"
+        )
+
+
 def _live_rule(session: Session, rule_set: RuleSet, rule_key: str) -> Rule:
     rule = _find_rule(session, rule_set, rule_key, include_deleted=False)
     if rule is None:
@@ -913,7 +945,7 @@ class _ProjectBinding:
         self.session.add_all(self.held)
 
 
-@cache
+@cache  # module manifests are static for the life of the process, so discover them once
 def _default_enabled_modules() -> frozenset[str]:
     states = module_settings.default_states(discover_modules())
     return frozenset(name for name, enabled in states.items() if enabled)

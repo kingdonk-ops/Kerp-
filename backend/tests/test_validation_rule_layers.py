@@ -680,6 +680,41 @@ def test_a_locked_tenant_rule_needs_an_unlock_first(db: Database) -> None:
         assert locked.locked  # the tenant layer may lock a default
 
 
+def test_a_tenant_reset_all_refuses_to_delete_a_locked_rule_the_tenant_added(
+    db: Database,
+) -> None:
+    seeded(db)
+    tenant_set = set_of(db, CTX_T1, "tenant")
+    with db.unit_of_work(CTX_T1) as s:
+        save_rule(s, tenant_set, spec("extra_gate", locked=True))
+        save_rule(s, tenant_set, spec("photo", "fields.photos > 5", action="warn"))
+    with db.unit_of_work(CTX_T1) as s:
+        with pytest.raises(RuleLockedError, match="extra_gate"):
+            delete_rule(s, tenant_set, "extra_gate")
+        with pytest.raises(RuleLockedError, match=r"'extra_gate'.*two-person unlock"):
+            reset_rule_set(s, tenant_set)
+    found = rules_of(db, CTX_T1, tenant_set)
+    assert (found["extra_gate"].deleted_at, found["extra_gate"].locked) == (None, True)
+    assert found["photo"].expression == "fields.photos > 5"  # nothing applied: all or nothing
+    assert events(db, CTX_T1, tenant_set)[-1] == "rule_saved"
+
+
+def test_a_tenant_reset_cannot_drop_a_lock_the_tenant_set(db: Database) -> None:
+    seeded(db)
+    tenant_set = set_of(db, CTX_T1, "tenant")
+    locked_photo = spec("photo", "fields.photos > 0", action="warn", severity="warning")
+    with db.unit_of_work(CTX_T1) as s:  # equal to the unlocked system default except the lock
+        save_rule(s, tenant_set, locked_photo.model_copy(update={"locked": True}))
+    with db.unit_of_work(CTX_T1) as s:
+        with pytest.raises(RuleLockedError, match=r"'photo'.*two-person unlock"):
+            reset_rule(s, tenant_set, "photo")
+        with pytest.raises(RuleLockedError, match=r"'photo'.*two-person unlock"):
+            reset_rule_set(s, tenant_set)
+    assert rules_of(db, CTX_T1, tenant_set)["photo"].locked
+    with db.unit_of_work(CTX_T1) as s:  # a lock the default also has is kept by a reset
+        assert reset_rule(s, tenant_set, "calibration").locked
+
+
 # --- two-person unlock (ADR 0004 §5, Amendment B, TD-116) ----------------------------------------
 
 

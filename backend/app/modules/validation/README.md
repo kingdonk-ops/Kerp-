@@ -157,7 +157,12 @@ approval records the ADR reference on the rule (`unlock_adr_reference`). Request
 rejection or cancellation and the unlock itself are each a ledger entry. A rule changed after
 the request cannot be unlocked by it. Unlocking the tenant default does not touch project
 copies; a project picks the unlocked default up by resetting the rule. Resetting never
-loosens beyond the default, so it is allowed on locked rules.
+loosens beyond the default, so it is allowed on locked rules, with one exception on the
+tenant layer: a reset (one rule or the whole set) that would **delete** a live locked rule
+the tenant added itself, or **unlock** a rule the tenant locked over an unlocked default, is
+refused with `RuleLockedError` (409) naming the rules, because it would skip the two-person
+unlock. The project layer has no such case (it cannot add locked rules, and its locked
+copies only lose their lock after a tenant unlock).
 
 ## Rules settings API (`/api/v1/validation`, ADR 0004 §7)
 

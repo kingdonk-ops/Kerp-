@@ -328,3 +328,19 @@ def test_tenant_rule_operations(api: Api) -> None:
     assert api.client.post(f"{photo}/reset", headers=headers).status_code == 200
     response = api.client.post(f"{tenant_set}/reset", headers=headers)
     assert response.status_code == 200, response.text
+
+
+def test_a_tenant_reset_all_cannot_remove_a_locked_rule_the_tenant_added(api: Api) -> None:
+    headers = api.as_("qd")
+    gate = api.tenant_rule(CHECK, "extra_gate")
+    tenant_set = f"{API}/rule-sets/{api.tenant[CHECK]}"
+    response = api.client.put(gate, json={**RULE, "locked": True}, headers=headers)
+    assert response.status_code == 200, response.text
+    assert api.client.delete(gate, headers=headers).status_code == 409
+    response = api.client.post(f"{tenant_set}/reset", headers=headers)
+    assert response.status_code == 409
+    assert "extra_gate" in response.json()["detail"]
+    sets = api.client.get(f"{API}/rule-sets", headers=headers).json()
+    rules = next(s for s in sets if s["id"] == api.tenant[CHECK])["rules"]
+    kept = next(r for r in rules if r["rule_key"] == "extra_gate")
+    assert (kept["locked"], kept["deleted_at"]) == (True, None)
