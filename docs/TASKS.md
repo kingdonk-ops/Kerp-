@@ -3,11 +3,11 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 33/149 tasks done (22%) · **ready now:** 17 · **epics awaiting breakdown:** 47
+**Overall:** 34/149 tasks done (23%) · **ready now:** 16 · **epics awaiting breakdown:** 47
 
 | Phase | Tasks done | Progress |
 |---|---|---|
-| 0 · Platform foundations | 33/65 | `█████░░░░░` 51% |
+| 0 · Platform foundations | 34/65 | `█████░░░░░` 52% |
 | 1 · Asset & Quality backbone | 0/75 (+1 epics) | `░░░░░░░░░░` 0% |
 | 2 · Welding quality | 0/9 | `░░░░░░░░░░` 0% |
 | 3 · Logistics | 0/0 (+7 epics) | `░░░░░░░░░░` 0% |
@@ -61,7 +61,7 @@
 | ▶ | [T-0046](../tracker/tasks/T-0046.md) | Field ergonomics tokens: 48 dp glove touch targets and an outdoor high-contrast theme (WCAG 2.1 AA) | frontend | S | T-0024 |  |
 | ✅ | [T-0025](../tracker/tasks/T-0025.md) | Reusable UI shells: RegisterPage, DetailPage (gate banner, tabs, audit), Dynamic Form Renderer | frontend | M | T-0024, T-0017 | #42 |
 | ▶ | [T-0045](../tracker/tasks/T-0045.md) | NFR budget harness: warn-only CI performance job + 300-question form-open budget (< 1.5 s) | frontend | S | T-0025 |  |
-| ▶ | [T-0047](../tracker/tasks/T-0047.md) | Dynamic Form Renderer: localised template strings (plain string or per-locale map, fallback to the template default language) | frontend | S | T-0025 |  |
+| ✅ | [T-0047](../tracker/tasks/T-0047.md) | Dynamic Form Renderer: localised template strings (plain string or per-locale map, fallback to the template default language) | frontend | S | T-0025 | #74 |
 | ⬜ | [T-0026](../tracker/tasks/T-0026.md) | Admin UI: System admin grants (appoint Project Admins), user manager, project creation, persona + site scope assignment with SoD warning | frontend | M | T-0024, T-0014, T-0039 |  |
 | ⬜ | [T-0041](../tracker/tasks/T-0041.md) | Lobby and access-request screens: lobby list, project-code entry, request status; admin access-request inbox | frontend | M | T-0040, T-0042 |  |
 | ⬜ | [T-0042](../tracker/tasks/T-0042.md) | Top-bar project picker wired to memberships + post-login landing (one project -> in, several -> last used, none -> lobby) | frontend | S | T-0014, T-0024 |  |

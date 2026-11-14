@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { i18n } from "../../i18n";
@@ -187,6 +187,73 @@ describe("DynamicForm", () => {
     render(<DynamicForm template={TEMPLATE} onSubmit={vi.fn()} />);
     expect(screen.getByLabelText(/Visual result/)).toHaveAttribute("aria-required", "true");
     expect(screen.getByLabelText("Remarks")).not.toHaveAttribute("aria-required");
+  });
+
+  describe("localised template strings (EDGE-SCREENS §2.2, TD-183)", () => {
+    // Synthetic bilingual template; keys, option values and CEL stay unlocalised.
+    const LOCALISED: FormTemplate = {
+      default_language: "de",
+      fields: [
+        {
+          field_key: "visual_result",
+          label: { en: "Visual result", de: "Sichtprüfung" },
+          help: { en: "Check the cap profile.", de: "Decklagenprofil prüfen." },
+          data_type: "select",
+          options: [
+            { value: "ACCEPT", label: { en: "Accept", de: "Annehmen" } },
+            { value: "REJECT", label: { en: "Reject", "de-AT": "Zurückweisen (AT)" } },
+          ],
+        },
+        {
+          field_key: "defect_length_mm",
+          label: { en: "Defect length (mm)", de: "Fehlerlänge (mm)" },
+          data_type: "number",
+          visible_if: "fields.visual_result == 'REJECT'",
+          validation: {
+            cel_expression: "fields.defect_length_mm > 0.0",
+            error_message: { en: "Length must be positive.", de: "Länge muss positiv sein." },
+          },
+        },
+      ],
+    };
+
+    it("resolves labels, option labels, help and error messages for the locale", () => {
+      const onSubmit = vi.fn();
+      render(<DynamicForm template={LOCALISED} locale="de-AT" onSubmit={onSubmit} />);
+
+      const select = screen.getByLabelText("Sichtprüfung");
+      expect(select).toHaveAccessibleDescription("Decklagenprofil prüfen.");
+      expect(within(select).getByRole("option", { name: "Annehmen" })).toHaveValue("ACCEPT");
+      expect(within(select).getByRole("option", { name: "Zurückweisen (AT)" })).toHaveValue("REJECT");
+
+      fireEvent.change(select, { target: { value: "REJECT" } });
+      fireEvent.change(screen.getByLabelText("Fehlerlänge (mm)"), { target: { value: "-1" } });
+      submit();
+      expect(onSubmit).not.toHaveBeenCalled();
+      expect(screen.getByLabelText("Fehlerlänge (mm)")).toHaveAccessibleDescription("Länge muss positiv sein.");
+
+      fireEvent.change(screen.getByLabelText("Fehlerlänge (mm)"), { target: { value: "3" } });
+      submit();
+      expect(onSubmit).toHaveBeenCalledWith({ visual_result: "REJECT", defect_length_mm: 3 });
+    });
+
+    it("defaults to the i18n language and falls back to the template default language", () => {
+      render(<DynamicForm template={LOCALISED} onSubmit={vi.fn()} />);
+      expect(i18n.language).toBe("en");
+      const select = screen.getByLabelText("Visual result");
+      expect(within(select).getByRole("option", { name: "Reject" })).toBeInTheDocument();
+
+      cleanup();
+      render(<DynamicForm template={LOCALISED} locale="fr" onSubmit={vi.fn()} />);
+      const fr = screen.getByLabelText("Sichtprüfung");
+      // No `fr`, no `de` entry on this option: first entry wins.
+      expect(within(fr).getByRole("option", { name: "Reject" })).toBeInTheDocument();
+    });
+
+    it("leaves a field without help undescribed", () => {
+      render(<DynamicForm template={TEMPLATE} onSubmit={vi.fn()} />);
+      expect(screen.getByLabelText("Remarks")).not.toHaveAttribute("aria-describedby");
+    });
   });
 
   it("uses a custom submit label and disables the form while busy", () => {

@@ -3,7 +3,8 @@ import { useTranslation } from "react-i18next";
 
 import type { JsonValue } from "../../lib/cel";
 import { evaluateForm } from "./engine";
-import type { FieldError, FormFieldDef, FormTemplate, FormValues, RuleEvaluator } from "./types";
+import { DEFAULT_TEMPLATE_LANGUAGE, localise } from "./localise";
+import type { FieldError, FormFieldDef, FormTemplate, FormValues, LocalisedString, RuleEvaluator } from "./types";
 
 export interface DynamicFormProps {
   template: FormTemplate;
@@ -15,6 +16,8 @@ export interface DynamicFormProps {
   onSubmit: (values: Record<string, JsonValue>) => void;
   submitLabel?: string;
   busy?: boolean;
+  /** BCP 47 locale for template strings; defaults to the active i18n language. */
+  locale?: string;
 }
 
 const INPUT = "w-full rounded border border-line bg-panel px-2 py-1";
@@ -28,8 +31,13 @@ export function DynamicForm({
   onSubmit,
   submitLabel,
   busy = false,
+  locale,
 }: DynamicFormProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  // Template content (labels, options, help, error messages) is localised from the template;
+  // UI chrome stays on `t()`.
+  const tx = (value: LocalisedString): string =>
+    localise(value, locale ?? i18n.language, template.default_language ?? DEFAULT_TEMPLATE_LANGUAGE);
   const formId = useId();
   const [values, setValues] = useState<FormValues>(initialValues);
   const [touched, setTouched] = useState<ReadonlySet<string>>(new Set());
@@ -47,7 +55,7 @@ export function DynamicForm({
 
   const errorText = (error: FieldError): string => {
     if (error.kind === "required") return t("shells.form.errors.required");
-    if (error.kind === "invalid") return error.message;
+    if (error.kind === "invalid") return tx(error.message);
     return t("shells.form.errors.ruleError");
   };
 
@@ -67,25 +75,35 @@ export function DynamicForm({
           const error = Object.hasOwn(evaluation.errors, field.field_key) ? evaluation.errors[field.field_key] : undefined;
           const shownError = error !== undefined && (submitted || touched.has(field.field_key)) ? error : undefined;
           const errorId = `${id}-error`;
+          const helpId = `${id}-help`;
+          const describedBy = [field.help !== undefined && helpId, shownError !== undefined && errorId]
+            .filter(Boolean)
+            .join(" ");
           // Static `required` or an active `required_if` (fail closed), computed by the engine.
           const required = evaluation.required.has(field.field_key);
           return (
             <div key={field.field_key} className="space-y-1">
               <label htmlFor={id} className="block text-sm font-medium">
-                {field.label}
+                {tx(field.label)}
                 {required && (
                   <span className="ml-1 text-danger" aria-hidden="true" title={t("shells.form.requiredMark")}>
                     *
                   </span>
                 )}
               </label>
+              {field.help !== undefined && (
+                <p id={helpId} className="text-sm text-muted">
+                  {tx(field.help)}
+                </p>
+              )}
               <FieldControl
                 field={field}
+                tx={tx}
                 id={id}
                 value={Object.hasOwn(values, field.field_key) ? values[field.field_key] : undefined}
                 required={required}
                 invalid={shownError !== undefined}
-                describedBy={shownError !== undefined ? errorId : undefined}
+                describedBy={describedBy === "" ? undefined : describedBy}
                 onChange={(value) => { setValue(field.field_key, value); }}
               />
               {shownError !== undefined && (
@@ -109,6 +127,8 @@ export function DynamicForm({
 
 interface FieldControlProps {
   field: FormFieldDef;
+  /** Resolves a localised template string. */
+  tx: (value: LocalisedString) => string;
   id: string;
   value: JsonValue | undefined;
   required: boolean;
@@ -117,7 +137,7 @@ interface FieldControlProps {
   onChange: (value: JsonValue) => void;
 }
 
-function FieldControl({ field, id, value, required, invalid, describedBy, onChange }: FieldControlProps) {
+function FieldControl({ field, tx, id, value, required, invalid, describedBy, onChange }: FieldControlProps) {
   const common = {
     id,
     name: field.field_key,
@@ -138,7 +158,7 @@ function FieldControl({ field, id, value, required, invalid, describedBy, onChan
           <option value="" />
           {(field.options ?? []).map((option) => (
             <option key={option.value} value={option.value}>
-              {option.label}
+              {tx(option.label)}
             </option>
           ))}
         </select>

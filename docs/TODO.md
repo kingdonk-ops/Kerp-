@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 152 · **Closed:** 98
+**Open:** 153 · **Closed:** 98
 
 ## decision (4)
 
@@ -64,7 +64,7 @@
 | [TD-131](../tracker/todo/TD-131.md) | Add a root .env.example for the dev stack (the implementer agent's permission rules block writing .env* files) | T-0003 | implementer |
 | [TD-208](../tracker/todo/TD-208.md) | Uploads infra: provision the kerp-vault bucket (CORS for browser PUT/GET, lifecycle on staging/), wire KERP_S3_* in compose, add MinIO to CI for the gated round-trip test | T-0016 | implementer |
 
-## deferred (29)
+## deferred (30)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -97,6 +97,7 @@
 | [TD-243](../tracker/todo/TD-243.md) | saved_views: expose portal views through the client portal layout | T-0020 | implementer |
 | [TD-248](../tracker/todo/TD-248.md) | Startup check that KERP_DEFAULT_TENANT_ID names an existing tenant row (needs the tenant table from T-0023) | T-0037 | implementer |
 | [TD-250](../tracker/todo/TD-250.md) | Request-context middleware: starlette ClientDisconnect (raised by request.body() after http.disconnect) is still logged as an unhandled 500; map it to 499/disconnected like CancelledError | T-0030 | implementer |
+| [TD-255](../tracker/todo/TD-255.md) | Dynamic Form Renderer: render section titles through localise() once the template schema has sections (T-0110) | T-0047 | implementer |
 
 ## later (61)
 
