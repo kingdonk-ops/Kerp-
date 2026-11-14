@@ -4,12 +4,16 @@ A project is a tenant-level row, so every write needs a session bound to the ten
 project (the request session until TD-122; ``Database.unit_of_work(TenancyContext(tid))``
 elsewhere). A project-bound session cannot create or change it (``OutOfScopeError``).
 Each change is appended to the audit chain ``project:<id>``. Authorisation is the router's.
+
+Modules that set a new project up (the validation module copies the tenant's default rule
+sets into it, ADR 0004 §2.3) register a **created listener**; ``create_project`` calls it in
+the same session and transaction, so a project never exists without its setup.
 """
 
 from __future__ import annotations
 
 import uuid
-from collections.abc import Collection
+from collections.abc import Callable, Collection
 from typing import Any, Final
 from zoneinfo import ZoneInfo
 
@@ -25,6 +29,7 @@ from app.modules.projects.schemas import ProjectCreate, ProjectUpdate
 
 __all__ = [
     "DuplicateProjectCodeError",
+    "add_created_listener",
     "create_project",
     "delete_project",
     "get_project",
@@ -34,6 +39,16 @@ __all__ = [
 ]
 
 CHAIN_PREFIX: Final = "project:"
+
+# ``listener(session, project)``: called by ``create_project`` once the row is flushed.
+CreatedListener = Callable[[Session, Project], None]
+_CREATED_LISTENERS: list[CreatedListener] = []
+
+
+def add_created_listener(listener: CreatedListener) -> None:
+    """Call ``listener`` for every project ``create_project`` creates (idempotent)."""
+    if listener not in _CREATED_LISTENERS:
+        _CREATED_LISTENERS.append(listener)
 
 
 class DuplicateProjectCodeError(ValueError):
@@ -82,6 +97,8 @@ def create_project(
     session.add(project)
     _flush(session, project.code)
     _audit(session, project, "create", actor_id)
+    for listener in list(_CREATED_LISTENERS):
+        listener(session, project)
     return project
 
 

@@ -46,6 +46,13 @@ request's scope was resolved from, so they are read once per request, T-0071):
   first project of a tenant is created through `service.create_project`. Creating grants no
   membership.
 
+## Setting a new project up
+
+`add_created_listener(listener)` registers `listener(session, project)`; `create_project`
+calls it in the creating session and transaction once the row is flushed, so a failure rolls
+the project back. The validation module copies the tenant's default rule sets into the new
+project this way (ADR 0004 §2.3, T-0034).
+
 ## Using it from another module
 
 ```python
