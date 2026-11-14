@@ -16,8 +16,8 @@ Additive apart from the policy swap, which is the core-table change TD-053 decid
 spec §6 amendments). The RLS DDL is inlined (frozen at this revision). The downgrade restores
 the standard policies of ``0006``/``0008`` and drops the table and function.
 
-Revision ID: 0014
-Revises: 0013
+Revision ID: 0015
+Revises: 0014
 Create Date: 2026-11-14
 """
 
@@ -28,8 +28,8 @@ from alembic import op
 
 from app.core.db import GUID, JSONType
 
-revision: str = "0014"
-down_revision: str | None = "0013"
+revision: str = "0015"
+down_revision: str | None = "0014"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

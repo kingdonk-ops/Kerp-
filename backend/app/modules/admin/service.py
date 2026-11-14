@@ -36,7 +36,7 @@ from app.modules.admin.models import AdminGrant
 from app.modules.admin.schemas import UserCreate, UserUpdate
 from app.modules.projects import service as projects
 
-# The security-definer function of migration 0014: the caller's own live grant kinds.
+# The security-definer function of migration 0015: the caller's own live grant kinds.
 CALLER_GRANTS_FUNCTION: Final = "kerp_caller_admin_grants"
 
 

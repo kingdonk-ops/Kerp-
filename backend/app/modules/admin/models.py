@@ -3,7 +3,7 @@
 One row per user and grant: ``system_admin`` (runs the deployment) or ``create_projects``
 (Project Admin). A grant is neither a persona nor a project membership and confers no
 capability (no ``A``/``S``, TD-151). The row is tenant-level (no project) and has its own RLS
-policy (migration ``0014``): a user reads their own rows (``app.current_user_id``); an
+policy (migration ``0015``): a user reads their own rows (``app.current_user_id``); an
 ``app.is_system_admin`` session reads and writes all; nobody else writes. Revoking a grant
 soft-deletes it; at most one live row per user and grant.
 """

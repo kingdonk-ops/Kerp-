@@ -5,7 +5,7 @@ stays in code and RLS but is never taken or returned by this API.
 
 | File | What |
 |---|---|
-| `models.py` | `oe_admin_grant` (`BaseRecordMixin`, tenant-level, own `admin_grant` RLS policy; migration `0014`) |
+| `models.py` | `oe_admin_grant` (`BaseRecordMixin`, tenant-level, own `admin_grant` RLS policy; migration `0015`) |
 | `schemas.py` | `UserCreate` / `UserUpdate` / `UserRead`, `UserLookupRequest` / `UserSummary`, `GrantIn` / `MemberAssign` / `MemberRead` / `MemberAssigned` |
 | `service.py` | `own_admin_grants` (registered as core's admin-grant lookup), `grant` / `revoke`, `create_user` / `update_user` / `lookup_user`, `project_members` / `assign_member` / `remove_member` |
 | `router.py` | `/api/v1/admin/...` (below) |

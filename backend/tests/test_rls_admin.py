@@ -1,7 +1,7 @@
 """Admin grants and membership-based visibility under PostgreSQL RLS (T-0014, TD-053, edge
 spec §6 amendments).
 
-Raw SQL skips the ORM scope, so only the policies of migration ``0014`` decide here. Needs
+Raw SQL skips the ORM scope, so only the policies of migration ``0015`` decide here. Needs
 real PostgreSQL and the ``NOSUPERUSER NOBYPASSRLS`` role ``kerp_app`` (CI's PostgreSQL step).
 All data is synthetic.
 """

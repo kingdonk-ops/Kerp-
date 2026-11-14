@@ -113,7 +113,7 @@ class ProjectMembership(Base, BaseRecordMixin):
             f"persona <> '{SITE_INSPECTOR}' OR site_node_id IS NOT NULL", name="inspector_site"
         ),
         # Membership-based policy (T-0014, TD-053): visible for the described project or the
-        # caller's own rows (the scope resolver reads those, TD-152); migration 0014.
+        # caller's own rows (the scope resolver reads those, TD-152); migration 0015.
         rls_table_info(
             RlsPolicy("membership", owner_column="user_id", project_column="member_project_id")
         ),

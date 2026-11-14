@@ -546,10 +546,10 @@ def test_me_projects_lists_the_callers_live_projects(api: Api) -> None:
     assert api.client.get("/api/v1/me/projects", headers=api.headers(DAVE)).json() == []
 
 
-def test_migration_0014_inlines_exactly_the_live_policy_sql() -> None:
+def test_migration_0015_inlines_exactly_the_live_policy_sql() -> None:
     """The migration's frozen DDL equals ``rls_policy_sql`` for each table at this revision."""
     versions = Path(__file__).resolve().parents[1] / "migrations" / "versions"
-    spec = importlib.util.spec_from_file_location("m0014", next(versions.glob("0014_*.py")))
+    spec = importlib.util.spec_from_file_location("m0015", next(versions.glob("0015_*.py")))
     assert spec is not None
     assert spec.loader is not None
     migration = importlib.util.module_from_spec(spec)
