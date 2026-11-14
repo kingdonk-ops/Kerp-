@@ -282,6 +282,7 @@ def test_me_returns_the_token_user(client: TestClient, users: dict[str, uuid.UUI
         "tenant_id": str(T1),
         "email": ALICE,
         "display_name": "Alice Example",
+        "is_internal": False,
     }
 
 

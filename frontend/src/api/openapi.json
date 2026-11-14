@@ -2286,6 +2286,11 @@
           "display_name": {
             "type": "string",
             "title": "Display Name"
+          },
+          "is_internal": {
+            "type": "boolean",
+            "title": "Is Internal",
+            "description": "Internal staff (read-only, derived at sign-in from the company Entra link or the deployment's internal e-mail domains); grants no access by itself"
           }
         },
         "type": "object",
@@ -2293,7 +2298,8 @@
           "id",
           "tenant_id",
           "email",
-          "display_name"
+          "display_name",
+          "is_internal"
         ],
         "title": "MeResponse"
       },

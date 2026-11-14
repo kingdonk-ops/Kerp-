@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import json
 import uuid
+from collections.abc import Collection
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 
@@ -48,6 +49,7 @@ from app.core.auth.passwords import hash_password, verify_password
 from app.core.auth.providers import AuthProvider, LocalPasswordProvider, PasswordCredentials
 from app.core.auth.runtime import AuthRuntime
 from app.core.auth.tokens import InvalidTokenError, IssuedToken, TokenClaims
+from app.core.config import get_settings
 from app.core.db import utcnow
 from app.core.tenancy.context import TenancyContext
 from app.core.tenancy.rls import bind_tenancy
@@ -63,6 +65,35 @@ class TokenPair:
     refresh: IssuedToken
 
 
+def email_domain_is_internal(email: str, domains: Collection[str]) -> bool:
+    """Whether ``email``'s domain is on the internal list: exact and case-insensitive, so a
+    subdomain is another domain (``domains`` are lower-cased by the settings)."""
+    domain = normalize_email(email).rpartition("@")[2]
+    return bool(domain) and domain in domains
+
+
+def derive_is_internal(user: User, domains: Collection[str]) -> bool:
+    """The internal-staff rule (diff §4.1, ADR 0009): linked to a member account of the
+    company Entra tenant (only members are ever linked, T-0054) or a listed e-mail domain."""
+    return user.entra_oid is not None or email_domain_is_internal(user.email, domains)
+
+
+def refresh_internal_flag(user: User, domains: Collection[str]) -> None:
+    """Recompute ``is_internal`` (account creation, every sign-in). Writes only on change, so a
+    sign-in does not bump the row's revision for nothing."""
+    internal = derive_is_internal(user, domains)
+    if user.is_internal is not internal:
+        user.is_internal = internal
+
+
+def is_internal_user(session: Session, user_id: uuid.UUID) -> bool:
+    """Whether ``user_id`` is internal staff: the one way other modules read the flag
+    (CLAUDE.md §6). ``False`` for an unknown user or one outside the session's tenant. The
+    flag grants no access by itself."""
+    flag = session.scalars(select(User.is_internal).where(User.id == user_id)).one_or_none()
+    return bool(flag)
+
+
 def create_user(
     session: Session,
     *,
@@ -71,8 +102,15 @@ def create_user(
     password: str | None,
     display_name: str = "",
     source: str = "api",
+    internal_domains: Collection[str] | None = None,
 ) -> User:
-    """Add a tenant-level user (admin/onboarding tasks build on this). Caller commits."""
+    """Add a tenant-level user (admin/onboarding tasks build on this). Caller commits.
+
+    ``is_internal`` is derived here from ``internal_domains`` (default: the deployment's
+    ``KERP_INTERNAL_EMAIL_DOMAINS``), never taken from the caller.
+    """
+    if internal_domains is None:
+        internal_domains = get_settings().internal_email_domains
     user = User(
         tenant_id=tenant_id,
         project_id=None,
@@ -80,8 +118,10 @@ def create_user(
         display_name=display_name,
         password_hash=hash_password(password) if password is not None else None,
         is_active=True,
+        is_internal=False,
         source=source,
     )
+    refresh_internal_flag(user, internal_domains)
     session.add(user)
     session.flush()
     return user
@@ -163,6 +203,7 @@ class AuthService:
             raise AuthenticationError("invalid credentials")
         self.login_lockout.succeeded(per_client)
         self.login_account_lockout.succeeded(account)
+        self._signed_in(user)
         return self._issue_pair(user.id, tenant, uuid.uuid4())
 
     def refresh(self, session: Session, refresh_token: str) -> TokenPair:
@@ -214,6 +255,7 @@ class AuthService:
         ).one_or_none()
         if user is None or not user.is_active:
             raise AuthenticationError("user not active")
+        self._signed_in(user)
         session_id = uuid.uuid4()
         # The PIN gate first: a session must never have a registered refresh token without
         # it, or plain ``/refresh`` would accept that token.
@@ -244,6 +286,12 @@ class AuthService:
         pair = self._rotate(session, claims)
         self.runtime.store.set_pin(session_id, pin_hash, self._pin_ttl())  # re-arm the gate
         return pair
+
+    def _signed_in(self, user: User) -> None:
+        """Every successful sign-in (password, magic link; SSO with T-0054) recomputes the
+        internal flag, so a domain removed from the list takes effect at the next one. A
+        refresh or PIN unlock continues a session and is not a sign-in."""
+        refresh_internal_flag(user, self.runtime.settings.internal_email_domains)
 
     def _live_refresh_claims(self, refresh_token: str) -> TokenClaims:
         try:

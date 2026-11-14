@@ -246,5 +246,9 @@ def logout(principal: CurrentPrincipal, service: AuthServiceDep, response: Respo
 def me(principal: CurrentPrincipal) -> MeResponse:
     user = principal.user
     return MeResponse(
-        id=user.id, tenant_id=user.tenant_id, email=user.email, display_name=user.display_name
+        id=user.id,
+        tenant_id=user.tenant_id,
+        email=user.email,
+        display_name=user.display_name,
+        is_internal=user.is_internal,
     )

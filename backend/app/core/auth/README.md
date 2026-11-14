@@ -14,10 +14,10 @@ rewritten (HS256 → RS256/EdDSA + JWKS + `jti` revocation in Redis).
 | `bearer.py` | `get_bearer`: verifies the `Authorization: Bearer` token once per request (no DB) |
 | `deps.py` | `CurrentPrincipal` (401 unless a valid token of an active user), `require_claims` |
 | `providers.py` | `AuthProvider` seam + `LocalPasswordProvider` (Entra ID SSO later: TD-043) |
-| `service.py` | `AuthService` login / refresh / logout / magic link / PIN unlock; `create_user`, `set_password` |
+| `service.py` | `AuthService` login / refresh / logout / magic link / PIN unlock; `create_user`, `set_password`; internal staff rule (`is_internal_user`, T-0049) |
 | `field.py` | Magic-link tokens + delivery seam, PIN rules (T-0009) |
 | `lockout.py` | `ProgressiveLockout` + policies, Redis-backed (T-0009) |
-| `models.py` | `auth_user` table (tenant-level rows, RLS) — migration `0003`; `auth_project_membership` (T-0010) — migration `0006`, persona CHECK widened for PER-16 in `0012` (T-0076) |
+| `models.py` | `auth_user` table (tenant-level rows, RLS) — migration `0003`, internal staff flag + Entra link in `0013` (T-0049, ADR 0009); `auth_project_membership` (T-0010) — migration `0006`, persona CHECK widened for PER-16 in `0012` (T-0076) |
 | `access.py` | Persona matrix, capability tiers, SoD, scope resolution, `require_capability` / `require_hold_release` guards (T-0010) |
 | `router.py`, `schemas.py` | HTTP endpoints below |
 
@@ -29,7 +29,7 @@ rewritten (HS256 → RS256/EdDSA + JWKS + `jti` revocation in Redis).
 | `POST /api/v1/auth/login` | none | `{email, password}` → `TokenResponse` (`no-store`) + refresh cookie; a `tenant_id` field is `422`; `429` when locked |
 | `POST /api/v1/auth/refresh` | refresh cookie + Origin | new `TokenResponse` + cookie (rotation); `401` for PIN-gated or ended sessions; `403` cross-origin |
 | `POST /api/v1/auth/logout` | bearer | `204`; revokes the token and its whole login session; clears the refresh cookie |
-| `GET /api/v1/auth/me` | bearer | `{id, tenant_id, email, display_name}` |
+| `GET /api/v1/auth/me` | bearer | `{id, tenant_id, email, display_name, is_internal}` (`is_internal` read-only, below) |
 | `POST /api/v1/auth/magic-link` | none | `{email}` → always `202`; sends a 15-min one-time link to an active user; `429` when throttled |
 | `POST /api/v1/auth/magic-link/redeem` | none | `{token, pin}` → `TokenResponse` + cookie of a new **PIN-gated** session |
 | `POST /api/v1/auth/pin/unlock` | refresh cookie + Origin | `{pin}` → rotated `TokenResponse` + cookie; `429` when locked; `403` cross-origin |
@@ -42,6 +42,36 @@ body ever carries the refresh token (below).
 names the tenant to the user. Production refuses to start without it (app startup). That the
 id names an existing tenant row is checked once first-run provisioning creates the tenant
 table (T-0023, TD-248).
+
+## Internal staff (T-0049, ADR 0009)
+
+Diff §4.1 *Internal staff*. `auth_user` carries (migration `0013`, additive):
+
+| Column | Type | Meaning |
+|---|---|---|
+| `is_internal` | boolean, not null, default `false` | Derived internal-staff flag (below) |
+| `entra_oid` | string(64), nullable | Object id of the linked **member** account of the company Entra tenant; unique per tenant (`uq_auth_user_tenant_entra_oid`). Set by the first SSO sign-in (T-0054) |
+| `entra_tid` | string(64), nullable | The Entra tenant id that vouched for the link |
+
+**Rule.** `is_internal` is true when `entra_oid` is set (T-0054 links members only and refuses
+guests) **or** the e-mail's domain is on `KERP_INTERNAL_EMAIL_DOMAINS`: exact, case-insensitive
+match, so `eu.company.example` is not `company.example`. False otherwise. It is recomputed by
+`create_user` and at every successful sign-in (password, magic-link redeem; SSO with T-0054),
+never at refresh or PIN unlock (they continue a session). Removing a domain takes effect at the
+user's next sign-in. A sign-in writes the row only when the flag changes.
+
+**Never input, never a claim.** No request body accepts `is_internal`, `entra_oid` or
+`entra_tid` (`422`; the admin create/update schemas of T-0014 must keep it that way) and the
+tokens carry no such claim. `/auth/me` shows the stored flag, read-only. Other modules read it
+only through `service.is_internal_user(session, user_id)` (false for an unknown user or one of
+another tenant), never the table. **It grants nothing:** not a persona or capability; a
+non-member internal user gets `404` on a project like anyone else. Its one use is the lobby
+list (T-0040).
+
+**`KERP_INTERNAL_EMAIL_DOMAINS`** (deployment configuration): comma-separated domains, e.g.
+`company.example,company-group.example`. Entries are trimmed, lower-cased and de-duplicated;
+an entry with `@`, whitespace or `*` stops the app at startup (settings validation). Empty or
+unset: no domain rule, only the Entra link makes an account internal.
 
 ## Refresh cookie (web SPA, T-0037)
 
@@ -200,6 +230,7 @@ session's bound project (or no bound project) → `404`; a member without the au
 | `KERP_ACCESS_TOKEN_MINUTES` | `15` | 1–15 |
 | `KERP_REFRESH_TOKEN_HOURS` | `12` | 1–24; session length from sign-in |
 | `KERP_DEFAULT_TENANT_ID` | unset | The deployment's one tenant (TD-120); required in production |
+| `KERP_INTERNAL_EMAIL_DOMAINS` | empty | Comma-separated e-mail domains of internal staff (exact match, no wildcards; see *Internal staff*); a malformed entry refuses startup |
 | `KERP_WEB_ORIGIN` | unset | Web SPA origin allowed on the cookie endpoints; unset = the API's own origin as the request sees it (behind a TLS-terminating proxy set this, or trust the proxy with `FORWARDED_ALLOW_IPS`) |
 | `KERP_REDIS_URL` | unset | Revocation store |
 
