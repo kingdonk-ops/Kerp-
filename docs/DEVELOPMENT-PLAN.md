@@ -189,9 +189,15 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
   `invite_token` and `setup_token` are invalidated, fresh ones issued with a new expiry, the
   invitee e-mailed again, the re-sender shown the new copyable link (`invite_token` only);
   audited and rate-limited (1 per 60 s, 5 per 24 h per project + invited e-mail, creations included; diff §4.1). A typeable invite
-  code is deferred (TD-264, planner default: link only). (4) Hardening the permission files
+  code was deferred (TD-264; since resolved: no code). (4) Hardening the permission files
   against agent edits through Bash is a later item (TD-263). Updated: T-0052, T-0053, T-0059,
   T-0077, TD-262. Raised: TD-263, TD-264.
+
+- **2026-11-14 — invite confirmations (product owner, binding):** no invite code, invites are
+  links only (TD-264 resolved); re-send limits 1 per 60 s and 5 per 24 h per project + invited
+  e-mail, re-send of expired never-accepted invites, and re-send by any PER-09 of the project or
+  a System admin are confirmed (diff §4.1 Re-send). Updated: T-0052 (also: POST /invites returns
+  429 at the cap), T-0053, T-0059, TD-264.
 
 ## Key engineering decisions (baked into the spec — see consolidation diff)
 
