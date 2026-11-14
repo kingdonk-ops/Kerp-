@@ -219,7 +219,8 @@ Wins over any earlier text on tenant selection, tenant administrators and projec
   - **Existing user, signed in:** opening the invite link shows a one-click **"Join project"**
     confirmation; accepting creates the membership and opens the project.
   - **Existing or brand-new user, not signed in:** the token survives the sign-in, the
-    first-time password set and the Entra ID SSO round trip (§4.5); the server grants the
+    first-time password set, the magic link (only for invites naming PER-14, §4.2; other invitees
+  use password or SSO) and the Entra ID SSO round trip (§4.5); the server grants the
     membership **immediately after authentication**, in the same request that completes it, and
     the client opens the project. The lobby is skipped.
   - The token is a secret in a URL: the invite link carries it in the URL **fragment**
@@ -229,6 +230,9 @@ Wins over any earlier text on tenant selection, tenant administrators and projec
   - Until e-mail delivery exists (TD-084) the inviter copies the invite link from the invite
     response and passes it on; e-mail delivery and the first-time password set through an
     e-mailed invite are the follow-up task.
+  - **Pilot-0 (product owner, 2026-11-14):** invites are part of the Pilot-0 gate; the invite
+    flow is exercised in the pilot deployment (T-0146), with the link copied by the inviter
+    until e-mail delivery exists.
   - **Team links need no user action.** A System admin linking a team to a project (or adding a
     user to a linked team) grants access directly (ADR 0008); there is no invite or click.
 - **Internal staff (product owner, 2026-11-14).** Each user account carries a derived
@@ -332,8 +336,23 @@ Wins over any earlier text on tenant selection, tenant administrators and projec
   counter. The server does not reject queued mutations because of the grace (they carry author
   and device and arrive under a fresh session); it **flags** a mutation whose reconstructed
   `occurred_at` (§6.4.1) falls after `session_expires_at + offline_grace_hours` for review
-  (`grace_exceeded`, possible tampered or rooted device) without dropping it. Interaction with
-  the 7-day window: TD-257.
+  (`grace_exceeded`, possible tampered or rooted device) without dropping it. **Interaction with
+  the offline window confirmed (product owner, 2026-11-14; TD-257 resolved):** the grace binds
+  edits; `offline_window_days` stays only as an upper bound (and the sizing of sync and outbox
+  for 14 days). With the defaults about 36 h offline after the last sign-in is enough; the window
+  does not extend the grace for multi-day offline sites.
+- **Magic links for Field Workers only (product owner, 2026-11-14; TD-136).** Sign-in by magic
+  link (`POST /api/v1/auth/magic-link`, redeem) is limited to users who hold **PER-14 Field
+  Worker** on at least one project (effective grants, direct or team-derived, §4.1; memberships
+  on soft-deleted projects ignored), or who carry a valid pending invite (§4.1 Invites) for
+  their e-mail that names PER-14. For anyone else the request gets the **same neutral 202** as
+  an unknown e-mail and no link is issued or sent (no account or persona enumeration; the
+  refusal is logged and audited without the token). Redeem re-checks eligibility, so a link
+  issued before the user lost their last PER-14 grant is refused. All other users sign in with
+  password or, for internal staff, Entra ID SSO (§4.5). The rule covers the KERP sign-in magic
+  link only; portal-scoped record links for people without an account
+  (`modules/portal-plan-review.md` §1.1) are a separate mechanism (planner reading; PER-15 and
+  the phase-7 portal: TD-261).
 
 ### 4.3 Devices (user, 2026-11-13; TD-164, decision 17a — Pilot-0 scope)
 
@@ -403,8 +422,8 @@ user is and nothing else.
   token is treated as a guest, and the sign-in refused ("sign in with the method from your
   invitation"), when the `acct` claim is not `0` (missing counts as not proven) or an `idp`
   claim is present and differs from the pinned issuer. Guests (client representatives,
-  subcontractors added to the company tenant) use password or magic link like other external
-  users and never become internal through Entra. **Deployment prerequisite:** the `acct`
+  subcontractors added to the company tenant) use password (or magic link if they are Field
+  Workers, §4.2) like other external users and never become internal through Entra. **Deployment prerequisite:** the `acct`
   optional claim must be enabled on the app registration; without it **every** SSO sign-in is
   refused. Such refusals are logged with the distinct reason `acct_claim_missing`; the server
   logs a start-up warning naming the required optional claims whenever SSO is enabled, and the
@@ -439,9 +458,14 @@ user is and nothing else.
 - **Session.** SSO is a second `AuthProvider` behind the existing seam (TD-003); on success it
   issues the **same KERP session** as a password sign-in: 15-minute access token, refresh token
   ending 12 h after sign-in (§4.2), cookie or native body transport, device enrolment and PIN
-  set-up for field clients (§4.3). Password and magic-link sign-in stay available (invited
-  external users keep them); whether internal users must use SSO only is not decided for the
-  pilot.
+  set-up for field clients (§4.3).
+- **SSO promoted, password kept (product owner, 2026-11-14).** Internal staff **should** sign in
+  with Entra ID SSO, but SSO is **not enforced**: password sign-in stays allowed for internal
+  users too, and there is no SSO-only mode and no lockout of password login by e-mail domain or
+  `is_internal`. When SSO is enabled the sign-in screen (web and Android) shows "Sign in with
+  Microsoft" as the **primary, default option**, with password sign-in available on the same
+  screen as a secondary option; the magic-link request stays available for Field Workers
+  (§4.2). External users keep password (and magic link if PER-14).
 - **Pilot-0.** Live SSO in the pilot deployment satisfies the daily re-login dependency of §4.2
   and is part of the Pilot-0 gate (T-0146).
 

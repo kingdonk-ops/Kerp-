@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 157 · **Closed:** 99
+**Open:** 156 · **Closed:** 101
 
 ## decision (5)
 
@@ -13,7 +13,7 @@
 | [TD-213](../tracker/todo/TD-213.md) | Object key layout: confirm {tenant}/{project}/{module}/{sha256} (no extension) instead of the master spec's {hash}.ext, plus transient staging/ and quarantine/ prefixes | T-0016 | implementer |
 | [TD-223](../tracker/todo/TD-223.md) | Who may open PRs to dev? If any account other than KERP_ALLOWED_REVIEWERS (or forks) can, require a human approval as well as review-gate | T-0067 | reviewer |
 | [TD-224](../tracker/todo/TD-224.md) | Magic-link request lockout is still per tenant+email: anyone can keep a known field worker from getting a link (4/hour, then doubling delay); decide per-client keying vs mailbox-flood protection | T-0068 | reviewer |
-| [TD-257](../tracker/todo/TD-257.md) | Offline grace (24 h after the server session ends) vs the 7-day offline window: confirm the grace binds edits and the window stays only as an upper bound | T-0143, T-0044 | planner |
+| [TD-261](../tracker/todo/TD-261.md) | Client Portal Users (PER-15, phase-7 portal) and magic links: confirm PER-15 signs in by password/SSO only after the PER-14-only magic-link decision | T-0057 | planner |
 
 ## spec-gap (36)
 
@@ -65,7 +65,7 @@
 | [TD-131](../tracker/todo/TD-131.md) | Add a root .env.example for the dev stack (the implementer agent's permission rules block writing .env* files) | T-0003 | implementer |
 | [TD-208](../tracker/todo/TD-208.md) | Uploads infra: provision the kerp-vault bucket (CORS for browser PUT/GET, lifecycle on staging/), wire KERP_S3_* in compose, add MinIO to CI for the gated round-trip test | T-0016 | implementer |
 
-## deferred (31)
+## deferred (30)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -76,7 +76,6 @@
 | [TD-074](../tracker/todo/TD-074.md) | Handover: offline drafting on tablets via the Dexie outbox | E-04-11 | planner |
 | [TD-122](../tracker/todo/TD-122.md) | Bind the request's project scope from the authorised project (tenancy context is tenant-level after T-0008) | T-0008 | implementer |
 | [TD-129](../tracker/todo/TD-129.md) | Guard the module toggle API (PUT /api/v1/modules/{name}) with the admin capability tier once RBAC lands (T-0010/T-0014) | T-0011 | implementer |
-| [TD-136](../tracker/todo/TD-136.md) | Restrict magic-link sign-in to the Field Worker persona (PER-14) once T-0010 personas exist | T-0009 | implementer |
 | [TD-140](../tracker/todo/TD-140.md) | Compile-on-save checks CEL rules only at top-level variables; field-level type checking against kind context schemas | T-0018 | implementer |
 | [TD-145](../tracker/todo/TD-145.md) | Wire the project switcher to the projects/membership API and gate All-Projects on the allowed project list | T-0024 | implementer |
 | [TD-146](../tracker/todo/TD-146.md) | Send the selected project scope with API requests and key cached queries by scope | T-0024 | implementer |
@@ -264,6 +263,7 @@
 | ✅ | [TD-120](../tracker/todo/TD-120.md) | Login tenant resolution: how a user picks the tenant at sign-in (multi-tenant accounts, MOD-01 cross-tenant collaboration) | 3a: tenant_id + RLS kept but hidden (one tenant per deployment); System admins appoint Project Admins (create_projects grant) who create projects and get PER-09 on them; PER-09 assigns users to its projects; admin roles never confer hold release or sign-off; one URL, top-bar project picker (one project -> in, several -> last used), lobby of visible-in-lobby projects with access requests decided by the project's admins, other projects by invite or project code. Spec diff §4.1, edge §5/§6, master §1.1/MOD-01; tasks T-0014, T-0023, T-0026, T-0037, T-0039..T-0042 (user, 2026-11-13) |
 | ✅ | [TD-121](../tracker/todo/TD-121.md) | Refresh-token lifetime, absolute session lifetime and SPA refresh-token transport are unspecified | 4c: access 15 min, refresh 12 h from sign-in (rotation never extends it, KERP_REFRESH_TOKEN_HOURS=12), daily re-login; offline local PIN unlock does not depend on a valid refresh token, so the 7-14 day offline window still works. Spec diff §4.2; task T-0037. SPA cookie transport decided in TD-203 (user, 2026-11-13) |
 | ✅ | [TD-135](../tracker/todo/TD-135.md) | Field-worker PIN semantics: confirm server-checked PIN per session that gates every refresh, and the lockout/magic-link numbers | 8a: hybrid PIN per enrolled device: local unlock against a keystore key (offline, no token needed); server asks for the PIN only on renewal after idle (KERP_PIN_IDLE_MINUTES, default 30); lockout numbers and server-side per-device counter kept. Spec diff §4.2; rework in T-0038 (server) and T-0143 (client) (user, 2026-11-13) |
+| ✅ | [TD-136](../tracker/todo/TD-136.md) | Restrict magic-link sign-in to the Field Worker persona (PER-14) once T-0010 personas exist | Product owner, 2026-11-14: KERP sign-in magic links are limited to Field Workers (PER-14 on at least one project, or a pending invite naming PER-14); anyone else gets the same neutral 202 and no link. Spec diff §4.2 (Magic links for Field Workers only); task T-0057, invite carry-through in T-0052; PER-15 / phase-7 portal question in TD-261 |
 | ✅ | [TD-139](../tracker/todo/TD-139.md) | Confirm per-kind rule context schemas and action vocabularies (validation compiler) | 9a: rule context schemas, p6_grammar groups and action vocabularies confirmed as built and recorded in ADR 0004 Addendum F; frozen by T-0131 (user, 2026-11-13) |
 | ✅ | [TD-141](../tracker/todo/TD-141.md) | Rule store: explicit per-rule version column, findings log only non-passing rules | per-rule version column; findings log only failed/errored rules. (user, 2026-11-13) |
 | ✅ | [TD-148](../tracker/todo/TD-148.md) | Module-to-navigation-group mapping for the 8-group IA is unspecified | 6a: module -> nav group mapping written into diff §6.1 (items may move later) (user, 2026-11-13) |
@@ -300,3 +300,4 @@
 | ✅ | [TD-242](../tracker/todo/TD-242.md) | saved_views: team visibility needs the teams module (T-0013) - pass the caller's team ids into Viewer and validate team_id | Scheduled as T-0074 (user decision TD-230, 2026-11-13): saved_views team visibility wired to the teams contract and widened from a single team_id to several linked teams |
 | ✅ | [TD-244](../tracker/todo/TD-244.md) | register-views spec 3: oe_saved_view lists no team reference and one is_default for two kinds of default | Team part decided (user, 2026-11-13): several teams per view via a view-team link, all linked to the view's project (register-views 3, T-0074); the is_default reading of T-0020 stands as built |
 | ✅ | [TD-251](../tracker/todo/TD-251.md) | Team-to-project link role: the persona matrix has no read-only 'Viewer' or generic 'Editor' role - which roles may a team link carry? | Decided (product owner, 2026-11-13): team-project links may grant PER-01..PER-14 excluding PER-09, plus the new PER-16 Project Viewer (Viewer tier, V only, single project, no hold/approval/sign authority, no SoD implications; linkable and individually assignable); PER-09 and PER-15 remain strictly individual (auditability, blast-radius control). Edge 5.2 amended; PER-16 built by T-0076 |
+| ✅ | [TD-257](../tracker/todo/TD-257.md) | Offline grace (24 h after the server session ends) vs the 7-day offline window: confirm the grace binds edits and the window stays only as an upper bound | Product owner, 2026-11-14: confirmed. The 24 h offline grace after the session end binds edits; offline_window_days stays only as an upper bound (about 36 h offline with the defaults is enough; the window does not extend the grace). Spec diff §4.2; tasks T-0143, T-0044 unchanged in substance |
