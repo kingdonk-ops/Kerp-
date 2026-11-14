@@ -8,7 +8,7 @@
 * ``oe_validation_unlock_request``: the two-person unlock of a locked tenant-layer rule
   (ADR 0004 §5, Amendment B, TD-116; T-0034).
 
-All use ``BaseRecordMixin`` and are under project RLS (migrations ``0005``, ``0013``).
+All use ``BaseRecordMixin`` and are under project RLS (migrations ``0005``, ``0014``).
 """
 
 from __future__ import annotations

@@ -8,7 +8,7 @@ Built fresh; Inspection-ERP's `Finding(key, severity, message)` shape was a refe
 
 | File | What |
 |---|---|
-| `models.py` | `oe_validation_rule_set`, `oe_validation_rule`, `oe_validation_finding` (migration `0005`), `oe_validation_unlock_request` (migration `0013`); all `BaseRecordMixin` + RLS |
+| `models.py` | `oe_validation_rule_set`, `oe_validation_rule`, `oe_validation_finding` (migration `0005`), `oe_validation_unlock_request` (migration `0014`); all `BaseRecordMixin` + RLS |
 | `compiler.py` | compile-on-save: kind/engine rules, per-kind CEL context schema, RE2 regex compile |
 | `defaults.py` | system default seed files `app/modules/<m>/rules/defaults/*.yaml`: `load_defaults()` |
 | `service.py` | rule store (`create_rule_set`, `save_rule`, `set_rule_enabled`, `delete_rule`, `reset_rule`, `reset_rule_set`), layers (`sync_system_layer`, `sync_system_defaults`, `seed_tenant`, `seed_project`, `copy_module_defaults`), unlock (`request_unlock`, `approve_unlock`, `reject_unlock`), `resolve_rule_set`, `run_checks` |

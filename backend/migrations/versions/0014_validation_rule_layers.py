@@ -4,8 +4,8 @@ Additive: nullable columns on ``oe_validation_rule_set`` (``module``, ``seed_ver
 ``oe_validation_rule`` (``label``, ``unlock_adr_reference``), and the new table
 ``oe_validation_unlock_request`` under project-scoped RLS (T-0007) on PostgreSQL.
 
-Revision ID: 0013
-Revises: 0012
+Revision ID: 0014
+Revises: 0013
 Create Date: 2026-11-14
 """
 
@@ -17,8 +17,8 @@ from alembic import op
 from app.core.db import GUID, JSONType
 from app.core.tenancy.rls import rls_policy_sql
 
-revision: str = "0013"
-down_revision: str | None = "0012"
+revision: str = "0014"
+down_revision: str | None = "0013"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

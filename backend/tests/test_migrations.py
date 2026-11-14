@@ -42,7 +42,7 @@ def test_upgrade_head_then_check_is_clean(url: str) -> None:
         engine = create_engine(url)
         try:
             with engine.connect() as conn:
-                assert MigrationContext.configure(conn).get_current_revision() == "0013"
+                assert MigrationContext.configure(conn).get_current_revision() == "0014"
         finally:
             engine.dispose()
     finally:
