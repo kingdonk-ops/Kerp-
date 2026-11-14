@@ -188,7 +188,7 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
   holders and a System admin re-send a pending (or expired, never accepted) invite; the old
   `invite_token` and `setup_token` are invalidated, fresh ones issued with a new expiry, the
   invitee e-mailed again, the re-sender shown the new copyable link (`invite_token` only);
-  audited and rate-limited (1 per 60 s, 5 per 24 h per invite; diff §4.1). A typeable invite
+  audited and rate-limited (1 per 60 s, 5 per 24 h per project + invited e-mail, creations included; diff §4.1). A typeable invite
   code is deferred (TD-264, planner default: link only). (4) Hardening the permission files
   against agent edits through Bash is a later item (TD-263). Updated: T-0052, T-0053, T-0059,
   T-0077, TD-262. Raised: TD-263, TD-264.
