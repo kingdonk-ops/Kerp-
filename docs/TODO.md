@@ -3,9 +3,9 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 155 · **Closed:** 103
+**Open:** 157 · **Closed:** 103
 
-## decision (5)
+## decision (6)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -14,6 +14,7 @@
 | [TD-223](../tracker/todo/TD-223.md) | Who may open PRs to dev? If any account other than KERP_ALLOWED_REVIEWERS (or forks) can, require a human approval as well as review-gate | T-0067 | reviewer |
 | [TD-224](../tracker/todo/TD-224.md) | Magic-link request lockout is still per tenant+email: anyone can keep a known field worker from getting a link (4/hour, then doubling delay); decide per-client keying vs mailbox-flood protection | T-0068 | reviewer |
 | [TD-261](../tracker/todo/TD-261.md) | Client Portal Users (PER-15, phase-7 portal) and magic links: confirm PER-15 signs in by password/SSO only after the PER-14-only magic-link decision | T-0057 | planner |
+| [TD-264](../tracker/todo/TD-264.md) | Invites: add a short human-typeable invite code as an alternative to the invite link, or keep link-only? | T-0052 | planner |
 
 ## spec-gap (35)
 
@@ -99,7 +100,7 @@
 | [TD-255](../tracker/todo/TD-255.md) | Dynamic Form Renderer: render section titles through localise() once the template schema has sections (T-0110) | T-0047 | implementer |
 | [TD-258](../tracker/todo/TD-258.md) | Server-side user preferences: the outdoor theme choice is remembered per user in this browser's localStorage only (kerp.theme.<userId>); roaming to another device needs a preferences API | T-0046 | implementer |
 
-## later (62)
+## later (63)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -165,6 +166,7 @@
 | [TD-247](../tracker/todo/TD-247.md) | saved_views: degrade gracefully when a stored view config no longer validates | T-0020 | implementer |
 | [TD-256](../tracker/todo/TD-256.md) | T-0014 membership admin API: accept PER-16 in its persona schema/enum and derive the PER-09 sod_warning hold-authority set from access.PERSONAS (A capability), so PER-16 never triggers it | T-0076 | implementer |
 | [TD-259](../tracker/todo/TD-259.md) | Outdoor theme default: switch the outdoor high-contrast theme on automatically when the OS asks for more contrast (prefers-contrast: more / forced-colors) and the user has no stored choice | T-0046 | implementer |
+| [TD-263](../tracker/todo/TD-263.md) | Harden .claude/settings.json and scripts/gemini_review.sh against agent edits via Bash (CODEOWNERS, CI check or PreToolUse hook) | — | planner |
 
 ## bug (2)
 
