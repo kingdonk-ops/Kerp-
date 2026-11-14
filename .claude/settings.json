@@ -4,6 +4,10 @@
       "Bash(scripts/gemini_review.sh *)"
     ],
     "deny": [
+      "Edit(/scripts/gemini_review.sh)",
+      "Write(/scripts/gemini_review.sh)",
+      "Edit(/.claude/settings.json)",
+      "Write(/.claude/settings.json)",
       "Edit(scripts/gemini_review.sh)",
       "Write(scripts/gemini_review.sh)",
       "Edit(.claude/settings.json)",
