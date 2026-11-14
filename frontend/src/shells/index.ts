@@ -12,4 +12,12 @@ export { DetailPage, type AuditEntry, type AuditSource, type DetailPageProps, ty
 export { GateBanner, type GateState, type GateStatus } from "./detail/GateBanner";
 export { DynamicForm, type DynamicFormProps } from "./form/DynamicForm";
 export { evaluateForm, type FormEvaluation } from "./form/engine";
-export type { FieldError, FormFieldDef, FormTemplate, FormValues, RuleEvaluator } from "./form/types";
+export { DEFAULT_TEMPLATE_LANGUAGE, localise } from "./form/localise";
+export type {
+  FieldError,
+  FormFieldDef,
+  FormTemplate,
+  FormValues,
+  LocalisedString,
+  RuleEvaluator,
+} from "./form/types";

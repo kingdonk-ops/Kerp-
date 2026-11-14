@@ -86,5 +86,15 @@ tab labels; the shells translate their own chrome through `t()` (`shells.*` keys
   such as `constructor` or `__proto__` behave like any other key.
 - **Errors** show once a field is touched or after a submit attempt; `onSubmit` receives the
   sanitised values only when the form is valid.
-- Template labels / messages are authored content, shown as-is (localisation: TD-183).
-  Calculated fields and range rules: TD-178.
+- **Localised template strings** (§2.2 amendment, TD-183, T-0047): `label`, option labels,
+  `help` and `validation.error_message` are a `LocalisedString` — a plain string (used as is) or
+  a per-locale map keyed by BCP 47 tag, e.g. `{ en: "Remarks", de: "Bemerkungen" }`.
+  `localise(value, locale, defaultLanguage)` picks the exact locale, then its language
+  (`de-AT` → `de`), then the template's `default_language` (default `en`,
+  `DEFAULT_TEMPLATE_LANGUAGE`), then the first entry; tags compare case-insensitively, only own
+  entries are read, an empty map gives `""`. The locale is the `locale` prop, else the active
+  i18n language. The engine keeps `error_message` unresolved (`FieldError.invalid.message`);
+  the renderer localises it. Keys, option values and CEL are never localised; UI chrome stays
+  on `t()`. `help` renders under the label and is part of the control's accessible
+  description. Section titles: the template schema has no sections yet (TD-255).
+- Calculated fields and range rules: TD-178.

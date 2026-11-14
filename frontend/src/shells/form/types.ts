@@ -1,23 +1,32 @@
 // Form template schema read by the Dynamic Form Renderer (EDGE-SCREENS §2.2). Labels, option
-// labels and error messages are template content authored in the designer, not UI chrome.
+// labels, error messages and help text are template content authored in the designer, not UI
+// chrome: each is a `LocalisedString` resolved by `localise` (§2.2 amendment, TD-183).
 import type { CelErrorCode, CelResult, JsonValue } from "../../lib/cel";
+
+/**
+ * A user-facing template string: plain (used as is) or a per-locale map keyed by BCP 47 tag,
+ * e.g. `{ en: "Remarks", de: "Bemerkungen" }`. Keys, option values and CEL are never localised.
+ */
+export type LocalisedString = string | Readonly<Record<string, string>>;
 
 export type FieldDataType = "text" | "number" | "boolean" | "select" | "date";
 
 export interface FieldOption {
   value: string;
-  label: string;
+  label: LocalisedString;
 }
 
 export interface FieldValidation {
   /** CEL; the value is valid only when this evaluates to exactly `true`. */
   cel_expression: string;
-  error_message: string;
+  error_message: LocalisedString;
 }
 
 export interface FormFieldDef {
   field_key: string;
-  label: string;
+  label: LocalisedString;
+  /** Help text shown under the label. */
+  help?: LocalisedString;
   data_type: FieldDataType;
   options?: readonly FieldOption[];
   required?: boolean;
@@ -29,6 +38,8 @@ export interface FormFieldDef {
 }
 
 export interface FormTemplate {
+  /** BCP 47 tag used when a localised string has no entry for the user's locale (default `en`). */
+  default_language?: string;
   fields: readonly FormFieldDef[];
 }
 
@@ -40,6 +51,7 @@ export type RuleEvaluator = (expression: string, context: Readonly<Record<string
 
 export type FieldError =
   | { kind: "required" }
-  | { kind: "invalid"; message: string }
+  /** `message` is the template `error_message`, unresolved: the renderer localises it. */
+  | { kind: "invalid"; message: LocalisedString }
   /** The rule errored or returned a non-bool: fail closed. */
   | { kind: "rule_error"; code: CelErrorCode | "NON_BOOL_RESULT" };
