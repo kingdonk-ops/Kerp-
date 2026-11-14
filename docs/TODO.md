@@ -3,9 +3,9 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 157 · **Closed:** 103
+**Open:** 156 · **Closed:** 104
 
-## decision (6)
+## decision (5)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -14,7 +14,6 @@
 | [TD-223](../tracker/todo/TD-223.md) | Who may open PRs to dev? If any account other than KERP_ALLOWED_REVIEWERS (or forks) can, require a human approval as well as review-gate | T-0067 | reviewer |
 | [TD-224](../tracker/todo/TD-224.md) | Magic-link request lockout is still per tenant+email: anyone can keep a known field worker from getting a link (4/hour, then doubling delay); decide per-client keying vs mailbox-flood protection | T-0068 | reviewer |
 | [TD-261](../tracker/todo/TD-261.md) | Client Portal Users (PER-15, phase-7 portal) and magic links: confirm PER-15 signs in by password/SSO only after the PER-14-only magic-link decision | T-0057 | planner |
-| [TD-264](../tracker/todo/TD-264.md) | Invites: add a short human-typeable invite code as an alternative to the invite link, or keep link-only? | T-0052 | planner |
 
 ## spec-gap (35)
 
@@ -304,3 +303,4 @@
 | ✅ | [TD-251](../tracker/todo/TD-251.md) | Team-to-project link role: the persona matrix has no read-only 'Viewer' or generic 'Editor' role - which roles may a team link carry? | Decided (product owner, 2026-11-13): team-project links may grant PER-01..PER-14 excluding PER-09, plus the new PER-16 Project Viewer (Viewer tier, V only, single project, no hold/approval/sign authority, no SoD implications; linkable and individually assignable); PER-09 and PER-15 remain strictly individual (auditability, blast-radius control). Edge 5.2 amended; PER-16 built by T-0076 |
 | ✅ | [TD-257](../tracker/todo/TD-257.md) | Offline grace (24 h after the server session ends) vs the 7-day offline window: confirm the grace binds edits and the window stays only as an upper bound | Product owner, 2026-11-14: confirmed. The 24 h offline grace after the session end binds edits; offline_window_days stays only as an upper bound (about 36 h offline with the defaults is enough; the window does not extend the grace). Spec diff §4.2; tasks T-0143, T-0044 unchanged in substance |
 | ✅ | [TD-262](../tracker/todo/TD-262.md) | Pilot-0 invites: how does a brand-new external invitee (no company Entra membership) get first credentials before T-0056 / TD-084? | Product owner, 2026-11-14: external users never use Microsoft sign-in (no federation); they are invited by e-mail, create their own password at invite acceptance from the e-mailed link, sign in with e-mail + password and reset it by e-mail. Invite e-mail, first-password set, self-service reset and outbound e-mail are in the Pilot-0 gate; the copy-link stays as a fallback. Spec diff §4.1, §4.2, §4.5, §4.6; tasks T-0058, T-0059, T-0077, T-0078; T-0056 restructured |
+| ✅ | [TD-264](../tracker/todo/TD-264.md) | Invites: add a short human-typeable invite code as an alternative to the invite link, or keep link-only? | Product owner, 2026-11-14: no invite code; invites are links only (e-mailed link with setup_token, copyable invite_token link as fallback, re-send rotates both). Spec diff §4.1 Re-send; tasks T-0052, T-0053, T-0059 |

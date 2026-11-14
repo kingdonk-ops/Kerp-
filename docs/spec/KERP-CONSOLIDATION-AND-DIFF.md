@@ -257,22 +257,21 @@ Wins over any earlier text on tenant selection, tenant administrators and projec
   - **Re-send (product owner, 2026-11-14).** For a pending invite (status `pending`, or
     `expired` and never accepted) the project's PER-09 holders and a System admin (the same
     people who may list and revoke the project's invites; any PER-09 of the project, not only
-    the original inviter, planner reading of the invite rules above) can **re-send** it
-    (`POST /api/v1/projects/{id}/invites/{invite_id}/resend`). Re-sending keeps the invited
+    the original inviter; product owner, 2026-11-14) can **re-send** it
+    (`POST /api/v1/projects/{id}/invites/{invite_id}/resend`); expired, never-accepted invites may be re-sent (product owner, 2026-11-14). Re-sending keeps the invited
     e-mail, persona(s) and site scope, **invalidates the previous `invite_token` and
     `setup_token`** (an old link then gets the neutral 410), issues fresh ones with a new expiry
     (`KERP_INVITE_TTL_HOURS` from the re-send), e-mails the invitee again (§4.6, off the request
     path) and shows the re-sender the new copyable link once (`invite_token` only, never the
     `setup_token`). Each re-send is audited (actor, invite, without tokens). Rate limit per
     **project + invited e-mail**, counting invite creations and re-sends together (so revoking
-    and re-creating does not reset it): at most one send per 60 s and 5 per 24 h (planner
-    defaults), 429 with `Retry-After` beyond that; per-actor limits follow TD-138. Rotation is
+    and re-creating does not reset it): at most one send per 60 s and 5 per 24 h (product
+    owner, 2026-11-14), 429 with `Retry-After` beyond that; per-actor limits follow TD-138. Rotation is
     atomic against acceptance (row lock or conditional update): the old token never succeeds
     after a re-send. The project's invite list shows pending and expired (never accepted)
     invites with expiry, last sent time and when re-send is next allowed. Accepted and revoked invites
-    cannot be re-sent (409); a new invite is created instead. A short human-typeable **invite
-    code** as an alternative to the link is not specified yet (TD-264, planner default: link
-    only).
+    cannot be re-sent (409); a new invite is created instead. **No invite code**: invites are links
+    only (product owner, 2026-11-14; TD-264 resolved).
   - **Pilot-0 (product owner, 2026-11-14; TD-262 resolved):** invites, the invite e-mail, the
     first-password set at acceptance and self-service password reset are part of the Pilot-0
     gate (T-0146); outbound e-mail (§4.6) is therefore a Pilot-0 dependency.
