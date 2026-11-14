@@ -17,6 +17,13 @@ same on SQLite (where it is the only filter) and on PostgreSQL (where RLS backs 
 * **Asset-Site scope** (T-0010, diff §4, PER-07): for a session whose context carries
   ``site_node_ids``, rows of ``SiteScopedMixin`` models are visible and writable only when
   their ``site_node_id`` is one of those sites. This filter is ORM-only (no RLS policy).
+* **Membership-based tables** (T-0014, TD-053): models whose table declares an ``RlsPolicy``
+  (``rls.rls_table_info``) get the same rule as their PostgreSQL policy: a ``membership``
+  row (project row, membership) is visible when its described project is in
+  ``TenancyContext.described_project_ids``, it is the caller's own row, or the session is
+  ``is_system_admin``; an ``admin_grant`` row when it is the caller's own or the session is
+  ``is_system_admin``. Updates and deletes need that visibility too; admin grants are
+  written by ``is_system_admin`` sessions only.
 
 An unbound session is not filtered here. On PostgreSQL RLS then shows it nothing.
 ORM bulk ``update()``/``delete()`` statements skip both the loader criteria and the flush
@@ -29,7 +36,7 @@ from __future__ import annotations
 import uuid
 from typing import Any, Final
 
-from sqlalchemy import and_, event, or_
+from sqlalchemy import ColumnElement, and_, event, false, or_
 from sqlalchemy.orm import (
     Mapped,
     ORMExecuteState,
@@ -39,9 +46,9 @@ from sqlalchemy.orm import (
     with_loader_criteria,
 )
 
-from app.core.db import GUID, BaseRecordMixin
+from app.core.db import GUID, Base, BaseRecordMixin
 from app.core.tenancy.context import TenancyContext
-from app.core.tenancy.rls import session_tenancy
+from app.core.tenancy.rls import RlsPolicy, session_tenancy, table_policy
 
 INCLUDE_DELETED: Final = "include_deleted"
 
@@ -67,6 +74,51 @@ def _site_allows(context: TenancyContext, record: object) -> bool:
     return record.site_node_id in context.site_node_ids
 
 
+def _policy_of(cls: type[Any]) -> RlsPolicy | None:
+    table = getattr(cls, "__table__", None)
+    return table_policy(table) if table is not None else None
+
+
+def _policy_classes() -> list[tuple[type[Any], RlsPolicy]]:
+    """Mapped classes whose table declares a non-standard RLS policy (T-0014)."""
+    found = []
+    for mapper in Base.registry.mappers:
+        policy = _policy_of(mapper.class_)
+        if policy is not None:
+            found.append((mapper.class_, policy))
+    return found
+
+
+def _policy_allows(context: TenancyContext, record: object) -> bool:
+    """The membership / admin-grant visibility rule for one loaded record (mirrors RLS)."""
+    policy = _policy_of(type(record))
+    if policy is None or context.is_system_admin:
+        return True
+    owner = policy.owner_column
+    if (
+        owner is not None
+        and context.user_id is not None
+        and getattr(record, owner) == context.user_id
+    ):
+        return True
+    if policy.kind == "admin_grant" or policy.project_column is None:
+        return False
+    return getattr(record, policy.project_column) in context.described_project_ids
+
+
+def _policy_criteria(
+    cls: type[Any], policy: RlsPolicy, context: TenancyContext
+) -> ColumnElement[bool]:
+    clauses: list[ColumnElement[bool]] = []
+    if policy.owner_column is not None and context.user_id is not None:
+        clauses.append(getattr(cls, policy.owner_column) == context.user_id)
+    if policy.kind == "membership" and policy.project_column is not None:
+        described = sorted(context.described_project_ids)
+        if described:
+            clauses.append(getattr(cls, policy.project_column).in_(described))
+    return or_(*clauses) if clauses else false()
+
+
 def is_visible(session: Session, record: BaseRecordMixin, *, include_deleted: bool = False) -> bool:
     """Whether ``record`` is readable by ``session``: same rule as the read filters."""
     if record.deleted_at is not None and not include_deleted:
@@ -78,6 +130,7 @@ def is_visible(session: Session, record: BaseRecordMixin, *, include_deleted: bo
         record.tenant_id == context.tenant_id
         and (record.project_id is None or record.project_id in context.readable_project_ids)
         and _site_allows(context, record)
+        and _policy_allows(context, record)
     )
 
 
@@ -141,6 +194,13 @@ def _filter_reads(state: ORMExecuteState) -> None:
                     include_aliases=True,
                 )
             )
+        if not context.is_system_admin:
+            options.extend(
+                with_loader_criteria(
+                    cls, _policy_criteria(cls, policy, context), include_aliases=True
+                )
+                for cls, policy in _policy_classes()
+            )
     if options:
         state.statement = state.statement.options(*options)
 
@@ -160,4 +220,13 @@ def _guard_writes(session: Session, flush_context: UOWTransaction, instances: ob
         if obj.tenant_id is not None and obj.tenant_id != context.tenant_id:
             raise OutOfScopeError(f"{type(obj).__name__} not found")
         if obj.project_id != context.project_id or not _site_allows(context, obj):
+            raise OutOfScopeError(f"{type(obj).__name__} not found")
+        # Membership-based tables (T-0014): admin grants are written by system admins only;
+        # other rows are updated or deleted only while the session can see them.
+        policy = _policy_of(type(obj))
+        if policy is None:
+            continue
+        if policy.kind == "admin_grant" and not context.is_system_admin:
+            raise OutOfScopeError(f"{type(obj).__name__} not found")
+        if obj not in session.new and not _policy_allows(context, obj):
             raise OutOfScopeError(f"{type(obj).__name__} not found")

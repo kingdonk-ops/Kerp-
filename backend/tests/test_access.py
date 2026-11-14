@@ -162,7 +162,9 @@ def test_portfolio_memberships_become_the_allowed_list() -> None:
         Grant(PC, Persona.SITE_SUPERINTENDENT),  # single-project: no cross-project read
     ]
     scope = resolve_scope(grants, base)
-    assert scope == replace(base, allowed_project_ids=frozenset({PA, PB}))
+    assert scope == replace(
+        base, allowed_project_ids=frozenset({PA, PB}), member_project_ids=frozenset({PA, PB, PC})
+    )
     assert scope.project_id is None  # writes: tenant-level only until a project is bound
     bound = resolve_scope(grants, base, PC)
     assert bound.project_id == PC

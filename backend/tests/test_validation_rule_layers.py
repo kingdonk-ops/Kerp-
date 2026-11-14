@@ -4,6 +4,7 @@ ADR 0004 §2, §3, §5, Amendment B. Service level, against the migrated schema 
 in CI, on PostgreSQL under RLS. Seed files, rules and tenants are synthetic.
 """
 
+import dataclasses
 import uuid
 from collections.abc import Iterator
 from pathlib import Path
@@ -429,14 +430,36 @@ def test_only_the_chosen_client_packs_sets_are_copied(db: Database) -> None:
 
 
 def test_seeding_a_project_keeps_the_callers_objects_attached(db: Database) -> None:
+    """Changing a project row needs a session that sees it (membership-based policy, TD-053):
+    a creator without a membership cannot see the new project until T-0039 grants PER-09
+    (TD-184), so this runs in a System admin provisioning session, as every project seed."""
     seeded(db)
-    with db.unit_of_work(CTX_T1) as s:
+    provisioning = dataclasses.replace(CTX_T1, is_system_admin=True)
+    with db.unit_of_work(provisioning) as s:
         create = ProjectCreate.model_validate({"code": "SYN-9", "name": "Synthetic 9"})
         project = projects.create_project(s, create)
         assert project in s
         project.name = "Renamed in the same unit of work"
-    with db.unit_of_work(CTX_T1) as s:
+    with db.unit_of_work(provisioning) as s:
         assert projects.get_project(s, project.id).name == "Renamed in the same unit of work"
+
+
+def test_after_seeding_a_non_member_creator_cannot_change_the_new_project(db: Database) -> None:
+    """The copy binds the session to the new project and back: the tenant scope it returns to
+    does not see the project row (no membership, no system_admin; TD-053, TD-184 until
+    T-0039), so a rename is refused as the PostgreSQL update policy refuses it."""
+    seeded(db)
+    with db.unit_of_work(CTX_T1) as s:
+        create = ProjectCreate.model_validate({"code": "SYN-8", "name": "Synthetic 8"})
+        project = projects.create_project(s, create)
+        assert rule_store.session_tenancy(s) == CTX_T1
+        assert project in s
+        project.name = "Renamed by a non-member"
+        with pytest.raises(OutOfScopeError):
+            s.flush()
+        s.rollback()
+    with db.unit_of_work(dataclasses.replace(CTX_T1, is_system_admin=True)) as s:
+        assert s.scalars(select(Project).where(Project.code == "SYN-8")).first() is None
 
 
 def test_a_failing_copy_rolls_the_project_back(db: Database) -> None:

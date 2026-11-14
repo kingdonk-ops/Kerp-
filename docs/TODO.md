@@ -3,9 +3,9 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 161 · **Closed:** 104
+**Open:** 165 · **Closed:** 105
 
-## decision (5)
+## decision (6)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -14,8 +14,9 @@
 | [TD-223](../tracker/todo/TD-223.md) | Who may open PRs to dev? If any account other than KERP_ALLOWED_REVIEWERS (or forks) can, require a human approval as well as review-gate | T-0067 | reviewer |
 | [TD-224](../tracker/todo/TD-224.md) | Magic-link request lockout is still per tenant+email: anyone can keep a known field worker from getting a link (4/hour, then doubling delay); decide per-client keying vs mailbox-flood protection | T-0068 | reviewer |
 | [TD-261](../tracker/todo/TD-261.md) | Client Portal Users (PER-15, phase-7 portal) and magic links: confirm PER-15 signs in by password/SSO only after the PER-14-only magic-link decision | T-0057 | planner |
+| [TD-271](../tracker/todo/TD-271.md) | Split TD-032 (tenant_id FK) out of T-0014: needs a tenants directory table, an FK on every table and an ADR (core-table change) | T-0014 | implementer |
 
-## spec-gap (36)
+## spec-gap (37)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -55,6 +56,7 @@
 | [TD-221](../tracker/todo/TD-221.md) | Client wet signature (mode iii): outcome when the client rejects after the inspection is already approved (INSPECTED_PASSED/INSPECTED_FAILED) or LOCKED_FOR_TURNOVER | T-0174 | reviewer |
 | [TD-249](../tracker/todo/TD-249.md) | GET /auth/me (and the JWT tid claim) still expose the tenant id to the SPA: confirm diff 4.1 'never see the tenant' allows it or drop tenant_id from MeResponse | T-0037 | implementer |
 | [TD-268](../tracker/todo/TD-268.md) | Confirm T-0034 rule-store interpretations: tenant persona = held on any project (no tenant roles yet), reset allowed on locked rules, projects cannot lock own rules, tenant edits a locked rule only after unlock | T-0034 | implementer |
+| [TD-270](../tracker/todo/TD-270.md) | Membership-based policy needs app.member_project_ids: spec says visible when the project is in app.allowed_project_ids or app.is_system_admin, but the allowed list holds only portfolio projects | T-0014 | implementer |
 
 ## missed (4)
 
@@ -99,11 +101,11 @@
 | [TD-250](../tracker/todo/TD-250.md) | Request-context middleware: starlette ClientDisconnect (raised by request.body() after http.disconnect) is still logged as an unhandled 500; map it to 499/disconnected like CancelledError | T-0030 | implementer |
 | [TD-255](../tracker/todo/TD-255.md) | Dynamic Form Renderer: render section titles through localise() once the template schema has sections (T-0110) | T-0047 | implementer |
 | [TD-258](../tracker/todo/TD-258.md) | Server-side user preferences: the outdoor theme choice is remembered per user in this browser's localStorage only (kerp.theme.<userId>); roaming to another device needs a preferences API | T-0046 | implementer |
-| [TD-265](../tracker/todo/TD-265.md) | T-0014 user create/update schemas must reject is_internal, entra_oid and entra_tid with 422 and the admin user list must show is_internal read-only (T-0049 criterion; those schemas do not exist yet) | T-0049 | implementer |
 | [TD-266](../tracker/todo/TD-266.md) | Call validation seed_tenant at tenant creation and sync_system_defaults on deploy: no tenant registry or tenant-creation flow exists yet, so system default seed files are not loaded automatically | T-0034 | implementer |
 | [TD-269](../tracker/todo/TD-269.md) | Store a project's chosen client pack so rule sets of a module enabled later are copied from that pack (T-0034 copies only base sets on module enable) | T-0108 | implementer |
+| [TD-273](../tracker/todo/TD-273.md) | Membership assignment does not validate site_node_id (PER-07 Asset-Site scope) against the asset hierarchy; no asset module exists yet | T-0014 | implementer |
 
-## later (64)
+## later (66)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -171,6 +173,8 @@
 | [TD-259](../tracker/todo/TD-259.md) | Outdoor theme default: switch the outdoor high-contrast theme on automatically when the OS asks for more contrast (prefers-contrast: more / forced-colors) and the user has no stored choice | T-0046 | implementer |
 | [TD-263](../tracker/todo/TD-263.md) | Harden .claude/settings.json and scripts/gemini_review.sh against agent edits via Bash (CODEOWNERS, CI check or PreToolUse hook) | — | planner |
 | [TD-267](../tracker/todo/TD-267.md) | Frontend Project Settings -> Rules screen (ADR 0004 §7) on the T-0034 Rules API: tabs by kind/module, same component for the tenant default layer, unlock request/approve | T-0034 | implementer |
+| [TD-272](../tracker/todo/TD-272.md) | Projects API: GET /api/v1/projects should list every project for a system_admin (diff §4.1 'System admins can list every project row'); it lists the caller's memberships only | T-0014 | implementer |
+| [TD-274](../tracker/todo/TD-274.md) | Deactivating a user (PATCH /api/v1/admin/users/{id}) can lock out the last active system_admin, including the caller | T-0014 | implementer |
 
 ## bug (2)
 
@@ -309,3 +313,4 @@
 | ✅ | [TD-257](../tracker/todo/TD-257.md) | Offline grace (24 h after the server session ends) vs the 7-day offline window: confirm the grace binds edits and the window stays only as an upper bound | Product owner, 2026-11-14: confirmed. The 24 h offline grace after the session end binds edits; offline_window_days stays only as an upper bound (about 36 h offline with the defaults is enough; the window does not extend the grace). Spec diff §4.2; tasks T-0143, T-0044 unchanged in substance |
 | ✅ | [TD-262](../tracker/todo/TD-262.md) | Pilot-0 invites: how does a brand-new external invitee (no company Entra membership) get first credentials before T-0056 / TD-084? | Product owner, 2026-11-14: external users never use Microsoft sign-in (no federation); they are invited by e-mail, create their own password at invite acceptance from the e-mailed link, sign in with e-mail + password and reset it by e-mail. Invite e-mail, first-password set, self-service reset and outbound e-mail are in the Pilot-0 gate; the copy-link stays as a fallback. Spec diff §4.1, §4.2, §4.5, §4.6; tasks T-0058, T-0059, T-0077, T-0078; T-0056 restructured |
 | ✅ | [TD-264](../tracker/todo/TD-264.md) | Invites: add a short human-typeable invite code as an alternative to the invite link, or keep link-only? | Product owner, 2026-11-14: no invite code; invites are links only (e-mailed link with setup_token, copyable invite_token link as fallback, re-send rotates both). Spec diff §4.1 Re-send; tasks T-0052, T-0053, T-0059 |
+| ✅ | [TD-265](../tracker/todo/TD-265.md) | T-0014 user create/update schemas must reject is_internal, entra_oid and entra_tid with 422 and the admin user list must show is_internal read-only (T-0049 criterion; those schemas do not exist yet) | T-0014: admin UserCreate/UserUpdate use extra=forbid (is_internal, entra_oid, entra_tid, tenant_id are 422; tested), GET /api/v1/admin/users lists is_internal read-only via app.core.auth.service, and POST /api/v1/admin/users creates accounts through app.core.auth.service.create_user, which derives the flag. |

@@ -23,7 +23,7 @@ from tests.auth_support import ALICE, BOB, T1, revoke_project_viewers, seed_user
 from tests.db_support import database_url
 from tests.tenancy_support import PA, PB
 
-TENANT = TenancyContext(tenant_id=T1)
+TENANT = TenancyContext(tenant_id=T1, is_system_admin=True)  # reads every membership (T-0014)
 
 
 @pytest.fixture

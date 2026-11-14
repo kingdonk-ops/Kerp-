@@ -7,7 +7,7 @@ modules carries the project's `id` as its `project_id`.
 
 | File | What |
 |---|---|
-| `models.py` | `oe_projects_project` (`BaseRecordMixin`, tenant-level row, standard RLS; migration `0008`) |
+| `models.py` | `oe_projects_project` (`BaseRecordMixin`, tenant-level row; migration `0008`, membership-based RLS since `0015`) |
 | `schemas.py` | `ProjectCreate` / `ProjectUpdate` / `ProjectRead`, `PolygonGeoJSON`; timezone, ISO 4217, BCP 47 validation |
 | `service.py` | `create_project`, `get_project`, `list_projects`, `update_project`, `delete_project`, `site_zone` |
 | `router.py` | `GET/POST /api/v1/projects`, `GET/PATCH/DELETE /api/v1/projects/{id}` |
@@ -30,8 +30,10 @@ column), GeoJSON text on SQLite. Python always sees a GeoJSON dict. No GiST inde
 
 A project is a **tenant-level row** (`project_id IS NULL`, CHECK constraint). It is written
 from a session bound to the tenant with no project; a project-bound session cannot create or
-change it. The table has the standard policy now; T-0014 replaces it with the
-membership-based one (TD-053). Changes go to the audit chain `project:<id>` (action and the
+change it. It is under the membership-based policy (T-0014, TD-053, migration `0014`): the row
+is visible to sessions bound to the project, allowed to read it, holding any membership in it
+(`app.member_project_ids`), or with `app.is_system_admin`; a plain tenant-level session sees no
+project. Scripts that need every project bind `TenancyContext(tenant_id, is_system_admin=True)`. Changes go to the audit chain `project:<id>` (action and the
 changed field names). Delete is a soft delete; the code stays taken (TD-186).
 
 ## Access
