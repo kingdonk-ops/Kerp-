@@ -223,7 +223,11 @@ Wins over any earlier text on tenant selection, tenant administrators and projec
     first-password set (below), the magic link (only for invites naming PER-14, §4.2) and, for
     company members only, the Entra ID SSO round trip (§4.5); the server grants the
     membership **immediately after authentication**, in the same request that completes it, and
-    the client opens the project. The lobby is skipped.
+    the client opens the project. The lobby is skipped. Sign-in lives in core auth, so this runs
+    through a core **post-authentication hook** (empty by default; receives the authenticated
+    user and the opaque `invite_token`, returns `joined_project_id` or `invite_error`) that the
+    admin module registers at start-up, like the magic-link eligibility hook (§4.2); core never
+    imports `app.modules` (planner rule, PR #79 review).
   - **External invitees create their own password (product owner, 2026-11-14).** Clients,
     subcontractors and other external users **never use Microsoft sign-in** (they are not on the
     company domain and there is no federation with their tenants, §4.5). They are invited by
@@ -237,8 +241,8 @@ Wins over any earlier text on tenant selection, tenant administrators and projec
     single-use, same expiry as the invite, revoked with it), both in the URL fragment; the
     first-password set needs both. The invite response shown to the inviter contains only the
     `invite_token`, so an inviter who copies the link can never set the invitee's password
-    (planner security rule, PR #79 review: the inviter must not be able to take over the
-    account). A brand-new invitee who opens a copied link is offered "Send me an e-mail to set
+    (**planner security rule, PR #79 review; not yet confirmed by the product owner**: the
+    inviter must not be able to take over the account). A brand-new invitee who opens a copied link is offered "Send me an e-mail to set
     my password", which runs the self-service reset (§4.2) and then accepts the invite after
     sign-in. Accounts that already have credentials ignore the `setup_token` and sign in as
     usual.
@@ -298,8 +302,9 @@ Wins over any earlier text on tenant selection, tenant administrators and projec
   tenant): e-mail + password only, never SSO; first password set at invite acceptance (§4.1).
   Field Workers (PER-14), internal or external: additionally magic link (below).
 - **Local passwords (planner defaults following NIST SP 800-63B rev. 4, 2026-11-14; no earlier
-  spec rule).** Minimum length `KERP_PASSWORD_MIN_LENGTH`, **default 15** characters (the
-  single-factor minimum of 800-63B rev. 4; configurable, never below 8), maximum at least 64
+  spec rule; not yet confirmed by the product owner).** Minimum length
+  `KERP_PASSWORD_MIN_LENGTH`, **default 15** characters (planner default: the single-factor
+  minimum of 800-63B rev. 4; configurable, never below 8), maximum at least 64
   (accepted up to 256); all printable ASCII, spaces and Unicode allowed, NFKC-normalised before
   hashing; **no composition rules, no periodic expiry, no hints or security questions**. Every
   new password is checked against a bundled blocklist of common and compromised passwords plus
@@ -555,9 +560,19 @@ Pilot-0 gate (2026-11-14), the transport is a Pilot-0 dependency. Planner defaul
 - **Send log** table (`BaseRecordMixin`, tenant RLS; System admins read it): template key,
   recipient (hashed for lookups plus masked for display), status (`queued | sent | bounced |
   complained | failed | suppressed`), provider message id, timestamps; never the link or the
-  token. **Bounces and complaints** arrive through SES notifications (SNS to an authenticated
-  endpoint, or an SQS poll) and put the address on a **suppression list**; sends to a
-  suppressed address are skipped and logged as `suppressed`. The magic-link, reset and invite
+  token. **Bounces and complaints** arrive through SES notifications (an SQS poll job, or SNS
+  to a public HTTPS endpoint) and put the address on a **suppression list** (also
+  `BaseRecordMixin` with RLS); sends to a suppressed address are skipped and logged as
+  `suppressed`. A valid SNS signature alone does not prove the message came from our SES
+  (anyone can sign messages from their own topic), so the SNS endpoint (planner rule, PR #79
+  review): accepts only messages whose `TopicArn` equals the configured topic
+  (`KERP_MAIL_SNS_TOPIC_ARN`); verifies the signature (SignatureVersion 2, SHA-256) with a
+  signing certificate fetched only from an `https://sns.<region>.amazonaws.com/` URL (host
+  checked exactly, region = the deployment's); honours a `SubscriptionConfirmation` only for the
+  configured topic (others are refused and logged, never confirmed); and writes suppression
+  and send-log rows under the deployment's hidden tenant from settings
+  (`KERP_DEFAULT_TENANT_ID`, §4.1), never a tenant or account value from the payload (the
+  endpoint has no JWT). Refusals are logged without the payload body. The magic-link, reset and invite
   flows still answer neutrally when a send is suppressed.
 - **Deployment prerequisites** (runbook, T-0146): verified sending domain with DKIM (and SPF /
   DMARC alignment), SES production access (out of the sandbox) in the deployment region, the

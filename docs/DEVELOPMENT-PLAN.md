@@ -167,14 +167,17 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
 - **2026-11-14 — PR #79 review round 1 and product-owner decisions (binding):** external users
   never use Microsoft sign-in; they are invited by e-mail, create their own password at invite
   acceptance (the `setup_token` only the invite e-mail carries is the proof; planner security
-  rule) and use self-service password reset by e-mail; local passwords follow NIST SP 800-63B
-  rev. 4 planner defaults (min 15, blocklist, no composition rules; diff §4.2); outbound e-mail
+  rule, not yet confirmed by the product owner) and use self-service password reset by e-mail;
+  local passwords follow NIST SP 800-63B rev. 4 planner defaults (min 15, not yet confirmed by
+  the product owner; blocklist, no composition rules; diff §4.2); outbound e-mail
   (SES, diff §4.6) is a Pilot-0 dependency. T-0057 confirmed in the gate. New: T-0058 (outbound
   e-mail, M), T-0059 (invite e-mail + first-password set, S), T-0077 (password policy + reset,
-  S), T-0078 (screens, S). T-0056 restructured to access-request decision e-mails only (outside
+  M), T-0078 (screens, S). T-0056 restructured to access-request decision e-mails only (outside
   the gate). Magic-link eligibility read in core (`load_grants`) with a core extension point for
-  invites; magic-link and reset delivery off the request path (diff §4.2). TD-262 raised and
-  resolved; TD-084 resolved.
+  invites; magic-link and reset delivery off the request path (diff §4.2). Round 2: invite
+  acceptance after sign-in through a core post-authentication hook (diff §4.1); SNS bounce
+  endpoint pinned to our topic, certificate host checked, deployment tenant from settings
+  (diff §4.6). TD-262 raised and resolved; TD-084 resolved.
 
 ## Key engineering decisions (baked into the spec — see consolidation diff)
 
@@ -192,7 +195,7 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
 | Access (2026-11-13) | One hidden tenant per deployment; System admins appoint Project Admins (`create_projects`); creator gets PER-09; lobby + access requests; project picker; one URL; admin roles never confer hold/sign-off (diff §4.1) |
 | Teams (2026-11-13) | Tenant-level teams, managed by System admins; a team links to several projects with one role (persona) per project; effective access = individual memberships ∪ team-derived grants, stored as membership rows keyed by source type/id (diff §4.1, ADR 0008); new PER-16 Project Viewer; teams are not planner crews; saved views share to several linked teams |
 | Sessions & devices (2026-11-13) | 15 min access, 12 h refresh from sign-in (daily re-login); hybrid device PIN, offline unlock independent of the server session; offline window 7 days default, 14 max; device registry + remote revoke/wipe (diff §4.2–§4.4) |
-| Login & lobby (2026-11-14) | Access-request lifecycle (`pending/approved/rejected/withdrawn`, reason, 24 h re-request cooldown) shown in the lobby; lobby list for internal staff only (Entra sign-in or `KERP_INTERNAL_EMAIL_DOMAINS`); single-use invite tokens bound to the e-mail (invites in the Pilot-0 gate); offline grace 24 h after session end binds edits, 7-day window only an upper bound (TD-257); Entra ID SSO identity only (OIDC + PKCE, no group mapping, no auto-create, same 12 h session), promoted for internal staff with password sign-in kept; magic links for Field Workers (PER-14) only (TD-136); externals never SSO: password set at invite acceptance + self-service reset (NIST 800-63B defaults); outbound e-mail via SES in Pilot-0 (diff §4.1, §4.2, §4.5, §4.6) |
+| Login & lobby (2026-11-14) | Access-request lifecycle (`pending/approved/rejected/withdrawn`, reason, 24 h re-request cooldown) shown in the lobby; lobby list for internal staff only (Entra sign-in or `KERP_INTERNAL_EMAIL_DOMAINS`); single-use invite tokens bound to the e-mail (invites in the Pilot-0 gate); offline grace 24 h after session end binds edits, 7-day window only an upper bound (TD-257); Entra ID SSO identity only (OIDC + PKCE, no group mapping, no auto-create, same 12 h session), promoted for internal staff with password sign-in kept; magic links for Field Workers (PER-14) only (TD-136); externals never SSO: password set at invite acceptance + self-service reset (NIST 800-63B planner defaults); outbound e-mail via SES in Pilot-0 (diff §4.1, §4.2, §4.5, §4.6) |
 | Field client (2026-11-13) | Capacitor Android 11+, SQLCipher SQLite + file-system media, managed Play/MDM; one client storage contract and a client-agnostic sync contract (diff §6.2); NFR budgets warn now, hard gate before Pilot-0 (diff §6.3) |
 | Region (2026-11-13) | Per-deployment setting: AWS `ap-southeast-2` for Australian deployments (diff §4.4) |
 

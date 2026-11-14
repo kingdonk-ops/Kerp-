@@ -60,7 +60,7 @@
 | ⬜ | [T-0052](../tracker/tasks/T-0052.md) | Project invites API: single-use expiring invite_token bound to the invited e-mail, one-click join, membership granted right after first sign-in (password, SSO; magic link for PER-14 invites) | admin | M | T-0014, T-0054, T-0057 |  |
 | ⬜ | [T-0057](../tracker/tasks/T-0057.md) | Magic-link sign-in limited to Field Workers (PER-14): neutral 202 and no link for anyone else, eligibility re-checked on redeem | identity | S | T-0014, T-0073 |  |
 | ⬜ | [T-0074](../tracker/tasks/T-0074.md) | saved_views: share a team view with several teams linked to the project (view-team link table, migrate team_id, wire teams contract) | saved_views | S | T-0013, T-0020 |  |
-| ⬜ | [T-0077](../tracker/tasks/T-0077.md) | Local password policy (NIST 800-63B defaults) and self-service password reset by e-mail: neutral 202, single-use expiring link, sessions revoked | identity | S | T-0037, T-0058, T-0068 |  |
+| ⬜ | [T-0077](../tracker/tasks/T-0077.md) | Local password policy (NIST 800-63B defaults) and self-service password reset by e-mail: neutral 202, single-use expiring link, sessions revoked | identity | M | T-0037, T-0058, T-0068 |  |
 | ✅ | [T-0021](../tracker/tasks/T-0021.md) | Observability + security headers (request id, structured logs, CSP/HSTS) | platform | S | T-0001 | #9 |
 | ⬜ | [T-0059](../tracker/tasks/T-0059.md) | Invite e-mail with setup_token and first-password set at invite acceptance for external invitees (one request: set password, accept, sign in) | admin | S | T-0052, T-0058, T-0077 |  |
 | ✅ | [T-0022](../tracker/tasks/T-0022.md) | Lint rule: heavy libs (fitz, cv2, rectpack, celpy, pyhanko) lazily imported | platform | S | T-0001 | #10 |
