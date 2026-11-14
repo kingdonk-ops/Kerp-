@@ -771,6 +771,11 @@ export interface components {
             email: string;
             /** Display Name */
             display_name: string;
+            /**
+             * Is Internal
+             * @description Internal staff (read-only, derived at sign-in from the company Entra link or the deployment's internal e-mail domains); grants no access by itself
+             */
+            is_internal: boolean;
         };
         /**
          * ModuleState

@@ -5,10 +5,10 @@ from functools import lru_cache
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as package_version
 from pathlib import Path
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import Field, SecretStr, field_validator, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 PACKAGE_NAME = "kerp-backend"
 
@@ -105,6 +105,10 @@ class Settings(BaseSettings):
     # Origin of the web SPA allowed to use the refresh cookie (CSRF Origin check on
     # ``/auth/refresh`` and ``/auth/pin/unlock``). Unset: the API's own origin (one URL).
     web_origin: str | None = None
+    # E-mail domains whose accounts are internal staff (T-0049, diff §4.1 Internal staff):
+    # comma-separated in the environment, lower-cased, exact match (no wildcards, a subdomain
+    # is a different domain). Empty: no domain rule (only the Entra member link counts).
+    internal_email_domains: Annotated[tuple[str, ...], NoDecode] = ()
 
     # Notification channels (T-0019, TD-168): the registered channel names every notification
     # goes to (JSON list in the environment). ``in_app`` is the inbox record and always on;
@@ -122,6 +126,30 @@ class Settings(BaseSettings):
         if "in_app" not in value:
             raise ValueError("notification_channels must include 'in_app'")
         return value
+
+    @field_validator("internal_email_domains", mode="before")
+    @classmethod
+    def _parse_internal_email_domains(cls, value: object) -> object:
+        """``"a.example, B.example"`` → ``("a.example", "b.example")``; refused at startup when an
+        entry is not a bare domain (``@``, whitespace or ``*``)."""
+        if isinstance(value, str):
+            value = value.split(",")
+        if not isinstance(value, list | tuple | set | frozenset):
+            return value
+        domains: set[str] = set()
+        for raw in value:
+            if not isinstance(raw, str):
+                raise ValueError("internal_email_domains entries must be strings")
+            entry = raw.strip().lower()
+            if not entry:
+                continue
+            if "@" in entry or "*" in entry or any(ch.isspace() for ch in entry):
+                raise ValueError(
+                    f"internal_email_domains entry {entry!r} is not a bare domain "
+                    "(no '@', spaces or wildcards; e.g. 'company.example')"
+                )
+            domains.add(entry)
+        return tuple(sorted(domains))
 
     @model_validator(mode="after")
     def _no_debug_in_production(self) -> "Settings":

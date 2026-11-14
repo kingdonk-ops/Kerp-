@@ -12,12 +12,24 @@ import uuid
 from datetime import datetime
 from typing import Final
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, String, UniqueConstraint
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    String,
+    UniqueConstraint,
+    false,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.db import GUID, Base, BaseRecordMixin
 
 TABLE: Final = "auth_user"
+ENTRA_OID_INDEX: Final = "uq_auth_user_tenant_entra_oid"
+# Entra object / tenant ids are GUIDs (36 chars); room for other forms without a migration.
+ENTRA_ID_LENGTH: Final = 64
 
 
 def normalize_email(email: str) -> str:
@@ -30,12 +42,22 @@ class User(Base, BaseRecordMixin):
 
     ``password_hash`` is ``NULL`` for users without a local password (e.g. SSO-only users
     later, TD-043). ``password_changed_at`` invalidates every token issued before it.
+
+    ``is_internal`` (T-0049, ADR 0009) is derived, never input: true when the account is
+    linked to a member account of the company Entra ID tenant (``entra_oid``, set by the
+    first SSO sign-in, T-0054) or its e-mail domain is on ``KERP_INTERNAL_EMAIL_DOMAINS``.
+    It is recomputed at creation and at every sign-in (``service.refresh_internal_flag``)
+    and grants nothing by itself. Other modules read it through
+    ``service.is_internal_user``.
     """
 
     __tablename__ = TABLE
     __table_args__ = (
         UniqueConstraint("tenant_id", "email", name="uq_auth_user_tenant_email"),
         CheckConstraint("project_id IS NULL", name="tenant_level"),
+        # One KERP account per Entra object id in a tenant (diff §4.5); unlinked accounts
+        # (NULL) do not collide. A unique index, so SQLite can add it without a table copy.
+        Index(ENTRA_OID_INDEX, "tenant_id", "entra_oid", unique=True),
     )
 
     email: Mapped[str] = mapped_column(String(320), nullable=False)
@@ -45,6 +67,11 @@ class User(Base, BaseRecordMixin):
     password_changed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    is_internal: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
+    entra_oid: Mapped[str | None] = mapped_column(String(ENTRA_ID_LENGTH), nullable=True)
+    entra_tid: Mapped[str | None] = mapped_column(String(ENTRA_ID_LENGTH), nullable=True)
 
 
 MEMBERSHIP_TABLE: Final = "auth_project_membership"
