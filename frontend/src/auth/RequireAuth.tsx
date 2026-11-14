@@ -16,7 +16,7 @@ export function RequireAuth() {
     return (
       <div role="alert" className="p-4 text-danger">
         <p>{t("app.loadError")}</p>
-        <button type="button" className="mt-2 underline" onClick={retry}>
+        <button type="button" className="mt-2 min-h-touch min-w-touch rounded border border-line px-3 underline" onClick={retry}>
           {t("app.retry")}
         </button>
       </div>

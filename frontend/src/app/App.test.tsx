@@ -101,9 +101,9 @@ describe("app shell", () => {
 
     locked = true;
     fireEvent.click(submit);
-    await waitFor(() =>
-      expect(screen.getByRole("alert")).toHaveTextContent(i18n.t("auth.login.locked")),
-    );
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent(i18n.t("auth.login.locked"));
+    });
   });
 
   it("renders the 8 navigation groups: 4 pillars + Backbone, Overview, Documents, Admin", async () => {
@@ -154,11 +154,9 @@ describe("app shell", () => {
     const project = (p: ProjectSummary) =>
       i18n.t("scope.projectOption", { code: p.code, name: p.name });
     const indicator = () => screen.getByTestId("scope-indicator");
-    await waitFor(() =>
-      expect(indicator()).toHaveTextContent(
-        i18n.t("scope.current", { scope: project(PROJECTS[0]) }),
-      ),
-    );
+    await waitFor(() => {
+      expect(indicator()).toHaveTextContent(i18n.t("scope.current", { scope: project(PROJECTS[0]) }));
+    });
     expect(within(switcher).getAllByRole("option").map((o) => o.textContent)).toEqual([
       i18n.t("scope.allProjects"),
       project(PROJECTS[0]),

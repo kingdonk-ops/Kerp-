@@ -58,6 +58,9 @@ export const en = {
     projectOption: "{{code}} — {{name}}",
     current: "Scope: {{scope}}",
   },
+  theme: {
+    outdoor: "Outdoor high contrast",
+  },
   home: {
     welcome: "Welcome, {{name}}.",
   },

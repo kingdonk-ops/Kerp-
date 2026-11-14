@@ -116,12 +116,12 @@ export function DetailPage({ title, subtitle, gate, tabs, audit, actions }: Deta
           <h1 className="text-2xl font-bold">{title}</h1>
           {subtitle !== undefined && <p className="text-muted">{subtitle}</p>}
         </div>
-        {actions !== undefined && <div className="flex gap-2">{actions}</div>}
+        {actions !== undefined && <div className="flex flex-wrap gap-touch-gap">{actions}</div>}
       </header>
 
       {gate != null && <GateBanner gate={gate} />}
 
-      <div role="tablist" aria-label={t("shells.detail.tabs")} className="flex gap-1 border-b border-line">
+      <div role="tablist" aria-label={t("shells.detail.tabs")} className="flex gap-touch-gap overflow-x-auto border-b border-line">
         {allTabs.map((tab, index) => {
           const selected = tab.id === active?.id;
           return (
@@ -138,7 +138,7 @@ export function DetailPage({ title, subtitle, gate, tabs, audit, actions }: Deta
               // Only the selected tab's panel is rendered, so only it may point at one.
               aria-controls={selected ? panelId : undefined}
               tabIndex={selected ? 0 : -1}
-              className={selected ? "border-b-2 border-brand px-3 py-2 font-semibold" : "px-3 py-2 text-muted"}
+              className={`min-h-touch min-w-touch shrink-0 px-3 ${selected ? "border-b-2 border-brand font-semibold" : "text-muted"}`}
               onClick={() => { select(tab.id); }}
               onKeyDown={(event) => { onKeyDown(event, index); }}
             >
@@ -167,7 +167,7 @@ function AuditLog({ source }: { source: AuditSource }) {
     return (
       <div className="space-y-2">
         <p className="text-danger">{t("shells.detail.audit.loadError")}</p>
-        <button type="button" className="rounded border border-line px-3 py-1" onClick={() => void query.refetch()}>
+        <button type="button" className="min-h-touch min-w-touch rounded border border-line px-3" onClick={() => void query.refetch()}>
           {t("app.retry")}
         </button>
       </div>

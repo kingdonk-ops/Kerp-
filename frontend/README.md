@@ -15,10 +15,11 @@ Single-page app for the KERP Field Operations Platform (`docs/spec/`).
 | Offline outbox | Dexie 4 on IndexedDB (`src/db/`) |
 | Rule expressions | CEL via `@marcbachmann/cel-js` (`src/lib/cel/`) |
 | i18n | i18next + react-i18next (`src/i18n/`) |
-| Tests | Vitest 5 + jsdom + Testing Library; `fake-indexeddb` for Dexie |
+| Tests | Vitest 5 + jsdom + Testing Library; `fake-indexeddb` for Dexie. Accessibility suites (`*.a11y.test.tsx`): Vitest browser mode in headless Google Chrome (Playwright) + axe-core |
 | Lint | ESLint 10 flat config (`eslint.config.js`): typescript-eslint `strictTypeChecked` + `stylisticTypeChecked`, react-hooks; `src/api/` ignored |
 
-Requires Node `>=22.12`.
+Requires Node `>=22.12` and, for `npm run test`, an installed Google Chrome (`KERP_CHROME_PATH`
+points at another Chrome/Chromium binary; TD-260).
 
 ## Scripts
 
@@ -27,7 +28,8 @@ npm ci
 npm run dev        # local dev server
 npm run lint       # ESLint (type-aware typescript-eslint strict + react-hooks), zero warnings
 npm run typecheck  # tsc --noEmit (strict)
-npm run test       # vitest run (all suites)
+npm run test       # vitest run: `unit` (jsdom) + `a11y` (headless Chrome) projects
+npx vitest run --project unit   # jsdom suites only
 npm run build      # typecheck + production build to dist/
 npm run gen:api    # regenerate src/api/ from the backend OpenAPI schema (backend venv active)
 ```
@@ -46,7 +48,8 @@ src/
   pages/      route components
   projects/   project scope: ProjectDirectory seam, ProjectScopeProvider, top-bar ProjectSwitcher
   shells/     RegisterPage, DetailPage (gate banner, tabs, audit), Dynamic Form Renderer (README.md)
-  test/       Vitest setup, fake backend (`fakeApi.ts`)
+  test/       Vitest setup, fake backend (`fakeApi.ts`), axe harness (`a11y.ts`)
+  theme/      display themes: ThemeProvider (per-user preference), ThemeToggle
 ```
 
 ## Shell (T-0024)
@@ -65,10 +68,37 @@ src/
   with requests is TD-146. The scope is a UI selection — the server binds the allowed
   projects from memberships (TD-053).
 - **Design tokens.** `src/index.css` `@theme` defines semantic colours (`brand`, `surface`,
-  `panel`, `ink`, `muted`, `line`, `pillar`, `success`, `warning`, `danger`); components use
+  `panel`, `ink`, `muted`, `line`, `pillar`, `focus`, `success`, `warning`, `danger`) and the touch
+  spacing (`touch`, `touch-gap`; see *Field ergonomics*); components use
   those utilities, not raw palette colours.
 - **Services.** `AppServices` (`src/app/services.tsx`: api, tokens, projects, preferences)
   is injected through `AppRoot` so tests use the fake backend in `src/test/fakeApi.ts`.
+
+## Field ergonomics (T-0046, diff §6.3)
+
+- **Glove targets.** `--spacing-touch: 48px` (48 CSS px = 48 dp) gives `min-h-touch`,
+  `min-w-touch`, `size-touch`, `h-touch`; `--spacing-touch-gap: 8px` gives `gap-touch-gap`
+  between neighbouring targets. Every control of the shell, sign-in page, `RegisterPage`,
+  `DetailPage` and `DynamicForm` is at least 48 × 48 px (checkboxes are `size-touch`). On phones
+  (< `md`) the navigation wraps into rows above the content; from `md` it is a side bar.
+- **Outdoor high-contrast theme.** `<html data-theme="outdoor">` swaps the semantic colour
+  tokens in `src/index.css` for a sunlight set (text ≥ 7:1, WCAG AAA); the standard theme
+  meets WCAG 2.1 AA. Focus rings use `--color-focus` (3 px outdoors). Components keep using
+  the semantic utilities, so they follow the theme. The top bar and the sign-in page carry the
+  toggle (`ThemeToggle`, `aria-pressed`).
+- **Remembered per user.** `ThemeProvider` (`src/theme/`) stores the choice in the preferences
+  storage under `kerp.theme.<userId>`; another user on the same device gets their own. The
+  sign-in page (no user yet) follows the device's last choice, `kerp.theme.device`.
+  Client-side only, like the project scope; a server-side preferences store is TD-258. An OS
+  "more contrast" default is TD-259.
+- **Checks.** `*.a11y.test.tsx` run axe-core (`src/test/a11y.ts`) in headless Chrome on the
+  field breakpoints (360 and 412 px phones, 800 × 1280 and 1280 × 800 tablets), in both themes,
+  over the app shell, sign-in page, `RegisterPage`, `DetailPage` (all gate states, tabs, audit
+  log) and `DynamicForm` (with errors). They fail on any WCAG 2.1 A/AA violation, on axe
+  `target-size` configured to 48 px, on a contrast result axe cannot decide, on enhanced
+  contrast (7:1) in the outdoor theme, and on any rendered control under 48 × 48 px
+  (`glove-target`: axe accepts a small target with free space around it; gloves do not). New
+  field screens add a case there.
 
 ## Shells (T-0025)
 
