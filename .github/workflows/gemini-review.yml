@@ -1,0 +1,39 @@
+name: Gemini review
+
+# Second-opinion AI review, run AFTER kerp-reviewer has approved the PR and its fixes
+# are in (see .claude/commands/kerp-run.md step 4b). The action only supports
+# issue_comment events: the coordinator comments `/gemini-review` on the PR and the
+# action posts its findings as a PR review. The coordinator then triages every
+# finding — fix it on the branch, or raise a TODO — before merging.
+#
+# Needs repository secret GEMINI_API_KEY. Optional repository variable GEMINI_MODEL.
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: gemini-review-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  gemini-review:
+    # Only on PRs, only when asked, and only by people with write access to the repo
+    # (keeps outsiders from spending the API key).
+    if: >-
+      github.event.issue.pull_request &&
+      contains(github.event.comment.body, '/gemini-review') &&
+      contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Gemini AI Code Reviewer
+        uses: truongnh1992/gemini-ai-code-reviewer@7c4b01afa073e48a44c72cdc1d010f9e3b95686f # v9.2.1
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-2.5-flash' }}
+          # Generated / bookkeeping files are never reviewed.
+          EXCLUDE: "tracker/*,docs/TASKS.md,docs/TODO.md,docs/pr-suggestions.md,frontend/src/api/*,package-lock.json,*.lock"

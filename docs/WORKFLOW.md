@@ -13,6 +13,8 @@
      │ 3  PR → dev                 → task in_review
      │ 4  kerp-reviewer (independent) → KERP-REVIEW: APPROVED | CHANGES_REQUESTED patch-id=…
      │      └─ changes → implementer fix round → gates → reviewer   (max 3 rounds, then blocked + TODO)
+     │ 4b `/gemini-review` comment → Gemini PR review → each finding: fix | TODO | dismiss
+     │      └─ any fix/TODO → reviewer confirmation round (advisory; not a required check)
      │ 5  rebase, task done, render boards → ci-gate ✅ + review-gate ✅ → squash-merge to dev
      ▼
    dev ── CI on push ── promote.yml: ≥5 merged PRs since last promotion → fast-forward main + tag
