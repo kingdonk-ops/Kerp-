@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(scripts/gemini_review.sh *)"
+    ]
+  }
+}

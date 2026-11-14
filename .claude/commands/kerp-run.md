@@ -43,7 +43,7 @@ Dispatch **kerp-reviewer** with PR number, task id, branch, round number. It pos
 ## 4b. Gemini second-opinion review (once per PR, after `APPROVED`)
 Only after kerp-reviewer has posted `KERP-REVIEW: APPROVED` and every fix is pushed:
 ```bash
-gh pr comment <n> --body "/gemini-review"   # .github/workflows/gemini-review.yml posts a Gemini PR review
+scripts/gemini_review.sh <n>   # posts exactly "/gemini-review"; .github/workflows/gemini-review.yml then posts a Gemini PR review
 ```
 Wait for the `Gemini review` workflow run to finish, then read the review comments
 (`gh api $R/pulls/<n>/reviews` and `gh api $R/pulls/<n>/comments`, author `github-actions[bot]`).
