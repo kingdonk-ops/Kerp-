@@ -241,8 +241,9 @@ Wins over any earlier text on tenant selection, tenant administrators and projec
     single-use, same expiry as the invite, revoked with it), both in the URL fragment; the
     first-password set needs both. The invite response shown to the inviter contains only the
     `invite_token`, so an inviter who copies the link can never set the invitee's password
-    (**planner security rule, PR #79 review; not yet confirmed by the product owner**: the
-    inviter must not be able to take over the account). A brand-new invitee who opens a copied link is offered "Send me an e-mail to set
+    (**product owner, 2026-11-14, confirming the PR #79 planner security rule**: only the
+    e-mailed invite can set a first password; the inviter must not be able to take over the
+    account). A brand-new invitee who opens a copied link is offered "Send me an e-mail to set
     my password", which runs the self-service reset (§4.2) and then accepts the invite after
     sign-in. Accounts that already have credentials ignore the `setup_token` and sign in as
     usual.
@@ -253,6 +254,21 @@ Wins over any earlier text on tenant selection, tenant administrators and projec
   - **Delivery.** Creating an invite e-mails the link to the invited address (§4.6). The
     inviter also sees the copyable link once (`invite_token` only) as a fallback, e.g. when a
     mail bounced.
+  - **Re-send (product owner, 2026-11-14).** For a pending invite (status `pending`, or
+    `expired` and never accepted) the project's PER-09 holders and a System admin (the same
+    people who may list and revoke the project's invites; any PER-09 of the project, not only
+    the original inviter, planner reading of the invite rules above) can **re-send** it
+    (`POST /api/v1/projects/{id}/invites/{invite_id}/resend`). Re-sending keeps the invited
+    e-mail, persona(s) and site scope, **invalidates the previous `invite_token` and
+    `setup_token`** (an old link then gets the neutral 410), issues fresh ones with a new expiry
+    (`KERP_INVITE_TTL_HOURS` from the re-send), e-mails the invitee again (§4.6, off the request
+    path) and shows the re-sender the new copyable link once (`invite_token` only, never the
+    `setup_token`). Each re-send is audited (actor, invite, without tokens). Rate limit per
+    invite: at most one re-send per 60 s and 5 per 24 h (planner defaults), 429 with
+    `Retry-After` beyond that; per-actor limits follow TD-138. Accepted and revoked invites
+    cannot be re-sent (409); a new invite is created instead. A short human-typeable **invite
+    code** as an alternative to the link is not specified yet (TD-264, planner default: link
+    only).
   - **Pilot-0 (product owner, 2026-11-14; TD-262 resolved):** invites, the invite e-mail, the
     first-password set at acceptance and self-service password reset are part of the Pilot-0
     gate (T-0146); outbound e-mail (§4.6) is therefore a Pilot-0 dependency.
@@ -301,10 +317,9 @@ Wins over any earlier text on tenant selection, tenant administrators and projec
   password (§4.5). External users (clients, subcontractors, other non-members of the company
   tenant): e-mail + password only, never SSO; first password set at invite acceptance (§4.1).
   Field Workers (PER-14), internal or external: additionally magic link (below).
-- **Local passwords (planner defaults following NIST SP 800-63B rev. 4, 2026-11-14; no earlier
-  spec rule; not yet confirmed by the product owner).** Minimum length
-  `KERP_PASSWORD_MIN_LENGTH`, **default 15** characters (planner default: the single-factor
-  minimum of 800-63B rev. 4; configurable, never below 8), maximum at least 64
+- **Local passwords (product owner, 2026-11-14; NIST SP 800-63B rev. 4 style).** Minimum length
+  `KERP_PASSWORD_MIN_LENGTH`, **default 8** characters (product owner, 2026-11-14, replacing
+  the earlier planner default of 15; configurable upwards, never below 8), maximum at least 64
   (accepted up to 256); all printable ASCII, spaces and Unicode allowed, NFKC-normalised before
   hashing; **no composition rules, no periodic expiry, no hints or security questions**. Every
   new password is checked against a bundled blocklist of common and compromised passwords plus
