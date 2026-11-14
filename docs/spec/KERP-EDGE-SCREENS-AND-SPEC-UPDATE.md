@@ -600,10 +600,17 @@ CREATE POLICY project_isolation_policy ON functional_tags
     update or delete grants. The auth-time lookup runs in a narrow system path (security-definer
     function returning only the caller's own grants), so deciding `app.is_system_admin` does not
     depend on the flag itself.
-  - **Access requests** (T-0040) are visible to the requester, to the PER-09 holders of the
+  - **Access requests** (T-0050) are visible to the requester, to the PER-09 holders of the
     request's project, and to `app.is_system_admin` sessions; nobody else.
   - **Lobby listing and project-code lookup** use a narrow read (id, code, name of lobby-visible
-    or code-matched projects) and do not widen the `projects` policy.
+    or code-matched projects) and do not widen the `projects` policy. The lobby listing is
+    served only to internal users (`is_internal`, diff §4.1 Internal staff; product owner,
+    2026-11-14), checked both by the endpoint and inside the narrow read function itself
+    (defence in depth); code lookup is open to every signed-in user.
+  - **Project invites** (diff §4.1 Invites; product owner, 2026-11-14) are visible to the
+    project's PER-09 holders and `app.is_system_admin` sessions; the invitee never reads the
+    invite table directly, only accepts by token through a narrow system path that checks hash,
+    expiry, single use and the bound e-mail.
 
 ### Session Initialization Handshake
 Every API request and background job sets the runtime project identifier within the database transaction:
