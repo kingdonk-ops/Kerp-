@@ -4,6 +4,13 @@ Consolidation §6: module pages are built on these three shells, never from scra
 Import from `src/shells` (`index.ts`). Callers pass already-translated titles, headers and
 tab labels; the shells translate their own chrome through `t()` (`shells.*` keys).
 
+**Field ergonomics (T-0046).** Every shell control is a 48 px glove target (`min-h-touch`,
+`min-w-touch`, checkboxes `size-touch`, clickable register rows `h-touch`) with `gap-touch-gap`
+between neighbours, and the shells use semantic colour tokens only, so the outdoor
+high-contrast theme applies. `shells.a11y.test.tsx` checks both with axe in Chrome on the field
+breakpoints in both themes (see the frontend README, *Field ergonomics*). Controls passed in by
+callers (`actions`, tab content) must use the same tokens.
+
 ## RegisterPage (`register/`)
 
 ```tsx

@@ -20,7 +20,9 @@ export interface DynamicFormProps {
   locale?: string;
 }
 
-const INPUT = "w-full rounded border border-line bg-panel px-2 py-1";
+// Glove targets (diff §6.3): controls are at least `--spacing-touch` (48 px) high and wide.
+const INPUT = "min-h-touch w-full rounded border border-line bg-panel px-2";
+const CHECKBOX = "size-touch accent-brand";
 
 /** Renders a form template; visibility and validation are CEL rules evaluated live. */
 export function DynamicForm({
@@ -117,7 +119,7 @@ export function DynamicForm({
       <button
         type="submit"
         disabled={busy}
-        className="rounded bg-brand px-4 py-2 text-on-brand disabled:opacity-50"
+        className="min-h-touch min-w-touch rounded bg-brand px-4 text-on-brand disabled:opacity-50"
       >
         {submitLabel ?? t("shells.form.submit")}
       </button>
@@ -150,7 +152,7 @@ function FieldControl({ field, tx, id, value, required, invalid, describedBy, on
   switch (field.data_type) {
     case "boolean":
       return (
-        <input {...common} type="checkbox" checked={value === true} onChange={(e) => { onChange(e.target.checked); }} />
+        <input {...common} type="checkbox" className={CHECKBOX} checked={value === true} onChange={(e) => { onChange(e.target.checked); }} />
       );
     case "select":
       return (

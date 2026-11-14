@@ -13,7 +13,7 @@ export function ProjectSwitcher() {
     <label className="flex items-center gap-2 text-sm">
       <span>{t("scope.label")}</span>
       <select
-        className="rounded border border-line bg-panel px-2 py-1 text-ink"
+        className="min-h-touch min-w-touch rounded border border-line bg-panel px-2 text-ink"
         disabled={isLoading}
         value={scope.kind === "all" ? ALL_VALUE : scope.projectId}
         onChange={(event) => {

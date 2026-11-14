@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Navigate, useLocation, useNavigate } from "react-router";
 
 import { LoginError, useAuth, type LoginFailure } from "../auth/AuthProvider";
+import { ThemeToggle } from "../theme/ThemeToggle";
 
 export function LoginPage() {
   const { t } = useTranslation();
@@ -34,7 +35,7 @@ export function LoginPage() {
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-surface p-4 text-ink">
+    <main className="flex min-h-screen flex-col items-center justify-center gap-4 bg-surface p-4 text-ink">
       <form
         onSubmit={(event) => void onSubmit(event)}
         className="w-full max-w-sm space-y-4 rounded-lg border border-line bg-panel p-6 shadow-sm"
@@ -49,7 +50,7 @@ export function LoginPage() {
             autoComplete="username"
             value={email}
             onChange={(e) => { setEmail(e.target.value); }}
-            className="mt-1 w-full rounded border border-line px-2 py-1"
+            className="mt-1 min-h-touch w-full rounded border border-line bg-panel px-2"
           />
         </label>
         <label className="block">
@@ -60,7 +61,7 @@ export function LoginPage() {
             autoComplete="current-password"
             value={password}
             onChange={(e) => { setPassword(e.target.value); }}
-            className="mt-1 w-full rounded border border-line px-2 py-1"
+            className="mt-1 min-h-touch w-full rounded border border-line bg-panel px-2"
           />
         </label>
         {failure && (
@@ -71,11 +72,12 @@ export function LoginPage() {
         <button
           type="submit"
           disabled={submitting}
-          className="w-full rounded bg-brand px-3 py-2 font-medium text-on-brand disabled:opacity-60"
+          className="min-h-touch w-full rounded bg-brand px-3 font-medium text-on-brand disabled:opacity-60"
         >
           {submitting ? t("auth.login.submitting") : t("auth.login.submit")}
         </button>
       </form>
+      <ThemeToggle />
     </main>
   );
 }

@@ -39,8 +39,10 @@ export interface RegisterPageProps<Row> {
   download?: DownloadFn;
 }
 
-const CONTROL = "rounded border border-line bg-panel px-2 py-1";
-const BUTTON = "rounded border border-line bg-panel px-3 py-1 disabled:opacity-50";
+// Glove targets (diff §6.3): every control is at least `--spacing-touch` (48 px) high and wide.
+const CONTROL = "min-h-touch min-w-touch rounded border border-line bg-panel px-2";
+const BUTTON = "min-h-touch min-w-touch rounded border border-line bg-panel px-3 disabled:opacity-50";
+const CHECKBOX = "size-touch shrink-0 accent-brand";
 
 /**
  * Shared list screen: quick + column filters, column visibility, CSV export, saved views.
@@ -121,20 +123,21 @@ function RegisterView<Row>({
     <section className="space-y-4">
       <h1 className="text-2xl font-bold">{title}</h1>
 
-      <div className="flex flex-wrap items-end gap-3">
+      <div className="flex flex-wrap items-end gap-touch-gap">
         <label className="flex flex-col text-sm">
           {t("shells.register.quickFilter")}
           <input className={CONTROL} type="search" value={query} onChange={(e) => { setQuery(e.target.value); }} />
         </label>
 
-        <fieldset className="flex flex-wrap gap-2 text-sm">
+        <fieldset className="flex flex-wrap gap-touch-gap text-sm">
           <legend className="text-sm">{t("shells.register.columns")}</legend>
           {columns.map((column) => {
             const isLastVisible = !hidden.has(column.id) && visibleColumns.length === 1;
             return (
-              <label key={column.id} className="flex items-center gap-1">
+              <label key={column.id} className="flex min-h-touch items-center gap-1 pr-2">
                 <input
                   type="checkbox"
+                  className={CHECKBOX}
                   checked={!hidden.has(column.id)}
                   disabled={isLastVisible}
                   onChange={() => { toggleColumn(column.id); }}
@@ -154,7 +157,7 @@ function RegisterView<Row>({
         </button>
 
         {savedViews !== undefined && (
-          <div className="flex flex-wrap items-end gap-2 text-sm">
+          <div className="flex flex-wrap items-end gap-touch-gap text-sm">
             <label className="flex flex-col">
               {t("shells.register.savedViews.label")}
               <select className={CONTROL} value={selectedView} onChange={(e) => { applyView(e.target.value); }}>
@@ -230,7 +233,7 @@ function RegisterView<Row>({
                   onKeyDown={onRowClick ? (e) => { if (e.key === "Enter") onRowClick(row); } : undefined}
                 >
                   {visibleColumns.map((column) => (
-                    <td key={column.id} className="px-3 py-2">
+                    <td key={column.id} className={onRowClick ? "h-touch px-3 py-2" : "px-3 py-2"}>
                       {cellText(column.value(row))}
                     </td>
                   ))}

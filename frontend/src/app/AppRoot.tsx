@@ -5,6 +5,7 @@ import { createBrowserRouter, createMemoryRouter, RouterProvider } from "react-r
 
 import { AuthProvider } from "../auth/AuthProvider";
 import { i18n } from "../i18n";
+import { ThemeProvider } from "../theme/ThemeProvider";
 import { createQueryClient } from "./queryClient";
 import { routes } from "./routes";
 import { createAppServices, ServicesProvider, type AppServices } from "./services";
@@ -15,7 +16,7 @@ interface AppProvidersProps {
   services?: AppServices;
 }
 
-/** Cross-cutting providers (i18n, services, server-state cache, auth). Router is added by `AppRoot`. */
+/** Cross-cutting providers (i18n, services, server-state cache, auth, display theme). Router is added by `AppRoot`. */
 export function AppProviders({ children, queryClient, services }: AppProvidersProps) {
   const [client] = useState(() => queryClient ?? createQueryClient());
   const [appServices] = useState(() => services ?? createAppServices());
@@ -23,7 +24,9 @@ export function AppProviders({ children, queryClient, services }: AppProvidersPr
     <I18nextProvider i18n={i18n}>
       <ServicesProvider services={appServices}>
         <QueryClientProvider client={client}>
-          <AuthProvider>{children}</AuthProvider>
+          <AuthProvider>
+            <ThemeProvider>{children}</ThemeProvider>
+          </AuthProvider>
         </QueryClientProvider>
       </ServicesProvider>
     </I18nextProvider>

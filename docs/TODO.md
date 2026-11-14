@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 154 · **Closed:** 99
+**Open:** 157 · **Closed:** 99
 
 ## decision (5)
 
@@ -65,7 +65,7 @@
 | [TD-131](../tracker/todo/TD-131.md) | Add a root .env.example for the dev stack (the implementer agent's permission rules block writing .env* files) | T-0003 | implementer |
 | [TD-208](../tracker/todo/TD-208.md) | Uploads infra: provision the kerp-vault bucket (CORS for browser PUT/GET, lifecycle on staging/), wire KERP_S3_* in compose, add MinIO to CI for the gated round-trip test | T-0016 | implementer |
 
-## deferred (30)
+## deferred (31)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -99,8 +99,9 @@
 | [TD-248](../tracker/todo/TD-248.md) | Startup check that KERP_DEFAULT_TENANT_ID names an existing tenant row (needs the tenant table from T-0023) | T-0037 | implementer |
 | [TD-250](../tracker/todo/TD-250.md) | Request-context middleware: starlette ClientDisconnect (raised by request.body() after http.disconnect) is still logged as an unhandled 500; map it to 499/disconnected like CancelledError | T-0030 | implementer |
 | [TD-255](../tracker/todo/TD-255.md) | Dynamic Form Renderer: render section titles through localise() once the template schema has sections (T-0110) | T-0047 | implementer |
+| [TD-258](../tracker/todo/TD-258.md) | Server-side user preferences: the outdoor theme choice is remembered per user in this browser's localStorage only (kerp.theme.<userId>); roaming to another device needs a preferences API | T-0046 | implementer |
 
-## later (61)
+## later (62)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -165,6 +166,7 @@
 | [TD-246](../tracker/todo/TD-246.md) | saved_views: validate register_key against register descriptors once modules declare them (E-01-01) | T-0020 | implementer |
 | [TD-247](../tracker/todo/TD-247.md) | saved_views: degrade gracefully when a stored view config no longer validates | T-0020 | implementer |
 | [TD-256](../tracker/todo/TD-256.md) | T-0014 membership admin API: accept PER-16 in its persona schema/enum and derive the PER-09 sod_warning hold-authority set from access.PERSONAS (A capability), so PER-16 never triggers it | T-0076 | implementer |
+| [TD-259](../tracker/todo/TD-259.md) | Outdoor theme default: switch the outdoor high-contrast theme on automatically when the OS asks for more contrast (prefers-contrast: more / forced-colors) and the user has no stored choice | T-0046 | implementer |
 
 ## bug (2)
 
@@ -173,7 +175,7 @@
 | [TD-159](../tracker/todo/TD-159.md) | Site filter from the bound project is applied to all site-scoped rows: a PER-07 on A who is PER-01 on B loses B's site-scoped rows (over-restrictive) | T-0010 | reviewer |
 | [TD-252](../tracker/todo/TD-252.md) | tracker.py new-todo cannot see open PRs in cloud sessions: gh pr list uses GraphQL (blocked), so TODO ids collide | T-0029 | coordinator |
 
-## risk (16)
+## risk (17)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -193,6 +195,7 @@
 | [TD-235](../tracker/todo/TD-235.md) | review-gate patch-id ignores dated note lines entirely - a scope decision recorded as a dated Note can be added or reworded after approval without re-review | T-0029 | implementer |
 | [TD-253](../tracker/todo/TD-253.md) | Refresh Origin fallback fails closed behind a TLS proxy: production without KERP_WEB_ORIGIN signs users out ~15 min after login; SPA treats the 403 as transient | T-0037 | coordinator |
 | [TD-254](../tracker/todo/TD-254.md) | spatial_bounds 10,000-position cap also runs on reads (ProjectRead): a stored row above the cap makes GET /projects 500 for the whole tenant | T-0060 | coordinator |
+| [TD-260](../tracker/todo/TD-260.md) | a11y component tests run in the installed Google Chrome (Vitest browser mode, Playwright channel chrome): CI relies on the runner's preinstalled Chrome; set KERP_CHROME_PATH or install a browser if the image changes | T-0046 | implementer |
 
 ## Closed
 

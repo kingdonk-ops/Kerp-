@@ -4,9 +4,20 @@
  * KERP design tokens (Tailwind v4 theme variables). Components use the semantic names
  * (`bg-surface`, `text-ink`, `bg-brand`, `border-line`, …), never raw palette colours,
  * so the theme can change in one place.
+ *
+ * Field ergonomics (diff §6.3, T-0046):
+ * - Glove use: every interactive control is at least `--spacing-touch` (48 CSS px = 48 dp)
+ *   high and wide (`min-h-touch`, `min-w-touch`, `size-touch`); neighbouring targets keep
+ *   `--spacing-touch-gap` apart (`gap-touch-gap`).
+ * - Outdoor: `<html data-theme="outdoor">` swaps the semantic colours for a high-contrast set
+ *   (text ≥ 7:1, WCAG AAA; borders and focus ≥ 3:1). The standard theme meets WCAG 2.1 AA.
+ * Both are checked with axe in `*.a11y.test.tsx` (Chrome, field breakpoints, both themes).
  */
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  --spacing-touch: 48px;
+  --spacing-touch-gap: 8px;
 
   --color-brand: oklch(0.45 0.13 255);
   --color-on-brand: oklch(0.99 0 0);
@@ -16,8 +27,38 @@
   --color-muted: oklch(0.52 0.02 260);
   --color-line: oklch(0.9 0.01 260);
   --color-pillar: oklch(0.93 0.04 85);
+  --color-focus: oklch(0.45 0.13 255);
 
   --color-success: oklch(0.55 0.14 150);
   --color-warning: oklch(0.72 0.15 75);
   --color-danger: oklch(0.55 0.2 27);
+}
+
+/* Outdoor high-contrast theme: same semantic names, sunlight-readable values. */
+:root[data-theme="outdoor"] {
+  --color-brand: oklch(0.3 0.12 260);
+  --color-on-brand: oklch(1 0 0);
+  --color-surface: oklch(1 0 0);
+  --color-panel: oklch(1 0 0);
+  --color-ink: oklch(0 0 0);
+  --color-muted: oklch(0.3 0 0);
+  --color-line: oklch(0.35 0 0);
+  --color-pillar: oklch(0.92 0.12 95);
+  --color-focus: oklch(0 0 0);
+
+  --color-success: oklch(0.4 0.12 150);
+  --color-warning: oklch(0.5 0.12 70);
+  --color-danger: oklch(0.42 0.17 27);
+}
+
+@layer base {
+  /* A visible focus ring on every control (keyboard and switch access), thicker outdoors. */
+  :focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  :root[data-theme="outdoor"] :focus-visible {
+    outline-width: 3px;
+  }
 }
