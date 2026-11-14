@@ -33,7 +33,7 @@
 | ✅ | [T-0009](../tracker/tasks/T-0009.md) | Field-worker auth: magic-link + 6-digit PIN local unlock + progressive lockout | identity | M | T-0008 | #35 |
 | ⬜ | [T-0038](../tracker/tasks/T-0038.md) | Field PIN hybrid rework: PIN per enrolled device, server PIN only on renewal after idle, lockout counter per device | identity | M | T-0043 |  |
 | ⬜ | [T-0043](../tracker/tasks/T-0043.md) | Device registry: enrolment, remote revoke with wipe signal, device_id on sessions and in the audit ledger (Pilot-0) | identity | M | T-0037, T-0014 |  |
-| 🟦 | [T-0049](../tracker/tasks/T-0049.md) | Internal staff flag: is_internal derived from the company Entra link or KERP_INTERNAL_EMAIL_DOMAINS, recomputed at sign-in | identity | S | T-0037 |  |
+| 🟪 | [T-0049](../tracker/tasks/T-0049.md) | Internal staff flag: is_internal derived from the company Entra link or KERP_INTERNAL_EMAIL_DOMAINS, recomputed at sign-in | identity | S | T-0037 | #83 |
 | ✅ | [T-0010](../tracker/tasks/T-0010.md) | Three-tier RBAC/ABAC: capability tiers × 15 personas × project/site scope (Asset-Site filter) + explicit multi-project read scope | identity | M | T-0008 | #39 |
 | ⬜ | [T-0054](../tracker/tasks/T-0054.md) | Entra ID SSO (identity only): OIDC code + PKCE AuthProvider, ID-token verification via tenant JWKS, match by verified e-mail then oid, same 12 h KERP session, no group-to-role mapping | identity | M | T-0037, T-0038, T-0043, T-0049 |  |
 | ✅ | [T-0011](../tracker/tasks/T-0011.md) | Module loader + manifest contract + per-project enable/disable | platform | M | T-0005 | #32 |
