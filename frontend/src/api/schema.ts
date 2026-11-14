@@ -307,6 +307,110 @@ export interface paths {
         patch: operations["update_project_api_v1_projects__project_id__patch"];
         trace?: never;
     };
+    "/api/v1/admin/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Users */
+        get: operations["list_users_api_v1_admin_users_get"];
+        put?: never;
+        /** Create User */
+        post: operations["create_user_api_v1_admin_users_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/users/{user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update User */
+        patch: operations["update_user_api_v1_admin_users__user_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/admin/users/lookup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Lookup User */
+        post: operations["lookup_user_api_v1_admin_users_lookup_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/projects/{project_id}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Members */
+        get: operations["list_members_api_v1_admin_projects__project_id__members_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/projects/{project_id}/members/{user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Assign Member */
+        put: operations["assign_member_api_v1_admin_projects__project_id__members__user_id__put"];
+        post?: never;
+        /** Remove Member */
+        delete: operations["remove_member_api_v1_admin_projects__project_id__members__user_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/projects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My Projects */
+        get: operations["my_projects_api_v1_me_projects_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/notifications/projects/{project_id}/notifications": {
         parameters: {
             query?: never;
@@ -883,6 +987,21 @@ export interface components {
             bold: boolean;
         };
         /**
+         * GrantIn
+         * @description One persona on the project; a Site Inspector (PER-07) names its site, nobody else.
+         */
+        GrantIn: {
+            persona: components["schemas"]["Persona"];
+            /** Site Node Id */
+            site_node_id?: string | null;
+        };
+        /** GrantRead */
+        GrantRead: {
+            persona: components["schemas"]["Persona"];
+            /** Site Node Id */
+            site_node_id: string | null;
+        };
+        /**
          * GroupBy
          * @description Group rows by ``columns`` (outermost first), with aggregates and a totals row.
          */
@@ -1052,6 +1171,53 @@ export interface components {
             is_internal: boolean;
         };
         /**
+         * MemberAssign
+         * @description ``PUT /admin/projects/{p}/members/{user}``: the user's complete set of personas on the
+         *     project. ``confirm_sod`` confirms a PER-09 + hold-authority combination (else 409).
+         */
+        MemberAssign: {
+            /** Grants */
+            grants: components["schemas"]["GrantIn"][];
+            /**
+             * Confirm Sod
+             * @default false
+             */
+            confirm_sod: boolean;
+        };
+        /** MemberAssigned */
+        MemberAssigned: {
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+            /** Email */
+            email: string;
+            /** Display Name */
+            display_name: string;
+            /** Grants */
+            grants: components["schemas"]["GrantRead"][];
+            /**
+             * Sod Warning
+             * @description PER-09 together with a hold-authority persona (confirmed with confirm_sod)
+             */
+            sod_warning: boolean;
+        };
+        /** MemberRead */
+        MemberRead: {
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+            /** Email */
+            email: string;
+            /** Display Name */
+            display_name: string;
+            /** Grants */
+            grants: components["schemas"]["GrantRead"][];
+        };
+        /**
          * ModuleState
          * @description A loaded module and whether it is enabled for the caller's project.
          */
@@ -1074,6 +1240,23 @@ export interface components {
         ModuleToggle: {
             /** Enabled */
             enabled: boolean;
+        };
+        /**
+         * MyProject
+         * @description One project of the caller, for the project picker (T-0042).
+         */
+        MyProject: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Code */
+            code: string;
+            /** Name */
+            name: string;
+            /** Personas */
+            personas: components["schemas"]["Persona"][];
         };
         /**
          * NotificationPost
@@ -1160,6 +1343,11 @@ export interface components {
             /** Deliveries */
             deliveries: components["schemas"]["DeliveryRead"][];
         };
+        /**
+         * Persona
+         * @enum {string}
+         */
+        Persona: "PER-01" | "PER-02" | "PER-03" | "PER-04" | "PER-05" | "PER-06" | "PER-07" | "PER-08" | "PER-09" | "PER-10" | "PER-11" | "PER-12" | "PER-13" | "PER-14" | "PER-15" | "PER-16";
         /**
          * PinUnlockRequest
          * @description The PIN. The device's refresh token comes from the refresh cookie: both are
@@ -1677,6 +1865,68 @@ export interface components {
         UploadTicket: {
             file: components["schemas"]["FileRead"];
             upload: components["schemas"]["PresignedRead"];
+        };
+        /**
+         * UserCreate
+         * @description ``POST /admin/users``: an account without credentials (invite / reset set them).
+         */
+        UserCreate: {
+            /** Email */
+            email: string;
+            /**
+             * Display Name
+             * @default
+             */
+            display_name: string;
+        };
+        /**
+         * UserLookupRequest
+         * @description ``POST /admin/users/lookup``: an exact e-mail, in the body so it stays out of URLs.
+         */
+        UserLookupRequest: {
+            /** Email */
+            email: string;
+        };
+        /** UserRead */
+        UserRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Email */
+            email: string;
+            /** Display Name */
+            display_name: string;
+            /** Is Active */
+            is_active: boolean;
+            /**
+             * Is Internal
+             * @description Internal staff: read-only, derived at sign-in and account creation
+             */
+            is_internal: boolean;
+        };
+        /** UserSummary */
+        UserSummary: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Email */
+            email: string;
+            /** Display Name */
+            display_name: string;
+        };
+        /**
+         * UserUpdate
+         * @description ``PATCH /admin/users/{id}``: rename, deactivate (``is_active: false``) or reactivate.
+         */
+        UserUpdate: {
+            /** Display Name */
+            display_name?: string | null;
+            /** Is Active */
+            is_active?: boolean | null;
         };
         /** ValidationError */
         ValidationError: {
@@ -2257,6 +2507,244 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_users_api_v1_admin_users_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserRead"][];
+                };
+            };
+        };
+    };
+    create_user_api_v1_admin_users_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_user_api_v1_admin_users__user_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    lookup_user_api_v1_admin_users_lookup_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserLookupRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_members_api_v1_admin_projects__project_id__members_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    assign_member_api_v1_admin_projects__project_id__members__user_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MemberAssign"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberAssigned"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_member_api_v1_admin_projects__project_id__members__user_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_projects_api_v1_me_projects_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyProject"][];
                 };
             };
         };

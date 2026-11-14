@@ -14,11 +14,12 @@ rewritten (HS256 → RS256/EdDSA + JWKS + `jti` revocation in Redis).
 | `bearer.py` | `get_bearer`: verifies the `Authorization: Bearer` token once per request (no DB) |
 | `deps.py` | `CurrentPrincipal` (401 unless a valid token of an active user), `require_claims` |
 | `providers.py` | `AuthProvider` seam + `LocalPasswordProvider` (Entra ID SSO later: TD-043) |
-| `service.py` | `AuthService` login / refresh / logout / magic link / PIN unlock; `create_user`, `set_password`; internal staff rule (`is_internal_user`, T-0049) |
+| `service.py` | `AuthService` login / refresh / logout / magic link / PIN unlock; `create_user`, `set_password`; user reads for the admin module (`list_users`, `get_user`, `users_by_id`, `find_user_by_email`, T-0014); internal staff rule (`is_internal_user`, T-0049) |
 | `field.py` | Magic-link tokens + delivery seam, PIN rules (T-0009) |
 | `lockout.py` | `ProgressiveLockout` + policies, Redis-backed (T-0009) |
-| `models.py` | `auth_user` table (tenant-level rows, RLS) — migration `0003`, internal staff flag + Entra link in `0013` (T-0049, ADR 0009); `auth_project_membership` (T-0010) — migration `0006`, persona CHECK widened for PER-16 in `0012` (T-0076) |
-| `access.py` | Persona matrix, capability tiers, SoD, scope resolution, `require_capability` / `require_hold_release` guards (T-0010) |
+| `models.py` | `auth_user` table (tenant-level rows, RLS) — migration `0003`, internal staff flag + Entra link in `0013` (T-0049, ADR 0009); `auth_project_membership` (T-0010) — migration `0006`, persona CHECK widened for PER-16 in `0012` (T-0076), membership-based RLS in `0014` (T-0014) |
+| `memberships.py` | The membership store's write side (`project_grants`, `set_user_grants`; revoke = soft delete, re-grant revives), used by the admin module (T-0014) |
+| `access.py` | Persona matrix, capability tiers, SoD, scope resolution, `require_capability` / `require_hold_release` guards (T-0010); admin-grant lookup seam, `is_system_admin` binding, `CallerIsSystemAdmin`, `sod_warning` (T-0014) |
 | `router.py`, `schemas.py` | HTTP endpoints below |
 
 ## Endpoints
@@ -61,7 +62,7 @@ never at refresh or PIN unlock (they continue a session). Removing a domain take
 user's next sign-in. A sign-in writes the row only when the flag changes.
 
 **Never input, never a claim.** No request body accepts `is_internal`, `entra_oid` or
-`entra_tid` (`422`; the admin create/update schemas of T-0014 must keep it that way) and the
+`entra_tid` (`422`; so do the admin user create/update schemas, T-0014, TD-265) and the
 tokens carry no such claim. `/auth/me` shows the stored flag, read-only. Other modules read it
 only through `service.is_internal_user(session, user_id)` (false for an unknown user or one of
 another tenant), never the table. **It grants nothing:** not a persona or capability; a
@@ -169,6 +170,17 @@ bad token leaves the session unbound (RLS shows it nothing). Endpoints that need
 `principal: CurrentPrincipal`, which also sets the `current_tenant_id` / `current_user_id`
 context vars. The session also gets the read-only allowed projects from the user's
 memberships (below). The write project is not bound from the request yet (TD-122).
+
+**System admin flag and user binding (T-0014, edge spec §6 amendments).** In the same short
+unit of work that reads the memberships, `resolve_request_scope` (bound to the caller, so the
+own-rows policies apply, TD-152) asks the registered admin-grant lookup for the caller's own
+grants and binds `system_admin` as `TenancyContext.is_system_admin` → `app.is_system_admin`;
+the token's `sub` is bound as `app.current_user_id`, and every project of the caller's
+memberships as `app.member_project_ids`. None of these is ever read from a token claim, request
+parameter or header. Core imports no module: the admin module registers its lookup with
+`register_admin_grant_lookup` at import (no lookup → nobody is a System admin). Neither admin
+grant is a persona or adds a capability (no `A`/`S`, TD-151). `sod_warning(personas)` flags
+PER-09 together with a persona that has `A` on one project (TD-151, derived from `PERSONAS`).
 
 ## Personas, tiers and scope (T-0010)
 

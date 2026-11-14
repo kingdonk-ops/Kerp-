@@ -32,6 +32,14 @@ class TenancyContext:
       "every project of the tenant" scope.
     * ``site_node_ids``: Asset-Site scoping (diff §4, PER-07). ``None`` means unrestricted;
       a set limits every ``SiteScopedMixin`` row to those sites (ORM layer).
+    * ``member_project_ids``: every project the user holds a membership in, whatever the
+      persona (``app.member_project_ids``, T-0014). It widens only the tenant-level rows that
+      *describe* a project (the project row, its memberships; ``MembershipScopedMixin``),
+      never project-scoped records.
+    * ``is_system_admin``: the caller holds the ``system_admin`` grant (``app.is_system_admin``,
+      T-0014, diff §4.1). Loaded server-side at authentication, never from the request; a
+      script or provisioning job may set it explicitly. It reads every project row and
+      membership and writes admin grants, but reads no project-scoped record.
     """
 
     tenant_id: uuid.UUID
@@ -39,12 +47,20 @@ class TenancyContext:
     user_id: uuid.UUID | None = None
     allowed_project_ids: frozenset[uuid.UUID] = frozenset()
     site_node_ids: frozenset[uuid.UUID] | None = None
+    member_project_ids: frozenset[uuid.UUID] = frozenset()
+    is_system_admin: bool = False
 
     @property
     def readable_project_ids(self) -> frozenset[uuid.UUID]:
         """Every project whose rows the session reads: the bound one plus the allowed list."""
         bound = frozenset({self.project_id}) if self.project_id is not None else frozenset()
         return bound | self.allowed_project_ids
+
+    @property
+    def described_project_ids(self) -> frozenset[uuid.UUID]:
+        """Projects whose descriptive tenant-level rows the session reads (T-0014, TD-053):
+        the readable ones plus every project of the user's memberships."""
+        return self.readable_project_ids | self.member_project_ids
 
 
 current_tenant_id: ContextVar[uuid.UUID | None] = ContextVar("current_tenant_id", default=None)
@@ -73,8 +89,9 @@ def get_tenancy_context(
     """FastAPI dependency: the request's tenancy, from the verified access token only.
 
     The tenant and user are the token's ``tid`` and ``sub``. The allowed (read-only)
-    projects come from the user's memberships in the membership store (T-0010); nothing in
-    the request can widen them. The write project is not bound yet (TD-122). Tests
+    projects come from the user's memberships in the membership store (T-0010), and the
+    ``system_admin`` flag from the admin grants table (T-0014); nothing in the request can
+    widen them. The write project is not bound yet (TD-122). Tests
     override this through ``app.dependency_overrides``.
     """
     claims = bearer.claims
