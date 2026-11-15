@@ -76,6 +76,8 @@ class RevocationStore(Protocol):
 
     def take_magic_link(self, digest: str) -> bytes | None: ...
 
+    def peek_magic_link(self, digest: str) -> bytes | None: ...
+
     def set_pin(self, session_id: uuid.UUID, pin_hash: str, ttl: timedelta) -> None: ...
 
     def get_pin(self, session_id: uuid.UUID) -> str | None: ...
@@ -196,6 +198,10 @@ class RedisRevocationStore:
     def take_magic_link(self, digest: str) -> bytes | None:
         # GETDEL is atomic: two concurrent redemptions cannot both get the payload.
         return _as_bytes(self._call(lambda: self._client.getdel(_magic_key(digest))))
+
+    def peek_magic_link(self, digest: str) -> bytes | None:
+        # Validates a link without spending it (T-0080): ``take_magic_link`` spends it.
+        return _as_bytes(self._call(lambda: self._client.get(_magic_key(digest))))
 
     def set_pin(self, session_id: uuid.UUID, pin_hash: str, ttl: timedelta) -> None:
         self._call(
@@ -372,6 +378,10 @@ class InMemoryRevocationStore:
             value = self._get(_magic_key(digest))
             self._entries.pop(_magic_key(digest), None)
             return value
+
+    def peek_magic_link(self, digest: str) -> bytes | None:
+        with self._lock:
+            return self._get(_magic_key(digest))
 
     def set_pin(self, session_id: uuid.UUID, pin_hash: str, ttl: timedelta) -> None:
         self._set(_pin_key(session_id), ttl, pin_hash.encode())

@@ -82,7 +82,7 @@
             "description": "Locked after repeated failures; retry after `Retry-After` seconds"
           },
           "401": {
-            "description": "Not authenticated; with `code: DEVICE_REVOKED` when `X-KERP-Device-Id` (or the session's device) is revoked: wipe the device's local data"
+            "description": "Not authenticated; with `code: DEVICE_REVOKED` when `X-KERP-Device-Id` (or the session's device) is revoked: wipe the device's local data. Sign-in answers `DEVICE_REVOKED` only after the credentials are right"
           },
           "422": {
             "description": "Validation Error",
@@ -180,7 +180,7 @@
             }
           },
           "401": {
-            "description": "Not authenticated; with `code: DEVICE_REVOKED` when `X-KERP-Device-Id` (or the session's device) is revoked: wipe the device's local data"
+            "description": "Not authenticated; with `code: DEVICE_REVOKED` when `X-KERP-Device-Id` (or the session's device) is revoked: wipe the device's local data. Sign-in answers `DEVICE_REVOKED` only after the credentials are right"
           },
           "422": {
             "description": "Validation Error",
@@ -261,7 +261,7 @@
             "description": "`Origin` is neither the web app's origin nor an allow-listed native app"
           },
           "401": {
-            "description": "Not authenticated; with `code: DEVICE_REVOKED` when `X-KERP-Device-Id` (or the session's device) is revoked: wipe the device's local data"
+            "description": "Not authenticated; with `code: DEVICE_REVOKED` when `X-KERP-Device-Id` (or the session's device) is revoked: wipe the device's local data. Sign-in answers `DEVICE_REVOKED` only after the credentials are right"
           },
           "422": {
             "description": "Validation Error",
@@ -341,7 +341,7 @@
             "description": "`Origin` is neither the web app's origin nor an allow-listed native app"
           },
           "401": {
-            "description": "Not authenticated; with `code: DEVICE_REVOKED` when `X-KERP-Device-Id` (or the session's device) is revoked: wipe the device's local data"
+            "description": "Not authenticated; with `code: DEVICE_REVOKED` when `X-KERP-Device-Id` (or the session's device) is revoked: wipe the device's local data. Sign-in answers `DEVICE_REVOKED` only after the credentials are right"
           },
           "422": {
             "description": "Validation Error",
@@ -408,7 +408,7 @@
           "devices"
         ],
         "summary": "Enrol",
-        "description": "Register this field device for the signed-in user and bind the session to it.",
+        "description": "Register this field device for the signed-in user and bind the session to it.\n\nA new device gets its wipe secret in this response, once (store it per account).",
         "operationId": "enrol_api_v1_devices_enrol_post",
         "requestBody": {
           "content": {
@@ -426,17 +426,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DeviceRead"
+                  "$ref": "#/components/schemas/DeviceEnrolled"
                 }
               }
             }
           },
           "201": {
-            "description": "Enrolled",
+            "description": "Enrolled: the only response that carries the `wipe_secret`",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DeviceRead"
+                  "$ref": "#/components/schemas/DeviceEnrolled"
                 }
               }
             }
@@ -627,7 +627,7 @@
           "devices"
         ],
         "summary": "Wipe Confirmed",
-        "description": "The revoked device confirms it wiped its local store (records, outbox, media, keys).",
+        "description": "The revoked device confirms it wiped its local store (records, outbox, media, keys),\nwith the wipe secret its enrolment returned.",
         "operationId": "wipe_confirmed_api_v1_devices__device_id__wipe_confirmed_post",
         "security": [
           {
@@ -646,15 +646,29 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/WipeConfirmRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
         "responses": {
           "204": {
             "description": "Successful Response"
           },
           "404": {
-            "description": "Unknown device"
-          },
-          "409": {
-            "description": "The device is not revoked"
+            "description": "Refused: the one answer for an unknown device, a device that is not revoked, and a wrong or missing wipe secret"
           },
           "422": {
             "description": "Validation Error",
@@ -4294,6 +4308,132 @@
         "title": "DeviceEnrolRequest",
         "description": "A field client registers itself after sign-in (every sign-in; idempotent)."
       },
+      "DeviceEnrolled": {
+        "properties": {
+          "device_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Device Id"
+          },
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "User Id"
+          },
+          "platform": {
+            "type": "string",
+            "enum": [
+              "android",
+              "ios",
+              "web"
+            ],
+            "title": "Platform"
+          },
+          "os_version": {
+            "type": "string",
+            "title": "Os Version"
+          },
+          "app_version": {
+            "type": "string",
+            "title": "App Version"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "revoked"
+            ],
+            "title": "Status"
+          },
+          "enrolled_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Enrolled At"
+          },
+          "last_seen_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Last Seen At"
+          },
+          "last_sync_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Sync At",
+            "description": "Last successful sync: work changed on the device after it is lost on revoke"
+          },
+          "revoked_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked At"
+          },
+          "revoked_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked By"
+          },
+          "wipe_confirmed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wipe Confirmed At"
+          },
+          "wipe_secret": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wipe Secret",
+            "description": "The device's wipe secret: only in the response of the enrolment that creates the device (`201`), never again (`null` on re-enrolment). Keep it in the keystore-backed store of this account and present it with `wipe-confirmed`"
+          }
+        },
+        "type": "object",
+        "required": [
+          "device_id",
+          "user_id",
+          "platform",
+          "os_version",
+          "app_version",
+          "status",
+          "enrolled_at",
+          "last_seen_at",
+          "last_sync_at",
+          "revoked_at",
+          "revoked_by",
+          "wipe_confirmed_at"
+        ],
+        "title": "DeviceEnrolled"
+      },
       "DeviceRead": {
         "properties": {
           "device_id": {
@@ -7698,6 +7838,25 @@
           "id"
         ],
         "title": "ViewColumn"
+      },
+      "WipeConfirmRequest": {
+        "properties": {
+          "wipe_secret": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wipe Secret",
+            "description": "The secret enrolment returned. Required: without it, or with a wrong one, the answer is the uniform refusal"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "WipeConfirmRequest"
       }
     },
     "securitySchemes": {

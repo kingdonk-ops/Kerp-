@@ -20,11 +20,11 @@ rewritten (HS256 → RS256/EdDSA + JWKS + `jti` revocation in Redis).
 | `service.py` | `AuthService` login / refresh / logout / magic link / PIN unlock; `create_user`, `set_password`; user reads for the admin module (`list_users`, `get_user`, `users_by_id`, `find_user_by_email`, T-0014); internal staff rule (`is_internal_user`, T-0049) |
 | `field.py` | Magic-link tokens + delivery seam, PIN rules (T-0009) |
 | `lockout.py` | `ProgressiveLockout` + policies, Redis-backed (T-0009) |
-| `models.py` | `auth_user` table (tenant-level rows, RLS) — migration `0003`, internal staff flag + Entra link in `0013` (T-0049, ADR 0009); `auth_project_membership` (T-0010) — migration `0006`, persona CHECK widened for PER-16 in `0012` (T-0076), membership-based RLS in `0015` (T-0014); `oe_identity_device` (T-0043) — migration `0016` |
+| `models.py` | `auth_user` table (tenant-level rows, RLS) — migration `0003`, internal staff flag + Entra link in `0013` (T-0049, ADR 0009); `auth_project_membership` (T-0010) — migration `0006`, persona CHECK widened for PER-16 in `0012` (T-0076), membership-based RLS in `0015` (T-0014); `oe_identity_device` (T-0043) — migration `0016`, `wipe_secret_hash` in `0018` (T-0080) |
 | `memberships.py` | The membership store's write side (`project_grants`, `set_user_grants`, `revoke_project`; revoke = soft delete, re-grant revives), used by the admin module (T-0014) and the projects module (creator PER-09, revoke on delete; T-0039) |
 | `access.py` | Persona matrix, capability tiers, SoD, scope resolution, `require_capability` / `require_hold_release` guards (T-0010); admin-grant lookup seam, `is_system_admin` binding, `CallerIsSystemAdmin`, `sod_warning` (T-0014); `CallerAdminGrants` (the caller's own `system_admin` / `create_projects`, cached with the scope; T-0039) |
-| `devices.py` | Device registry (`oe_identity_device`): enrol + session binding, `resolve_request_device` (last seen, revoked → `DEVICE_REVOKED`), revoke, wipe confirmation, `record_sync` for the sync endpoints (T-0043) |
-| `device_api.py` | Device endpoints: enrol, own / per-user lists, revoke (self, `system_admin`, PER-09 of a shared project; cross-project wipe warning), wipe-confirmed (T-0043) |
+| `devices.py` | Device registry (`oe_identity_device`): enrol + session binding, `resolve_request_device` (last seen, revoked → `DEVICE_REVOKED`), revoke, wipe secret + uniform wipe confirmation (T-0080), `record_sync` for the sync endpoints (T-0043) |
+| `device_api.py` | Device endpoints: enrol, own / per-user lists, revoke (self, `system_admin`, PER-09 of a shared project; cross-project wipe warning), wipe-confirmed with the wipe secret (T-0043, T-0080) |
 | `device_signal.py` | `X-KERP-Device-Id` header, `DeviceRevokedError` → `401` with `code: DEVICE_REVOKED` (no database) |
 | `router.py`, `schemas.py` | HTTP endpoints below |
 
@@ -40,16 +40,18 @@ rewritten (HS256 → RS256/EdDSA + JWKS + `jti` revocation in Redis).
 | `POST /api/v1/auth/magic-link` | none | `{email}` → always `202`; sends a 15-min one-time link to an active user; `429` when throttled |
 | `POST /api/v1/auth/magic-link/redeem` | none | `{token, pin}` → `TokenResponse` + cookie of a new **PIN-gated** session |
 | `POST /api/v1/auth/pin/unlock` | refresh cookie + Origin (native app: `refresh_token` in the body) | `{pin}` → rotated `TokenResponse` + cookie; `429` when locked; `403` cross-origin |
-| `POST /api/v1/devices/enrol` | bearer | `{device_id, platform, os_version, app_version}` → device; `201` new, `200` known; binds the session to the device; `409` another account's id or a session already bound elsewhere |
+| `POST /api/v1/devices/enrol` | bearer | `{device_id, platform, os_version, app_version}` → device + `wipe_secret`; `201` new (the only response carrying the secret), `200` known (`wipe_secret: null`); binds the session to the device; `409` another account's id or a session already bound elsewhere |
 | `GET /api/v1/devices` | bearer | the caller's devices (last seen, last sync, status) |
 | `GET /api/v1/users/{user_id}/devices` | bearer | a user's devices: the user, a `system_admin`, or a PER-09 of a project the user belongs to; `403` a shared project without PER-09; `404` otherwise |
 | `POST /api/v1/devices/{device_id}/revoke` | bearer | `{confirm_cross_project_wipe?}` → revoked device + `role` + `cross_project_warning`; same callers as above; `409` until a PER-09 confirms the cross-project wipe |
-| `POST /api/v1/devices/{device_id}/wipe-confirmed` | none | `204`; the revoked device reports its wipe; `404` unknown, `409` not revoked |
+| `POST /api/v1/devices/{device_id}/wipe-confirmed` | none | `{wipe_secret}` → `204`: the revoked device reports its wipe; every refusal (unknown id, active device, wrong or missing secret) is the same `404 {"detail": "Not Found"}` (T-0080) |
 
 `TokenResponse` is `{access_token, token_type, expires_in, refresh_expires_in}`: no response
 body carries the refresh token (below), except for an allow-listed native app
 (`refresh_token`, *Native app origins*). Every token endpoint and every authenticated request
 reads `X-KERP-Device-Id`; a revoked device is `401` with `code: DEVICE_REVOKED` (*Devices*).
+Sign-in (login, magic-link redeem) checks the credentials first: only then is the device
+checked (T-0080, *Device hardening*).
 
 **One hidden tenant (T-0037, diff §4.1, TD-120).** A deployment serves one tenant,
 `KERP_DEFAULT_TENANT_ID`; login and magic-link requests carry no tenant field and nothing
@@ -153,7 +155,8 @@ Every field client (Capacitor Android build, field PWA) enrols after each sign-i
 its `platform` (`android | ios | web`), OS and app version. `oe_identity_device` (tenant-level,
 `BaseRecordMixin`, standard RLS policy, unique `(tenant_id, device_id)`) keeps user,
 `enrolled_at`, `last_seen_at`, `last_sync_at`, status `active | revoked`, `revoked_by`,
-`revoked_at`, `wipe_confirmed_at`. Who may see or revoke which device is decided in
+`revoked_at`, `wipe_confirmed_at`, `wipe_secret_hash` (T-0080, migration `0018`). Who may see
+or revoke which device is decided in
 `device_api.py`; the table's policy itself is the standard tenant-level one.
 
 - **Session binding.** Enrolment binds the login session (`sid`) to the device in the
@@ -187,12 +190,52 @@ its `platform` (`android | ios | web`), OS and app version. `oe_identity_device`
   {"detail": "Device revoked", "code": "DEVICE_REVOKED"}`: an access token or refresh/unlock of
   a session killed by the revoke, and any call (login, magic-link redeem, refresh, unlock,
   authenticated request, enrolment) naming the revoked device in `X-KERP-Device-Id` (that
-  session is then killed too). The client wipes its local store (records, outbox, media, keys;
-  T-0143) and calls `POST /api/v1/devices/{device_id}/wipe-confirmed` without a token (its
-  sessions are dead): `204`, `wipe_confirmed_at` set once and audited. A plain `401` (expired,
-  logged out) never means "wipe". A wiped client enrols again under a new `device_id`; a
-  revoked id stays revoked.
-- **Enrolment audit.** The first enrolment of a device is appended to `device:<device_id>`.
+  session is then killed too). Sign-in names a revoked device this way only once the
+  credentials are right (*Device hardening* below). The client wipes its local store (records,
+  outbox, media, keys; T-0143) and calls `POST /api/v1/devices/{device_id}/wipe-confirmed`
+  without a token (its sessions are dead) but with its wipe secret: `204`, `wipe_confirmed_at`
+  set once and audited. A plain `401` (expired, logged out) never means "wipe". A wiped client
+  enrols again under a new `device_id`; a revoked id stays revoked.
+- **Enrolment audit.** The first enrolment of a device is appended to `device:<device_id>`
+  (never with the wipe secret).
+
+### Device hardening (T-0080, diff §4.3; TD-286, TD-291)
+
+- **Per-device wipe secret.** The enrolment that creates the device row issues a wipe secret:
+  32 bytes from the OS CSPRNG (256 bits), URL-safe base64 (`devices.new_wipe_secret`). It is in
+  that one `201` response (`wipe_secret`) and never again: re-enrolment answers
+  `wipe_secret: null`, and no list or other response carries it. The row keeps only its
+  SHA-256 (`wipe_secret_hash`, hex; a 256-bit random secret needs no slow hash); the secret is
+  never written to the database, the audit ledger or the logs. A device enrolled before
+  migration `0018` has no secret, so it **cannot confirm its wipe** (it gets the uniform
+  refusal); acceptable because no device is in production before the pilot (planner default).
+- **Uniform wipe-confirmed answer.** `POST /api/v1/devices/{device_id}/wipe-confirmed`
+  `{wipe_secret}` records `wipe_confirmed_at` (once) only for a revoked device with the right
+  secret. An unknown id, an active device, a device without a secret, and a wrong or missing
+  secret (no body, `{}`) all get the same `404 {"detail": "Not Found"}` after the same work:
+  one lookup, one SHA-256 of the presented secret, one `hmac.compare_digest` against the
+  stored digest (a fixed dummy digest when there is none). The OpenAPI lists only `204` and
+  that `404` (plus FastAPI's `422` for a malformed body, which does not depend on the device).
+  Confirmations (`wipe_confirmed`) and refusals (`wipe_refused` with `reason`
+  `unknown_device | no_secret | wrong_secret | not_revoked`, for admins only) are appended to
+  `device:<device_id>`; never the secret.
+- **Credentials before the device.** Password login authenticates first; magic-link redeem
+  validates the link **without spending it** (`RevocationStore.peek_magic_link`). Wrong
+  credentials, or an unknown, expired or spent link, get the usual uniform `401` whatever
+  `X-KERP-Device-Id` names (unknown, active or revoked): no device-status oracle to an
+  unauthenticated caller. With valid credentials a revoked device is still
+  `401 {code: DEVICE_REVOKED}` so the client wipes; a valid magic link is then left unspent
+  (the same link redeems later from an active device) and is spent only once the device check
+  passes. Refresh, PIN unlock, authenticated requests and enrolment are unchanged (their
+  caller already holds a session). The SSO exchange gets the same rule with T-0054.
+- **Client contract (T-0143).** On `201` from enrolment the client stores `wipe_secret` in the
+  keystore-backed secure store **per account** (with that account's local store, keyed by the
+  `device_id`); it never logs it or sends it anywhere else. On `DEVICE_REVOKED` it wipes the
+  account's local store (records, outbox, media, keys) **except** the wipe secret, then calls
+  `POST /api/v1/devices/{device_id}/wipe-confirmed` with `{"wipe_secret": "<secret>"}` (no
+  token), retrying on network errors and `5xx`; `204` or `404` ends it, and the secret is then
+  deleted. A `200` re-enrolment (`wipe_secret: null`) keeps the stored secret; a client that
+  has lost it enrols under a new `device_id` after its next wipe.
 
 ## Field workers: magic link + PIN (T-0009)
 

@@ -4,6 +4,9 @@
 Runs on the real migration (SQLite here, PostgreSQL under RLS in CI). All data synthetic.
 """
 
+import base64
+import json
+import logging
 import uuid
 from collections.abc import Iterator
 from datetime import timedelta
@@ -13,7 +16,7 @@ from typing import Any
 import httpx
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import event
+from sqlalchemy import event, text
 from sqlalchemy.orm import Session
 
 from app.core.audit.service import chain_entries, verify_chain
@@ -25,6 +28,7 @@ from app.core.auth.device_signal import (
     InvalidDeviceHeaderError,
     parse_device_id,
 )
+from app.core.auth.field import MAGIC_LINK_TTL
 from app.core.auth.models import DEVICE_TABLE, Device, ProjectMembership
 from app.core.auth.revocation import (
     InMemoryRevocationStore,
@@ -101,6 +105,7 @@ class Api:
 
     def __init__(self, client: TestClient, runtime: AuthRuntime, db: Database) -> None:
         self.client, self.runtime, self.db = client, runtime, db
+        self.secrets: dict[uuid.UUID, str] = {}  # the wipe secret each enrolment returned
         self.users = {e: seed_user(db, T1, e) for e in (ALICE, BOB, CAROL, DAVE, FIONA, GREG)}
         with db.unit_of_work(ROOT) as s:
             assert admin_service.grant(s, self.users[ALICE], SYSTEM_ADMIN, actor_id=None)
@@ -135,7 +140,9 @@ class Api:
     def device_on(self, email: str) -> tuple[dict[str, str], uuid.UUID]:
         """Sign ``email`` in and enrol a fresh device; returns the tokens and the device."""
         tokens, device = self.login(email), uuid.uuid4()
-        assert self.enrol(tokens, device).status_code == 201
+        response = self.enrol(tokens, device)
+        assert response.status_code == 201
+        self.secrets[device] = response.json()["wipe_secret"]
         return tokens, device
 
     def revoke(
@@ -587,21 +594,180 @@ def test_a_plain_logout_is_not_a_device_revoke(api: Api) -> None:
 # --- wipe confirmation ------------------------------------------------------------------------
 
 
-def test_the_revoked_device_confirms_its_wipe(api: Api) -> None:
-    _tokens, device = api.device_on(GREG)
+def _confirm(api: Api, device: uuid.UUID, secret: str | None = None, **kw: Any) -> httpx.Response:
     url = f"{DEVICES}/{device}/wipe-confirmed"
-    assert api.client.post(url).status_code == 409  # still active
-    assert api.client.post(f"{DEVICES}/{uuid.uuid4()}/wipe-confirmed").status_code == 404
+    if secret is None:
+        return api.client.post(url, **kw)
+    return api.client.post(url, json={"wipe_secret": secret}, **kw)
+
+
+def _refusal(response: httpx.Response) -> tuple[int, bytes]:
+    return response.status_code, response.content
+
+
+def test_the_revoked_device_confirms_its_wipe_with_its_secret(api: Api) -> None:
+    _tokens, device = api.device_on(GREG)
+    secret = api.secrets[device]
     assert api.revoke(api.login(ALICE), device).status_code == 200
-    assert api.client.post(url).status_code == 204
+    assert _confirm(api, device, secret).status_code == 204
     confirmed = api.row(device).wipe_confirmed_at
     assert confirmed is not None
-    assert api.client.post(url).status_code == 204
+    assert _confirm(api, device, secret).status_code == 204
     assert api.row(device).wipe_confirmed_at == confirmed  # the first confirmation stays
     entries = api.chain(f"device:{device}")
     assert [e["action"] for e in entries] == ["enrol", "revoke", "wipe_confirmed"]
     with api.db.unit_of_work(ROOT) as s:
         assert chain_entries(s, f"device:{device}")[-1].device_id == device
+    assert all(secret not in json.dumps(e) for e in entries)
+
+
+def test_every_refused_wipe_confirmation_gets_the_same_answer(api: Api) -> None:
+    """Unknown id, active device, wrong or missing secret: one answer, nothing recorded."""
+    _t, active = api.device_on(GREG)
+    _t, revoked = api.device_on(FIONA)
+    assert api.revoke(api.login(ALICE), revoked).status_code == 200
+    wrong = "x" * 43
+    answers = {
+        "unknown, no secret": _confirm(api, uuid.uuid4()),
+        "unknown, some secret": _confirm(api, uuid.uuid4(), wrong),
+        "active, no secret": _confirm(api, active),
+        "active, its own secret": _confirm(api, active, api.secrets[active]),
+        "active, wrong secret": _confirm(api, active, wrong),
+        "revoked, no secret": _confirm(api, revoked),
+        "revoked, empty body": api.client.post(f"{DEVICES}/{revoked}/wipe-confirmed", json={}),
+        "revoked, wrong secret": _confirm(api, revoked, wrong),
+        "revoked, another device's secret": _confirm(api, revoked, api.secrets[active]),
+    }
+    refusals = {name: _refusal(r) for name, r in answers.items()}
+    assert set(refusals.values()) == {(404, b'{"detail":"Not Found"}')}, refusals
+    assert api.row(active).wipe_confirmed_at is None
+    assert api.row(revoked).wipe_confirmed_at is None
+    # The right secret still works after the refusals (no lock-out of the device).
+    assert _confirm(api, revoked, api.secrets[revoked]).status_code == 204
+
+
+def test_refused_wipe_confirmations_are_audited_without_the_secret(api: Api) -> None:
+    _t, active = api.device_on(GREG)
+    _t, revoked = api.device_on(FIONA)
+    assert api.revoke(api.login(ALICE), revoked).status_code == 200
+    unknown, wrong = uuid.uuid4(), "y" * 43
+    _confirm(api, unknown, wrong)
+    _confirm(api, active, api.secrets[active])
+    _confirm(api, revoked, wrong)
+    _confirm(api, revoked)
+
+    def refused(device: uuid.UUID) -> list[dict[str, Any]]:
+        return [e for e in api.chain(f"device:{device}") if e["action"] == "wipe_refused"]
+
+    assert [e["reason"] for e in refused(unknown)] == ["unknown_device"]
+    assert [e["reason"] for e in refused(active)] == ["not_revoked"]
+    assert [e["reason"] for e in refused(revoked)] == ["wrong_secret", "wrong_secret"]
+    everything = json.dumps(
+        [api.chain(f"device:{d}") for d in (unknown, active, revoked)], default=str
+    )
+    for secret in (wrong, api.secrets[active], api.secrets[revoked]):
+        assert secret not in everything
+    with api.db.unit_of_work(ROOT) as s:
+        for device in (unknown, active, revoked):
+            assert verify_chain(s, f"device:{device}").ok
+
+
+def test_wipe_confirmation_compares_in_constant_time_whatever_the_device(
+    api: Api, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Comparable work: every call hashes the presented secret and runs one constant-time
+    compare against a stored hash (a dummy one when the device has none or is unknown)."""
+    compared: list[tuple[str, str]] = []
+    real = devices.hmac.compare_digest
+
+    def spy(a: str, b: str) -> bool:
+        compared.append((a, b))
+        return real(a, b)
+
+    monkeypatch.setattr(devices.hmac, "compare_digest", spy)
+    _t, active = api.device_on(GREG)
+    _t, revoked = api.device_on(FIONA)
+    assert api.revoke(api.login(ALICE), revoked).status_code == 200
+    calls = [
+        (uuid.uuid4(), None),
+        (uuid.uuid4(), "z" * 43),
+        (active, None),
+        (active, api.secrets[active]),
+        (revoked, "z" * 43),
+        (revoked, api.secrets[revoked]),
+    ]
+    for device, secret in calls:
+        before = len(compared)
+        _confirm(api, device, secret)
+        assert len(compared) == before + 1, device
+        assert all(len(side) == 64 for side in compared[-1])
+
+
+def test_a_device_enrolled_without_a_secret_cannot_confirm_its_wipe(api: Api) -> None:
+    """Enrolled before T-0080 (no hash): the device gets the uniform refusal (README)."""
+    _t, device = api.device_on(GREG)
+    with api.db.unit_of_work(ROOT) as s:
+        row = devices.find_device(s, device)
+        assert row is not None
+        row.wipe_secret_hash = None
+    assert api.revoke(api.login(ALICE), device).status_code == 200
+    unknown = _refusal(_confirm(api, uuid.uuid4(), api.secrets[device]))
+    assert _refusal(_confirm(api, device, api.secrets[device])) == unknown
+    assert _refusal(_confirm(api, device)) == unknown
+    assert api.row(device).wipe_confirmed_at is None
+    reasons = [e.get("reason") for e in api.chain(f"device:{device}")]
+    assert reasons[-2:] == ["no_secret", "no_secret"]
+
+
+def test_wipe_confirmation_openapi_lists_only_the_uniform_refusal(api: Api) -> None:
+    spec = api.client.get("/openapi.json").json()
+    operation = spec["paths"]["/api/v1/devices/{device_id}/wipe-confirmed"]["post"]
+    assert set(operation["responses"]) == {"204", "404", "422"}
+    assert "WipeConfirmRequest" in json.dumps(operation["requestBody"])
+    assert "wipe_secret" in spec["components"]["schemas"]["WipeConfirmRequest"]["properties"]
+    assert "wipe_secret" in spec["components"]["schemas"]["DeviceEnrolled"]["properties"]
+    assert "wipe_secret" not in spec["components"]["schemas"]["DeviceRead"]["properties"]
+
+
+# --- wipe secret at enrolment -------------------------------------------------------------------
+
+
+def test_enrolment_issues_the_wipe_secret_once_and_stores_only_its_hash(
+    api: Api, caplog: pytest.LogCaptureFixture
+) -> None:
+    caplog.set_level(logging.DEBUG)
+    tokens = api.login(FIONA)
+    device = uuid.uuid4()
+    first = api.enrol(tokens, device)
+    assert first.status_code == 201
+    secret = first.json()["wipe_secret"]
+    assert isinstance(secret, str)
+    assert len(base64.urlsafe_b64decode(secret + "=" * (-len(secret) % 4))) >= 32  # 256 bits
+    # Never again: re-enrolling and listing do not return it.
+    again = api.enrol(api.login(FIONA), device)
+    assert again.status_code == 200
+    assert again.json()["wipe_secret"] is None
+    listed = api.client.get(DEVICES, headers=api.bearer(tokens)).json()
+    assert all("wipe_secret" not in d and "wipe_secret_hash" not in d for d in listed)
+    admin = api.client.get(
+        f"/api/v1/users/{api.users[FIONA]}/devices", headers=api.bearer(api.login(ALICE))
+    )
+    assert secret not in admin.text
+    assert "wipe_secret" not in admin.text
+    # Stored only as a hash: no column of the row, no audit payload, no log line holds it.
+    row = api.row(device)
+    assert row.wipe_secret_hash is not None
+    assert row.wipe_secret_hash == devices.wipe_secret_digest(secret)
+    assert row.wipe_secret_hash != secret
+    with api.db.unit_of_work(ROOT) as s:
+        raw = s.execute(text(f"SELECT * FROM {DEVICE_TABLE}")).all()
+    assert all(secret not in str(value) for line in raw for value in line)
+    assert secret not in json.dumps(api.chain(f"device:{device}"))
+    assert caplog.records  # the request logs were captured
+    assert secret not in caplog.text
+    # Two devices never share a secret.
+    _t, other = api.device_on(GREG)
+    assert api.secrets[other] != secret
 
 
 # --- lists ------------------------------------------------------------------------------------
@@ -655,6 +821,120 @@ def test_magic_link_redeem_from_a_revoked_device_is_refused(tmp_path: Path, db: 
         fresh = {DEVICE_HEADER: str(uuid.uuid4())}
         ok = client.post("/api/v1/auth/magic-link/redeem", json=redeem, headers=fresh)
         assert ok.status_code == 200
+
+
+def _three_devices(api: Api, email: str) -> dict[str, dict[str, str]]:
+    """``X-KERP-Device-Id`` headers for an unknown, an active and a revoked device."""
+    _t, active = api.device_on(email)
+    _t, revoked = api.device_on(email)
+    assert api.revoke(api.login(ALICE), revoked).status_code == 200
+    return {
+        "unknown": {DEVICE_HEADER: str(uuid.uuid4())},
+        "active": {DEVICE_HEADER: str(active)},
+        "revoked": {DEVICE_HEADER: str(revoked)},
+    }
+
+
+def test_login_with_wrong_credentials_answers_alike_for_every_device_state(api: Api) -> None:
+    """Credentials first (TD-291): no device-status oracle to an unauthenticated caller."""
+    headers = _three_devices(api, GREG)
+    for body in (
+        {"email": GREG, "password": "wrong password, synthetic"},
+        {"email": "nobody@example.test", "password": PASSWORD},
+    ):
+        answers = {
+            state: _refusal(api.client.post(LOGIN, json=body, headers=h))
+            for state, h in headers.items()
+        }
+        assert len(set(answers.values())) == 1, answers
+        assert answers["revoked"][0] == 401
+        assert b"DEVICE_REVOKED" not in answers["revoked"][1]
+        refused = api.client.post(LOGIN, json=body, headers=headers["revoked"])
+        assert refused.headers.get("www-authenticate") == api.client.post(
+            LOGIN, json=body, headers=headers["unknown"]
+        ).headers.get("www-authenticate")
+
+
+def test_login_with_valid_credentials_on_a_revoked_device_is_device_revoked(api: Api) -> None:
+    headers = _three_devices(api, GREG)
+    body = {"email": GREG, "password": PASSWORD}
+    assert _revoked(api.client.post(LOGIN, json=body, headers=headers["revoked"]))
+    for state in ("unknown", "active"):
+        assert api.client.post(LOGIN, json=body, headers=headers[state]).status_code == 200
+
+
+def _magic_link_api(tmp_path: Path, db: Database) -> Iterator[tuple[Api, CapturingSender]]:
+    sender = CapturingSender()
+    settings = make_settings(database_url=database_url(tmp_path))
+    app, runtime = auth_app(settings, magic_links=sender)
+    with TestClient(app) as client:
+        yield Api(client, runtime, db), sender
+
+
+@pytest.fixture
+def field_api(tmp_path: Path, db: Database) -> Iterator[tuple[Api, CapturingSender]]:
+    yield from _magic_link_api(tmp_path, db)
+
+
+REDEEM = "/api/v1/auth/magic-link/redeem"
+
+
+def _link(api: Api, sender: CapturingSender, email: str) -> str:
+    assert api.client.post("/api/v1/auth/magic-link", json={"email": email}).status_code == 202
+    return sender.sent[-1].token
+
+
+def test_an_invalid_magic_link_answers_alike_for_every_device_state(
+    field_api: tuple[Api, CapturingSender],
+) -> None:
+    api, sender = field_api
+    headers = _three_devices(api, GREG)
+    spent = _link(api, sender, GREG)
+    assert api.client.post(REDEEM, json={"token": spent, "pin": PIN}).status_code == 200
+    for token in ("not-a-link-" + "a" * 32, spent):
+        answers = {
+            state: _refusal(api.client.post(REDEEM, json={"token": token, "pin": PIN}, headers=h))
+            for state, h in headers.items()
+        }
+        assert len(set(answers.values())) == 1, answers
+        assert answers["revoked"][0] == 401
+        assert b"DEVICE_REVOKED" not in answers["revoked"][1]
+
+
+def test_an_expired_magic_link_answers_alike_for_every_device_state(
+    tmp_path: Path, db: Database
+) -> None:
+    clock = [1000.0]
+    store = InMemoryRevocationStore(clock=lambda: clock[0])
+    sender = CapturingSender()
+    settings = make_settings(database_url=database_url(tmp_path))
+    app, runtime = auth_app(settings, store=store, magic_links=sender)
+    with TestClient(app) as client:
+        api = Api(client, runtime, db)
+        headers = _three_devices(api, GREG)
+        token = _link(api, sender, GREG)
+        clock[0] += MAGIC_LINK_TTL.total_seconds() + 1
+        answers = {
+            state: _refusal(client.post(REDEEM, json={"token": token, "pin": PIN}, headers=h))
+            for state, h in headers.items()
+        }
+    assert len(set(answers.values())) == 1, answers
+    assert answers["revoked"][0] == 401
+    assert b"DEVICE_REVOKED" not in answers["revoked"][1]
+
+
+def test_a_valid_magic_link_on_a_revoked_device_stays_unspent(
+    field_api: tuple[Api, CapturingSender],
+) -> None:
+    api, sender = field_api
+    headers = _three_devices(api, GREG)
+    token = _link(api, sender, GREG)
+    redeem = {"token": token, "pin": PIN}
+    assert _revoked(api.client.post(REDEEM, json=redeem, headers=headers["revoked"]))
+    assert _revoked(api.client.post(REDEEM, json=redeem, headers=headers["revoked"]))
+    # The link was not spent: the same link then redeems from an active device, once.
+    assert api.client.post(REDEEM, json=redeem, headers=headers["active"]).status_code == 200
+    assert api.client.post(REDEEM, json=redeem, headers=headers["active"]).status_code == 401
 
 
 def test_unlock_of_a_session_killed_by_a_device_revoke_is_device_revoked(

@@ -12,6 +12,8 @@ tenant-level record. The tenant comes from the session binding, never from an ar
   (``bind_device``). Enrolling again (every sign-in) updates platform and versions. A
   ``device_id`` already enrolled by another user is refused (``DeviceConflictError``); a
   revoked one stays revoked (``DeviceRevokedError``): a wiped client enrols under a new id.
+  The enrolment that creates the row issues the device's **wipe secret** (T-0080): returned
+  once, stored only as its SHA-256 (``wipe_secret_hash``).
 * **Seen** (``resolve_request_device``): a request whose session is bound to a device, or
   that names an enrolled device of its user in ``X-KERP-Device-Id``, runs "through" that
   device: ``last_seen_at`` is updated (at most once a minute) and the audit ledger records
@@ -19,13 +21,21 @@ tenant-level record. The tenant comes from the session binding, never from an ar
 * **Revoke** (``mark_revoked``): status ``revoked`` with who and when; once that is
   committed, every session bound to the device is revoked at once (``revoke_device``),
   marked so that its next call is answered ``DEVICE_REVOKED``.
+* **Wipe confirmation** (``confirm_wipe``): unauthenticated, so it does the same work for any
+  ``device_id`` and secret (one hash, one constant-time compare, against a dummy digest when
+  the device is unknown or has no secret) and tells the caller only "confirmed" or "refused";
+  the refusal reason is for the audit ledger alone (T-0080, TD-286, TD-291).
 """
 
 from __future__ import annotations
 
+import hashlib
+import hmac
+import secrets
 import uuid
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import Final
+from typing import Final, Literal
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -39,6 +49,35 @@ from app.core.tenancy.rls import session_tenancy
 
 # ``last_seen_at`` is written at most this often per device (not on every request).
 SEEN_RESOLUTION: Final = timedelta(minutes=1)
+
+
+# The wipe secret: 32 random bytes (256 bits), URL-safe base64 without padding (43 chars).
+WIPE_SECRET_BYTES: Final = 32
+# Compared against when there is no stored digest, so every call runs one compare.
+_NO_DIGEST: Final = hashlib.sha256(b"kerp:no-wipe-secret").hexdigest()
+
+WipeRefusal = Literal["unknown_device", "no_secret", "wrong_secret", "not_revoked"]
+
+
+def new_wipe_secret() -> str:
+    """A fresh per-device wipe secret (>= 256 bits from the OS CSPRNG)."""
+    return secrets.token_urlsafe(WIPE_SECRET_BYTES)
+
+
+def wipe_secret_digest(secret: str) -> str:
+    """The stored form of a wipe secret: SHA-256, hex. A high-entropy random secret needs no
+    slow hash; the digest alone does not let anyone confirm a wipe."""
+    return hashlib.sha256(secret.encode()).hexdigest()
+
+
+@dataclass(frozen=True, slots=True)
+class WipeOutcome:
+    """What ``confirm_wipe`` decided. ``refused`` is for the audit ledger only: the caller
+    answers every refusal alike."""
+
+    device: Device | None
+    recorded: bool = False  # ``wipe_confirmed_at`` was set by this call
+    refused: WipeRefusal | None = None
 
 
 class DeviceConflictError(ValueError):
@@ -95,10 +134,11 @@ def enrol(
     platform: str,
     os_version: str,
     app_version: str,
-) -> tuple[Device, bool]:
+) -> tuple[Device, str | None]:
     """Register (or refresh) the device and bind the login session to it.
 
-    Returns the device and whether it was new. A revoked device kills the calling session
+    Returns the device and, only when this call created it, its new wipe secret (else
+    ``None``: the secret is never issued twice). A revoked device kills the calling session
     and raises ``DeviceRevokedError``; another user's ``device_id``, or a session already
     bound to another device, raises ``DeviceConflictError``.
     """
@@ -112,8 +152,9 @@ def enrol(
     if device is not None and device.status == DEVICE_REVOKED:
         store.revoke_device_session(session_id, session_ttl)
         raise DeviceRevokedError("device revoked")
-    created = device is None
+    wipe_secret: str | None = None
     if device is None:
+        wipe_secret = new_wipe_secret()
         device = Device(
             tenant_id=_tenant_id(session),
             project_id=None,
@@ -121,6 +162,7 @@ def enrol(
             device_id=device_id,
             enrolled_at=now,
             status=DEVICE_ACTIVE,
+            wipe_secret_hash=wipe_secret_digest(wipe_secret),
             created_by=user_id,
         )
         session.add(device)
@@ -131,7 +173,7 @@ def enrol(
     device.updated_by = user_id
     session.flush()
     store.bind_device(session_id, device_id, session_ttl)
-    return device, created
+    return device, wipe_secret
 
 
 def touch(device: Device, now: datetime | None = None) -> bool:
@@ -174,18 +216,34 @@ def mark_revoked(session: Session, device: Device, *, actor_id: uuid.UUID) -> bo
     return True
 
 
-def confirm_wipe(session: Session, device: Device) -> bool:
-    """Record the client's wipe of a revoked device; ``False`` when it was recorded before.
+def confirm_wipe(session: Session, device_id: uuid.UUID, wipe_secret: str | None) -> WipeOutcome:
+    """Record the client's wipe of a revoked device that presents its wipe secret.
 
-    ``ValueError`` for an active device (nothing was asked to be wiped).
+    Comparable work whatever the outcome: one lookup, one digest of the presented secret
+    (an empty one when missing) and one constant-time compare (against a dummy digest when
+    the device is unknown or was enrolled without a secret). Only a revoked device with the
+    right secret sets ``wipe_confirmed_at``, once; a second confirmation changes nothing.
     """
-    if device.status != DEVICE_REVOKED:
-        raise ValueError("only a revoked device confirms a wipe")
+    device = find_device(session, device_id)
+    stored = device.wipe_secret_hash if device is not None else None
+    presented = wipe_secret_digest(wipe_secret or "")
+    matches = hmac.compare_digest(presented, stored or _NO_DIGEST)
+    refused: WipeRefusal | None = None
+    if device is None:
+        refused = "unknown_device"
+    elif stored is None:
+        refused = "no_secret"
+    elif not matches or not wipe_secret:
+        refused = "wrong_secret"
+    elif device.status != DEVICE_REVOKED:
+        refused = "not_revoked"
+    if device is None or refused is not None:
+        return WipeOutcome(device, refused=refused)
     if device.wipe_confirmed_at is not None:
-        return False
+        return WipeOutcome(device)
     device.wipe_confirmed_at = utcnow()
     session.flush()
-    return True
+    return WipeOutcome(device, recorded=True)
 
 
 def resolve_request_device(
