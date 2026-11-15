@@ -204,9 +204,10 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
   stay `{tenant}/{project}/{module}/{sha256}` without extension, plus transient `staging/` and
   `quarantine/` prefixes (TD-213; master spec §1.1); tenants directory table + `tenant_id` FK
   split into its own task (TD-271); PER-15 Client Portal Users sign in by password/SSO, no
-  sign-in magic links (TD-261; diff §4.2; E-07-01 reworded); PRs to `dev` come only from the
-  owner login, fork PR workflows need approval, no human-approval requirement until a second
-  collaborator (TD-223; WORKFLOW.md); coating/Grating ITR interim confirmed, still open with
+  sign-in magic links (TD-261; diff §4.2; E-07-01 reworded); the owner is the sole
+  collaborator (agents act as the owner login); fork PR workflows from external contributors
+  need approval (setting applied, owner-reported) and unexpected fork PRs are closed; no
+  human-approval requirement until a second collaborator (TD-223; WORKFLOW.md); coating/Grating ITR interim confirmed, still open with
   the client (TD-096). New: T-0079 (platform, M). Updated: T-0023 (depends on T-0079), T-0077,
   E-07-01, TD-032. Raised: TD-276 (risk), TD-277 (later).
 

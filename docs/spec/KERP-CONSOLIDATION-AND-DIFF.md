@@ -438,10 +438,11 @@ Wins over any earlier text on tenant selection, tenant administrators and projec
   2026-11-15; TD-261).
   **Request lockout keyed per mailbox (product owner, 2026-11-15; TD-224).** The magic-link
   request lockout stays keyed by tenant + e-mail (T-0068): 4 immediate requests, then a lock
-  doubling from 1 minute to 15 minutes, counted over a 1-hour window. It is also the mailbox-flood cap (how many e-mails one address can be
-  sent), so it is not re-keyed per client. Accepted consequence: anyone who knows a Field
-  Worker's e-mail can delay that worker's link; the worker can still sign in by password where
-  they have one, or unlock offline with the PIN within the grace (§4.2).
+  doubling from 1 minute to 15 minutes, counted over a 1-hour window. It is also the
+  mailbox-flood cap (how many e-mails one address can be sent), so it is not re-keyed per
+  client. Accepted consequence: anyone who knows a Field Worker's e-mail can delay that
+  worker's link; the worker can still sign in by password where they have one, or unlock
+  offline with the PIN within the grace (offline grace, above).
 
 ### 4.3 Devices (user, 2026-11-13; TD-164, decision 17a — Pilot-0 scope)
 
