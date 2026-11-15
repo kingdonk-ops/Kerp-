@@ -3,17 +3,13 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 163 · **Closed:** 108
+**Open:** 161 · **Closed:** 112
 
-## decision (5)
+## decision (1)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
 | [TD-096](../tracker/todo/TD-096.md) | Approved coating ITR dropped the residual-dust rating row the ITP requires; Grating and Gridmesh ITR has no approved version: confirm with the client before shipping default templates | T-0113 | planner |
-| [TD-213](../tracker/todo/TD-213.md) | Object key layout: confirm {tenant}/{project}/{module}/{sha256} (no extension) instead of the master spec's {hash}.ext, plus transient staging/ and quarantine/ prefixes | T-0016 | implementer |
-| [TD-223](../tracker/todo/TD-223.md) | Who may open PRs to dev? If any account other than KERP_ALLOWED_REVIEWERS (or forks) can, require a human approval as well as review-gate | T-0067 | reviewer |
-| [TD-261](../tracker/todo/TD-261.md) | Client Portal Users (PER-15, phase-7 portal) and magic links: confirm PER-15 signs in by password/SSO only after the PER-14-only magic-link decision | T-0057 | planner |
-| [TD-271](../tracker/todo/TD-271.md) | Split TD-032 (tenant_id FK) out of T-0014: needs a tenants directory table, an FK on every table and an ADR (core-table change) | T-0014 | implementer |
 
 ## spec-gap (37)
 
@@ -71,7 +67,7 @@
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
 | [TD-011](../tracker/todo/TD-011.md) | forms F13 report-slot mapping + F14 AI import assistant (SPEC-11 §2) not in Phase 1 tasks | T-0110 | planner |
-| [TD-032](../tracker/todo/TD-032.md) | tenant_id FK to the tenants directory table (spec §1.1) once the tenants table exists | T-0005 | implementer |
+| [TD-032](../tracker/todo/TD-032.md) | tenant_id FK to the tenants directory table (spec §1.1) once the tenants table exists | T-0005, T-0079 | implementer |
 | [TD-041](../tracker/todo/TD-041.md) | CEL parity gaps between celpy 0.5.0 and @marcbachmann/cel-js 8 (pinned known_gap fixtures) must be closed or accepted before T-0131 | T-0017, T-0018 | implementer |
 | [TD-047](../tracker/todo/TD-047.md) | Automate refresh of backend/requirements*.lock (uv pip compile output): Dependabot pip does not find *.lock files or re-run uv; options: scheduled uv --upgrade workflow opening a PR, or Renovate pip-compile manager | T-0028, T-0032 | implementer |
 | [TD-074](../tracker/todo/TD-074.md) | Handover: offline drafting on tablets via the Dexie outbox | E-04-11 | planner |
@@ -104,7 +100,7 @@
 | [TD-269](../tracker/todo/TD-269.md) | Store a project's chosen client pack so rule sets of a module enabled later are copied from that pack (T-0034 copies only base sets on module enable) | T-0108 | implementer |
 | [TD-273](../tracker/todo/TD-273.md) | Membership assignment does not validate site_node_id (PER-07 Asset-Site scope) against the asset hierarchy; no asset module exists yet | T-0014 | implementer |
 
-## later (66)
+## later (67)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -174,6 +170,7 @@
 | [TD-272](../tracker/todo/TD-272.md) | Projects API: GET /api/v1/projects should list every project for a system_admin (diff §4.1 'System admins can list every project row'); it lists the caller's memberships only | T-0014 | implementer |
 | [TD-274](../tracker/todo/TD-274.md) | Deactivating a user (PATCH /api/v1/admin/users/{id}) can lock out the last active system_admin, including the caller | T-0014 | implementer |
 | [TD-275](../tracker/todo/TD-275.md) | Deploy: when the migration owner and runtime role are split (TD-056), grant EXECUTE on kerp_caller_admin_grants() to the runtime role | T-0014 | implementer |
+| [TD-277](../tracker/todo/TD-277.md) | setup_github.sh: set fork PR workflow approval to 'all external contributors' (TD-223 mitigation) instead of relying on a manual Settings step | T-0067 | planner |
 
 ## bug (2)
 
@@ -182,7 +179,7 @@
 | [TD-159](../tracker/todo/TD-159.md) | Site filter from the bound project is applied to all site-scoped rows: a PER-07 on A who is PER-01 on B loses B's site-scoped rows (over-restrictive) | T-0010 | reviewer |
 | [TD-252](../tracker/todo/TD-252.md) | tracker.py new-todo cannot see open PRs in cloud sessions: gh pr list uses GraphQL (blocked), so TODO ids collide | T-0029 | coordinator |
 
-## risk (16)
+## risk (17)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -202,6 +199,7 @@
 | [TD-253](../tracker/todo/TD-253.md) | Refresh Origin fallback fails closed behind a TLS proxy: production without KERP_WEB_ORIGIN signs users out ~15 min after login; SPA treats the 403 as transient | T-0037 | coordinator |
 | [TD-254](../tracker/todo/TD-254.md) | spatial_bounds 10,000-position cap also runs on reads (ProjectRead): a stored row above the cap makes GET /projects 500 for the whole tenant | T-0060 | coordinator |
 | [TD-260](../tracker/todo/TD-260.md) | a11y component tests run in the installed Google Chrome (Vitest browser mode, Playwright channel chrome): CI relies on the runner's preinstalled Chrome; set KERP_CHROME_PATH or install a browser if the image changes | T-0046 | implementer |
+| [TD-276](../tracker/todo/TD-276.md) | A PR-added or PR-edited workflow can emit a check named review-gate; accepted while the owner is the sole collaborator (revisit when a second collaborator joins) | T-0067 | planner |
 
 ## Closed
 
@@ -299,9 +297,11 @@
 | ✅ | [TD-202](../tracker/todo/TD-202.md) | Lobby details: a project code only finds the project and files an access request (never grants access); the lobby is also reachable from the project picker for users who already have projects | Q1a: a project code only finds that one project and lets the user file an access request decided by the project's PER-09 holders; it never grants access by itself. Users who already have projects open the lobby from the picker. Spec diff §4.1; T-0040, T-0041 (user, 2026-11-13) |
 | ✅ | [TD-203](../tracker/todo/TD-203.md) | SPA refresh-token transport: keep the JSON body (sessionStorage) or move to an httpOnly SameSite cookie | Q6a: the web SPA gets the refresh token as an httpOnly Secure SameSite cookie (CSRF-protected /auth/refresh); the Capacitor Android build keeps the JSON-body transport. Spec diff §4.2; T-0037 (user, 2026-11-13) |
 | ✅ | [TD-206](../tracker/todo/TD-206.md) | Confirm planner default: once the offline window expires without server contact, queued data is kept but new edits are blocked until an online sign-in | Accepted for the Capacitor/PWA field client until the native Android app launches with a normal login system; revisit then (TD-210). (user, 2026-11-13) |
+| ✅ | [TD-213](../tracker/todo/TD-213.md) | Object key layout: confirm {tenant}/{project}/{module}/{sha256} (no extension) instead of the master spec's {hash}.ext, plus transient staging/ and quarantine/ prefixes | Product owner, 2026-11-15: keep {tenant}/{project}/{module}/{sha256} with no extension (content-addressed dedup; filename and content type on the row, applied on download; no extension-driven serving). Master spec §1.1 Storage Isolation amended, including the transient staging/ and quarantine/ prefixes |
 | ✅ | [TD-214](../tracker/todo/TD-214.md) | Pilot-0 checklist gaps: no inspector capture screen in the subset (T-0130 not listed; needs T-0124/T-0112/T-0128), no ad-hoc inspection UI, and T-0133 depends on the deferred P6 import T-0104 | R2a: T-0130 joins Pilot-0, T-0165 cut for capture and ad-hoc start, T-0133's P6 tests split to T-0166 outside the pilot so T-0104 leaves the gate (user, 2026-11-13) |
 | ✅ | [TD-218](../tracker/todo/TD-218.md) | Field palette after Pilot-0: video and audio notes, barcode/QR answer fields, reference images on questions (TD-166 remainder) | R4b: in Pilot-0; cut into T-0167 (video/audio/barcode field types), T-0168 (reference images), T-0169 (SAQ media probe), T-0170 (video/audio capture), T-0171 (barcode field + reference image display) (user, 2026-11-13) |
 | ✅ | [TD-219](../tracker/todo/TD-219.md) | Pilot-0 client co-sign on the inspector's device: who the client signer is (named PER-15 account with own PIN vs typed name + drawn signature) and which states it applies to | R1a + co-sign redesign: the client co-signs with their own KERP account (PER-15): (i) online PIN (T-0162), (ii) QR assertion signed by the client's own device key (T-0173, T-0175), (iii) provisional wet signature confirmed by the client (T-0174, T-0176); ledger T-0163, inspector screens T-0164 (user, 2026-11-13) |
+| ✅ | [TD-223](../tracker/todo/TD-223.md) | Who may open PRs to dev? If any account other than KERP_ALLOWED_REVIEWERS (or forks) can, require a human approval as well as review-gate | Product owner, 2026-11-15: repo is user-owned and public; the only principals are the owner (agents act as the owner login) and outside fork contributors. Mitigation: fork PR workflows require approval for all external contributors (applied by the owner 2026-11-15, owner-reported), owner stays sole collaborator, unexpected fork PRs are closed without running workflows. No human-approval requirement now; when a second human joins add CODEOWNERS on .github/ + scripts/ with required code-owner review. Residual risk: TD-276 |
 | ✅ | [TD-224](../tracker/todo/TD-224.md) | Magic-link request lockout is still per tenant+email: anyone can keep a known field worker from getting a link (4/hour, then doubling delay); decide per-client keying vs mailbox-flood protection | Product owner, 2026-11-15: keep the per-mailbox cap; magic-link request lockout stays keyed by tenant + e-mail; targeted-delay risk accepted |
 | ✅ | [TD-228](../tracker/todo/TD-228.md) | Teams scope and management: project-level teams only, managed by PER-09 (no tenant-level or cross-project teams) | Overridden (user, 2026-11-13): teams are tenant-level, created and staffed by system_admin, linked to several projects with one role (persona) per project; every member gets that access; PER-09 keeps managing individual members (diff 4.1 Teams, ADR 0008) |
 | ✅ | [TD-229](../tracker/todo/TD-229.md) | Teams module vs planner crews and roster teams (TD-073/TD-083) and the handover 'project team' | Confirmed (user, 2026-11-13): teams are separate from planner crews/rosters and are only about who has access with what permissions; 'project team' in the spec means everyone on the project (diff 4.1 Teams) |
@@ -312,6 +312,8 @@
 | ✅ | [TD-251](../tracker/todo/TD-251.md) | Team-to-project link role: the persona matrix has no read-only 'Viewer' or generic 'Editor' role - which roles may a team link carry? | Decided (product owner, 2026-11-13): team-project links may grant PER-01..PER-14 excluding PER-09, plus the new PER-16 Project Viewer (Viewer tier, V only, single project, no hold/approval/sign authority, no SoD implications; linkable and individually assignable); PER-09 and PER-15 remain strictly individual (auditability, blast-radius control). Edge 5.2 amended; PER-16 built by T-0076 |
 | ✅ | [TD-256](../tracker/todo/TD-256.md) | T-0014 membership admin API: accept PER-16 in its persona schema/enum and derive the PER-09 sod_warning hold-authority set from access.PERSONAS (A capability), so PER-16 never triggers it | T-0014 / PR #86: the membership admin schema (admin/schemas.py GrantIn) types persona as access.Persona, the same PER-01..PER-16 list as PERSONA_CODES and the membership CHECK; access.HOLD_AUTHORITY is derived from PERSONAS (personas with the A capability) and feeds sod_warning, so PER-16 never warns (tested in tests/test_admin.py). No frontend persona UI exists in this PR; the frontend-label sentence binds whichever task builds that UI through the CLAUDE.md section 6 i18n rule. |
 | ✅ | [TD-257](../tracker/todo/TD-257.md) | Offline grace (24 h after the server session ends) vs the 7-day offline window: confirm the grace binds edits and the window stays only as an upper bound | Product owner, 2026-11-14: confirmed. The 24 h offline grace after the session end binds edits; offline_window_days stays only as an upper bound (about 36 h offline with the defaults is enough; the window does not extend the grace). Spec diff §4.2; tasks T-0143, T-0044 unchanged in substance |
+| ✅ | [TD-261](../tracker/todo/TD-261.md) | Client Portal Users (PER-15, phase-7 portal) and magic links: confirm PER-15 signs in by password/SSO only after the PER-14-only magic-link decision | Product owner, 2026-11-15: planner reading confirmed. PER-15 Client Portal Users sign in by password (or Entra ID SSO if company members); KERP sign-in magic links stay PER-14 only; portal-scoped record links (modules/portal-plan-review.md §1.1) unchanged |
 | ✅ | [TD-262](../tracker/todo/TD-262.md) | Pilot-0 invites: how does a brand-new external invitee (no company Entra membership) get first credentials before T-0056 / TD-084? | Product owner, 2026-11-14: external users never use Microsoft sign-in (no federation); they are invited by e-mail, create their own password at invite acceptance from the e-mailed link, sign in with e-mail + password and reset it by e-mail. Invite e-mail, first-password set, self-service reset and outbound e-mail are in the Pilot-0 gate; the copy-link stays as a fallback. Spec diff §4.1, §4.2, §4.5, §4.6; tasks T-0058, T-0059, T-0077, T-0078; T-0056 restructured |
 | ✅ | [TD-264](../tracker/todo/TD-264.md) | Invites: add a short human-typeable invite code as an alternative to the invite link, or keep link-only? | Product owner, 2026-11-14: no invite code; invites are links only (e-mailed link with setup_token, copyable invite_token link as fallback, re-send rotates both). Spec diff §4.1 Re-send; tasks T-0052, T-0053, T-0059 |
 | ✅ | [TD-265](../tracker/todo/TD-265.md) | T-0014 user create/update schemas must reject is_internal, entra_oid and entra_tid with 422 and the admin user list must show is_internal read-only (T-0049 criterion; those schemas do not exist yet) | T-0014: admin UserCreate/UserUpdate use extra=forbid (is_internal, entra_oid, entra_tid, tenant_id are 422; tested), GET /api/v1/admin/users lists is_internal read-only via app.core.auth.service, and POST /api/v1/admin/users creates accounts through app.core.auth.service.create_user, which derives the flag. |
+| ✅ | [TD-271](../tracker/todo/TD-271.md) | Split TD-032 (tenant_id FK) out of T-0014: needs a tenants directory table, an FK on every table and an ADR (core-table change) | Product owner, 2026-11-15: split out as its own task T-0079 (tenants directory table + tenant_id FK on every table, ADR; phase 0, order 14, depends on T-0014). TD-032 now points at T-0079 |

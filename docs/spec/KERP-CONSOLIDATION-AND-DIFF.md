@@ -432,8 +432,10 @@ Wins over any earlier text on tenant selection, tenant administrators and projec
   registers, so core never imports a module (CLAUDE.md §6). All other users sign in with
   password or, for internal staff, Entra ID SSO (§4.5). The rule covers the KERP sign-in magic
   link only; portal-scoped record links for people without an account
-  (`modules/portal-plan-review.md` §1.1) are a separate mechanism (planner reading; PER-15 and
-  the phase-7 portal: TD-261).
+  (`modules/portal-plan-review.md` §1.1) are a separate mechanism and stay as specified.
+  **Client Portal Users (PER-15) sign in by password**, or by Entra ID SSO if they are company
+  members; they get no KERP sign-in magic links (product owner confirmed the planner reading,
+  2026-11-15; TD-261).
   **Request lockout keyed per mailbox (product owner, 2026-11-15; TD-224).** The magic-link
   request lockout stays keyed by tenant + e-mail (T-0068): 4 immediate requests, then a lock
   doubling from 1 minute to 15 minutes, counted over a 1-hour window. It is also the mailbox-flood cap (how many e-mails one address can be

@@ -41,7 +41,8 @@ In accordance with strict operational domain boundaries, generic back-office fun
   ```sql
   SET LOCAL app.current_tenant_id = '018f3a20-4e3b-7221-9ac4-b1c098675df1';
   ```
-* **Storage Isolation**: Object storage (S3-compatible / MinIO) applies tenant prefix partitioning (`s3://kerp-vault/{tenant_id}/{project_id}/{module_namespace}/{hash}.ext`) with short-lived presigned URLs for viewing and uploading.
+* **Storage Isolation**: Object storage (S3-compatible / MinIO) applies tenant prefix partitioning (`s3://kerp-vault/{tenant_id}/{project_id}/{module_namespace}/{sha256}`) with short-lived presigned URLs for viewing and uploading.
+* **Amendment (product owner, 2026-11-15; TD-213).** Object keys carry **no file extension**: the key is the SHA-256 of the content, so identical bytes uploaded under different names or types share one object (content-addressed dedup). The original filename and content type live on the file row and are applied on download (`Content-Disposition` and the served content type), never derived from the key, so the store never serves by extension. Two transient prefixes exist besides the content keys: `staging/{tenant_id}/{project_id}/{file_id}` (target of the presigned upload PUT) and `quarantine/{tenant_id}/{project_id}/{file_id}` (the verify job's private copy on which size, magic bytes, SHA-256 and the malware scan run; no URL is ever issued for it). Both are deleted in every outcome and swept if left over; only a verified quarantine copy is published to the content key, and an existing content key is never overwritten (T-0016).
 * **Amendment (user, 2026-11-13; TD-120).** One tenant per deployment, hidden from users: login resolves it from deployment configuration and no screen or request names it. Admin grants, project creation, the lobby and the project picker: `KERP-CONSOLIDATION-AND-DIFF.md` §4.1. Hosting region is a per-deployment setting (§4.4 there, TD-171).
 
 ### 1.2 Timezone & Spatial Anchoring Standards
