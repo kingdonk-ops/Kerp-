@@ -199,6 +199,18 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
   a System admin are confirmed (diff §4.1 Re-send). Updated: T-0052 (also: POST /invites returns
   429 at the cap), T-0053, T-0059, TD-264.
 
+- **2026-11-15 — product-owner decisions (binding):** magic-link request lockout stays keyed
+  per mailbox (tenant + e-mail), targeted-delay risk accepted (TD-224; diff §4.2); object keys
+  stay `{tenant}/{project}/{module}/{sha256}` without extension, plus transient `staging/` and
+  `quarantine/` prefixes (TD-213; master spec §1.1); tenants directory table + `tenant_id` FK
+  split into its own task (TD-271); PER-15 Client Portal Users sign in by password/SSO, no
+  sign-in magic links (TD-261; diff §4.2; E-07-01 reworded); the owner is the sole
+  collaborator (agents act as the owner login); fork PR workflows from external contributors
+  need approval (setting applied, owner-reported) and unexpected fork PRs are closed; no
+  human-approval requirement until a second collaborator (TD-223; WORKFLOW.md); coating/Grating ITR interim confirmed, still open with
+  the client (TD-096). New: T-0079 (platform, M). Updated: T-0023 (depends on T-0079), T-0077,
+  E-07-01, TD-032. Raised: TD-276 (risk), TD-277 (later).
+
 ## Key engineering decisions (baked into the spec — see consolidation diff)
 
 | Area | Decision |
@@ -220,5 +232,5 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
 | Region (2026-11-13) | Per-deployment setting: AWS `ap-southeast-2` for Australian deployments (diff §4.4) |
 
 ## Open decisions (see `TODO.md`)
-TD-261 (PER-15 portal users and magic links; planner reading applied), TD-004 (hosting target), TD-072 (ADR 0004 rule-set defaults per project), TD-073 (handover first-shift trigger),
-TD-039 (dropped AIP-proposal extras). TD-013 (review-gate ignores tracker) is resolved by T-0029. TD-002/005/007/008/009/012 are resolved by this merge; TD-001 by ADR 0001 (`docs/decisions/`). TD-002 is carried into code by ADR 0002 (`docs/decisions/0002-port-one-engine.md`). TD-034 (remaining Inspection-ERP core packages) is resolved by ADR 0007. TD-003 (SSO vs local JWT) is resolved; the SSO spec is diff §4.5 (TD-043 resolved 2026-11-14). Resolved 2026-11-14 by the product owner: TD-257 (offline grace binds; window is an upper bound), TD-136 (magic links PER-14 only, T-0057) and TD-262 (externals create their own password, reset by e-mail); TD-084 (outbound e-mail) resolved by diff §4.6.
+TD-096 (coating/Grating ITR, with the client; interim confirmed 2026-11-15), TD-004 (hosting target), TD-072 (ADR 0004 rule-set defaults per project), TD-073 (handover first-shift trigger),
+TD-039 (dropped AIP-proposal extras). TD-013 (review-gate ignores tracker) is resolved by T-0029. TD-002/005/007/008/009/012 are resolved by this merge; TD-001 by ADR 0001 (`docs/decisions/`). TD-002 is carried into code by ADR 0002 (`docs/decisions/0002-port-one-engine.md`). TD-034 (remaining Inspection-ERP core packages) is resolved by ADR 0007. TD-003 (SSO vs local JWT) is resolved; the SSO spec is diff §4.5 (TD-043 resolved 2026-11-14). Resolved 2026-11-14 by the product owner: TD-257 (offline grace binds; window is an upper bound), TD-136 (magic links PER-14 only, T-0057) and TD-262 (externals create their own password, reset by e-mail); TD-084 (outbound e-mail) resolved by diff §4.6. Resolved 2026-11-15 by the product owner: TD-224 (per-mailbox magic-link cap), TD-213 (object key layout), TD-271 (T-0079), TD-261 (PER-15 password/SSO) and TD-223 (PR principals; residual risk TD-276).

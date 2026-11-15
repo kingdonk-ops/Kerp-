@@ -343,7 +343,8 @@ Wins over any earlier text on tenant selection, tenant administrators and projec
   refresh token of the user** (all devices; device enrolment and PIN stay, §4.3); it does not
   sign the user in (they sign in with the new password; planner default). A "your password was
   changed" notice goes to the account's address. Requests are rate-limited per e-mail address
-  (same mailbox-flood cap as magic links, T-0068 / TD-224) and per client (TD-138); confirm
+  (the same per-mailbox cap as magic links, keyed by tenant + e-mail: T-0068, product owner
+  2026-11-15, TD-224) and per client (TD-138); confirm
   attempts per token are limited. An account without a password (brand-new invitee) can use
   reset to set its first password. Request, confirm and refusals are audited; tokens are scrubbed
   from logs and Sentry.
@@ -431,8 +432,17 @@ Wins over any earlier text on tenant selection, tenant administrators and projec
   registers, so core never imports a module (CLAUDE.md §6). All other users sign in with
   password or, for internal staff, Entra ID SSO (§4.5). The rule covers the KERP sign-in magic
   link only; portal-scoped record links for people without an account
-  (`modules/portal-plan-review.md` §1.1) are a separate mechanism (planner reading; PER-15 and
-  the phase-7 portal: TD-261).
+  (`modules/portal-plan-review.md` §1.1) are a separate mechanism and stay as specified.
+  **Client Portal Users (PER-15) sign in by password**, or by Entra ID SSO if they are company
+  members; they get no KERP sign-in magic links (product owner confirmed the planner reading,
+  2026-11-15; TD-261).
+  **Request lockout keyed per mailbox (product owner, 2026-11-15; TD-224).** The magic-link
+  request lockout stays keyed by tenant + e-mail (T-0068): 4 immediate requests, then a lock
+  doubling from 1 minute to 15 minutes, counted over a 1-hour window. It is also the
+  mailbox-flood cap (how many e-mails one address can be sent), so it is not re-keyed per
+  client. Accepted consequence: anyone who knows a Field Worker's e-mail can delay that
+  worker's link; the worker can still sign in by password where they have one, or unlock
+  offline with the PIN within the grace (offline grace, above).
 
 ### 4.3 Devices (user, 2026-11-13; TD-164, decision 17a — Pilot-0 scope)
 
