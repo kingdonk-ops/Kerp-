@@ -3,16 +3,15 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 164 · **Closed:** 107
+**Open:** 163 · **Closed:** 108
 
-## decision (6)
+## decision (5)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
 | [TD-096](../tracker/todo/TD-096.md) | Approved coating ITR dropped the residual-dust rating row the ITP requires; Grating and Gridmesh ITR has no approved version: confirm with the client before shipping default templates | T-0113 | planner |
 | [TD-213](../tracker/todo/TD-213.md) | Object key layout: confirm {tenant}/{project}/{module}/{sha256} (no extension) instead of the master spec's {hash}.ext, plus transient staging/ and quarantine/ prefixes | T-0016 | implementer |
 | [TD-223](../tracker/todo/TD-223.md) | Who may open PRs to dev? If any account other than KERP_ALLOWED_REVIEWERS (or forks) can, require a human approval as well as review-gate | T-0067 | reviewer |
-| [TD-224](../tracker/todo/TD-224.md) | Magic-link request lockout is still per tenant+email: anyone can keep a known field worker from getting a link (4/hour, then doubling delay); decide per-client keying vs mailbox-flood protection | T-0068 | reviewer |
 | [TD-261](../tracker/todo/TD-261.md) | Client Portal Users (PER-15, phase-7 portal) and magic links: confirm PER-15 signs in by password/SSO only after the PER-14-only magic-link decision | T-0057 | planner |
 | [TD-271](../tracker/todo/TD-271.md) | Split TD-032 (tenant_id FK) out of T-0014: needs a tenants directory table, an FK on every table and an ADR (core-table change) | T-0014 | implementer |
 
@@ -303,6 +302,7 @@
 | ✅ | [TD-214](../tracker/todo/TD-214.md) | Pilot-0 checklist gaps: no inspector capture screen in the subset (T-0130 not listed; needs T-0124/T-0112/T-0128), no ad-hoc inspection UI, and T-0133 depends on the deferred P6 import T-0104 | R2a: T-0130 joins Pilot-0, T-0165 cut for capture and ad-hoc start, T-0133's P6 tests split to T-0166 outside the pilot so T-0104 leaves the gate (user, 2026-11-13) |
 | ✅ | [TD-218](../tracker/todo/TD-218.md) | Field palette after Pilot-0: video and audio notes, barcode/QR answer fields, reference images on questions (TD-166 remainder) | R4b: in Pilot-0; cut into T-0167 (video/audio/barcode field types), T-0168 (reference images), T-0169 (SAQ media probe), T-0170 (video/audio capture), T-0171 (barcode field + reference image display) (user, 2026-11-13) |
 | ✅ | [TD-219](../tracker/todo/TD-219.md) | Pilot-0 client co-sign on the inspector's device: who the client signer is (named PER-15 account with own PIN vs typed name + drawn signature) and which states it applies to | R1a + co-sign redesign: the client co-signs with their own KERP account (PER-15): (i) online PIN (T-0162), (ii) QR assertion signed by the client's own device key (T-0173, T-0175), (iii) provisional wet signature confirmed by the client (T-0174, T-0176); ledger T-0163, inspector screens T-0164 (user, 2026-11-13) |
+| ✅ | [TD-224](../tracker/todo/TD-224.md) | Magic-link request lockout is still per tenant+email: anyone can keep a known field worker from getting a link (4/hour, then doubling delay); decide per-client keying vs mailbox-flood protection | Product owner, 2026-11-15: keep the per-mailbox cap; magic-link request lockout stays keyed by tenant + e-mail; targeted-delay risk accepted |
 | ✅ | [TD-228](../tracker/todo/TD-228.md) | Teams scope and management: project-level teams only, managed by PER-09 (no tenant-level or cross-project teams) | Overridden (user, 2026-11-13): teams are tenant-level, created and staffed by system_admin, linked to several projects with one role (persona) per project; every member gets that access; PER-09 keeps managing individual members (diff 4.1 Teams, ADR 0008) |
 | ✅ | [TD-229](../tracker/todo/TD-229.md) | Teams module vs planner crews and roster teams (TD-073/TD-083) and the handover 'project team' | Confirmed (user, 2026-11-13): teams are separate from planner crews/rosters and are only about who has access with what permissions; 'project team' in the spec means everyone on the project (diff 4.1 Teams) |
 | ✅ | [TD-230](../tracker/todo/TD-230.md) | Saved view visibility 'team' names no team: oe_saved_view (register-views 3) has no team reference | Decided (user, 2026-11-13): a team view can be shared with several teams, all linked to the view's project, visible only on that project (register-views 3); built by T-0074 |
