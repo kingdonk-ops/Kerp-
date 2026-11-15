@@ -18,6 +18,7 @@ from pydantic import ValidationError
 from sqlalchemy import select
 
 from app.core.audit.service import chain_entries
+from app.core.auth import access
 from app.core.auth.access import (
     HOLD_AUTHORITY,
     PERSONAS,
@@ -238,6 +239,21 @@ def test_the_scope_resolver_binds_the_system_admin_flag_from_the_table(db: Datab
     assert not member.is_system_admin
     assert member.member_project_ids == {home}
     assert member.allowed_project_ids == frozenset()  # PER-02 is not a portfolio persona
+
+
+def test_without_a_registered_lookup_nobody_is_system_admin(
+    db: Database, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Fail closed: with no admin-grant lookup installed, a ``system_admin`` grant row does not
+    make the caller a System admin (``access.register_admin_grant_lookup``)."""
+    alice = seed_user(db, T1, ALICE)
+    _make_admin(db, alice)
+    caller = TenancyContext(tenant_id=T1, user_id=alice)
+    assert resolve_request_scope(db, caller).is_system_admin  # the row is really there
+    monkeypatch.setattr(access, "_admin_grant_lookups", [])
+    assert resolve_request_scope(db, caller).is_system_admin is False
+    with db.unit_of_work(ROOT) as s:
+        assert caller_admin_grants(s, T1, alice) == frozenset()
 
 
 def test_project_rows_are_visible_by_membership_or_to_system_admins(db: Database) -> None:

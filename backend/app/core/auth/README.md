@@ -17,7 +17,7 @@ rewritten (HS256 → RS256/EdDSA + JWKS + `jti` revocation in Redis).
 | `service.py` | `AuthService` login / refresh / logout / magic link / PIN unlock; `create_user`, `set_password`; user reads for the admin module (`list_users`, `get_user`, `users_by_id`, `find_user_by_email`, T-0014); internal staff rule (`is_internal_user`, T-0049) |
 | `field.py` | Magic-link tokens + delivery seam, PIN rules (T-0009) |
 | `lockout.py` | `ProgressiveLockout` + policies, Redis-backed (T-0009) |
-| `models.py` | `auth_user` table (tenant-level rows, RLS) — migration `0003`, internal staff flag + Entra link in `0013` (T-0049, ADR 0009); `auth_project_membership` (T-0010) — migration `0006`, persona CHECK widened for PER-16 in `0012` (T-0076), membership-based RLS in `0014` (T-0014) |
+| `models.py` | `auth_user` table (tenant-level rows, RLS) — migration `0003`, internal staff flag + Entra link in `0013` (T-0049, ADR 0009); `auth_project_membership` (T-0010) — migration `0006`, persona CHECK widened for PER-16 in `0012` (T-0076), membership-based RLS in `0015` (T-0014) |
 | `memberships.py` | The membership store's write side (`project_grants`, `set_user_grants`; revoke = soft delete, re-grant revives), used by the admin module (T-0014) |
 | `access.py` | Persona matrix, capability tiers, SoD, scope resolution, `require_capability` / `require_hold_release` guards (T-0010); admin-grant lookup seam, `is_system_admin` binding, `CallerIsSystemAdmin`, `sod_warning` (T-0014) |
 | `router.py`, `schemas.py` | HTTP endpoints below |

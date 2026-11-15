@@ -5,7 +5,12 @@
   ``app.is_system_admin`` session reads and writes all; nobody else writes.
 * ``kerp_caller_admin_grants()``: ``SECURITY DEFINER`` function returning the session user's
   own live grant kinds, used at authentication to decide ``app.is_system_admin`` (edge spec
-  §6 amendments). Under ``FORCE`` RLS the owner is still subject to the own-rows policy.
+  §6 amendments). Correctness rests on the function's ``WHERE`` clause (bound tenant and
+  user, live rows), not on RLS: the owner runs it, and an owner that is a superuser or
+  ``BYPASSRLS`` is not subject to any policy, ``FORCE`` or not. ``EXECUTE`` is revoked from
+  ``PUBLIC`` and granted to ``CURRENT_USER``, the app role that runs the migrations (TD-056,
+  as in ``0002``); a deploy that splits the migration owner from the runtime role grants it
+  to the runtime role there (TD-275).
 * ``oe_projects_project`` and ``auth_project_membership`` lose the standard project policies
   and get the membership-based ones: readable when the described project is the bound one, in
   ``app.allowed_project_ids`` or ``app.member_project_ids``, or the session is a System admin
@@ -121,6 +126,11 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $fn$
     WHERE g.tenant_id = {_TENANT} AND g.user_id = {_USER} AND g.deleted_at IS NULL
 $fn$
 """
+# Nobody but the app role may call it (functions default to EXECUTE for PUBLIC).
+_FUNCTION_PRIVILEGES = (
+    f"REVOKE EXECUTE ON FUNCTION {FUNCTION}() FROM PUBLIC",
+    f"GRANT EXECUTE ON FUNCTION {FUNCTION}() TO CURRENT_USER",
+)
 
 
 def upgrade() -> None:
@@ -163,6 +173,8 @@ def upgrade() -> None:
     for statement in _admin_grant_sql():
         op.execute(statement)
     op.execute(_FUNCTION_SQL)
+    for statement in _FUNCTION_PRIVILEGES:
+        op.execute(statement)
     for table, column, owner in MEMBERSHIP_TABLES:
         for statement in _membership_sql(table, column, owner):
             op.execute(statement)

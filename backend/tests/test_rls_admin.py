@@ -129,6 +129,23 @@ def test_the_auth_lookup_function_returns_only_the_callers_own_grants(db: Databa
     assert _rows(db, None, lookup) == []
 
 
+def test_only_the_migrating_app_role_may_execute_the_lookup_function(db: Database) -> None:
+    """``EXECUTE`` is revoked from ``PUBLIC`` and granted to the app role (the role running the
+    migrations, ``kerp_app`` here, TD-056), so no other role can call the definer function."""
+    acl = (
+        "SELECT a.grantee, a.privilege_type FROM pg_proc p, aclexplode(p.proacl) a"
+        " WHERE p.proname = 'kerp_caller_admin_grants'"
+    )
+    grants = _rows(db, None, acl)
+    assert grants, "proacl is NULL: PUBLIC still holds the default EXECUTE"
+    assert all(grantee != 0 for grantee, _privilege in grants)  # 0 = PUBLIC
+    can_execute = (
+        "SELECT has_function_privilege(current_user, 'kerp_caller_admin_grants()', 'EXECUTE'),"
+        " has_function_privilege('public', 'kerp_caller_admin_grants()', 'EXECUTE')"
+    )
+    assert _rows(db, None, can_execute) == [(True, False)]
+
+
 # --- membership-based visibility ------------------------------------------------------------
 
 

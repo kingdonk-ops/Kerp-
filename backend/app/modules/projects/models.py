@@ -2,7 +2,7 @@
 
 A project is a tenant-level row (``project_id IS NULL``); its own id is the project id that
 every project-scoped row of the other modules carries. It is under the membership-based RLS
-policy (migration ``0014``, T-0014, TD-053): visible to sessions bound to it, allowed to read
+policy (migration ``0015``, T-0014, TD-053): visible to sessions bound to it, allowed to read
 it or holding a membership in it, and to ``system_admin`` sessions.
 """
 
@@ -39,7 +39,7 @@ class Project(Base, BaseRecordMixin):
         UniqueConstraint("tenant_id", "code", name="uq_oe_projects_project_tenant_code"),
         CheckConstraint("project_id IS NULL", name="tenant_level"),
         CheckConstraint("status IN (" + ", ".join(f"'{s}'" for s in STATUSES) + ")", name="status"),
-        rls_table_info(RlsPolicy("membership", project_column="id")),  # T-0014, migration 0014
+        rls_table_info(RlsPolicy("membership", project_column="id")),  # T-0014, migration 0015
     )
 
     code: Mapped[str] = mapped_column(String(32), nullable=False)

@@ -28,7 +28,10 @@ module: this module registers `own_admin_grants` with `access.register_admin_gra
 at import (the module loader imports the router at start-up; without it nobody is a System
 admin). On PostgreSQL the lookup is the `SECURITY DEFINER` function
 `kerp_caller_admin_grants()`, which takes no argument and returns only the session user's
-rows. Routers read the flag with `access.CallerIsSystemAdmin` (the bound session's flag),
+rows (its `WHERE` clause, not RLS, guarantees that). `EXECUTE` is revoked from `PUBLIC` and
+granted only to the app role running the migrations (`CURRENT_USER`, TD-056; split-role
+deploys: TD-275). Without a registered lookup nobody is a System admin (fail closed, tested).
+Routers read the flag with `access.CallerIsSystemAdmin` (the bound session's flag),
 never from a claim, parameter or header.
 
 ## API (`/api/v1/admin`)
