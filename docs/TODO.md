@@ -84,15 +84,15 @@
 | [TD-147](../tracker/todo/TD-147.md) | Field-worker sign-in screens: magic-link request/redeem and 6-digit PIN unlock in the SPA | T-0024 | implementer |
 | [TD-149](../tracker/todo/TD-149.md) | Area/discipline scoping (PER-04) and granted-subtree scoping (PER-15) are not enforced yet | T-0010 | implementer |
 | [TD-150](../tracker/todo/TD-150.md) | Asset-Site scoping is ORM-only and matches site_node_id exactly (no RLS, no subtree) | T-0010 | implementer |
-| [TD-155](../tracker/todo/TD-155.md) | Schedule the jobs sweep: enumerate tenant/project scopes under RLS (no BYPASSRLS) and run service.sweep from an SAQ cron | T-0015 | implementer |
+| [TD-155](../tracker/todo/TD-155.md) | Schedule the jobs sweep: enumerate tenant/project scopes under RLS (no BYPASSRLS) and run service.sweep from an SAQ cron | T-0015, T-0214 | implementer |
 | [TD-156](../tracker/todo/TD-156.md) | Jobs API: per-kind capability check on POST /jobs and GET /jobs/{id} once RBAC lands (T-0010) | T-0015 | implementer |
 | [TD-178](../tracker/todo/TD-178.md) | Form renderer: calculated fields (dynamic math) and dynamic ranges | T-0025 | implementer |
 | [TD-179](../tracker/todo/TD-179.md) | RegisterPage: server-side saved views (per user, shareable) | T-0025 | implementer |
 | [TD-180](../tracker/todo/TD-180.md) | RegisterPage: PDF export and server-side export of the full result set | T-0025 | implementer |
 | [TD-181](../tracker/todo/TD-181.md) | DetailPage: audit log and gate-status endpoints | T-0025 | implementer |
 | [TD-182](../tracker/todo/TD-182.md) | RegisterPage: server-side filtering, sorting and paging | T-0025 | implementer |
-| [TD-209](../tracker/todo/TD-209.md) | Uploads: file deletion and content-object GC; recover files stuck in 'verifying' after a failed verify job | T-0016 | implementer |
-| [TD-212](../tracker/todo/TD-212.md) | Uploads: run the orphan sweep on a schedule for every project (needs the scope list of TD-155) | T-0016 | implementer |
+| [TD-209](../tracker/todo/TD-209.md) | Uploads: file deletion and content-object GC; recover files stuck in 'verifying' after a failed verify job | T-0016, T-0215 | implementer |
+| [TD-212](../tracker/todo/TD-212.md) | Uploads: run the orphan sweep on a schedule for every project (needs the scope list of TD-155) | T-0016, T-0215 | implementer |
 | [TD-217](../tracker/todo/TD-217.md) | Inspection scheduling after Pilot-0: calendar view, general recurrence (beyond scaffolds), light work-order grouping (TD-165 remainder) | T-0152 | planner |
 | [TD-231](../tracker/todo/TD-231.md) | Teams admin screen (system_admin): list, create, rename, delete, add/remove members, link teams to projects with a role; read-only linked-teams view per project | T-0013 | planner |
 | [TD-238](../tracker/todo/TD-238.md) | Notifications: run non-in-app channels (FCM T-0144, e-mail TD-084) as an SAQ job after commit, with a persisted per-channel delivery log and retry; T-0019 calls them synchronously inside the caller's transaction | T-0019 | implementer |
@@ -106,7 +106,7 @@
 | [TD-273](../tracker/todo/TD-273.md) | Membership assignment does not validate site_node_id (PER-07 Asset-Site scope) against the asset hierarchy; no asset module exists yet | T-0014 | implementer |
 | [TD-278](../tracker/todo/TD-278.md) | Rule 'Try it' on a recent real context (ADR 0004 §6): pick a recent record/event of the set's kind and evaluate against it; T-0036 only evaluates supplied sample contexts | T-0036 | implementer |
 | [TD-288](../tracker/todo/TD-288.md) | pending_updates on a set with no parent default answers 409 instead of an empty offer | T-0036 | reviewer |
-| [TD-298](../tracker/todo/TD-298.md) | Rate-limit the unauthenticated wipe-confirmed endpoint (every refusal appends an audit entry) | T-0080 | implementer |
+| [TD-298](../tracker/todo/TD-298.md) | Rate-limit the unauthenticated wipe-confirmed endpoint (every refusal appends an audit entry) | T-0080, T-0212 | implementer |
 
 ## later (76)
 
@@ -160,7 +160,7 @@
 | [TD-204](../tracker/todo/TD-204.md) | After Pilot-0: biometric unlock, certificate pinning (Capacitor) and per-device sync-health views | T-0043 | planner |
 | [TD-207](../tracker/todo/TD-207.md) | Local PIN unlock for the web PWA build (no platform keystore): e.g. a non-extractable WebCrypto key wrapping the IndexedDB data key | T-0143 | planner |
 | [TD-210](../tracker/todo/TD-210.md) | Native Android app: normal login system and offline-window expiry behaviour (replaces the TD-206 interim rule) | T-0143 | user |
-| [TD-211](../tracker/todo/TD-211.md) | Uploads: replace the always-clean StubScanner with a real malware scanner (e.g. ClamAV/clamd in the worker) | T-0016 | implementer |
+| [TD-211](../tracker/todo/TD-211.md) | Uploads: replace the always-clean StubScanner with a real malware scanner (e.g. ClamAV/clamd in the worker) | T-0016, T-0213 | implementer |
 | [TD-215](../tracker/todo/TD-215.md) | Optional chain-of-custody hash for offline records: SHA-256(prev_hash + payload + monotonic_ms) per device clock session | T-0148 | planner |
 | [TD-226](../tracker/todo/TD-226.md) | Key the per-client login lockout on the IPv6 /64, not the full address (clients can rotate within their prefix) | T-0068 | reviewer |
 | [TD-227](../tracker/todo/TD-227.md) | Task board totals count dropped tasks: leave status dropped out of the Overall and per-phase denominators in scripts/tracker.py render | T-0029 | planner |
@@ -176,7 +176,7 @@
 | [TD-263](../tracker/todo/TD-263.md) | Harden .claude/settings.json and scripts/gemini_review.sh against agent edits via Bash (CODEOWNERS, CI check or PreToolUse hook) | — | planner |
 | [TD-267](../tracker/todo/TD-267.md) | Frontend Project Settings -> Rules screen (ADR 0004 §7) on the T-0034 Rules API: tabs by kind/module, same component for the tenant default layer, unlock request/approve | T-0034 | implementer |
 | [TD-272](../tracker/todo/TD-272.md) | Projects API: GET /api/v1/projects should list every project for a system_admin (diff §4.1 'System admins can list every project row'); it lists the caller's memberships only | T-0014 | implementer |
-| [TD-274](../tracker/todo/TD-274.md) | Deactivating a user (PATCH /api/v1/admin/users/{id}) can lock out the last active system_admin, including the caller | T-0014 | implementer |
+| [TD-274](../tracker/todo/TD-274.md) | Deactivating a user (PATCH /api/v1/admin/users/{id}) can lock out the last active system_admin, including the caller | T-0014, T-0211 | implementer |
 | [TD-275](../tracker/todo/TD-275.md) | Deploy: when the migration owner and runtime role are split (TD-056), grant EXECUTE on kerp_caller_admin_grants() to the runtime role | T-0014 | implementer |
 | [TD-277](../tracker/todo/TD-277.md) | setup_github.sh: set fork PR workflow approval to 'all external contributors' (TD-223 mitigation) instead of relying on a manual Settings step | T-0067 | planner |
 | [TD-279](../tracker/todo/TD-279.md) | Offer whole rule sets a running project lacks (a set first shipped, or first added to the tenant layer, after the project was created): today such a gate falls back to the tenant set via resolve_rule_set and no per-project copy is offered | T-0036 | implementer |

@@ -3,11 +3,11 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 45/164 tasks done (27%) · **ready now:** 21 · **epics awaiting breakdown:** 47
+**Overall:** 45/172 tasks done (26%) · **ready now:** 28 · **epics awaiting breakdown:** 47
 
 | Phase | Tasks done | Progress |
 |---|---|---|
-| 0 · Platform foundations | 45/80 | `█████░░░░░` 56% |
+| 0 · Platform foundations | 45/88 | `█████░░░░░` 51% |
 | 1 · Asset & Quality backbone | 0/75 (+1 epics) | `░░░░░░░░░░` 0% |
 | 2 · Welding quality | 0/9 | `░░░░░░░░░░` 0% |
 | 3 · Logistics | 0/0 (+7 epics) | `░░░░░░░░░░` 0% |
@@ -22,14 +22,22 @@
 | | ID | Title | Module | Size | Depends on | PR |
 |---|---|---|---|---|---|---|
 | ✅ | [T-0001](../tracker/tasks/T-0001.md) | Backend scaffold: FastAPI app factory, settings, /health | platform | S | — | #7 |
+| ▶ | [T-0210](../tracker/tasks/T-0210.md) | Request auth never holds two pooled DB connections: device lookup before the request session's first query | identity | S | — |  |
 | ✅ | [T-0002](../tracker/tasks/T-0002.md) | Frontend scaffold: Vite + React 18 + TS strict, Tailwind, TanStack Query, Dexie, router, i18n, Vitest | platform | S | — | #8 |
+| ▶ | [T-0211](../tracker/tasks/T-0211.md) | Last active System admin is kept on deactivation and revoke; concurrent duplicate grant/user create answer 200/409, not 500 | admin | S | — |  |
 | ✅ | [T-0003](../tracker/tasks/T-0003.md) | Dev infra: docker-compose (PG16+PostGIS+ltree, Redis7, MinIO), Makefile, .env.example | platform | S | T-0001 | #33 |
+| ▶ | [T-0212](../tracker/tasks/T-0212.md) | Rate-limit the unauthenticated wipe-confirmed endpoint per client; cap wipe_secret length | identity | S | — |  |
 | ✅ | [T-0004](../tracker/tasks/T-0004.md) | Backend Dockerfile (multi-stage, --only-binary) + CI image build to GHCR | platform | S | T-0001 | #11 |
+| ▶ | [T-0213](../tracker/tasks/T-0213.md) | Production refuses to verify uploads with the always-clean StubScanner unless explicitly allowed | uploads | S | — |  |
 | ✅ | [T-0005](../tracker/tasks/T-0005.md) | Database layer + BaseRecordMixin + Alembic + metadata contract test | platform | M | T-0001 | #13 |
+| ▶ | [T-0214](../tracker/tasks/T-0214.md) | Schedule the jobs sweep: list tenant/project scopes under RLS and run service.sweep from an SAQ cron | jobs | M | — |  |
 | ✅ | [T-0006](../tracker/tasks/T-0006.md) | Hash-chain audit ledger: append-only (seq, chain_key, prev_hash, content_hash, payload) + REVOKE UPDATE/DELETE | audit | M | T-0005 | #20 |
+| ⬜ | [T-0215](../tracker/tasks/T-0215.md) | Run the uploads orphan sweep hourly per project and recover files stuck in 'verifying' | uploads | S | T-0214 |  |
 | ✅ | [T-0007](../tracker/tasks/T-0007.md) | Project-scoped RLS: project_id context, policy helper, cross-project→404, 4 RLS-bypass contract tests | tenancy | M | T-0005 | #19 |
+| ▶ | [T-0216](../tracker/tasks/T-0216.md) | At most one pending unlock request per rule (partial unique index); a concurrent duplicate answers 409 | validation | S | — |  |
 | ✅ | [T-0008](../tracker/tasks/T-0008.md) | Auth: users, RS256/EdDSA JWT + JWKS endpoint, 15-min access + rotating refresh, jti revocation in Redis | identity | M | T-0007 | #31 |
 | ✅ | [T-0037](../tracker/tasks/T-0037.md) | Auth sessions: hidden deployment tenant at login, 12-hour refresh from sign-in (daily re-login) + same-second password-change token rejection | identity | M | T-0009 | #69 |
+| ▶ | [T-0217](../tracker/tasks/T-0217.md) | One shared bind_project helper for project-scoped routers; remove the unused require_capability/require_hold_release guards | identity | S | — |  |
 | ✅ | [T-0009](../tracker/tasks/T-0009.md) | Field-worker auth: magic-link + 6-digit PIN local unlock + progressive lockout | identity | M | T-0008 | #35 |
 | ✅ | [T-0038](../tracker/tasks/T-0038.md) | Field PIN hybrid rework: PIN per enrolled device, server PIN only on renewal after idle, lockout counter per device | identity | M | T-0043 | #95 |
 | ✅ | [T-0043](../tracker/tasks/T-0043.md) | Device registry: enrolment, remote revoke with wipe signal, device_id on sessions and in the audit ledger (Pilot-0) | identity | M | T-0037, T-0014 | #89 |
