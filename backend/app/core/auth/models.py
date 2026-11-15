@@ -25,6 +25,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.db import GUID, Base, BaseRecordMixin
+from app.core.tenancy.rls import RlsPolicy, rls_table_info
 
 TABLE: Final = "auth_user"
 ENTRA_OID_INDEX: Final = "uq_auth_user_tenant_entra_oid"
@@ -85,8 +86,9 @@ class ProjectMembership(Base, BaseRecordMixin):
     """One persona of one user on one project (T-0010): the membership store.
 
     A tenant-level row (``project_id IS NULL``): the project it grants is
-    ``member_project_id``, so the tenant-level session that resolves a request's scope can
-    read the user's memberships across projects (T-0014 tightens who else may, TD-053).
+    ``member_project_id``. Under the membership-based policy (T-0014, TD-053) a row is
+    visible to its own user (so the scope resolver reads the caller's memberships across
+    projects), to sessions that see its project, and to ``system_admin`` sessions.
     A Site Inspector (PER-07) membership names its site (Asset-Site scoping). Revoking a
     membership soft-deletes it.
     """
@@ -109,6 +111,11 @@ class ProjectMembership(Base, BaseRecordMixin):
         ),
         CheckConstraint(
             f"persona <> '{SITE_INSPECTOR}' OR site_node_id IS NOT NULL", name="inspector_site"
+        ),
+        # Membership-based policy (T-0014, TD-053): visible for the described project or the
+        # caller's own rows (the scope resolver reads those, TD-152); migration 0015.
+        rls_table_info(
+            RlsPolicy("membership", owner_column="user_id", project_column="member_project_id")
         ),
     )
 

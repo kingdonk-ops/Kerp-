@@ -5,7 +5,7 @@ Ported from Inspection-ERP `core/tenancy/` (ADR 0001) and extended from tenant t
 
 | Layer | File | Applies to | Off PostgreSQL |
 |---|---|---|---|
-| PostgreSQL RLS (`ENABLE` + `FORCE`, policies `project_isolation_policy` + `tenant_level_read_policy` + `allowed_projects_read_policy`) | `rls.py` | every statement: ORM, Core, raw SQL | n/a |
+| PostgreSQL RLS (`ENABLE` + `FORCE`, policies `project_isolation_policy` + `tenant_level_read_policy` + `allowed_projects_read_policy`; membership-based tables and admin grants: below) | `rls.py` | every statement: ORM, Core, raw SQL | n/a |
 | ORM scope (`do_orm_execute` loader criteria + `before_flush` write guard) | `scope.py` | ORM entity selects and flushes | the only filter |
 
 | | Project session (tenant T, project P, allowed L) | Tenant-level session (tenant T, no project, allowed L) |
@@ -39,8 +39,40 @@ project. There is no implicit "every project of the tenant" scope.
 rows. A project session therefore cannot create a tenant-level row, demote a project row to
 tenant level (which would leak it to every project), or change or delete a tenant-level row.
 An unset setting reads as `NULL` (`NULLIF(..., '')`), so an unbound session sees no rows and
-cannot write any. The stricter membership-based policy on tenant-level tables that describe a
-project (TD-053) is T-0014's.
+cannot write any.
+
+## Membership-based tables and admin grants (T-0014, TD-053, edge spec §6 amendments)
+
+Some tenant-level tables do not use the three standard policies. The model declares its policy
+on the table (`__table_args__ = (..., rls_table_info(RlsPolicy(...)))`); `rls_policy_sql(table,
+policy)` emits the DDL, `rls_coverage_problems` expects that policy's names (and reports any
+leftover standard policy as unexpected), and the ORM scope (`scope.py`) mirrors it.
+
+| Policy | Tables | Read | Insert | Update / delete |
+|---|---|---|---|---|
+| `membership` (`membership_{read,insert,update,delete}_policy`) | `oe_projects_project` (project = `id`), `auth_project_membership` (project = `member_project_id`, owner = `user_id`) | the described project is `app.current_project_id`, in `app.allowed_project_ids` or `app.member_project_ids`, or `app.is_system_admin`; or the row's owner is `app.current_user_id` | exact scope | exact scope **and** readable (old and new row) |
+| `admin_grant` (`admin_grant_{read,write}_policy`) | `oe_admin_grant` | own rows (`user_id = app.current_user_id`) or `app.is_system_admin` | `app.is_system_admin` + exact scope | `app.is_system_admin` + exact scope |
+
+So a client-portal user who is a member of project A reads A's project row and memberships but
+not B's (404); a plain tenant-level session (no user, no flag) reads no project row at all; a
+System admin reads every project row and membership but, because the project-scoped tables keep
+the standard policies, **no project-scoped record** of a project without a membership.
+
+Settings bound per transaction (all from the server, never from the request):
+
+| Setting | From |
+|---|---|
+| `app.current_tenant_id` | token `tid` |
+| `app.current_project_id` | the bound project (not from the request yet, TD-122) |
+| `app.allowed_project_ids` | projects of the caller's portfolio personas (T-0010) |
+| `app.member_project_ids` | every project of the caller's memberships, whatever the persona (T-0014); it widens only the `membership` tables |
+| `app.current_user_id` | token `sub` (T-0014) |
+| `app.is_system_admin` | `true` or unset: the caller's own `system_admin` grant, loaded at authentication through the admin module's lookup (`access.register_admin_grant_lookup`; on PostgreSQL the `SECURITY DEFINER` function `kerp_caller_admin_grants()`) in the same unit of work that reads the memberships (T-0014) |
+
+The scope resolver runs bound to the caller (`TenancyContext(tid, user_id=sub)`), so the
+own-rows clauses let it read the caller's memberships and grants without depending on what it
+decides (TD-152). Seeds, scripts and provisioning jobs that need every project row bind
+`TenancyContext(tenant_id, is_system_admin=True)` explicitly.
 
 ## Binding
 
@@ -54,7 +86,7 @@ project (TD-053) is T-0014's.
 - **Core connections:** `bind_connection(conn, ctx)` inside the transaction.
 - `bind_tenancy(session, ctx)` stores the context on `session.info`. An `after_begin` hook
   applies it with `set_config(..., true)` (`SET LOCAL`) at the start of every transaction.
-  `install_pool_reset` also clears the three settings when a connection returns to the pool.
+  `install_pool_reset` also clears every setting (`rls.SETTINGS`) when a connection returns to the pool.
 - **One scope per session.** `bind_tenancy` raises if asked to switch a session that holds
   loaded objects or pending changes to a *different* context, because `session.get` would
   hand out identity-map objects of the old scope without SQL. Commit and `expunge_all()`
@@ -96,5 +128,6 @@ Migration `0006` (T-0010) inlines its RLS DDL so it stays frozen at that revisio
 `tests/test_rls_bypass.py` covers the four bypass paths: SAQ worker, cross-module service
 call, raw-SQL aggregation, DB migration. It needs PostgreSQL and runs in CI's PostgreSQL step
 as the `NOSUPERUSER NOBYPASSRLS` role `kerp_app` (skipped elsewhere, TD-052).
-`tests/test_rls_multi_project.py` covers the allowed list under RLS the same way.
+`tests/test_rls_multi_project.py` covers the allowed list under RLS the same way, and
+`tests/test_rls_admin.py` the membership-based and admin-grant policies (T-0014).
 `tests/test_tenancy.py` and `tests/test_access.py` run on both dialects.

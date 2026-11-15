@@ -53,6 +53,7 @@ from app.core.config import get_settings
 from app.core.db import utcnow
 from app.core.tenancy.context import TenancyContext
 from app.core.tenancy.rls import bind_tenancy
+from app.core.tenancy.scope import get_or_404
 
 
 class AuthenticationError(Exception):
@@ -125,6 +126,30 @@ def create_user(
     session.add(user)
     session.flush()
     return user
+
+
+def list_users(session: Session) -> list[User]:
+    """The session tenant's live accounts, by e-mail (user administration, T-0014)."""
+    return list(session.scalars(select(User).order_by(User.email)))
+
+
+def get_user(session: Session, user_id: uuid.UUID) -> User:
+    """A live account of the session's tenant, else ``OutOfScopeError`` (404)."""
+    return get_or_404(session, User, user_id)
+
+
+def users_by_id(session: Session, user_ids: Collection[uuid.UUID]) -> dict[uuid.UUID, User]:
+    """The live accounts among ``user_ids`` (member lists, T-0014)."""
+    if not user_ids:
+        return {}
+    rows = session.scalars(select(User).where(User.id.in_(list(user_ids))))
+    return {user.id: user for user in rows}
+
+
+def find_user_by_email(session: Session, email: str) -> User | None:
+    """The live account with exactly this e-mail (case-insensitive, trimmed), if any."""
+    query = select(User).where(User.email == normalize_email(email))
+    return session.scalars(query).one_or_none()
 
 
 def set_password(user: User, password: str) -> None:

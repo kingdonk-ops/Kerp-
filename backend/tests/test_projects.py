@@ -39,8 +39,9 @@ from tests.auth_support import ALICE, BOB, PASSWORD, T1, T2, auth_app, make_sett
 from tests.db_support import ON_POSTGRES, database_url
 
 PROJECTS = "/api/v1/projects"
-CTX_T1 = TenancyContext(tenant_id=T1)
-CTX_T2 = TenancyContext(tenant_id=T2)
+# Provisioning context: a System admin session reads every project row (T-0014, TD-053).
+CTX_T1 = TenancyContext(tenant_id=T1, is_system_admin=True)
+CTX_T2 = TenancyContext(tenant_id=T2, is_system_admin=True)
 CAROL = "carol@example.test"
 # A synthetic rectangle around a made-up site, counter-clockwise, closed.
 BOUNDS: dict[str, Any] = {

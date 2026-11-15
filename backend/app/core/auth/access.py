@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Callable, Iterable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import StrEnum
 from typing import TYPE_CHECKING, Annotated, Final
 
@@ -220,7 +220,9 @@ def resolve_scope(
     """The session scope for a user: ``base`` plus the bound project and the allowed list.
 
     The allowed (read-only) projects are those of the user's portfolio-scope personas; the
-    bound project, if any, must be one of the user's projects and sets the site filter.
+    bound project, if any, must be one of the user's projects and sets the site filter. Every
+    project of the grants becomes a member project (it widens only the rows describing a
+    project, T-0014); ``base.is_system_admin`` is kept.
     """
     grants = list(grants)
     allowed = frozenset(
@@ -233,6 +235,8 @@ def resolve_scope(
         user_id=base.user_id,
         allowed_project_ids=allowed,
         site_node_ids=sites,
+        member_project_ids=frozenset(g.project_id for g in grants),
+        is_system_admin=base.is_system_admin,
     )
 
 
@@ -248,6 +252,53 @@ def load_grants(session: Session, tenant_id: uuid.UUID, user_id: uuid.UUID) -> l
     return [Grant(row[0], Persona(row[1]), row[2]) for row in rows]
 
 
+# --- tenant-level admin grants (T-0014, diff §4.1) ---------------------------------------
+
+SYSTEM_ADMIN: Final = "system_admin"
+CREATE_PROJECTS: Final = "create_projects"
+ADMIN_GRANTS: Final = (SYSTEM_ADMIN, CREATE_PROJECTS)
+
+AdminGrantLookup = Callable[[Session, uuid.UUID, uuid.UUID], frozenset[str]]
+_admin_grant_lookups: list[AdminGrantLookup] = []
+
+
+def register_admin_grant_lookup(lookup: AdminGrantLookup) -> None:
+    """Install the admin module's lookup of a user's own grants (core never imports a
+    module). Idempotent; without one nobody is a system admin (fail closed)."""
+    if lookup not in _admin_grant_lookups:
+        _admin_grant_lookups.append(lookup)
+
+
+def caller_admin_grants(
+    session: Session, tenant_id: uuid.UUID, user_id: uuid.UUID
+) -> frozenset[str]:
+    """The user's own tenant-level admin grants (``system_admin``, ``create_projects``).
+
+    Neither grant is a persona or a membership, and neither adds a capability: no ``A`` or
+    ``S`` comes from them (TD-151); those come only from the personas in ``PERSONAS``.
+    """
+    found: frozenset[str] = frozenset()
+    for lookup in _admin_grant_lookups:
+        found |= lookup(session, tenant_id, user_id)
+    return found & frozenset(ADMIN_GRANTS)
+
+
+# Personas with hold or commercial authority (``A``): PER-02, PER-06, PER-07, PER-11. Derived
+# from the matrix, so a persona without ``A`` (e.g. PER-16) never warns (TD-256).
+HOLD_AUTHORITY: Final = frozenset(
+    p for p, spec in PERSONAS.items() if Capability.APPROVE in spec.capabilities
+)
+
+
+def sod_warning(personas: Iterable[Persona]) -> bool:
+    """Whether a user's *full* persona set on one project combines PER-09 with a
+    hold-authority persona (TD-151, edge spec §5 Admins): allowed, but the assignment must
+    be confirmed and is audited with ``sod_warning: true``. Callers pass every grant of the
+    user on the project, whatever its source (T-0073 adds team-derived ones)."""
+    held = frozenset(personas)
+    return Persona.PROJECT_ADMINISTRATOR in held and bool(held & HOLD_AUTHORITY)
+
+
 # ``request.state`` attribute holding ``(tenant_id, user_id, grants)`` once the request's
 # scope has been resolved, so guards and routers do not query the memberships again (T-0071).
 GRANTS_STATE: Final = "kerp_grants"
@@ -259,16 +310,22 @@ def resolve_request_scope(
     """Bind the request's allowed projects from the membership store (never the request).
 
     Runs in its own short tenant-level unit of work, before the request session is bound.
-    With ``state`` (the request's ``request.state``) the loaded grants are kept there for
-    ``get_caller_grants``.
+    The same unit of work loads the caller's own admin grants (``caller_admin_grants``) and
+    binds ``system_admin`` as ``is_system_admin`` (T-0014, edge spec §6 amendments): never
+    from token claims, request parameters or headers. With ``state`` (the request's
+    ``request.state``) the loaded grants are kept there for ``get_caller_grants``.
     """
     if base.user_id is None:
         return base
-    with database.unit_of_work(TenancyContext(tenant_id=base.tenant_id)) as session:
+    # Bound to the caller (``app.current_user_id``): the membership and admin-grant policies
+    # let a session read its own rows, so neither lookup depends on what it decides (TD-152).
+    own = TenancyContext(tenant_id=base.tenant_id, user_id=base.user_id)
+    with database.unit_of_work(own) as session:
         grants = load_grants(session, base.tenant_id, base.user_id)
+        is_admin = SYSTEM_ADMIN in caller_admin_grants(session, base.tenant_id, base.user_id)
     if state is not None:
         setattr(state, GRANTS_STATE, (base.tenant_id, base.user_id, tuple(grants)))
-    return resolve_scope(grants, base, base.project_id)
+    return resolve_scope(grants, replace(base, is_system_admin=is_admin), base.project_id)
 
 
 # --- FastAPI guards ----------------------------------------------------------------------
@@ -289,6 +346,16 @@ def get_caller_grants(
 
 
 CallerGrants = Annotated[list[Grant], Depends(get_caller_grants)]
+
+
+def get_caller_is_system_admin(principal: CurrentPrincipal, session: DbSession) -> bool:
+    """Whether the request session was bound with ``is_system_admin`` for this caller: the
+    flag ``resolve_request_scope`` loaded from the grants table (never the request)."""
+    context = session_tenancy(session)
+    return context is not None and context.is_system_admin and context.user_id == principal.user_id
+
+
+CallerIsSystemAdmin = Annotated[bool, Depends(get_caller_is_system_admin)]
 
 
 def get_project_access(grants: CallerGrants, session: DbSession) -> ProjectAccess:

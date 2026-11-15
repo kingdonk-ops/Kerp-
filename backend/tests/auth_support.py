@@ -100,7 +100,8 @@ def seed_user(
 def revoke_project_viewers(db: Database, tenant_id: uuid.UUID = T1) -> None:
     """Soft-delete the tenant's PER-16 memberships: the ``0012`` downgrade refuses while any
     is active, so tests that grant PER-16 call this before migrating down to base."""
-    with db.unit_of_work(TenancyContext(tenant_id=tenant_id)) as session:
+    # A System admin session reads every membership (membership-based policy, T-0014).
+    with db.unit_of_work(TenancyContext(tenant_id=tenant_id, is_system_admin=True)) as session:
         for row in session.query(ProjectMembership).filter_by(persona="PER-16"):
             row.deleted_at = datetime.now(UTC)
 

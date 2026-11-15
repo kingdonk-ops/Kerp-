@@ -19,6 +19,19 @@ the projects in ``app.allowed_project_ids`` (comma-separated UUIDs bound from th
 memberships): a portfolio session reads several projects but still writes only
 ``app.current_project_id``.
 
+Tenant-level tables that *describe* a project, and the admin grants, use other policies
+instead (T-0014, TD-053, edge spec §6 amendments), declared on the model's table with
+``rls_table_info(RlsPolicy(...))`` and mirrored by the ORM scope:
+
+* ``membership`` (the project row, memberships): a row is readable when the project it
+  describes is the bound project, in ``app.allowed_project_ids``, in
+  ``app.member_project_ids`` (every project of the caller's memberships) or the session has
+  ``app.is_system_admin``; with an owner column, the caller also reads their own rows
+  (``app.current_user_id``), which is how the scope resolver reads the caller's memberships.
+  Inserts need the exact scope; updates and deletes need the exact scope *and* visibility.
+* ``admin_grant``: the caller reads their own rows; an ``app.is_system_admin`` session reads
+  and writes all of them; nobody else inserts, updates or deletes.
+
 * ``NULLIF(..., '')``: once a connection has set a custom setting, it reads back as ``''``
   after the transaction, not ``NULL``. ``''::uuid`` would raise; ``NULL`` matches nothing.
   An unbound session therefore sees no rows and cannot write any (fail closed).
@@ -35,9 +48,10 @@ the only filter there.
 
 from __future__ import annotations
 
-from typing import Final
+from dataclasses import dataclass
+from typing import Any, Final, Literal
 
-from sqlalchemy import MetaData, event, text
+from sqlalchemy import MetaData, Table, event, text
 from sqlalchemy.engine import Connection, Engine
 from sqlalchemy.engine.interfaces import DBAPIConnection
 from sqlalchemy.orm import Session, SessionTransaction
@@ -48,11 +62,30 @@ from app.core.tenancy.context import TenancyContext
 TENANT_SETTING: Final = "app.current_tenant_id"
 PROJECT_SETTING: Final = "app.current_project_id"
 ALLOWED_SETTING: Final = "app.allowed_project_ids"
+MEMBER_SETTING: Final = "app.member_project_ids"
+USER_SETTING: Final = "app.current_user_id"
+SYSTEM_ADMIN_SETTING: Final = "app.is_system_admin"
+SETTINGS: Final = (
+    TENANT_SETTING,
+    PROJECT_SETTING,
+    ALLOWED_SETTING,
+    MEMBER_SETTING,
+    USER_SETTING,
+    SYSTEM_ADMIN_SETTING,
+)
 POLICY_NAME: Final = "project_isolation_policy"
 READ_POLICY_NAME: Final = "tenant_level_read_policy"
 ALLOWED_READ_POLICY_NAME: Final = "allowed_projects_read_policy"
 POLICY_NAMES: Final = (POLICY_NAME, READ_POLICY_NAME, ALLOWED_READ_POLICY_NAME)
+MEMBERSHIP_POLICY_NAMES: Final = (
+    "membership_read_policy",
+    "membership_insert_policy",
+    "membership_update_policy",
+    "membership_delete_policy",
+)
+ADMIN_GRANT_POLICY_NAMES: Final = ("admin_grant_read_policy", "admin_grant_write_policy")
 SESSION_INFO_KEY: Final = "kerp_tenancy"
+RLS_INFO_KEY: Final = "kerp_rls"
 
 # Tables with tenant_id that are deliberately not under RLS, each with its reason
 # (Inspection-ERP ADR 0003 pattern). Empty until a module needs one; adding an entry
@@ -74,6 +107,99 @@ ALLOWED_PROJECT_ROW_SQL: Final = (
 )
 
 
+_USER_EXPR: Final = f"NULLIF(current_setting('{USER_SETTING}', true), '')::uuid"
+SYSTEM_ADMIN_SQL: Final = (
+    f"COALESCE(NULLIF(current_setting('{SYSTEM_ADMIN_SETTING}', true), '')::boolean, false)"
+)
+
+
+def _id_list_sql(setting: str) -> str:
+    return f"string_to_array(NULLIF(current_setting('{setting}', true), ''), ',')::uuid[]"
+
+
+@dataclass(frozen=True, slots=True)
+class RlsPolicy:
+    """A table's non-standard RLS policy (T-0014), declared with ``rls_table_info``.
+
+    * ``kind="membership"``: tenant-level rows describing the project in ``project_column``;
+      ``owner_column`` (optional) names the user who always reads their own rows.
+    * ``kind="admin_grant"``: own rows (``owner_column``) readable; only ``system_admin``
+      sessions read all rows and write any.
+    """
+
+    kind: Literal["membership", "admin_grant"]
+    owner_column: str | None = None
+    project_column: str | None = None
+
+
+def rls_table_info(policy: RlsPolicy) -> dict[str, Any]:
+    """``__table_args__`` entry declaring ``policy``: ``{"info": {RLS_INFO_KEY: policy}}``."""
+    return {"info": {RLS_INFO_KEY: policy}}
+
+
+def table_policy(table: Table) -> RlsPolicy | None:
+    """The table's non-standard policy, or ``None`` for the standard project policy."""
+    policy = table.info.get(RLS_INFO_KEY)
+    return policy if isinstance(policy, RlsPolicy) else None
+
+
+def membership_visible_sql(project_column: str, owner_column: str | None = None) -> str:
+    """Read rule of a ``membership`` table: the described project is one the session sees."""
+    clauses = [
+        f"{project_column} = {_PROJECT_EXPR}",
+        f"{project_column} = ANY({_id_list_sql(ALLOWED_SETTING)})",
+        f"{project_column} = ANY({_id_list_sql(MEMBER_SETTING)})",
+        SYSTEM_ADMIN_SQL,
+    ]
+    if owner_column is not None:
+        clauses.append(f"{owner_column} = {_USER_EXPR}")
+    return f"tenant_id = {_TENANT_EXPR} AND ({' OR '.join(clauses)})"
+
+
+def _special_policy_sql(table: str, policy: RlsPolicy) -> list[str]:
+    if policy.kind == "membership":
+        if policy.project_column is None:
+            raise ValueError(f"{table}: a membership policy needs project_column")
+        names: tuple[str, ...] = MEMBERSHIP_POLICY_NAMES
+        read, insert, update, delete = names
+        visible = membership_visible_sql(policy.project_column, policy.owner_column)
+        guarded = f"{SCOPE_ROW_SQL} AND {visible}"
+        creates = [
+            f"CREATE POLICY {read} ON {table} FOR SELECT USING ({visible})",
+            f"CREATE POLICY {insert} ON {table} FOR INSERT WITH CHECK ({SCOPE_ROW_SQL})",
+            f"CREATE POLICY {update} ON {table} FOR UPDATE USING ({guarded})"
+            f" WITH CHECK ({guarded})",
+            f"CREATE POLICY {delete} ON {table} FOR DELETE USING ({guarded})",
+        ]
+    else:
+        if policy.owner_column is None:
+            raise ValueError(f"{table}: an admin_grant policy needs owner_column")
+        names = ADMIN_GRANT_POLICY_NAMES
+        read, write = names
+        own = f"{policy.owner_column} = {_USER_EXPR}"
+        admin = f"{SCOPE_ROW_SQL} AND {SYSTEM_ADMIN_SQL}"
+        creates = [
+            f"CREATE POLICY {read} ON {table} FOR SELECT"
+            f" USING (tenant_id = {_TENANT_EXPR} AND ({own} OR {SYSTEM_ADMIN_SQL}))",
+            f"CREATE POLICY {write} ON {table} FOR ALL USING ({admin}) WITH CHECK ({admin})",
+        ]
+    drops = [f"DROP POLICY IF EXISTS {name} ON {table}" for name in (*POLICY_NAMES, *names)]
+    return [
+        f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY",
+        f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY",
+        *drops,
+        *creates,
+    ]
+
+
+def expected_policy_names(table: Table) -> tuple[str, ...]:
+    """The policies ``rls_coverage_problems`` requires on ``table``."""
+    policy = table_policy(table)
+    if policy is None:
+        return POLICY_NAMES
+    return MEMBERSHIP_POLICY_NAMES if policy.kind == "membership" else ADMIN_GRANT_POLICY_NAMES
+
+
 def rls_tables(metadata: MetaData, *, exempt: frozenset[str] = RLS_EXEMPT) -> list[str]:
     """Names of the tables in ``metadata`` that must be under RLS."""
     return sorted(
@@ -83,14 +209,16 @@ def rls_tables(metadata: MetaData, *, exempt: frozenset[str] = RLS_EXEMPT) -> li
     )
 
 
-def rls_policy_sql(table: str) -> list[str]:
-    """DDL that puts ``table`` under project-scoped RLS (idempotent).
+def rls_policy_sql(table: str, policy: RlsPolicy | None = None) -> list[str]:
+    """DDL that puts ``table`` under project-scoped RLS, or ``policy`` (idempotent).
 
     Migrations run it with ``op.execute`` right after creating a table::
 
         for statement in rls_policy_sql("oe_asset_node"):
             op.execute(statement)
     """
+    if policy is not None:
+        return _special_policy_sql(table, policy)
     return [
         f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY",
         f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY",
@@ -111,7 +239,7 @@ def apply_rls_policies(connection: Connection, metadata: MetaData) -> list[str]:
         return []
     tables = rls_tables(metadata)
     for table in tables:
-        for statement in rls_policy_sql(table):
+        for statement in rls_policy_sql(table, table_policy(metadata.tables[table])):
             connection.execute(text(statement))
     return tables
 
@@ -144,8 +272,14 @@ def rls_coverage_problems(connection: Connection, metadata: MetaData) -> list[st
             problems.append(f"{table}: row level security not enabled")
         if not row.relforcerowsecurity:
             problems.append(f"{table}: row level security not forced")
+        expected = expected_policy_names(metadata.tables[table])
         problems.extend(
-            f"{table}: policy {name} missing" for name in POLICY_NAMES if name not in row.policies
+            f"{table}: policy {name} missing" for name in expected if name not in row.policies
+        )
+        # A leftover standard policy on a membership table would re-widen it (FOR ALL reads).
+        problems.extend(
+            f"{table}: unexpected policy {name}"
+            for name in sorted(set(row.policies) - set(expected))
         )
     return problems
 
@@ -219,20 +353,35 @@ def bind_connection(connection: Connection, context: TenancyContext | None) -> N
     if connection.dialect.name != "postgresql":
         return
     # set_config, not SET LOCAL: SET cannot take bind parameters (psycopg 3 binds server-side).
-    connection.execute(
-        text(
-            "SELECT set_config(:t_name, :tenant, true), set_config(:p_name, :project, true),"
-            " set_config(:a_name, :allowed, true)"
-        ),
-        {
-            "t_name": TENANT_SETTING,
-            "p_name": PROJECT_SETTING,
-            "a_name": ALLOWED_SETTING,
-            "tenant": str(context.tenant_id) if context else "",
-            "project": str(context.project_id) if context and context.project_id else "",
-            "allowed": ",".join(sorted(map(str, context.allowed_project_ids))) if context else "",
-        },
-    )
+    values = setting_values(context)
+    calls = ", ".join(f"set_config(:n{i}, :v{i}, true)" for i in range(len(values)))
+    params: dict[str, str] = {}
+    for i, (name, value) in enumerate(values.items()):
+        params[f"n{i}"], params[f"v{i}"] = name, value
+    connection.execute(text(f"SELECT {calls}"), params)
+
+
+def _ids(ids: frozenset[Any]) -> str:
+    return ",".join(sorted(map(str, ids)))
+
+
+def setting_values(context: TenancyContext | None) -> dict[str, str]:
+    """The session settings bound for ``context``; every one empty (unset) when unbound.
+
+    ``app.current_user_id`` and ``app.is_system_admin`` come from the context, which the
+    request fills from the verified token and the admin grants table (T-0014), never from
+    request input. The flag is ``"true"`` or unset, never ``"false"``.
+    """
+    if context is None:
+        return dict.fromkeys(SETTINGS, "")
+    return {
+        TENANT_SETTING: str(context.tenant_id),
+        PROJECT_SETTING: str(context.project_id) if context.project_id else "",
+        ALLOWED_SETTING: _ids(context.allowed_project_ids),
+        MEMBER_SETTING: _ids(context.member_project_ids),
+        USER_SETTING: str(context.user_id) if context.user_id else "",
+        SYSTEM_ADMIN_SETTING: "true" if context.is_system_admin else "",
+    }
 
 
 @event.listens_for(Session, "after_begin")
@@ -257,9 +406,8 @@ def install_pool_reset(engine: Engine) -> None:
             return
         try:
             cursor = dbapi_connection.cursor()
-            cursor.execute(f"RESET {TENANT_SETTING}")
-            cursor.execute(f"RESET {PROJECT_SETTING}")
-            cursor.execute(f"RESET {ALLOWED_SETTING}")
+            for name in SETTINGS:
+                cursor.execute(f"RESET {name}")
             cursor.close()
             dbapi_connection.commit()
         except Exception:  # pragma: no cover - a connection we cannot reset is dropped

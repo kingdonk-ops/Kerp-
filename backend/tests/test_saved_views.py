@@ -36,7 +36,8 @@ from tests.audit_support import migrated_database
 from tests.auth_support import ALICE, BOB, PASSWORD, T1, T2, auth_app, make_settings, seed_user
 from tests.db_support import database_url
 
-CTX_T1 = TenancyContext(tenant_id=T1)
+# Provisioning context: a System admin session reads every project row (T-0014, TD-053).
+CTX_T1 = TenancyContext(tenant_id=T1, is_system_admin=True)
 CTX_T2 = TenancyContext(tenant_id=T2)
 CAROL = "carol@example.test"
 DAVE = "dave@example.test"
