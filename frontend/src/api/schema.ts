@@ -371,6 +371,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/settings/deployment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Deployment Settings */
+        get: operations["read_deployment_settings_api_v1_settings_deployment_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Deployment Settings */
+        patch: operations["update_deployment_settings_api_v1_settings_deployment_patch"];
+        trace?: never;
+    };
     "/api/v1/projects": {
         parameters: {
             query?: never;
@@ -1179,6 +1197,68 @@ export interface components {
             detail: string | null;
         };
         /**
+         * DeploymentSettingsRead
+         * @description The effective deployment settings (the shipped defaults until a System admin edits).
+         */
+        DeploymentSettingsRead: {
+            /**
+             * Offline Window Days
+             * @description Days an offline device may work, 1-14
+             */
+            offline_window_days: number;
+            /**
+             * Offline Grace Hours
+             * @description Hours after the server session ended that an offline device may keep unlocking with the PIN and queueing changes (1 to 24 x offline_window_days)
+             */
+            offline_grace_hours: number;
+            /**
+             * Max Checkout Clock Skew S
+             * @description Largest device clock skew in seconds allowed when taking work offline
+             */
+            max_checkout_clock_skew_s: number;
+            /**
+             * Default Status
+             * @description Status of a new project
+             * @enum {string}
+             */
+            default_status: "ACTIVE" | "ON_HOLD" | "CLOSED";
+            /**
+             * Default Site Timezone
+             * @description IANA site timezone of a new project
+             */
+            default_site_timezone: string;
+            /**
+             * Default Currency Code
+             * @description ISO 4217 currency of a new project
+             */
+            default_currency_code: string;
+            /**
+             * Default Locale
+             * @description BCP 47 locale of a new project
+             */
+            default_locale: string;
+        };
+        /**
+         * DeploymentSettingsUpdate
+         * @description ``PATCH``: only the given fields change; none may be ``null``; no unknown fields.
+         */
+        DeploymentSettingsUpdate: {
+            /** Offline Window Days */
+            offline_window_days?: number | null;
+            /** Offline Grace Hours */
+            offline_grace_hours?: number | null;
+            /** Max Checkout Clock Skew S */
+            max_checkout_clock_skew_s?: number | null;
+            /** Default Status */
+            default_status?: ("ACTIVE" | "ON_HOLD" | "CLOSED") | null;
+            /** Default Site Timezone */
+            default_site_timezone?: string | null;
+            /** Default Currency Code */
+            default_currency_code?: string | null;
+            /** Default Locale */
+            default_locale?: string | null;
+        };
+        /**
          * DeviceEnrolRequest
          * @description A field client registers itself after sign-in (every sign-in; idempotent).
          */
@@ -1890,34 +1970,25 @@ export interface components {
         /**
          * ProjectCreate
          * @description ``POST /projects``. The tenant comes from the token, never from the body.
+         *
+         *     ``status``, ``site_timezone``, ``currency_code`` and ``locale`` may be omitted: the service
+         *     then takes the deployment's defaults for new projects (settings module, T-0044). They
+         *     cannot be ``null``.
          */
         ProjectCreate: {
             /** Code */
             code: string;
             /** Name */
             name: string;
-            /**
-             * Status
-             * @default ACTIVE
-             * @enum {string}
-             */
-            status: "ACTIVE" | "ON_HOLD" | "CLOSED";
-            /**
-             * Site Timezone
-             * @default Australia/Perth
-             */
-            site_timezone: string;
+            /** Status */
+            status?: ("ACTIVE" | "ON_HOLD" | "CLOSED") | null;
+            /** Site Timezone */
+            site_timezone?: string | null;
             spatial_bounds?: components["schemas"]["PolygonGeoJSON"] | null;
-            /**
-             * Currency Code
-             * @default AUD
-             */
-            currency_code: string;
-            /**
-             * Locale
-             * @default en-AU
-             */
-            locale: string;
+            /** Currency Code */
+            currency_code?: string | null;
+            /** Locale */
+            locale?: string | null;
         };
         /** ProjectRead */
         ProjectRead: {
@@ -3203,6 +3274,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JobRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_deployment_settings_api_v1_settings_deployment_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeploymentSettingsRead"];
+                };
+            };
+        };
+    };
+    update_deployment_settings_api_v1_settings_deployment_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeploymentSettingsUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeploymentSettingsRead"];
                 };
             };
             /** @description Validation Error */

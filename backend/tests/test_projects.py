@@ -82,14 +82,22 @@ def test_projects_module_is_loaded_and_cannot_be_switched_off() -> None:
 # --- settings validation --------------------------------------------------------------------
 
 
-def test_defaults() -> None:
+def test_defaults_are_left_to_the_service() -> None:
+    """Omitted settings stay unset; ``create_project`` fills the deployment defaults (T-0044)."""
     body = _create()
-    assert (body.site_timezone, body.currency_code, body.locale) == (
-        "Australia/Perth",
-        "AUD",
-        "en-AU",
-    )
-    assert (body.status, body.spatial_bounds) == ("ACTIVE", None)
+    assert (body.site_timezone, body.currency_code, body.locale) == (None, None, None)
+    assert (body.status, body.spatial_bounds) == (None, None)
+
+
+def test_created_project_gets_the_shipped_defaults(db: Database) -> None:
+    with db.unit_of_work(CTX_T1) as s:
+        project = service.create_project(s, _create())
+        assert (project.site_timezone, project.currency_code, project.locale) == (
+            "Australia/Perth",
+            "AUD",
+            "en-AU",
+        )
+        assert (project.status, project.spatial_bounds) == ("ACTIVE", None)
 
 
 @pytest.mark.parametrize("zone", ["America/Edmonton", "UTC", "Asia/Kolkata"])

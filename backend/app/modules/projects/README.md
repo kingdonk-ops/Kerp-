@@ -8,7 +8,7 @@ modules carries the project's `id` as its `project_id`.
 | File | What |
 |---|---|
 | `models.py` | `oe_projects_project` (`BaseRecordMixin`, tenant-level row; migration `0008`, membership-based RLS since `0015`) |
-| `schemas.py` | `ProjectCreate` / `ProjectUpdate` / `ProjectRead`, `PolygonGeoJSON`; timezone, ISO 4217, BCP 47 validation |
+| `schemas.py` | `ProjectCreate` / `ProjectUpdate` / `ProjectRead`, `PolygonGeoJSON`; timezone, ISO 4217, BCP 47 validation from `app.core.locale` (shared with the settings module) |
 | `service.py` | `create_project`, `get_project`, `list_projects`, `update_project`, `delete_project`, `site_zone` |
 | `router.py` | `GET/POST /api/v1/projects`, `GET/PATCH/DELETE /api/v1/projects/{id}` |
 
@@ -17,11 +17,20 @@ modules carries the project's `id` as its `project_id`.
 | Column | Rule |
 |---|---|
 | `code`, `name` | `code` unique per tenant (409 on a clash), `[A-Za-z0-9][A-Za-z0-9._-]{0,31}` |
-| `status` | `ACTIVE` (default), `ON_HOLD`, `CLOSED` (TD-185) |
-| `site_timezone` | an IANA zone from the `tzdata` package (not the host's zoneinfo: no `localtime`, `posixrules`, `Factory`), default `Australia/Perth` |
+| `status` | `ACTIVE`, `ON_HOLD`, `CLOSED` (TD-185); default: the deployment setting |
+| `site_timezone` | an IANA zone from the `tzdata` package (not the host's zoneinfo: no `localtime`, `posixrules`, `Factory`); default: the deployment setting |
 | `spatial_bounds` | GeoJSON `Polygon`, 2D `[lon, lat]`, closed rings, at most 10,000 positions across all rings, or `null` |
-| `currency_code` | active ISO 4217 code, default `AUD` |
-| `locale` | BCP 47 `ll[-Ssss][-RR|-nnn]`, default `en-AU` |
+| `currency_code` | active ISO 4217 code; default: the deployment setting |
+| `locale` | BCP 47 `ll[-Ssss][-RR|-nnn]`; default: the deployment setting |
+
+**Defaults for new projects** (T-0044, diff §4.4). `POST /projects` may omit `status`,
+`site_timezone`, `currency_code` and `locale` (never send `null`, 422); `create_project` then
+takes them from the deployment settings (`app.modules.settings.service.project_defaults`;
+shipped `ACTIVE`, `Australia/Perth`, `AUD`, `en-AU`, changed by System admins through
+`PATCH /api/v1/settings/deployment`). The service always passes all four values explicitly;
+the column defaults in `models.py` (`DEFAULT_*`, and the DB-side `site_timezone`/`status`
+defaults of T-0063) are fallback literals equal to the shipped defaults (tested). Changing a
+deployment default never changes existing projects. This module depends on `settings`.
 
 `spatial_bounds` uses `app.core.geo.GeoJSONGeometry`: `geometry(Polygon,4326)` on PostgreSQL
 (written with `ST_GeomFromGeoJSON`, read with `ST_AsGeoJSON`, so spatial SQL works on the

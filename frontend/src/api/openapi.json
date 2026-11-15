@@ -853,6 +853,76 @@
         }
       }
     },
+    "/api/v1/settings/deployment": {
+      "get": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Read Deployment Settings",
+        "operationId": "read_deployment_settings_api_v1_settings_deployment_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeploymentSettingsRead"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Update Deployment Settings",
+        "operationId": "update_deployment_settings_api_v1_settings_deployment_patch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeploymentSettingsUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeploymentSettingsRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/projects": {
       "get": {
         "tags": [
@@ -4030,6 +4100,158 @@
         ],
         "title": "DeliveryRead"
       },
+      "DeploymentSettingsRead": {
+        "properties": {
+          "offline_window_days": {
+            "type": "integer",
+            "title": "Offline Window Days",
+            "description": "Days an offline device may work, 1-14"
+          },
+          "offline_grace_hours": {
+            "type": "integer",
+            "title": "Offline Grace Hours",
+            "description": "Hours after the server session ended that an offline device may keep unlocking with the PIN and queueing changes (1 to 24 x offline_window_days)"
+          },
+          "max_checkout_clock_skew_s": {
+            "type": "integer",
+            "title": "Max Checkout Clock Skew S",
+            "description": "Largest device clock skew in seconds allowed when taking work offline"
+          },
+          "default_status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "ON_HOLD",
+              "CLOSED"
+            ],
+            "title": "Default Status",
+            "description": "Status of a new project"
+          },
+          "default_site_timezone": {
+            "type": "string",
+            "title": "Default Site Timezone",
+            "description": "IANA site timezone of a new project"
+          },
+          "default_currency_code": {
+            "type": "string",
+            "title": "Default Currency Code",
+            "description": "ISO 4217 currency of a new project"
+          },
+          "default_locale": {
+            "type": "string",
+            "title": "Default Locale",
+            "description": "BCP 47 locale of a new project"
+          }
+        },
+        "type": "object",
+        "required": [
+          "offline_window_days",
+          "offline_grace_hours",
+          "max_checkout_clock_skew_s",
+          "default_status",
+          "default_site_timezone",
+          "default_currency_code",
+          "default_locale"
+        ],
+        "title": "DeploymentSettingsRead",
+        "description": "The effective deployment settings (the shipped defaults until a System admin edits)."
+      },
+      "DeploymentSettingsUpdate": {
+        "properties": {
+          "offline_window_days": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 14.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Offline Window Days"
+          },
+          "offline_grace_hours": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 336.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Offline Grace Hours"
+          },
+          "max_checkout_clock_skew_s": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 300.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Checkout Clock Skew S"
+          },
+          "default_status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "ACTIVE",
+                  "ON_HOLD",
+                  "CLOSED"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Status"
+          },
+          "default_site_timezone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Site Timezone"
+          },
+          "default_currency_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Currency Code"
+          },
+          "default_locale": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Locale"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "DeploymentSettingsUpdate",
+        "description": "``PATCH``: only the given fields change; none may be ``null``; no unknown fields."
+      },
       "DeviceEnrolRequest": {
         "properties": {
           "device_id": {
@@ -5691,19 +5913,31 @@
             "title": "Name"
           },
           "status": {
-            "type": "string",
-            "enum": [
-              "ACTIVE",
-              "ON_HOLD",
-              "CLOSED"
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "ACTIVE",
+                  "ON_HOLD",
+                  "CLOSED"
+                ]
+              },
+              {
+                "type": "null"
+              }
             ],
-            "title": "Status",
-            "default": "ACTIVE"
+            "title": "Status"
           },
           "site_timezone": {
-            "type": "string",
-            "title": "Site Timezone",
-            "default": "Australia/Perth"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Site Timezone"
           },
           "spatial_bounds": {
             "anyOf": [
@@ -5716,14 +5950,26 @@
             ]
           },
           "currency_code": {
-            "type": "string",
-            "title": "Currency Code",
-            "default": "AUD"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency Code"
           },
           "locale": {
-            "type": "string",
-            "title": "Locale",
-            "default": "en-AU"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Locale"
           }
         },
         "additionalProperties": false,
@@ -5733,7 +5979,7 @@
           "name"
         ],
         "title": "ProjectCreate",
-        "description": "``POST /projects``. The tenant comes from the token, never from the body."
+        "description": "``POST /projects``. The tenant comes from the token, never from the body.\n\n``status``, ``site_timezone``, ``currency_code`` and ``locale`` may be omitted: the service\nthen takes the deployment's defaults for new projects (settings module, T-0044). They\ncannot be ``null``."
       },
       "ProjectRead": {
         "properties": {
