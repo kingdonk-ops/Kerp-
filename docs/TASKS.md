@@ -51,7 +51,7 @@
 | ✅ | [T-0017](../tracker/tasks/T-0017.md) | CEL runtime substrate: celpy (server) + JS CEL (client) + shared conformance_fixtures.json harness | platform | M | T-0001, T-0002 | #15 |
 | ✅ | [T-0018](../tracker/tasks/T-0018.md) | Verification engine shell + single rule store: run_checks(context, rule_set), oe_validation_rule_set/rule (kinds, engines), compile-on-save, findings log | validation | M | T-0006, T-0017 | #36 |
 | ✅ | [T-0034](../tracker/tasks/T-0034.md) | Rule store layers: system defaults → tenant seed → project copy, project edit/disable/delete/add/reset, locked rules + two-person unlock | validation | M | T-0018, T-0010, T-0011, T-0012 | #85 |
-| 🟦 | [T-0036](../tracker/tasks/T-0036.md) | Rule store: default-upgrade offers with per-rule diff, tenant drift report, 'Try it' evaluation | validation | S | T-0034 |  |
+| 🟪 | [T-0036](../tracker/tasks/T-0036.md) | Rule store: default-upgrade offers with per-rule diff, tenant drift report, 'Try it' evaluation | validation | S | T-0034 | #88 |
 | ✅ | [T-0019](../tracker/tasks/T-0019.md) | notifications module (in-app) behind a pluggable channel interface | notifications | S | T-0012 | #64 |
 | ▶ | [T-0035](../tracker/tasks/T-0035.md) | Per-record override of a blocked check: reasoned request, routed approver (never self), notifications, audit, bound to the checked values | validation | M | T-0018, T-0010, T-0019 |  |
 | ▶ | [T-0040](../tracker/tasks/T-0040.md) | Lobby discovery API: visible-in-lobby flag, lobby listing for internal users, project-code lookup | admin | S | T-0014, T-0049 |  |
