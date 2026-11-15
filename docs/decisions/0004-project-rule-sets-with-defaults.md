@@ -188,8 +188,9 @@ and the drift report in Consequences. Where it is more specific than the section
 - **Drift report:** PER-13 or PER-01, limited by RLS to the projects of their portfolio.
 - **`removed_by_<layer>`:** the set deleted its copy of a rule and the default's version is newer
   than the copy's `origin_version` (changed since the **copy**, not necessarily since the
-  delete). Once listed it stays in the offer until the set (or the rule) is reset; it cannot be
-  accepted, since a deleted rule is only brought back by a deliberate reset.
+  delete). Once listed it stays in the offer until it is reset; it cannot be accepted, since a
+  deleted rule is only brought back by a deliberate reset (of the whole set, or of that one
+  rule: `reset_rule` also restores a deleted rule to the current default).
 - **New system sets:** a system set shipped for the first time is copied into the tenant layer
   automatically by `sync_system_defaults` (a new key holds no tenant choice to keep), so new
   projects get it. A changed system set is only offered to the tenant layer, never forced (§4).
