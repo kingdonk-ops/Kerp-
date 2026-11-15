@@ -211,6 +211,22 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
   the client (TD-096). New: T-0079 (platform, M). Updated: T-0023 (depends on T-0079), T-0077,
   E-07-01, TD-032. Raised: TD-276 (risk), TD-277 (later).
 
+- **2026-11-15 — product-owner decisions, second batch (binding):** one account per `device_id`
+  for Pilot-0 (T-0043 behaviour, another account's enrolment is 409); the client keys its local
+  store per account so a revoke wipes only that account's data; whether pilot crews share
+  tablets is confirmed with the pilot team, and if so a shared-device task is added before the
+  pilot (TD-283; diff §4.3; TD-293). Rule-set upgrade offers, "Try it" and the drift report
+  follow the T-0036 reading (offers read by set readers, accepted and tried only by the set's
+  editor so PER-09 never accepts a `check` update; drift report PER-13/PER-01 within their
+  portfolio; `removed_by_<layer>` = deleted copy whose default changed since the copy, on offer
+  until reset; first-time system sets auto-copied to the tenant layer; routes by set id) (TD-281;
+  ADR 0004 Amendment G). Native body transport: `KERP_NATIVE_APP_ORIGINS` requires
+  `KERP_WEB_ORIGIN`, the API's own origin never gets it, and it also covers magic-link redeem and
+  PIN unlock (TD-285; diff §4.2). Unauthenticated `wipe-confirmed` and the revoked-device status
+  oracle are accepted for development and fixed before pilot go-live (TD-286, TD-291; diff §4.3).
+  New: T-0080 (identity, S, phase 0, order 10). Updated: T-0143 (per-account store, depends on
+  T-0080). Raised: TD-293 (decision, ask the pilot team).
+
 ## Key engineering decisions (baked into the spec — see consolidation diff)
 
 | Area | Decision |
@@ -232,5 +248,5 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
 | Region (2026-11-13) | Per-deployment setting: AWS `ap-southeast-2` for Australian deployments (diff §4.4) |
 
 ## Open decisions (see `TODO.md`)
-TD-096 (coating/Grating ITR, with the client; interim confirmed 2026-11-15), TD-004 (hosting target), TD-072 (ADR 0004 rule-set defaults per project), TD-073 (handover first-shift trigger),
-TD-039 (dropped AIP-proposal extras). TD-013 (review-gate ignores tracker) is resolved by T-0029. TD-002/005/007/008/009/012 are resolved by this merge; TD-001 by ADR 0001 (`docs/decisions/`). TD-002 is carried into code by ADR 0002 (`docs/decisions/0002-port-one-engine.md`). TD-034 (remaining Inspection-ERP core packages) is resolved by ADR 0007. TD-003 (SSO vs local JWT) is resolved; the SSO spec is diff §4.5 (TD-043 resolved 2026-11-14). Resolved 2026-11-14 by the product owner: TD-257 (offline grace binds; window is an upper bound), TD-136 (magic links PER-14 only, T-0057) and TD-262 (externals create their own password, reset by e-mail); TD-084 (outbound e-mail) resolved by diff §4.6. Resolved 2026-11-15 by the product owner: TD-224 (per-mailbox magic-link cap), TD-213 (object key layout), TD-271 (T-0079), TD-261 (PER-15 password/SSO) and TD-223 (PR principals; residual risk TD-276).
+TD-096 (coating/Grating ITR, with the client; interim confirmed 2026-11-15), TD-293 (shared tablets in the pilot, ask the pilot team before go-live), TD-004 (hosting target), TD-072 (ADR 0004 rule-set defaults per project), TD-073 (handover first-shift trigger),
+TD-039 (dropped AIP-proposal extras). TD-013 (review-gate ignores tracker) is resolved by T-0029. TD-002/005/007/008/009/012 are resolved by this merge; TD-001 by ADR 0001 (`docs/decisions/`). TD-002 is carried into code by ADR 0002 (`docs/decisions/0002-port-one-engine.md`). TD-034 (remaining Inspection-ERP core packages) is resolved by ADR 0007. TD-003 (SSO vs local JWT) is resolved; the SSO spec is diff §4.5 (TD-043 resolved 2026-11-14). Resolved 2026-11-14 by the product owner: TD-257 (offline grace binds; window is an upper bound), TD-136 (magic links PER-14 only, T-0057) and TD-262 (externals create their own password, reset by e-mail); TD-084 (outbound e-mail) resolved by diff §4.6. Resolved 2026-11-15 by the product owner: TD-224 (per-mailbox magic-link cap), TD-213 (object key layout), TD-271 (T-0079), TD-261 (PER-15 password/SSO) and TD-223 (PR principals; residual risk TD-276). Resolved 2026-11-15 (second batch): TD-283 (one account per device id, per-account client store; follow-up TD-293), TD-281 (rule-set upgrade permissions, ADR 0004 Amendment G) and TD-285 (native-origin allow-list); TD-286 and TD-291 (device risks) accepted for development and covered by T-0080 before pilot go-live.

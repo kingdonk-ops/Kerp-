@@ -3,11 +3,11 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 41/163 tasks done (25%) · **ready now:** 20 · **epics awaiting breakdown:** 47
+**Overall:** 41/164 tasks done (25%) · **ready now:** 21 · **epics awaiting breakdown:** 47
 
 | Phase | Tasks done | Progress |
 |---|---|---|
-| 0 · Platform foundations | 41/79 | `█████░░░░░` 52% |
+| 0 · Platform foundations | 41/80 | `█████░░░░░` 51% |
 | 1 · Asset & Quality backbone | 0/75 (+1 epics) | `░░░░░░░░░░` 0% |
 | 2 · Welding quality | 0/9 | `░░░░░░░░░░` 0% |
 | 3 · Logistics | 0/0 (+7 epics) | `░░░░░░░░░░` 0% |
@@ -36,6 +36,7 @@
 | ✅ | [T-0049](../tracker/tasks/T-0049.md) | Internal staff flag: is_internal derived from the company Entra link or KERP_INTERNAL_EMAIL_DOMAINS, recomputed at sign-in | identity | S | T-0037 | #83 |
 | ✅ | [T-0010](../tracker/tasks/T-0010.md) | Three-tier RBAC/ABAC: capability tiers × 15 personas × project/site scope (Asset-Site filter) + explicit multi-project read scope | identity | M | T-0008 | #39 |
 | ⬜ | [T-0054](../tracker/tasks/T-0054.md) | Entra ID SSO (identity only): OIDC code + PKCE AuthProvider, ID-token verification via tenant JWKS, match by verified e-mail then oid, same 12 h KERP session, no group-to-role mapping | identity | M | T-0037, T-0038, T-0043, T-0049 |  |
+| ▶ | [T-0080](../tracker/tasks/T-0080.md) | Device hardening before pilot: per-device wipe secret, credentials-first login device check, uniform answers | identity | S | T-0043 |  |
 | ✅ | [T-0011](../tracker/tasks/T-0011.md) | Module loader + manifest contract + per-project enable/disable | platform | M | T-0005 | #32 |
 | ✅ | [T-0012](../tracker/tasks/T-0012.md) | projects module: CRUD + settings (IANA timezone, spatial_bounds, currency/locale) | projects | M | T-0010, T-0011 | #43 |
 | ✅ | [T-0014](../tracker/tasks/T-0014.md) | admin module: user + project-membership administration API (PER-09 on its projects), admin grants table, membership-based RLS on projects and tenant-level tables | admin | M | T-0010, T-0011, T-0012 | #86 |
@@ -139,7 +140,7 @@
 | ⬜ | [T-0127](../tracker/tasks/T-0127.md) | Frontend: client storage contract + Dexie (web PWA) adapter, useOfflineSync tier-1 outbox + offline indicator | frontend | M | T-0126, T-0024 |  |
 | ▶ | [T-0141](../tracker/tasks/T-0141.md) | Capacitor Android build: Android 11+ (API 30) shell, signed release for managed Google Play / MDM, CI build job | frontend | M | T-0024 |  |
 | ⬜ | [T-0142](../tracker/tasks/T-0142.md) | Android storage adapter: SQLCipher SQLite records + outbox and file-system media behind the client storage contract | frontend | M | T-0141, T-0127 |  |
-| ⬜ | [T-0143](../tracker/tasks/T-0143.md) | Field device session: enrolment, offline PIN unlock against the keystore, offline-window enforcement, wipe on DEVICE_REVOKED | frontend | M | T-0142, T-0038, T-0043, T-0044, T-0054, T-0172 |  |
+| ⬜ | [T-0143](../tracker/tasks/T-0143.md) | Field device session: enrolment, offline PIN unlock against the keystore, offline-window enforcement, wipe on DEVICE_REVOKED | frontend | M | T-0142, T-0038, T-0043, T-0044, T-0054, T-0172, T-0080 |  |
 | ⬜ | [T-0144](../tracker/tasks/T-0144.md) | FCM push channel for the Android build: device push tokens, assignment/return pushes through the pluggable channel interface | notifications | S | T-0019, T-0043, T-0141 |  |
 | ⬜ | [T-0145](../tracker/tasks/T-0145.md) | Delta-sync budget: 1,000 records pulled and applied in < 30 s on simulated 4G (warn-only in the NFR job) | sync | S | T-0126, T-0045 |  |
 | ⬜ | [T-0172](../tracker/tasks/T-0172.md) | Client clock: per-action device_wall_time + monotonic_ms + clock_session_id on every outbox mutation, time anchors from /api/v1/time, Android elapsedRealtime plugin | frontend | M | T-0127, T-0141, T-0147 |  |
