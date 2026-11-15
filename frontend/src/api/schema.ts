@@ -677,6 +677,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/validation/rule-sets/{rule_set_id}/updates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tenant Rule Set Updates */
+        get: operations["tenant_rule_set_updates_api_v1_validation_rule_sets__rule_set_id__updates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/validation/rule-sets/{rule_set_id}/updates/{rule_key}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Accept Tenant Update */
+        post: operations["accept_tenant_update_api_v1_validation_rule_sets__rule_set_id__updates__rule_key__accept_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/validation/rule-sets/{rule_set_id}/rules/{rule_key}/try": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Try Tenant Rule */
+        post: operations["try_tenant_rule_api_v1_validation_rule_sets__rule_set_id__rules__rule_key__try_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/validation/drift-report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Drift Report */
+        get: operations["drift_report_api_v1_validation_drift_report_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/validation/rule-sets/{rule_set_id}/rules/{rule_key}/unlock-requests": {
         parameters: {
             query?: never;
@@ -848,6 +916,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/validation/projects/{project_id}/rule-sets/{rule_set_id}/updates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Project Rule Set Updates */
+        get: operations["project_rule_set_updates_api_v1_validation_projects__project_id__rule_sets__rule_set_id__updates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/validation/projects/{project_id}/rule-sets/{rule_set_id}/updates/{rule_key}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Accept Project Update */
+        post: operations["accept_project_update_api_v1_validation_projects__project_id__rule_sets__rule_set_id__updates__rule_key__accept_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/validation/projects/{project_id}/rule-sets/{rule_set_id}/rules/{rule_key}/try": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Try Project Rule */
+        post: operations["try_project_rule_api_v1_validation_projects__project_id__rule_sets__rule_set_id__rules__rule_key__try_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -862,6 +981,27 @@ export interface components {
              */
             fn: "sum" | "avg" | "min" | "max" | "count" | "count-distinct";
         };
+        /**
+         * CheckFinding
+         * @description A rule of the set that did not pass. ``message`` is the user-readable reason.
+         */
+        CheckFinding: {
+            /** Rule Key */
+            rule_key: string;
+            /** Rule Version */
+            rule_version: number;
+            /**
+             * Outcome
+             * @enum {string}
+             */
+            outcome: "fail" | "error";
+            /** Action */
+            action: string;
+            /** Severity */
+            severity: string;
+            /** Message */
+            message: string;
+        };
         /** DeliveryRead */
         DeliveryRead: {
             /** Channel */
@@ -870,6 +1010,39 @@ export interface components {
             ok: boolean;
             /** Detail */
             detail: string | null;
+        };
+        /**
+         * DriftEntryRead
+         * @description A project rule that differs from the tenant default (or a default the project lacks).
+         */
+        DriftEntryRead: {
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /**
+             * Rule Set Id
+             * Format: uuid
+             */
+            rule_set_id: string;
+            /** Rule Set Key */
+            rule_set_key: string;
+            /** Kind */
+            kind: string;
+            /** Rule Key */
+            rule_key: string;
+            /**
+             * Drift
+             * @enum {string}
+             */
+            drift: "added" | "modified" | "deleted" | "missing" | "default_removed";
+            /** Fields */
+            fields: string[];
+            /** Project Version */
+            project_version: number | null;
+            /** Default Version */
+            default_version: number | null;
         };
         /** FileRead */
         FileRead: {
@@ -1485,6 +1658,19 @@ export interface components {
             /** Locale */
             locale?: string | null;
         };
+        /** RegexMatch */
+        RegexMatch: {
+            /** Text */
+            text: string;
+            /** Start */
+            start: number;
+            /** End */
+            end: number;
+            /** Groups */
+            groups: {
+                [key: string]: string | null;
+            };
+        };
         /**
          * ResolvedColumn
          * @description A saved column as the register shows it; ``missing``: no longer in the catalogue.
@@ -1617,6 +1803,59 @@ export interface components {
             project_id: string | null;
             /** Rules */
             rules: components["schemas"]["RuleRead"][];
+        };
+        /**
+         * RuleSetUpdatesRead
+         * @description ``GET .../rule-sets/{set}/updates``: the per-rule diff against the parent default.
+         */
+        RuleSetUpdatesRead: {
+            /**
+             * Rule Set Id
+             * Format: uuid
+             */
+            rule_set_id: string;
+            /** Key */
+            key: string;
+            /** Kind */
+            kind: string;
+            /** Layer */
+            layer: string;
+            /** Version */
+            version: number;
+            /**
+             * Default Rule Set Id
+             * Format: uuid
+             */
+            default_rule_set_id: string;
+            /** Default Layer */
+            default_layer: string;
+            /** Default Version */
+            default_version: number;
+            /** Default Seed Version */
+            default_seed_version: number | null;
+            /** Available */
+            available: number;
+            /** Updates */
+            updates: components["schemas"]["RuleUpdateRead"][];
+        };
+        /**
+         * RuleUpdateRead
+         * @description One rule of an upgrade offer: the set's rule (``current``) next to the new default.
+         */
+        RuleUpdateRead: {
+            /** Rule Key */
+            rule_key: string;
+            /**
+             * Change
+             * @enum {string}
+             */
+            change: "new" | "changed" | "removed" | "removed_by_project" | "removed_by_tenant" | "key_in_use";
+            /** Acceptable */
+            acceptable: boolean;
+            /** Fields */
+            fields: string[];
+            current: components["schemas"]["RuleRead"] | null;
+            default: components["schemas"]["RuleRead"] | null;
         };
         /**
          * SavedViewCreate
@@ -1791,6 +2030,56 @@ export interface components {
              * @description Seconds until the login session ends (sign-in + 12 h); then sign in again
              */
             refresh_expires_in: number;
+        };
+        /** TryError */
+        TryError: {
+            /** Code */
+            code: string;
+            /** Message */
+            message: string;
+        };
+        /**
+         * TryResult
+         * @description What a rule does with a sample context (ADR 0004 §6). Never persisted.
+         *
+         *     CEL rules: ``pass`` when the expression returns ``true``, ``fail`` on any other value,
+         *     ``error`` when it cannot be evaluated; ``value`` is the result (KERP CEL JSON). A ``check``
+         *     rule that does not pass also returns the ``finding`` ``run_checks`` would log. Regex rules
+         *     (sample ``{"text": ...}``): ``pass`` when the pattern matches (``autolink``: every match;
+         *     ``p6_grammar``: a full match), with the matches and their named groups.
+         */
+        TryResult: {
+            /** Rule Key */
+            rule_key: string;
+            /** Rule Version */
+            rule_version: number | null;
+            /** Kind */
+            kind: string;
+            /** Engine */
+            engine: string;
+            /**
+             * Outcome
+             * @enum {string}
+             */
+            outcome: "pass" | "fail" | "error";
+            /** Value */
+            value?: unknown;
+            error?: components["schemas"]["TryError"] | null;
+            finding?: components["schemas"]["CheckFinding"] | null;
+            /** Matches */
+            matches?: components["schemas"]["RegexMatch"][];
+        };
+        /**
+         * TryRuleInput
+         * @description Body of ``POST .../rules/{rule_key}/try``: a sample context and, optionally, a draft
+         *     rule to try instead of the stored one (nothing is saved either way).
+         */
+        TryRuleInput: {
+            /** Context */
+            context?: {
+                [key: string]: unknown;
+            };
+            rule?: components["schemas"]["RuleInput"] | null;
         };
         /**
          * UnlockRequestCreate
@@ -3396,6 +3685,125 @@ export interface operations {
             };
         };
     };
+    tenant_rule_set_updates_api_v1_validation_rule_sets__rule_set_id__updates_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rule_set_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuleSetUpdatesRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    accept_tenant_update_api_v1_validation_rule_sets__rule_set_id__updates__rule_key__accept_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rule_set_id: string;
+                rule_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuleSetRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    try_tenant_rule_api_v1_validation_rule_sets__rule_set_id__rules__rule_key__try_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rule_set_id: string;
+                rule_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TryRuleInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TryResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    drift_report_api_v1_validation_drift_report_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DriftEntryRead"][];
+                };
+            };
+        };
+    };
     request_unlock_api_v1_validation_rule_sets__rule_set_id__rules__rule_key__unlock_requests_post: {
         parameters: {
             query?: never;
@@ -3744,6 +4152,108 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RuleSetRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    project_rule_set_updates_api_v1_validation_projects__project_id__rule_sets__rule_set_id__updates_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                rule_set_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuleSetUpdatesRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    accept_project_update_api_v1_validation_projects__project_id__rule_sets__rule_set_id__updates__rule_key__accept_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                rule_set_id: string;
+                rule_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuleSetRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    try_project_rule_api_v1_validation_projects__project_id__rule_sets__rule_set_id__rules__rule_key__try_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                rule_set_id: string;
+                rule_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TryRuleInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TryResult"];
                 };
             };
             /** @description Validation Error */

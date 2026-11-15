@@ -16,8 +16,8 @@ cannot be changed, disabled or deleted on the project layer, nor on the tenant l
 two-person unlock (``request_unlock`` + ``approve_unlock``) has cleared it (§5, Amendment B).
 Permissions (who may call what, §7) are the router's.
 
-Upgrade offers and "Try it" are T-0036; the per-record override of a blocked check
-(Amendment A) T-0035.
+Upgrade offers, the drift report and "Try it" (T-0036) are in ``upgrades.py``; the
+per-record override of a blocked check (Amendment A) is T-0035.
 """
 
 from __future__ import annotations
@@ -336,7 +336,7 @@ def run_checks(
             outcome="error" if isinstance(result, CelError) else "fail",
             action=rule.action,
             severity=rule.severity,
-            message=_message(rule, result),
+            message=_message(rule.rule_key, rule.params, result),
         )
         findings.append(finding)
         rows.append(
@@ -511,7 +511,7 @@ def sync_system_layer(session: Session, seeds: Iterable[SeedRuleSet] | None = No
     A set is created on first load and rewritten only when its seed ``version`` is newer
     than the stored one, so reloading the same version writes nothing (ADR 0004 §2.1); an
     older seed version is ignored. Copies already made from the system layer (tenant,
-    projects) do not change: new defaults are *offered* to them (T-0036).
+    projects) do not change: new defaults are *offered* to them (``upgrades``, T-0036).
     """
     context = _tenant_context(session)
     changed = []
@@ -531,8 +531,14 @@ def seed_tenant(
     does not have yet into it (ADR 0004 §2.2). Returns the keys copied. Idempotent."""
     context = _tenant_context(session)
     sync_system_layer(session, seeds)
+    return _copy_new_system_sets(session, actor_id or context.user_id)
+
+
+def _copy_new_system_sets(session: Session, actor: uuid.UUID | None) -> list[str]:
+    """Copy every system set the tenant layer does not have yet into it (a new key carries
+    no tenant choice to keep, so nothing is forced; existing copies are only *offered*
+    upgrades, T-0036)."""
     have = {rule_set.key for rule_set in list_rule_sets(session, "tenant")}
-    actor = actor_id or context.user_id
     return [
         _copy_set(session, system_set, "tenant", actor).key
         for system_set in list_rule_sets(session, "system")
@@ -546,12 +552,17 @@ def sync_system_defaults(
     seeds: Iterable[SeedRuleSet] | None = None,
 ) -> dict[uuid.UUID, list[str]]:
     """Bring every listed tenant's ``system`` layer to the shipped seed versions (on deploy,
-    when a seed version changed). One unit of work per tenant, so RLS applies unchanged."""
+    when a seed version changed). One unit of work per tenant, so RLS applies unchanged.
+
+    A set shipped for the first time is also copied into the tenant layer, so new projects
+    get it (ADR 0004 §4); a changed set is only *offered* to the tenant layer
+    (``upgrades.pending_updates``). Returns the changed system keys per tenant."""
     loaded = load_defaults() if seeds is None else tuple(seeds)
     changed: dict[uuid.UUID, list[str]] = {}
     for tenant_id in tenant_ids:
         with database.unit_of_work(TenancyContext(tenant_id=tenant_id)) as session:
             changed[tenant_id] = sync_system_layer(session, loaded)
+            _copy_new_system_sets(session, None)
     return changed
 
 
@@ -804,7 +815,10 @@ def _reset_to(
     default: Rule,
     actor: uuid.UUID | None,
     source: str,
+    event: str = "rule_reset",
+    **extra: str | int | bool | None,
 ) -> Rule:
+    """Make ``rule`` (or a new rule) equal to ``default`` and name it as the origin."""
     values = _copied_values(default)
     if rule is None:
         rule = Rule(
@@ -826,7 +840,7 @@ def _reset_to(
         rule.version += 1
     rule.updated_by = actor
     rule.source = source
-    _record_change(session, rule_set, rule, "rule_reset", actor, source)
+    _record_change(session, rule_set, rule, event, actor, source, **extra)
     return rule
 
 
@@ -1186,8 +1200,9 @@ def _snapshot(rule: Rule) -> dict[str, Any]:
     return snapshot
 
 
-def _message(rule: Rule, result: CelOk | CelError) -> str:
+def _message(rule_key: str, params: Mapping[str, Any], result: CelOk | CelError) -> str:
+    """A finding's message: the rule's ``params.message``, else a generic one."""
     if isinstance(result, CelError):
-        return f"{rule.rule_key}: rule could not be evaluated ({result.code})"
-    message = rule.params.get("message")
-    return message if isinstance(message, str) and message else f"{rule.rule_key}: check failed"
+        return f"{rule_key}: rule could not be evaluated ({result.code})"
+    message = params.get("message")
+    return message if isinstance(message, str) and message else f"{rule_key}: check failed"

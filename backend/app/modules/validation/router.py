@@ -12,14 +12,22 @@ One API for the tenant default layer and the project set (the same Rules screen,
 * ``GET    /unlock-requests``, ``POST /unlock-requests/{id}/approve|reject``
 * ``/projects/{project}/rule-sets...``                      the same rule operations on the
   project's own copy (no unlock: only the tenant layer unlocks)
+* ``GET    .../rule-sets/{set}/updates``                    upgrade offer: per-rule diff
+* ``POST   .../rule-sets/{set}/updates/{key}/accept``       accept one rule of it (T-0036)
+* ``POST   .../rule-sets/{set}/rules/{key}/try``            "Try it" on a sample context
+* ``GET    /drift-report``                                  project rules that differ from
+  the tenant defaults
 
 **Who may (§7).** Tenant layer: ``check`` sets PER-13 Quality Director, other kinds PER-01
 Operations Management. Project set: ``check`` sets PER-06 QA/QC Lead, other kinds PER-09
 Project Administrator, so PER-09 never changes, disables or deletes a ``check`` rule (SoD).
 Unlock: PER-13 requests; a second, different PER-13 or PER-01 user approves (TD-116 interim).
-Everyone else is 403. The request binds no project yet (TD-122) and there is no tenant-level
-role store yet (T-0014), so a tenant persona is one the caller holds on any project of the
-tenant (the same interim as project creation, TD-184). A non-member of the project in the
+An upgrade offer is read by whoever reads the set and accepted by whoever edits it; "Try it"
+is for whoever edits the set; the drift report is for the tenant readers (PER-13, PER-01)
+and covers the projects their portfolio scope reads (RLS). Everyone else is 403. The request
+binds no project yet (TD-122) and there is no tenant-level role store yet (T-0014), so a
+tenant persona is one the caller holds on any project of the tenant (the same interim as
+project creation, TD-184). A non-member of the project in the
 path, or a set outside the path's scope, is 404.
 """
 
@@ -40,13 +48,17 @@ from app.core.db import DbSession
 from app.core.tenancy.context import TenancyContext
 from app.core.tenancy.rls import bind_tenancy, session_tenancy
 from app.modules.projects import service as projects
-from app.modules.validation import service
+from app.modules.validation import service, upgrades
 from app.modules.validation.models import RuleSet
 from app.modules.validation.schemas import (
     KEY_PATTERN,
+    DriftEntryRead,
     RuleInput,
     RuleRead,
     RuleSetRead,
+    RuleSetUpdatesRead,
+    TryResult,
+    TryRuleInput,
     UnlockRequestCreate,
     UnlockRequestRead,
 )
@@ -78,7 +90,7 @@ def _errors() -> Iterator[None]:
     """The service's refusals as HTTP answers."""
     try:
         yield
-    except (service.RuleCompileError, ValidationError) as exc:
+    except (service.RuleCompileError, upgrades.SampleContextError, ValidationError) as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
     except service.RuleStoreError as exc:  # incl. RuleLockedError
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
@@ -122,6 +134,12 @@ def _tenant_set(
     return rule_set, held
 
 
+def _tenant_set_read(session: Session, grants: list[Grant], rule_set_id: uuid.UUID) -> RuleSet:
+    """A tenant-layer set the caller may read (PER-13 or PER-01)."""
+    _require(_tenant_personas(grants), TENANT_READERS)
+    return service.get_rule_set(session, rule_set_id, "tenant")
+
+
 def _bind_project(
     principal: Principal, grants: list[Grant], session: Session, project_id: uuid.UUID
 ) -> frozenset[Persona]:
@@ -142,11 +160,15 @@ def _project_set(
     session: Session,
     project_id: uuid.UUID,
     rule_set_id: uuid.UUID,
+    *,
+    edit: bool = True,
 ) -> RuleSet:
-    """A set of the project's own copy that the caller may edit (§7, SoD for PER-09)."""
+    """A set of the project's own copy that the caller may edit (§7, SoD for PER-09), or,
+    with ``edit=False``, read (every member)."""
     held = _bind_project(principal, grants, session, project_id)
     rule_set = service.get_rule_set(session, rule_set_id, "project")
-    _require(held, PROJECT_EDITORS.get(rule_set.kind, PROJECT_OTHER))
+    if edit:
+        _require(held, PROJECT_EDITORS.get(rule_set.kind, PROJECT_OTHER))
     return rule_set
 
 
@@ -185,6 +207,18 @@ def _reset(
         else:
             service.reset_rule(session, rule_set.id, rule_key, actor_id=actor)
     return _read(session, rule_set)
+
+
+def _accept(session: Session, rule_set: RuleSet, rule_key: str, actor: uuid.UUID) -> RuleSetRead:
+    with _errors():
+        upgrades.accept_update(session, rule_set.id, rule_key, actor_id=actor)
+    return _read(session, rule_set)
+
+
+def _try(session: Session, rule_set: RuleSet, rule_key: str, body: TryRuleInput) -> TryResult:
+    with _errors():
+        draft = None if body.rule is None else body.rule.to_spec(rule_key)
+        return upgrades.try_rule(session, rule_set.id, rule_key, body.context, draft=draft)
 
 
 # --- tenant default layer ---------------------------------------------------------------------
@@ -263,6 +297,45 @@ def reset_tenant_rule_set(
 ) -> RuleSetRead:
     rule_set, _ = _tenant_set(session, grants, rule_set_id)
     return _reset(session, rule_set, None, principal.user_id)
+
+
+@router.get(f"{TENANT_SET}/updates", response_model=RuleSetUpdatesRead)
+def tenant_rule_set_updates(
+    rule_set_id: uuid.UUID, grants: CallerGrants, session: DbSession
+) -> RuleSetUpdatesRead:
+    rule_set = _tenant_set_read(session, grants, rule_set_id)
+    with _errors():
+        return upgrades.pending_updates(session, rule_set.id)
+
+
+@router.post(f"{TENANT_SET}/updates/{{rule_key}}/accept", response_model=RuleSetRead)
+def accept_tenant_update(
+    rule_set_id: uuid.UUID,
+    rule_key: RuleKey,
+    principal: CurrentPrincipal,
+    grants: CallerGrants,
+    session: DbSession,
+) -> RuleSetRead:
+    rule_set, _ = _tenant_set(session, grants, rule_set_id)
+    return _accept(session, rule_set, rule_key, principal.user_id)
+
+
+@router.post(f"{TENANT_SET}/rules/{{rule_key}}/try", response_model=TryResult)
+def try_tenant_rule(
+    rule_set_id: uuid.UUID,
+    rule_key: RuleKey,
+    body: TryRuleInput,
+    grants: CallerGrants,
+    session: DbSession,
+) -> TryResult:
+    rule_set, _ = _tenant_set(session, grants, rule_set_id)
+    return _try(session, rule_set, rule_key, body)
+
+
+@router.get("/drift-report", response_model=list[DriftEntryRead])
+def drift_report(grants: CallerGrants, session: DbSession) -> list[DriftEntryRead]:
+    _require(_tenant_personas(grants), TENANT_READERS)
+    return upgrades.drift_report(session)
 
 
 # --- two-person unlock (ADR 0004 §5, Amendment B, TD-116) -------------------------------------
@@ -415,3 +488,43 @@ def reset_project_rule_set(
 ) -> RuleSetRead:
     rule_set = _project_set(principal, grants, session, project_id, rule_set_id)
     return _reset(session, rule_set, None, principal.user_id)
+
+
+@router.get(f"{PROJECT_SET}/updates", response_model=RuleSetUpdatesRead)
+def project_rule_set_updates(
+    project_id: uuid.UUID,
+    rule_set_id: uuid.UUID,
+    principal: CurrentPrincipal,
+    grants: CallerGrants,
+    session: DbSession,
+) -> RuleSetUpdatesRead:
+    rule_set = _project_set(principal, grants, session, project_id, rule_set_id, edit=False)
+    with _errors():
+        return upgrades.pending_updates(session, rule_set.id)
+
+
+@router.post(f"{PROJECT_SET}/updates/{{rule_key}}/accept", response_model=RuleSetRead)
+def accept_project_update(
+    project_id: uuid.UUID,
+    rule_set_id: uuid.UUID,
+    rule_key: RuleKey,
+    principal: CurrentPrincipal,
+    grants: CallerGrants,
+    session: DbSession,
+) -> RuleSetRead:
+    rule_set = _project_set(principal, grants, session, project_id, rule_set_id)
+    return _accept(session, rule_set, rule_key, principal.user_id)
+
+
+@router.post(f"{PROJECT_SET}/rules/{{rule_key}}/try", response_model=TryResult)
+def try_project_rule(
+    project_id: uuid.UUID,
+    rule_set_id: uuid.UUID,
+    rule_key: RuleKey,
+    body: TryRuleInput,
+    principal: CurrentPrincipal,
+    grants: CallerGrants,
+    session: DbSession,
+) -> TryResult:
+    rule_set = _project_set(principal, grants, session, project_id, rule_set_id)
+    return _try(session, rule_set, rule_key, body)

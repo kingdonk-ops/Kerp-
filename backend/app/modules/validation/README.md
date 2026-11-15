@@ -12,6 +12,7 @@ Built fresh; Inspection-ERP's `Finding(key, severity, message)` shape was a refe
 | `compiler.py` | compile-on-save: kind/engine rules, per-kind CEL context schema, RE2 regex compile |
 | `defaults.py` | system default seed files `app/modules/<m>/rules/defaults/*.yaml`: `load_defaults()` |
 | `service.py` | rule store (`create_rule_set`, `save_rule`, `set_rule_enabled`, `delete_rule`, `reset_rule`, `reset_rule_set`), layers (`sync_system_layer`, `sync_system_defaults`, `seed_tenant`, `seed_project`, `copy_module_defaults`), unlock (`request_unlock`, `approve_unlock`, `reject_unlock`), `resolve_rule_set`, `run_checks` |
+| `upgrades.py` | default-upgrade offers (`pending_updates`, `accept_update`), the tenant drift report (`drift_report`), "Try it" (`try_rule`) — T-0036 |
 | `schemas.py` | `RuleSpec` (input), `CheckResult` / `CheckFinding` (output), the Rules API shapes |
 | `router.py` | Rules settings API (ADR 0004 §7), see below |
 
@@ -130,8 +131,12 @@ only (an added rule has `origin_rule_key` NULL; an edit keeps the origin).
    a chosen client pack (`source_pack`), that pack's sets too, never another pack's.
    **Enabling a module** on a project for the first time copies that module's tenant sets
    (`copy_module_defaults`, through the module loader's enable listener). An existing copy
-   is never replaced: a later change to a default does not reach a running project (the
-   upgrade offer is T-0036).
+   is never replaced: a later change to a default does not reach a running project; it is
+   **offered** (below).
+5. **On deploy** `sync_system_defaults` brings every tenant's system layer to the shipped
+   seed versions and copies a set shipped for the **first** time into the tenant layer (a
+   new key holds no tenant choice to keep), so new projects get it. A *changed* system set
+   is only offered to the tenant layer.
 
 A copied rule keeps `locked`, `label`, `enabled` and everything else of its source and names
 it in `origin_rule_key`/`origin_version`.
@@ -164,6 +169,55 @@ refused with `RuleLockedError` (409) naming the rules, because it would skip the
 unlock. The project layer has no such case (it cannot add locked rules, and its locked
 copies only lose their lock after a tenant unlock).
 
+## Default upgrades are offered, never forced (ADR 0004 §4, T-0036)
+
+`pending_updates(session, set_id)` diffs a set against the **current** default of its parent
+layer (project → tenant, tenant → system), rule by rule; it writes nothing. Each project rule
+is matched to its default through `origin_rule_key`, and `origin_version` (the default's
+version when it was copied) tells whether the default has moved on since.
+
+| `change` | When | Accept |
+|---|---|---|
+| `new` | the default has a rule the set lacks | adds a copy |
+| `changed` | the default's version is newer than `origin_version` **and** its values differ from the set's rule (`fields` names them: the project's own edits show up here too) | replaces the rule with a copy of the default |
+| `removed` | the set has a copied rule whose default was deleted | soft-deletes it |
+| `removed_by_project` / `removed_by_tenant` | the set deleted the rule and the default has changed since | refused (409): a deleted rule is never re-added; **reset** brings it back on purpose |
+| `key_in_use` | the set added its own rule under the key of a new default | refused (409) |
+
+`accept_update(session, set_id, rule_key)` applies that one rule only: versioned (rule and
+set), ledgered as `rule_update_accepted` with `change`, `from_layer`, `default_version` and
+the rule snapshot. Anything not on offer is `RuleNotFoundError` (404). On the tenant layer
+accepting may not delete or unlock a locked rule (two-person unlock, `RuleLockedError`, 409),
+as for reset. A rule that only lags behind (older `origin_version`, same values) is not
+offered; a project that never edited its copy sees exactly the default's changes.
+
+New projects always get the latest defaults: they copy the tenant layer as it is at creation
+(including updates the tenant accepted from the system layer).
+
+## Tenant drift report (ADR 0004 Consequences, T-0036)
+
+`drift_report(session)` (tenant-level session) lists, per project, set and rule, how project
+rules differ from the tenant defaults: `added` (a live rule the project added, or every rule of
+a set with no tenant default), `modified` (a copied rule whose values differ, `fields`),
+`deleted` (a default the project deleted), `missing` (a default the copy lacks — an update
+not accepted) and `default_removed` (a copied rule whose default the tenant removed). It
+covers the projects the session can read (RLS: the caller's portfolio projects,
+`allowed_project_ids`), never others.
+
+## "Try it" (ADR 0004 §6, T-0036)
+
+`try_rule(session, set_id, rule_key, context, draft=None)` evaluates the stored rule (enabled
+or not) or a `draft` `RuleSpec` (compiled first, `RuleCompileError`) against a sample context
+and returns a `TryResult`; it writes **nothing** (no finding, version or ledger entry).
+
+- CEL kinds: the context is KERP CEL JSON (`params` is reserved and bound to the rule's own
+  params). `outcome` is `pass` (`true`), `fail` (any other value) or `error`, with the `value`
+  or the CEL `error`. A `check` rule that does not pass also returns the `finding`
+  `run_checks` would log (same message rules).
+- Regex kinds: the context is `{"text": "..."}` (at most 20 000 characters). `autolink`
+  returns every match (up to 100) with its named groups; `p6_grammar` a full match.
+- A malformed sample is `SampleContextError` (422).
+
 ## Rules settings API (`/api/v1/validation`, ADR 0004 §7)
 
 | Route | What |
@@ -176,6 +230,10 @@ copies only lose their lock after a tenant unlock).
 | `POST /rule-sets/{set}/rules/{key}/unlock-requests` | request an unlock (`adr_reference`, `reason`) |
 | `GET /unlock-requests?status=`, `POST /unlock-requests/{id}/approve`, `/reject` | decide |
 | `GET /projects/{p}/rule-sets` and `/projects/{p}/rule-sets/{set}/...` | the same rule operations on the project copy |
+| `GET .../rule-sets/{set}/updates` | the upgrade offer (`RuleSetUpdatesRead`), tenant and project sets |
+| `POST .../rule-sets/{set}/updates/{key}/accept` | accept one rule of it |
+| `POST .../rule-sets/{set}/rules/{key}/try` | "Try it" (`TryRuleInput`: `context`, optional draft `rule`) |
+| `GET /drift-report` | the tenant drift report (`DriftEntryRead`) |
 
 | Layer | `check` sets | other kinds |
 |---|---|---|
@@ -183,7 +241,9 @@ copies only lose their lock after a tenant unlock).
 | Project set (read: any member) | PER-06 | PER-09 |
 | Unlock | PER-13 requests; another PER-13 or PER-01 approves or rejects (the requester may withdraw) | |
 
-So PER-09 can never change, disable, delete or reset a `check` rule (SoD). Everyone else is
+An upgrade offer is read by whoever reads the set and accepted by whoever edits it; "Try it"
+needs the editor of the set; the drift report needs PER-13 or PER-01. So PER-09 can never
+change, disable, delete, reset or accept an update to a `check` rule (SoD). Everyone else is
 403; a non-member of the project, or a set outside the path's layer/project, is 404. Locked
 → 409, compile errors → 422. Interim until T-0014's tenant roles: a "tenant" persona is one
 the caller holds on any project of the tenant (as for project creation, TD-184). The
@@ -191,7 +251,8 @@ request binds no project yet (TD-122): project routes bind the path's project.
 
 ## Not here
 
-Upgrade offers, drift report, "Try it": **T-0036**. Per-record override of a blocked check
+"Try it" on a recent real context (only supplied samples so far) and offering whole rule sets
+a running project lacks: see the TODOs raised by T-0036. Per-record override of a blocked check
 (Amendment A): **T-0035**. Storing the project's chosen client pack (so a module enabled
 later copies that pack's sets): **T-0108**. The Rules settings screen (frontend): see the
 TODO raised by T-0034.

@@ -344,3 +344,112 @@ def test_a_tenant_reset_all_cannot_remove_a_locked_rule_the_tenant_added(api: Ap
     rules = next(s for s in sets if s["id"] == api.tenant[CHECK])["rules"]
     kept = next(r for r in rules if r["rule_key"] == "extra_gate")
     assert (kept["locked"], kept["deleted_at"]) == (True, None)
+
+
+# --- upgrade offers, drift report, "Try it" (T-0036, ADR 0004 §4, §6) ----------------------------
+
+
+def test_a_project_is_offered_a_changed_default_and_accepts_it_rule_by_rule(api: Api) -> None:
+    tenant_photo = api.tenant_rule(CHECK, "photo")
+    tightened = {**RULE, "expression": "fields.photos > 2", "action": "warn"}
+    assert api.client.put(tenant_photo, json=tightened, headers=api.as_("qd")).status_code == 200
+    added = api.tenant_rule(CHECK, "witness")
+    assert api.client.put(added, json=RULE, headers=api.as_("qd")).status_code == 200
+    project_set = f"{API}/projects/{api.project}/rule-sets/{api.project_sets[CHECK]}"
+    response = api.client.get(f"{project_set}/updates", headers=api.as_("pm"))  # any member
+    assert response.status_code == 200, response.text
+    offer = response.json()
+    assert (offer["default_layer"], offer["available"]) == ("tenant", 2)
+    assert [(u["rule_key"], u["change"], u["fields"]) for u in offer["updates"]] == [
+        ("photo", "changed", ["expression"]),
+        ("witness", "new", []),
+    ]
+    accept = f"{project_set}/updates/photo/accept"
+    for name in ("pa", "pm", "qd", "ops"):  # PER-06 accepts check rules (§7, SoD for PER-09)
+        assert api.client.post(accept, headers=api.as_(name)).status_code == 403, name
+    assert api.client.post(accept, headers=api.as_("outsider")).status_code == 404
+    response = api.client.post(accept, headers=api.as_("qa"))
+    assert response.status_code == 200, response.text
+    photo = next(r for r in response.json()["rules"] if r["rule_key"] == "photo")
+    assert (photo["expression"], photo["origin_version"], photo["version"]) == (
+        "fields.photos > 2",
+        2,
+        2,
+    )
+    assert "witness" not in [r["rule_key"] for r in response.json()["rules"]]
+    assert api.client.post(accept, headers=api.as_("qa")).status_code == 404  # no longer offered
+    remaining = api.client.get(f"{project_set}/updates", headers=api.as_("qa")).json()
+    assert [u["rule_key"] for u in remaining["updates"]] == ["witness"]
+
+
+def test_a_rule_the_project_deleted_is_not_re_added_through_the_api(api: Api) -> None:
+    headers = api.as_("qa")
+    photo = api.project_rule(CHECK, "photo")
+    assert api.client.delete(photo, headers=headers).status_code == 200
+    tightened = {**RULE, "expression": "fields.photos > 2", "action": "warn"}
+    tenant_photo = api.tenant_rule(CHECK, "photo")
+    assert api.client.put(tenant_photo, json=tightened, headers=api.as_("qd")).status_code == 200
+    project_set = f"{API}/projects/{api.project}/rule-sets/{api.project_sets[CHECK]}"
+    offer = api.client.get(f"{project_set}/updates", headers=headers).json()
+    assert [(u["rule_key"], u["change"], u["acceptable"]) for u in offer["updates"]] == [
+        ("photo", "removed_by_project", False)
+    ]
+    accept = f"{project_set}/updates/photo/accept"
+    assert api.client.post(accept, headers=headers).status_code == 409
+
+
+def test_the_tenant_layer_reads_and_accepts_system_updates(api: Api) -> None:
+    tenant_set = f"{API}/rule-sets/{api.tenant[CHECK]}"
+    for name in ("qa", "pa", "pm"):
+        assert api.client.get(f"{tenant_set}/updates", headers=api.as_(name)).status_code == 403
+    response = api.client.get(f"{tenant_set}/updates", headers=api.as_("ops"))
+    assert response.status_code == 200, response.text
+    assert (response.json()["default_layer"], response.json()["updates"]) == ("system", [])
+    accept = f"{tenant_set}/updates/photo/accept"
+    assert api.client.post(accept, headers=api.as_("ops")).status_code == 403  # check: PER-13
+    assert api.client.post(accept, headers=api.as_("qd")).status_code == 404  # nothing offered
+
+
+def test_the_drift_report(api: Api) -> None:
+    photo = api.project_rule(CHECK, "photo")
+    assert api.client.post(f"{photo}/disable", headers=api.as_("qa")).status_code == 200
+    for name in ("qa", "pa", "pm"):
+        assert api.client.get(f"{API}/drift-report", headers=api.as_(name)).status_code == 403
+    response = api.client.get(f"{API}/drift-report", headers=api.as_("qd"))
+    assert response.status_code == 200, response.text
+    found = [
+        (e["project_id"], e["rule_set_key"], e["rule_key"], e["drift"], e["fields"])
+        for e in response.json()
+    ]
+    assert found == [(str(api.project), CHECK, "photo", "modified", ["enabled"])]  # not "other"
+
+
+def test_try_it_on_the_project_and_tenant_layers(api: Api) -> None:
+    photo = api.project_rule(CHECK, "photo")
+    body = {"context": {"fields": {"ok": False}}}
+    assert api.client.post(f"{photo}/try", json=body, headers=api.as_("pa")).status_code == 403
+    response = api.client.post(f"{photo}/try", json=body, headers=api.as_("qa"))
+    assert response.status_code == 200, response.text
+    result = response.json()
+    assert (result["outcome"], result["value"], result["rule_version"]) == ("fail", False, 1)
+    assert (result["finding"]["action"], result["finding"]["outcome"]) == ("warn", "fail")
+    draft = {"context": {"fields": {"n": 3.0}}, "rule": {**RULE, "expression": "fields.n > 2.0"}}
+    new_one = api.project_rule(CHECK, "new_one") + "/try"
+    response = api.client.post(new_one, json=draft, headers=api.as_("qa"))
+    assert (response.status_code, response.json()["outcome"]) == (200, "pass")
+    assert response.json()["rule_version"] is None
+    bad = {"context": {}, "rule": {**RULE, "expression": "nope.x"}}
+    assert api.client.post(f"{photo}/try", json=bad, headers=api.as_("qa")).status_code == 422
+    reserved = {"context": {"params": {}}}
+    assert api.client.post(f"{photo}/try", json=reserved, headers=api.as_("qa")).status_code == 422
+    ghost = api.project_rule(CHECK, "ghost") + "/try"
+    assert api.client.post(ghost, json=body, headers=api.as_("qa")).status_code == 404
+    rules = api.client.get(f"{API}/projects/{api.project}/rule-sets", headers=api.as_("qa"))
+    check = next(s for s in rules.json() if s["key"] == CHECK)
+    assert "new_one" not in [r["rule_key"] for r in check["rules"]]  # nothing saved
+    assert check["version"] == 1
+    events = api.tenant_rule(DIGEST, "events") + "/try"
+    sample = {"context": {"event": {"kind": "punch"}}}
+    assert api.client.post(events, json=sample, headers=api.as_("qd")).status_code == 403
+    response = api.client.post(events, json=sample, headers=api.as_("ops"))
+    assert (response.status_code, response.json()["outcome"]) == (200, "pass")
