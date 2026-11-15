@@ -17,12 +17,10 @@ Field-worker auth (T-0009) keeps its short-lived state here too:
 
 * ``magic:<sha256(token)>``: a pending magic link (JSON ``{uid, tid}``). Taken atomically
   (``GETDEL``), so a link signs in exactly once. TTL = the link lifetime.
-* ``pin:<sid>``: the scrypt hash of the 6-digit PIN that gates a field-worker session. Its
-  presence marks the session as PIN-gated (``/refresh`` refuses it; only the PIN unlock
-  rotates it). TTL = the refresh lifetime plus a margin, re-armed on every unlock.
 * ``lockout:<scope>:<subject digest>:n`` / ``:lock``: the progressive-lockout failure
   counter (TTL = the counting window, from the first failure) and the current lock
-  (TTL = the delay). See ``lockout.py``.
+  (TTL = the delay). See ``lockout.py``. The field PIN's counter is per device
+  (``pin-device``, T-0038); the PIN hash itself is on the device row, not here.
 
 Device binding (T-0043, diff §4.3; the device registry itself is ``oe_identity_device``):
 
@@ -78,12 +76,12 @@ class RevocationStore(Protocol):
 
     def peek_magic_link(self, digest: str) -> bytes | None: ...
 
-    def set_pin(self, session_id: uuid.UUID, pin_hash: str, ttl: timedelta) -> None: ...
-
-    def get_pin(self, session_id: uuid.UUID) -> str | None: ...
-
     def begin_attempt(
-        self, key: str, window: timedelta, delay_after: Callable[[int], timedelta]
+        self,
+        key: str,
+        window: timedelta,
+        delay_after: Callable[[int], timedelta],
+        extra: int = 0,
     ) -> tuple[int, int]: ...
 
     def clear_failures(self, key: str) -> None: ...
@@ -121,10 +119,6 @@ def _refresh_key(jti: str) -> str:
 
 def _magic_key(digest: str) -> str:
     return f"{KEY_PREFIX}magic:{digest}"
-
-
-def _pin_key(session_id: uuid.UUID) -> str:
-    return f"{KEY_PREFIX}pin:{session_id}"
 
 
 def _device_of_key(session_id: uuid.UUID) -> str:
@@ -203,21 +197,18 @@ class RedisRevocationStore:
         # Validates a link without spending it (T-0080): ``take_magic_link`` spends it.
         return _as_bytes(self._call(lambda: self._client.get(_magic_key(digest))))
 
-    def set_pin(self, session_id: uuid.UUID, pin_hash: str, ttl: timedelta) -> None:
-        self._call(
-            lambda: self._client.set(_pin_key(session_id), pin_hash.encode(), ex=_seconds(ttl))
-        )
-
-    def get_pin(self, session_id: uuid.UUID) -> str | None:
-        value = _as_bytes(self._call(lambda: self._client.get(_pin_key(session_id))))
-        return value.decode() if value is not None else None
-
     def begin_attempt(
-        self, key: str, window: timedelta, delay_after: Callable[[int], timedelta]
+        self,
+        key: str,
+        window: timedelta,
+        delay_after: Callable[[int], timedelta],
+        extra: int = 0,
     ) -> tuple[int, int]:
         """Atomically: refuse while locked, else count the attempt and arm its lock.
 
-        Returns ``(0, seconds_left)`` while locked, else ``(attempt, 0)``. Check, count and
+        Returns ``(0, seconds_left)`` while locked, else ``(attempt, 0)``. ``extra`` failures
+        made elsewhere (a field device's offline PIN failures, T-0038) are added in the same
+        step, before this attempt, and only when it runs (never while locked). Check, count and
         lock run as one optimistic transaction (WATCH on the counter and the lock, MULTI/EXEC,
         retried on conflict), so a burst cannot slip past a lock another request is arming
         (TD-191). The counter's window starts at the first failure and is never extended;
@@ -238,10 +229,11 @@ class RedisRevocationStore:
                             return 0, math.ceil(left_lock_ms / 1000)
                         current = _as_bytes(pipe.get(counter))
                         left_ms = int(str(pipe.pttl(counter))) if current is not None else -2
-                        attempt = int(current) + 1 if current is not None and left_ms > 0 else 1
+                        known = int(current) if current is not None and left_ms > 0 else 0
+                        attempt = known + extra + 1
                         delay = delay_after(attempt)
                         pipe.multi()
-                        if attempt == 1:
+                        if known == 0:
                             pipe.set(counter, attempt, ex=_seconds(window))
                         else:
                             pipe.set(counter, attempt, px=left_ms)
@@ -383,16 +375,12 @@ class InMemoryRevocationStore:
         with self._lock:
             return self._get(_magic_key(digest))
 
-    def set_pin(self, session_id: uuid.UUID, pin_hash: str, ttl: timedelta) -> None:
-        self._set(_pin_key(session_id), ttl, pin_hash.encode())
-
-    def get_pin(self, session_id: uuid.UUID) -> str | None:
-        with self._lock:
-            value = self._get(_pin_key(session_id))
-        return value.decode() if value is not None else None
-
     def begin_attempt(
-        self, key: str, window: timedelta, delay_after: Callable[[int], timedelta]
+        self,
+        key: str,
+        window: timedelta,
+        delay_after: Callable[[int], timedelta],
+        extra: int = 0,
     ) -> tuple[int, int]:
         counter, lock = _failures_key(key), _lock_key(key)
         with self._lock:
@@ -400,9 +388,9 @@ class InMemoryRevocationStore:
                 return 0, max(1, math.ceil(self._entries[lock][0] - self._clock()))
             current = self._get(counter)
             if current is None:
-                expires, attempt = self._clock() + _seconds(window), 1
+                expires, attempt = self._clock() + _seconds(window), extra + 1
             else:
-                expires, attempt = self._entries[counter][0], int(current) + 1
+                expires, attempt = self._entries[counter][0], int(current) + extra + 1
             self._entries[counter] = (expires, str(attempt).encode())
             delay = delay_after(attempt)
             if delay > timedelta(0):

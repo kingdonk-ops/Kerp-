@@ -170,7 +170,7 @@ def test_reuse_detection_still_revokes_the_session(
 def test_pin_failure_window_follows_the_refresh_lifetime(
     setup: tuple[TestClient, AuthRuntime],
 ) -> None:
-    # Until T-0038 moves the PIN to the device, its counter outlives the 12 h session.
+    # The per-device PIN counter (T-0038) outlives the 12 h session it is counted in.
     service = AuthService(setup[1])
     assert service.pin_lockout.policy.window == SESSION + PIN_TTL_MARGIN
 

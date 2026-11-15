@@ -13,7 +13,11 @@ tenant-level record. The tenant comes from the session binding, never from an ar
   ``device_id`` already enrolled by another user is refused (``DeviceConflictError``); a
   revoked one stays revoked (``DeviceRevokedError``): a wiped client enrols under a new id.
   The enrolment that creates the row issues the device's **wipe secret** (T-0080): returned
-  once, stored only as its SHA-256 (``wipe_secret_hash``).
+  once, stored only as its SHA-256 (``wipe_secret_hash``). The enrolment may also set the
+  device's field **PIN** (T-0038, diff §4.2): once; a device that has one keeps it
+  (``DevicePinAlreadySetError``), it is changed only with ``set_pin``.
+* **PIN** (``set_pin``, ``pin_device``): the scrypt hash of the device's 6-digit PIN is on
+  the row (``pin_hash``). A sign-in never resets it.
 * **Seen** (``resolve_request_device``): a request whose session is bound to a device, or
   that names an enrolled device of its user in ``X-KERP-Device-Id``, runs "through" that
   device: ``last_seen_at`` is updated (at most once a minute) and the audit ledger records
@@ -84,6 +88,10 @@ class DeviceConflictError(ValueError):
     """The ``device_id`` is enrolled by another user, or the session by another device (409)."""
 
 
+class DevicePinAlreadySetError(ValueError):
+    """Enrolment tried to set the PIN of a device that has one (409: change it instead)."""
+
+
 def _tenant_id(session: Session) -> uuid.UUID:
     context = session_tenancy(session)
     if context is None or context.project_id is not None:
@@ -134,13 +142,16 @@ def enrol(
     platform: str,
     os_version: str,
     app_version: str,
+    pin_hash: str | None = None,
 ) -> tuple[Device, str | None]:
     """Register (or refresh) the device and bind the login session to it.
 
     Returns the device and, only when this call created it, its new wipe secret (else
     ``None``: the secret is never issued twice). A revoked device kills the calling session
     and raises ``DeviceRevokedError``; another user's ``device_id``, or a session already
-    bound to another device, raises ``DeviceConflictError``.
+    bound to another device, raises ``DeviceConflictError``. ``pin_hash`` sets the device's
+    PIN if it has none yet; a device with a PIN raises ``DevicePinAlreadySetError`` (nothing
+    is changed or bound).
     """
     bound = store.session_device(session_id)
     if bound is not None and bound != device_id:
@@ -152,6 +163,8 @@ def enrol(
     if device is not None and device.status == DEVICE_REVOKED:
         store.revoke_device_session(session_id, session_ttl)
         raise DeviceRevokedError("device revoked")
+    if pin_hash is not None and device is not None and device.pin_hash is not None:
+        raise DevicePinAlreadySetError("this device already has a PIN")
     wipe_secret: str | None = None
     if device is None:
         wipe_secret = new_wipe_secret()
@@ -171,9 +184,29 @@ def enrol(
     device.app_version = app_version
     device.last_seen_at = now
     device.updated_by = user_id
+    if pin_hash is not None:
+        device.pin_hash = pin_hash
+        device.pin_set_at = now
     session.flush()
     store.bind_device(session_id, device_id, session_ttl)
     return device, wipe_secret
+
+
+def set_pin(session: Session, device: Device, pin_hash: str, *, actor_id: uuid.UUID) -> None:
+    """Replace the device's PIN (the caller checked who may). Caller commits."""
+    now = utcnow()
+    device.pin_hash = pin_hash
+    device.pin_set_at = now
+    device.updated_by = actor_id
+    session.flush()
+
+
+def pin_device(session: Session, device_id: uuid.UUID, user_id: uuid.UUID) -> Device | None:
+    """The user's active device ``device_id``, if it is one (the PIN gate's lookup)."""
+    device = find_device(session, device_id)
+    if device is None or device.user_id != user_id or device.status != DEVICE_ACTIVE:
+        return None
+    return device
 
 
 def touch(device: Device, now: datetime | None = None) -> bool:

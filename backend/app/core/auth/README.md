@@ -1,4 +1,4 @@
-# app/core/auth — users, asymmetric JWTs, JWKS, revocation (T-0008), field-worker auth (T-0009), device registry (T-0043)
+# app/core/auth — users, asymmetric JWTs, JWKS, revocation (T-0008), field-worker auth (T-0009, T-0038), device registry (T-0043)
 
 This is the identity module (`module: identity` in the tracker): it lives in `app/core/` because
 every request's authentication depends on it (T-0008, T-0010 notes).
@@ -18,13 +18,13 @@ rewritten (HS256 → RS256/EdDSA + JWKS + `jti` revocation in Redis).
 | `deps.py` | `CurrentPrincipal` (401 unless a valid token of an active user), `require_claims` |
 | `providers.py` | `AuthProvider` seam + `LocalPasswordProvider` (Entra ID SSO later: TD-043) |
 | `service.py` | `AuthService` login / refresh / logout / magic link / PIN unlock; `create_user`, `set_password`; user reads for the admin module (`list_users`, `get_user`, `users_by_id`, `find_user_by_email`, T-0014); internal staff rule (`is_internal_user`, T-0049) |
-| `field.py` | Magic-link tokens + delivery seam, PIN rules (T-0009) |
-| `lockout.py` | `ProgressiveLockout` + policies, Redis-backed (T-0009) |
-| `models.py` | `auth_user` table (tenant-level rows, RLS) — migration `0003`, internal staff flag + Entra link in `0013` (T-0049, ADR 0009); `auth_project_membership` (T-0010) — migration `0006`, persona CHECK widened for PER-16 in `0012` (T-0076), membership-based RLS in `0015` (T-0014); `oe_identity_device` (T-0043) — migration `0016`, `wipe_secret_hash` in `0018` (T-0080) |
+| `field.py` | Magic-link tokens + delivery seam, PIN rules and the `PIN_REQUIRED` / `PIN_INVALID` / `PIN_EXHAUSTED` answers (T-0009, T-0038) |
+| `lockout.py` | `ProgressiveLockout` + policies, Redis-backed (T-0009); offline failures counted with `extra` (T-0038) |
+| `models.py` | `auth_user` table (tenant-level rows, RLS) — migration `0003`, internal staff flag + Entra link in `0013` (T-0049, ADR 0009); `auth_project_membership` (T-0010) — migration `0006`, persona CHECK widened for PER-16 in `0012` (T-0076), membership-based RLS in `0015` (T-0014); `oe_identity_device` (T-0043) — migration `0016`, `wipe_secret_hash` in `0018` (T-0080), `pin_hash` + `pin_set_at` in `0019` (T-0038) |
 | `memberships.py` | The membership store's write side (`project_grants`, `set_user_grants`, `revoke_project`; revoke = soft delete, re-grant revives), used by the admin module (T-0014) and the projects module (creator PER-09, revoke on delete; T-0039) |
 | `access.py` | Persona matrix, capability tiers, SoD, scope resolution, `require_capability` / `require_hold_release` guards (T-0010); admin-grant lookup seam, `is_system_admin` binding, `CallerIsSystemAdmin`, `sod_warning` (T-0014); `CallerAdminGrants` (the caller's own `system_admin` / `create_projects`, cached with the scope; T-0039) |
-| `devices.py` | Device registry (`oe_identity_device`): enrol + session binding, `resolve_request_device` (last seen, revoked → `DEVICE_REVOKED`), revoke, wipe secret + uniform wipe confirmation (T-0080), `record_sync` for the sync endpoints (T-0043) |
-| `device_api.py` | Device endpoints: enrol, own / per-user lists, revoke (self, `system_admin`, PER-09 of a shared project; cross-project wipe warning), wipe-confirmed with the wipe secret (T-0043, T-0080) |
+| `devices.py` | Device registry (`oe_identity_device`): enrol + session binding, `resolve_request_device` (last seen, revoked → `DEVICE_REVOKED`), revoke, wipe secret + uniform wipe confirmation (T-0080), `record_sync` for the sync endpoints (T-0043); the device PIN (`set_pin`, `pin_device`, T-0038) |
+| `device_api.py` | Device endpoints: enrol (with the PIN), PIN change, own / per-user lists, revoke (self, `system_admin`, PER-09 of a shared project; cross-project wipe warning), wipe-confirmed with the wipe secret (T-0043, T-0080, T-0038) |
 | `device_signal.py` | `X-KERP-Device-Id` header, `DeviceRevokedError` → `401` with `code: DEVICE_REVOKED` (no database) |
 | `router.py`, `schemas.py` | HTTP endpoints below |
 
@@ -34,19 +34,22 @@ rewritten (HS256 → RS256/EdDSA + JWKS + `jti` revocation in Redis).
 |---|---|---|
 | `GET /.well-known/jwks.json` | none | `{"keys": [...]}` public JWKs (active + retired), `Cache-Control: public, max-age=300` |
 | `POST /api/v1/auth/login` | none | `{email, password}` → `TokenResponse` (`no-store`) + refresh cookie (native app: token in the body); a `tenant_id` field is `422`; `429` when locked |
-| `POST /api/v1/auth/refresh` | refresh cookie + Origin (native app: `{refresh_token}` body) | new `TokenResponse` + cookie (rotation); `401` for PIN-gated or ended sessions; `403` cross-origin |
+| `POST /api/v1/auth/refresh` | refresh cookie + Origin (native app: `{refresh_token}` body) | new `TokenResponse` + cookie (rotation); `401 {code: PIN_REQUIRED}` for a session of a device with a PIN idle `KERP_PIN_IDLE_MINUTES` or longer (token not spent); `401` for ended sessions; `403` cross-origin |
 | `POST /api/v1/auth/logout` | bearer | `204`; revokes the token and its whole login session; clears the refresh cookie |
 | `GET /api/v1/auth/me` | bearer | `{id, tenant_id, email, display_name, is_internal}` (`is_internal` read-only, below) |
 | `POST /api/v1/auth/magic-link` | none | `{email}` → always `202`; sends a 15-min one-time link to an active user; `429` when throttled |
-| `POST /api/v1/auth/magic-link/redeem` | none | `{token, pin}` → `TokenResponse` + cookie of a new **PIN-gated** session |
-| `POST /api/v1/auth/pin/unlock` | refresh cookie + Origin (native app: `refresh_token` in the body) | `{pin}` → rotated `TokenResponse` + cookie; `429` when locked; `403` cross-origin |
-| `POST /api/v1/devices/enrol` | bearer | `{device_id, platform, os_version, app_version}` → device + `wipe_secret`; `201` new (the only response carrying the secret), `200` known (`wipe_secret: null`); binds the session to the device; `409` another account's id or a session already bound elsewhere |
+| `POST /api/v1/auth/magic-link/redeem` | none | `{token}` → `TokenResponse` + cookie of a new session (on an enrolled device: bound to it, PIN kept) |
+| `POST /api/v1/auth/pin/unlock` | refresh cookie + Origin (native app: `refresh_token` in the body) | `{pin, failed_offline?}` → rotated `TokenResponse` + cookie; `401 {code: PIN_INVALID \| PIN_EXHAUSTED}`; `429` when locked; `403` cross-origin |
+| `POST /api/v1/devices/enrol` | bearer | `{device_id, platform, os_version, app_version, pin?}` → device + `wipe_secret`; `201` new (the only response carrying the secret), `200` known (`wipe_secret: null`); binds the session to the device; sets the PIN once; `409` another account's id, a session already bound elsewhere, or `code: PIN_ALREADY_SET` |
+| `PUT /api/v1/devices/{device_id}/pin` | bearer (a session bound to the device) | `{pin}` → `204`; a new device PIN (the old one is not needed); `403` another session, `404` not the caller's active device |
 | `GET /api/v1/devices` | bearer | the caller's devices (last seen, last sync, status) |
 | `GET /api/v1/users/{user_id}/devices` | bearer | a user's devices: the user, a `system_admin`, or a PER-09 of a project the user belongs to; `403` a shared project without PER-09; `404` otherwise |
 | `POST /api/v1/devices/{device_id}/revoke` | bearer | `{confirm_cross_project_wipe?}` → revoked device + `role` + `cross_project_warning`; same callers as above; `409` until a PER-09 confirms the cross-project wipe |
 | `POST /api/v1/devices/{device_id}/wipe-confirmed` | none | `{wipe_secret}` → `204`: the revoked device reports its wipe; every refusal (unknown id, active device, wrong or missing secret) is the same `404 {"detail": "Not Found"}` (T-0080) |
 
-`TokenResponse` is `{access_token, token_type, expires_in, refresh_expires_in}`: no response
+`TokenResponse` is `{access_token, token_type, expires_in, refresh_expires_in, session_expires_at}`
+(`session_expires_at`: the session's end, sign-in + 12 h, the same on every rotation and PIN
+unlock; a field client starts its offline grace there, diff §4.2, T-0038): no response
 body carries the refresh token (below), except for an allow-listed native app
 (`refresh_token`, *Native app origins*). Every token endpoint and every authenticated request
 reads `X-KERP-Device-Id`; a revoked device is `401` with `code: DEVICE_REVOKED` (*Devices*).
@@ -237,14 +240,54 @@ or revoke which device is decided in
   deleted. A `200` re-enrolment (`wipe_secret: null`) keeps the stored secret; a client that
   has lost it enrols under a new `device_id` after its next wipe.
 
-## Field workers: magic link + PIN (T-0009)
+## Field workers: magic link + the device PIN, hybrid (T-0009, T-0038)
 
-`field.py`, `lockout.py`. The PIN is a **local session unlock only**: it never authenticates
-on its own. A magic link starts a session on the device and sets that session's 6-digit PIN
-(scrypt hash in Redis under `pin:<sid>`; weak PINs such as `111111` / `123456` are refused).
-`/auth/refresh` refuses such a session; only `/auth/pin/unlock` with the device's refresh
-token **and** the PIN rotates it. The refresh token without the PIN, or the PIN without the
-refresh token, gets nothing. Interpretation recorded in TD-135.
+`field.py`, `lockout.py`. Diff §4.2 *Field PIN, hybrid* (TD-135, decision 8a). The PIN
+belongs to the **enrolled device**, not to a server session, and it never authenticates on
+its own: a PIN alone never starts or renews a session.
+
+- **Set once, kept.** The 6-digit PIN is set at enrolment (`POST /devices/enrol` with
+  `pin`; weak PINs such as `111111` / `123456` are refused, `422`). Its scrypt hash is on the
+  device row (`pin_hash`, `pin_set_at`; migration `0019`); nothing about it is kept per
+  session. Enrolment never replaces a PIN (`409 {code: PIN_ALREADY_SET}`). A magic-link or
+  password sign-in starts an ordinary session; on an enrolled device of the user
+  (`X-KERP-Device-Id`) the session is bound to the device at once, and the PIN stays.
+- **Change.** `PUT /devices/{device_id}/pin` from a session bound to the device (so after an
+  online sign-in there; the old PIN is not needed, so a forgotten PIN is reset by signing in).
+  Audited as `pin_changed` on `device:<device_id>` (enrolment with a PIN: `pin_set`); never
+  the PIN.
+- **Renewal after idle.** `/auth/refresh` rotates a session of a device with a PIN normally
+  while its last renewal (the refresh token's `iat`: sign-in, rotation or unlock) is less
+  than `KERP_PIN_IDLE_MINUTES` ago (default 30). After a longer idle it answers
+  `401 {"detail": "PIN required", "code": "PIN_REQUIRED"}` and leaves the token unspent;
+  `/auth/pin/unlock` with that refresh token **and** the PIN renews the session (any time,
+  not only after idle). Sessions not bound to a device, or of a device without a PIN, are
+  never PIN-gated.
+- **Which device.** The session's device is the token's `did` claim (set when the session is
+  bound at sign-in, and carried by every rotation), else the store's binding (a session
+  bound by its enrolment, until its first rotation). The gate therefore does not depend on a
+  Redis key once the claim exists (TD-142, resolved; residual: the first refresh token of a
+  session bound by enrolment rather than at sign-in relies on the binding, so clients send
+  `X-KERP-Device-Id` at sign-in). A session naming a device that is no longer an active
+  device of its user is refused.
+- **Answers of `/auth/pin/unlock`** (only after the refresh token checked out): `200` new
+  pair; `401 {code: PIN_INVALID}` wrong PIN (ask again); `401 {code: PIN_EXHAUSTED}` the
+  10th wrong PIN and every attempt after it (sign in again on the device); `429` +
+  `Retry-After` while locked; plain `401` for a session without a device PIN or a dead
+  token; `DEVICE_REVOKED` as everywhere.
+
+**PIN lockout per device.** The numbers are T-0009's: 4 tries back to back, then 30 s
+doubling to 15 min; the **10th wrong PIN ends PIN unlock on that device** until a sign-in
+there: a new session bound to the device (sign-in naming it, or its enrolment) or a PIN
+change clears the counter. Nothing is revoked: not the session (its access token keeps
+working until it expires), not the device; PIN failures never trigger a wipe. From the 10th
+failure on no lock is armed (`LockoutPolicy.lock_after`), so later attempts get
+`PIN_EXHAUSTED`, not `429`. **Offline failures:** the device counts wrong PINs made offline
+with the same numbers and reports them with its next unlock as `failed_offline` (0 to 1000,
+clamped to 10); they are added to the device's counter before the attempt, in the same
+atomic step, so the attempt's number and lock follow the same escalation. They are applied
+only when the attempt runs: a `429` applies nothing, so the client keeps the count until any
+other answer.
 
 **Progressive lockout** (Redis, shared by every worker; replaces Inspection-ERP's in-memory
 `ratelimit.py`): an attempt is counted before the secret is checked; once the immediate tries
@@ -252,12 +295,13 @@ are used up, each failure locks the subject and attempts during the lock are ref
 `429` + `Retry-After` without checking the secret; a right answer clears the count. Check,
 count and lock are one atomic store operation (`begin_attempt`: WATCH/MULTI on Redis), so a
 burst cannot slip past a lock another request is arming (TD-191). Subjects
-are hashed into the keys. If Redis evicts a `pin:<sid>` key the PIN gate fails open: run
-Redis with `maxmemory-policy noeviction` (TD-142 tracks a token-claim remedy).
+are hashed into the keys. Run Redis with `maxmemory-policy noeviction` all the same: an
+evicted counter forgets failures (and an evicted session binding is covered by the `did`
+claim only after the session's first rotation).
 
 | Scope | Key | Immediate tries | Then locked | Hard cap |
 |---|---|---|---|---|
-| PIN unlock | session | 4 | 30 s doubling to 15 min | 10th wrong PIN revokes the session (counter window = refresh lifetime + 1 day, so it outlives the 12 h session; until T-0038 moves the PIN to the device) |
+| PIN unlock | tenant + device | 4 (plus reported offline failures) | 30 s doubling to 15 min | 10th wrong PIN ends PIN unlock on the device until a sign-in there; nothing revoked (counter window = refresh lifetime + 1 day: it outlives the session it is counted in, and a new session on the device clears it) |
 | Password login | tenant + e-mail + client IP | 6 | 30 s doubling to 15 min | none (no permanent lock-out) |
 | Password login backstop | tenant + e-mail, any client | 51 per 24 h | 30 s doubling to 15 min | none |
 | Magic-link request | tenant + e-mail | 4 per hour | 1 min doubling to 15 min | none |
@@ -281,7 +325,8 @@ development logs the token, production logs "not delivered" until e-mail exists 
 ## Tokens
 
 Claims: `iss`, `aud`, `sub` (user), `tid` (tenant), `sid` (login session), `jti`, `type`
-(`access`|`refresh`), `iat`, `nbf`, `exp`. Header: `kid` (RFC 7638 thumbprint), `alg`
+(`access`|`refresh`), `iat`, `nbf`, `exp`; `did` (the session's bound device, when known:
+T-0038) is optional. Header: `kid` (RFC 7638 thumbprint), `alg`
 (`EdDSA` or `RS256`, from the key), `typ` (`at+jwt` for access tokens). Verification looks
 the key up by `kid` and accepts only that key's algorithm (no `none`, no HS/RS confusion).
 
@@ -381,6 +426,7 @@ session's bound project (or no bound project) → `404`; a member without the au
 | `KERP_JWT_ISSUER` / `KERP_JWT_AUDIENCE` | `kerp` / `kerp-api` | `iss` / `aud` |
 | `KERP_ACCESS_TOKEN_MINUTES` | `15` | 1–15 |
 | `KERP_REFRESH_TOKEN_HOURS` | `12` | 1–24; session length from sign-in |
+| `KERP_PIN_IDLE_MINUTES` | `30` | 1–1440; a session of a device with a PIN idle this long needs the PIN to renew (*Field workers*) |
 | `KERP_DEFAULT_TENANT_ID` | unset | The deployment's one tenant (TD-120); required in production |
 | `KERP_INTERNAL_EMAIL_DOMAINS` | empty | Comma-separated e-mail domains of internal staff (exact match, no wildcards; see *Internal staff*); a malformed entry refuses startup |
 | `KERP_WEB_ORIGIN` | unset | Web SPA origin allowed on the cookie endpoints; unset = the API's own origin as the request sees it (behind a TLS-terminating proxy set this, or trust the proxy with `FORWARDED_ALLOW_IPS`); required with `KERP_NATIVE_APP_ORIGINS` |

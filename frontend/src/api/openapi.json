@@ -156,7 +156,7 @@
           "auth"
         ],
         "summary": "Redeem Magic Link",
-        "description": "Spend a magic link: start a session on this device, gated by the PIN set here.\n\nThe session's refresh token then works only through `/auth/pin/unlock`.",
+        "description": "Spend a magic link: start a session. On an enrolled device (`X-KERP-Device-Id`) it is\nbound to that device at once; the device's PIN stays as it is.",
         "operationId": "redeem_magic_link_api_v1_auth_magic_link_redeem_post",
         "requestBody": {
           "content": {
@@ -206,7 +206,7 @@
           "auth"
         ],
         "summary": "Pin Unlock",
-        "description": "Unlock a PIN-gated session: the device's refresh token + the PIN rotate the tokens.\n\nWrong PINs lock the session progressively; the 10th wrong PIN revokes it.",
+        "description": "Renew a session of a device with a PIN: the device's refresh token + the PIN.\n\nWrong PINs lock the device's PIN unlock progressively (offline failures reported in\n`failed_offline` count too); the 10th wrong PIN ends PIN unlock on the device until the\nnext sign-in there. Nothing is revoked and nothing is wiped.",
         "operationId": "pin_unlock_api_v1_auth_pin_unlock_post",
         "security": [
           {
@@ -261,7 +261,7 @@
             "description": "`Origin` is neither the web app's origin nor an allow-listed native app"
           },
           "401": {
-            "description": "Not authenticated; with `code: DEVICE_REVOKED` when `X-KERP-Device-Id` (or the session's device) is revoked: wipe the device's local data. Sign-in answers `DEVICE_REVOKED` only after the credentials are right"
+            "description": "Not authenticated. With `code`: `PIN_REQUIRED` (refresh: idle too long, unlock with the PIN), `PIN_INVALID` (unlock: wrong PIN), `PIN_EXHAUSTED` (unlock: the 10th wrong PIN, sign in again on this device), `DEVICE_REVOKED` (wipe the device)"
           },
           "422": {
             "description": "Validation Error",
@@ -282,7 +282,7 @@
           "auth"
         ],
         "summary": "Refresh",
-        "description": "Rotate: the refresh token is spent and a new pair is issued. Reuse revokes the session.\n\nThe new refresh token keeps the session's end (sign-in + 12 h); after it, sign in again.\nThe web SPA sends the cookie; an allow-listed native app sends ``refresh_token``.",
+        "description": "Rotate: the refresh token is spent and a new pair is issued. Reuse revokes the session.\n\nThe new refresh token keeps the session's end (sign-in + 12 h); after it, sign in again.\nThe web SPA sends the cookie; an allow-listed native app sends ``refresh_token``. A\nsession of a device with a PIN that was idle too long gets `401 {code: PIN_REQUIRED}`\n(the token is not spent: unlock with it and the PIN).",
         "operationId": "refresh_api_v1_auth_refresh_post",
         "security": [
           {
@@ -341,7 +341,7 @@
             "description": "`Origin` is neither the web app's origin nor an allow-listed native app"
           },
           "401": {
-            "description": "Not authenticated; with `code: DEVICE_REVOKED` when `X-KERP-Device-Id` (or the session's device) is revoked: wipe the device's local data. Sign-in answers `DEVICE_REVOKED` only after the credentials are right"
+            "description": "Not authenticated. With `code`: `PIN_REQUIRED` (refresh: idle too long, unlock with the PIN), `PIN_INVALID` (unlock: wrong PIN), `PIN_EXHAUSTED` (unlock: the 10th wrong PIN, sign in again on this device), `DEVICE_REVOKED` (wipe the device)"
           },
           "422": {
             "description": "Validation Error",
@@ -408,7 +408,7 @@
           "devices"
         ],
         "summary": "Enrol",
-        "description": "Register this field device for the signed-in user and bind the session to it.\n\nA new device gets its wipe secret in this response, once (store it per account).",
+        "description": "Register this field device for the signed-in user and bind the session to it.\n\nA new device gets its wipe secret in this response, once (store it per account). `pin`\nsets the device's field PIN, once: a sign-in on the device later keeps it.",
         "operationId": "enrol_api_v1_devices_enrol_post",
         "requestBody": {
           "content": {
@@ -442,7 +442,7 @@
             }
           },
           "409": {
-            "description": "Another account's device, or session"
+            "description": "Another account's device, or session; `code: PIN_ALREADY_SET` when `pin` is sent for a device that has a PIN"
           },
           "422": {
             "description": "Validation Error",
@@ -460,6 +460,64 @@
             "HTTPBearer": []
           }
         ]
+      }
+    },
+    "/api/v1/devices/{device_id}/pin": {
+      "put": {
+        "tags": [
+          "devices"
+        ],
+        "summary": "Change Pin",
+        "description": "Set a new field PIN for this device, from a signed-in session of the device (diff\n§4.2: the PIN is changed after an online sign-in; the old PIN is not needed). Clears the\ndevice's PIN failures.",
+        "operationId": "change_pin_api_v1_devices__device_id__pin_put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "device_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Device Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DevicePinRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "403": {
+            "description": "Not a session of this device"
+          },
+          "404": {
+            "description": "Not an active device of the caller"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/devices": {
@@ -4297,6 +4355,20 @@
             "pattern": "^[\\x20-\\x7e]*$",
             "title": "App Version",
             "default": ""
+          },
+          "pin": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9]{6}$",
+                "description": "6-digit PIN of this device"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pin",
+            "description": "The device's field PIN, set once (the device keeps it across sign-ins). `409` when the device already has one: change it with `PUT /devices/{device_id}/pin`"
           }
         },
         "additionalProperties": false,
@@ -4404,6 +4476,19 @@
             ],
             "title": "Wipe Confirmed At"
           },
+          "pin_set_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pin Set At",
+            "description": "When the device's field PIN was last set (null: none)"
+          },
           "wipe_secret": {
             "anyOf": [
               {
@@ -4433,6 +4518,23 @@
           "wipe_confirmed_at"
         ],
         "title": "DeviceEnrolled"
+      },
+      "DevicePinRequest": {
+        "properties": {
+          "pin": {
+            "type": "string",
+            "pattern": "^[0-9]{6}$",
+            "title": "Pin",
+            "description": "6-digit PIN of this device"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "pin"
+        ],
+        "title": "DevicePinRequest",
+        "description": "A new PIN for the device (from a signed-in session of that device)."
       },
       "DeviceRead": {
         "properties": {
@@ -4529,6 +4631,19 @@
               }
             ],
             "title": "Wipe Confirmed At"
+          },
+          "pin_set_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pin Set At",
+            "description": "When the device's field PIN was last set (null: none)"
           }
         },
         "type": "object",
@@ -4656,6 +4771,19 @@
               }
             ],
             "title": "Wipe Confirmed At"
+          },
+          "pin_set_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pin Set At",
+            "description": "When the device's field PIN was last set (null: none)"
           },
           "role": {
             "type": "string",
@@ -5432,22 +5560,15 @@
             "maxLength": 256,
             "minLength": 16,
             "title": "Token"
-          },
-          "pin": {
-            "type": "string",
-            "pattern": "^[0-9]{6}$",
-            "title": "Pin",
-            "description": "6-digit PIN of this device's session"
           }
         },
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "token",
-          "pin"
+          "token"
         ],
         "title": "MagicLinkRedeemRequest",
-        "description": "Spend a magic link and set the PIN that will unlock the new session on this device."
+        "description": "Spend a magic link: a new session (on an enrolled device: bound to it, PIN kept)."
       },
       "MagicLinkRequest": {
         "properties": {
@@ -5937,7 +6058,7 @@
             "type": "string",
             "pattern": "^[0-9]{6}$",
             "title": "Pin",
-            "description": "6-digit PIN of this device's session"
+            "description": "6-digit PIN of this device"
           },
           "refresh_token": {
             "anyOf": [
@@ -5952,6 +6073,14 @@
             ],
             "title": "Refresh Token",
             "description": "The refresh token, for the native app only (its `Origin` is on `KERP_NATIVE_APP_ORIGINS`); ignored on every other request, which uses the cookie"
+          },
+          "failed_offline": {
+            "type": "integer",
+            "maximum": 1000.0,
+            "minimum": 0.0,
+            "title": "Failed Offline",
+            "description": "Wrong PINs entered on the device while offline since its last successful unlock, not yet reported: counted before this attempt with the same escalation. Applied only when the attempt runs (not on 429): keep the count until another answer",
+            "default": 0
           }
         },
         "additionalProperties": false,
@@ -7302,6 +7431,12 @@
             "title": "Refresh Expires In",
             "description": "Seconds until the login session ends (sign-in + 12 h); then sign in again"
           },
+          "session_expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Session Expires At",
+            "description": "When the login session ends (sign-in + 12 h, the refresh token's end): the same on every rotation and PIN unlock. A field client starts its offline grace here"
+          },
           "refresh_token": {
             "anyOf": [
               {
@@ -7319,7 +7454,8 @@
         "required": [
           "access_token",
           "expires_in",
-          "refresh_expires_in"
+          "refresh_expires_in",
+          "session_expires_at"
         ],
         "title": "TokenResponse",
         "description": "The access token. The refresh token is the ``httpOnly`` refresh cookie (diff §4.2,\nTD-203); only a request from an allow-listed native-app ``Origin`` gets it in the body\n(``refresh_token``, T-0043) instead."

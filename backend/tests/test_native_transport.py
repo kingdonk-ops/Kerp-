@@ -167,10 +167,15 @@ def test_the_native_field_worker_flow_uses_the_body(
     client: TestClient, sender: CapturingSender
 ) -> None:
     assert client.post("/api/v1/auth/magic-link", json={"email": ALICE}).status_code == 202
-    redeem = {"token": sender.sent[-1].token, "pin": PIN}
-    headers = {"Origin": NATIVE, DEVICE_HEADER: str(uuid.uuid4())}
+    redeem = {"token": sender.sent[-1].token}
+    device = uuid.uuid4()
+    headers = {"Origin": NATIVE, DEVICE_HEADER: str(device)}
     redeemed = client.post("/api/v1/auth/magic-link/redeem", json=redeem, headers=headers)
     token = _assert_body_transport(redeemed)
+    # The device's PIN is set at enrolment (T-0038); the PIN unlock renews its session.
+    enrol = {"device_id": str(device), "platform": "android", "pin": PIN}
+    bearer = {**headers, "Authorization": f"Bearer {redeemed.json()['access_token']}"}
+    assert client.post("/api/v1/devices/enrol", json=enrol, headers=bearer).status_code == 201
     unlocked = client.post(
         UNLOCK, json={"pin": PIN, "refresh_token": token}, headers={"Origin": NATIVE}
     )

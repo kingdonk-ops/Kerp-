@@ -101,6 +101,10 @@ class Settings(BaseSettings):
     access_token_minutes: int = Field(default=15, ge=1, le=15)
     # A login session ends this long after sign-in; rotation never extends it (diff §4.2).
     refresh_token_hours: int = Field(default=12, ge=1, le=24)
+    # Field PIN, hybrid (T-0038, diff §4.2): a session of a device with a PIN rotates on plain
+    # ``/auth/refresh`` while its last renewal is less than this many minutes ago; after a
+    # longer idle it needs ``/auth/pin/unlock`` (refresh token + the device PIN).
+    pin_idle_minutes: int = Field(default=30, ge=1, le=24 * 60)
     # The deployment's one hidden tenant (diff §4.1, TD-120): every login signs in to it.
     # Required in production (checked at startup).
     default_tenant_id: uuid.UUID | None = None

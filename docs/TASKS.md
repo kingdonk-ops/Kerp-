@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 44/164 tasks done (27%) · **ready now:** 20 · **epics awaiting breakdown:** 47
+**Overall:** 44/164 tasks done (27%) · **ready now:** 19 · **epics awaiting breakdown:** 47
 
 | Phase | Tasks done | Progress |
 |---|---|---|
@@ -31,7 +31,7 @@
 | ✅ | [T-0008](../tracker/tasks/T-0008.md) | Auth: users, RS256/EdDSA JWT + JWKS endpoint, 15-min access + rotating refresh, jti revocation in Redis | identity | M | T-0007 | #31 |
 | ✅ | [T-0037](../tracker/tasks/T-0037.md) | Auth sessions: hidden deployment tenant at login, 12-hour refresh from sign-in (daily re-login) + same-second password-change token rejection | identity | M | T-0009 | #69 |
 | ✅ | [T-0009](../tracker/tasks/T-0009.md) | Field-worker auth: magic-link + 6-digit PIN local unlock + progressive lockout | identity | M | T-0008 | #35 |
-| ▶ | [T-0038](../tracker/tasks/T-0038.md) | Field PIN hybrid rework: PIN per enrolled device, server PIN only on renewal after idle, lockout counter per device | identity | M | T-0043 |  |
+| 🟦 | [T-0038](../tracker/tasks/T-0038.md) | Field PIN hybrid rework: PIN per enrolled device, server PIN only on renewal after idle, lockout counter per device | identity | M | T-0043 |  |
 | ✅ | [T-0043](../tracker/tasks/T-0043.md) | Device registry: enrolment, remote revoke with wipe signal, device_id on sessions and in the audit ledger (Pilot-0) | identity | M | T-0037, T-0014 | #89 |
 | ✅ | [T-0049](../tracker/tasks/T-0049.md) | Internal staff flag: is_internal derived from the company Entra link or KERP_INTERNAL_EMAIL_DOMAINS, recomputed at sign-in | identity | S | T-0037 | #83 |
 | ✅ | [T-0010](../tracker/tasks/T-0010.md) | Three-tier RBAC/ABAC: capability tiers × 15 personas × project/site scope (Asset-Site filter) + explicit multi-project read scope | identity | M | T-0008 | #39 |

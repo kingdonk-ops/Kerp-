@@ -20,6 +20,7 @@ from app.core.auth.device_signal import (
     device_revoked_handler,
     invalid_device_header_handler,
 )
+from app.core.auth.field import PinGateError, pin_gate_handler
 from app.core.auth.router import router as auth_router
 from app.core.auth.runtime import check_startup_config, close_auth_runtime
 from app.core.body_limit import BodyLimitMiddleware
@@ -116,6 +117,7 @@ def create_app(
     app.add_exception_handler(OutOfScopeError, _out_of_scope_handler)
     # A revoked field device: 401 with code DEVICE_REVOKED, the client wipes (T-0043).
     app.add_exception_handler(DeviceRevokedError, device_revoked_handler)
+    app.add_exception_handler(PinGateError, pin_gate_handler)
     app.add_exception_handler(InvalidDeviceHeaderError, invalid_device_header_handler)
 
     app.include_router(health_router)

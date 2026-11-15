@@ -10,8 +10,13 @@
   revoked (rotation with reuse detection).
 * **Logout**: revokes the access token's ``jti`` and its session, so every token of that
   login (including the refresh token) stops working at once.
-* **Field workers** (T-0009, ``field.py``): a magic link starts a PIN-gated session; only
-  ``unlock`` (refresh token + PIN) rotates it. Wrong PINs, wrong passwords and magic-link
+* **Field PIN, hybrid** (T-0038, ``field.py``, diff §4.2): the PIN belongs to the enrolled
+  device (its hash is on the device row). A sign-in naming an enrolled device of the user
+  binds the new session to it at once (the ``did`` claim) and clears the device's PIN
+  failures, without touching the PIN. ``refresh`` rotates a session of a device with a PIN
+  while its last renewal is less than ``KERP_PIN_IDLE_MINUTES`` ago; after a longer idle it
+  raises ``PinGateError(PIN_REQUIRED)`` and only ``unlock`` (refresh token + PIN) renews it.
+  Wrong PINs (per device, offline failures included), wrong passwords and magic-link
   requests run through the Redis-backed progressive lockout (``lockout.py``), which raises
   ``LockedOutError`` (HTTP 429) without checking the secret.
 
@@ -36,11 +41,15 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.auth.device_signal import DeviceRevokedError
-from app.core.auth.devices import device_status
+from app.core.auth.devices import device_status, pin_device
 from app.core.auth.field import (
     MAGIC_LINK_TTL,
+    PIN_EXHAUSTED,
+    PIN_INVALID,
+    PIN_REQUIRED,
     PIN_TTL_MARGIN,
     MagicLink,
+    PinGateError,
     magic_link_digest,
     new_magic_link_token,
 )
@@ -51,7 +60,7 @@ from app.core.auth.lockout import (
     PIN_POLICY,
     ProgressiveLockout,
 )
-from app.core.auth.models import DEVICE_REVOKED, User, normalize_email
+from app.core.auth.models import DEVICE_REVOKED, Device, User, normalize_email
 from app.core.auth.passwords import hash_password, verify_password
 from app.core.auth.providers import AuthProvider, LocalPasswordProvider, PasswordCredentials
 from app.core.auth.runtime import AuthRuntime
@@ -200,6 +209,11 @@ def _subject(tenant_id: uuid.UUID, email: str) -> str:
     return f"{tenant_id}:{normalize_email(email)}"
 
 
+def pin_failure_subject(tenant_id: uuid.UUID, device_id: uuid.UUID) -> str:
+    """The PIN lockout's subject: one counter per device (diff §4.2)."""
+    return f"{tenant_id}:{device_id}"
+
+
 UNKNOWN_CLIENT = "unknown"
 
 
@@ -213,9 +227,15 @@ class AuthService:
             store, LOGIN_ACCOUNT_POLICY, "login-account"
         )
         self.magic_link_lockout = ProgressiveLockout(store, MAGIC_LINK_REQUEST_POLICY, "magic")
-        # The PIN cap holds for the whole session: the counter outlives the refresh token.
+        # Per device. The cap holds until a sign-in on the device clears it: the counter
+        # outlives any one session (``lockout.PIN_POLICY``).
         pin_policy = replace(PIN_POLICY, window=self._pin_ttl())
-        self.pin_lockout = ProgressiveLockout(store, pin_policy, "pin")
+        self.pin_lockout = ProgressiveLockout(store, pin_policy, "pin-device")
+
+    def clear_pin_failures(self, tenant_id: uuid.UUID, device_id: uuid.UUID) -> None:
+        """Forget the device's PIN failures: a sign-in on it (a new session bound to it) or a
+        PIN change ends the "10th wrong PIN" stop."""
+        self.pin_lockout.succeeded(pin_failure_subject(tenant_id, device_id))
 
     def login(
         self,
@@ -248,18 +268,22 @@ class AuthService:
         # that the device it names is revoked (and is told to wipe).
         refuse_revoked_device(session, device_id)
         self._signed_in(user)
-        return self._issue_pair(user.id, tenant, uuid.uuid4())
+        session_id = uuid.uuid4()
+        bound = self._bind_sign_in_device(session, user.id, tenant, session_id, device_id)
+        return self._issue_pair(user.id, tenant, session_id, device_id=bound)
 
     def refresh(
         self, session: Session, refresh_token: str, *, device_id: uuid.UUID | None = None
     ) -> TokenPair:
+        """Rotate. A session of a device with a PIN that was idle (no renewal) for
+        ``KERP_PIN_IDLE_MINUTES`` or longer raises ``PinGateError(PIN_REQUIRED)`` instead; the
+        token is not spent, so the device can still unlock with it."""
         claims = self._live_refresh_claims(refresh_token)
         self._refuse_revoked_device(session, claims, device_id)
-        if self.runtime.store.get_pin(claims.session_id) is not None:
-            # A PIN-gated (field-worker) session rotates only through ``unlock``. The token
-            # is not consumed: the device can still unlock with it.
-            raise AuthenticationError("PIN unlock required")
-        return self._rotate(session, claims)
+        bound, device = self._session_device(session, claims)
+        if device is not None and device.pin_hash is not None and self._idle_too_long(claims):
+            raise PinGateError(PIN_REQUIRED)
+        return self._rotate(session, claims, device_id=bound)
 
     def request_magic_link(self, session: Session, *, email: str) -> None:
         """Send a one-time sign-in link to an active user. Silent for anyone else."""
@@ -287,15 +311,15 @@ class AuthService:
         )
 
     def redeem_magic_link(
-        self, session: Session, *, token: str, pin: str, device_id: uuid.UUID | None = None
+        self, session: Session, *, token: str, device_id: uuid.UUID | None = None
     ) -> TokenPair:
-        """Spend a magic link: start a new session on this device, gated by ``pin``.
+        """Spend a magic link: start a new session (on ``device_id``, if it is an enrolled
+        device of the user: bound at once, its PIN kept, its PIN failures cleared).
 
-        ``pin`` is validated by the request schema (6 digits, not a weak PIN). The link is
-        validated first without spending it (T-0080): an unknown, expired or spent link is the
-        uniform ``AuthenticationError`` whatever the device. Only then is a revoked
-        ``device_id`` refused (``DeviceRevokedError``, the link stays unspent); the link is
-        spent once the device check has passed.
+        The link is validated first without spending it (T-0080): an unknown, expired or
+        spent link is the uniform ``AuthenticationError`` whatever the device. Only then is a
+        revoked ``device_id`` refused (``DeviceRevokedError``, the link stays unspent); the
+        link is spent once the device check has passed.
         """
         digest = magic_link_digest(token)
         pending = self.runtime.store.peek_magic_link(digest)
@@ -318,10 +342,8 @@ class AuthService:
             raise AuthenticationError("user not active")
         self._signed_in(user)
         session_id = uuid.uuid4()
-        # The PIN gate first: a session must never have a registered refresh token without
-        # it, or plain ``/refresh`` would accept that token.
-        self.runtime.store.set_pin(session_id, hash_password(pin), self._pin_ttl())
-        return self._issue_pair(user_id, tenant_id, session_id)
+        bound = self._bind_sign_in_device(session, user_id, tenant_id, session_id, device_id)
+        return self._issue_pair(user_id, tenant_id, session_id, device_id=bound)
 
     def unlock(
         self,
@@ -330,31 +352,70 @@ class AuthService:
         refresh_token: str,
         pin: str,
         device_id: uuid.UUID | None = None,
+        failed_offline: int = 0,
     ) -> TokenPair:
-        """Rotate a PIN-gated session with the device's refresh token *and* the PIN.
+        """Renew a session of a device with a PIN: the device's refresh token *and* the PIN.
 
-        Neither half works alone. Wrong PINs escalate the session's lockout; the last
-        allowed failure (``PIN_POLICY.max_attempts``) revokes the session.
+        Neither half works alone; a session without a device PIN is ``AuthenticationError``.
+        ``failed_offline`` wrong PINs the device saw offline are counted first, with the same
+        escalation. Wrong PINs raise ``PinGateError(PIN_INVALID)``; the 10th wrong PIN on the
+        device (``PIN_POLICY.max_attempts``) and every attempt after it raise
+        ``PinGateError(PIN_EXHAUSTED)`` until a sign-in on the device. Nothing is revoked.
         """
         claims = self._live_refresh_claims(refresh_token)
         self._refuse_revoked_device(session, claims, device_id)
-        session_id = claims.session_id
-        pin_hash = self.runtime.store.get_pin(session_id)
-        if pin_hash is None:
-            raise AuthenticationError("not a PIN-gated session")
-        subject = str(session_id)
-        attempt = self.pin_lockout.begin(subject)
-        if self.pin_lockout.policy.exhausted(attempt):
-            self._revoke_session(session_id)
-            raise AuthenticationError("PIN attempts exhausted")
+        bound, device = self._session_device(session, claims)
+        if bound is None or device is None or device.pin_hash is None:
+            raise AuthenticationError("not a session of a device with a PIN")
+        pin_hash = device.pin_hash
+        subject = pin_failure_subject(claims.tenant_id, bound)
+        policy = self.pin_lockout.policy
+        attempt = self.pin_lockout.begin(subject, extra=failed_offline)
+        if policy.exhausted(attempt):
+            raise PinGateError(PIN_EXHAUSTED)
         if not verify_password(pin, pin_hash):
-            if attempt == self.pin_lockout.policy.max_attempts:
-                self._revoke_session(session_id)
-            raise AuthenticationError("wrong PIN")
+            if policy.max_attempts is not None and attempt >= policy.max_attempts:
+                raise PinGateError(PIN_EXHAUSTED)
+            raise PinGateError(PIN_INVALID)
         self.pin_lockout.succeeded(subject)
-        pair = self._rotate(session, claims)
-        self.runtime.store.set_pin(session_id, pin_hash, self._pin_ttl())  # re-arm the gate
-        return pair
+        return self._rotate(session, claims, device_id=bound)
+
+    def _bind_sign_in_device(
+        self,
+        session: Session,
+        user_id: uuid.UUID,
+        tenant_id: uuid.UUID,
+        session_id: uuid.UUID,
+        device_id: uuid.UUID | None,
+    ) -> uuid.UUID | None:
+        """Bind a new session to the device it signs in on, if that is an active device the
+        user enrolled (else ``None``: enrolment binds it later). A sign-in on the device
+        clears its PIN failures and never touches its PIN."""
+        if device_id is None or pin_device(session, device_id, user_id) is None:
+            return None
+        self.runtime.store.bind_device(session_id, device_id, self.runtime.tokens.ttl["refresh"])
+        self.clear_pin_failures(tenant_id, device_id)
+        return device_id
+
+    def _session_device(
+        self, session: Session, claims: TokenClaims
+    ) -> tuple[uuid.UUID | None, Device | None]:
+        """The session's device: the token's ``did`` claim, else the store's binding (a
+        session bound by enrolment, before its first rotation), and its row. A session that
+        names a device which is no longer an active device of the user is refused."""
+        bound = claims.device_id or self.runtime.store.session_device(claims.session_id)
+        if bound is None:
+            return None, None
+        bind_tenancy(session, TenancyContext(tenant_id=claims.tenant_id, user_id=claims.user_id))
+        device = pin_device(session, bound, claims.user_id)
+        if device is None:
+            raise AuthenticationError("the session's device is not active")
+        return bound, device
+
+    def _idle_too_long(self, claims: TokenClaims) -> bool:
+        """Idle = time since the session's last renewal (the refresh token's ``iat``)."""
+        limit = timedelta(minutes=self.runtime.settings.pin_idle_minutes)
+        return self.runtime.tokens.now() - claims.issued_at >= limit
 
     def _signed_in(self, user: User) -> None:
         """Every successful sign-in (password, magic link; SSO with T-0054) recomputes the
@@ -382,7 +443,7 @@ class AuthService:
         """A refresh or unlock from a revoked device (header, or the session's own binding)
         kills the session and raises ``DeviceRevokedError`` before the token is spent."""
         bound = self.runtime.store.session_device(claims.session_id)
-        candidates = {d for d in (bound, device_id) if d is not None}
+        candidates = {d for d in (claims.device_id, bound, device_id) if d is not None}
         if not candidates:
             return
         bind_tenancy(session, TenancyContext(tenant_id=claims.tenant_id, user_id=claims.user_id))
@@ -395,7 +456,9 @@ class AuthService:
                 )
                 raise
 
-    def _rotate(self, session: Session, claims: TokenClaims) -> TokenPair:
+    def _rotate(
+        self, session: Session, claims: TokenClaims, *, device_id: uuid.UUID | None = None
+    ) -> TokenPair:
         if not self.runtime.store.consume_refresh(claims.jti):
             # Valid signature but already used (or never registered): assume a stolen
             # token is being replayed and kill the whole session.
@@ -408,7 +471,11 @@ class AuthService:
             self._revoke_session(claims.session_id)
             raise
         return self._issue_pair(
-            claims.user_id, claims.tenant_id, claims.session_id, not_after=claims.expires_at
+            claims.user_id,
+            claims.tenant_id,
+            claims.session_id,
+            not_after=claims.expires_at,
+            device_id=device_id,
         )
 
     def _pin_ttl(self) -> timedelta:
@@ -428,9 +495,11 @@ class AuthService:
         session_id: uuid.UUID,
         *,
         not_after: datetime | None = None,
+        device_id: uuid.UUID | None = None,
     ) -> TokenPair:
         """A new pair. A new session ends at now + refresh TTL; a rotation passes the
-        session's end as ``not_after``, so neither token outlives it."""
+        session's end as ``not_after``, so neither token outlives it. ``device_id`` (the
+        session's bound device) becomes both tokens' ``did`` claim."""
         tokens = self.runtime.tokens
         refresh = tokens.issue(
             "refresh",
@@ -438,6 +507,7 @@ class AuthService:
             tenant_id=tenant_id,
             session_id=session_id,
             not_after=not_after,
+            device_id=device_id,
         )
         access = tokens.issue(
             "access",
@@ -445,6 +515,7 @@ class AuthService:
             tenant_id=tenant_id,
             session_id=session_id,
             not_after=refresh.claims.expires_at,
+            device_id=device_id,
         )
         self.runtime.store.register_refresh(
             refresh.claims.jti, session_id, refresh.claims.remaining()

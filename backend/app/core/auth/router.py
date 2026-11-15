@@ -99,6 +99,7 @@ def _token_response(pair: TokenPair, response: Response, *, native: bool) -> Tok
         access_token=pair.access.token,
         expires_in=int((access.expires_at - access.issued_at).total_seconds()),
         refresh_expires_in=refresh_seconds,
+        session_expires_at=refresh.expires_at,
         refresh_token=pair.refresh.token if native else None,
     )
 
@@ -179,6 +180,16 @@ def _locked(exc: LockedOutError) -> HTTPException:
     )
 
 
+_PIN_RESPONSE: Final[dict[int | str, dict[str, Any]]] = {
+    status.HTTP_401_UNAUTHORIZED: {
+        "description": (
+            "Not authenticated. With `code`: `PIN_REQUIRED` (refresh: idle too long, unlock "
+            "with the PIN), `PIN_INVALID` (unlock: wrong PIN), `PIN_EXHAUSTED` (unlock: the "
+            "10th wrong PIN, sign in again on this device), `DEVICE_REVOKED` (wipe the device)"
+        )
+    }
+}
+
 _LOCKED_RESPONSE: Final[dict[int | str, dict[str, Any]]] = {
     status.HTTP_429_TOO_MANY_REQUESTS: {
         "description": "Locked after repeated failures; retry after `Retry-After` seconds"
@@ -252,13 +263,12 @@ def redeem_magic_link(
     request: Request,
     response: Response,
 ) -> TokenResponse:
-    """Spend a magic link: start a session on this device, gated by the PIN set here.
-
-    The session's refresh token then works only through `/auth/pin/unlock`.
+    """Spend a magic link: start a session. On an enrolled device (`X-KERP-Device-Id`) it is
+    bound to that device at once; the device's PIN stays as it is.
     """
     try:
         pair = service.redeem_magic_link(
-            session, token=body.token, pin=body.pin, device_id=request_device_id(request)
+            session, token=body.token, device_id=request_device_id(request)
         )
     except AuthenticationError as exc:
         raise unauthorized(invalid_token=True) from exc
@@ -270,7 +280,7 @@ def redeem_magic_link(
 @router.post(
     f"{PREFIX}/pin/unlock",
     **_TOKEN_ROUTE,
-    responses={**_LOCKED_RESPONSE, **_COOKIE_RESPONSES, **_DEVICE_REVOKED_RESPONSE},
+    responses={**_LOCKED_RESPONSE, **_COOKIE_RESPONSES, **_PIN_RESPONSE},
 )
 def pin_unlock(
     body: PinUnlockRequest,
@@ -281,9 +291,11 @@ def pin_unlock(
     response: Response,
     kerp_refresh: CookieToken = None,
 ) -> TokenResponse:
-    """Unlock a PIN-gated session: the device's refresh token + the PIN rotate the tokens.
+    """Renew a session of a device with a PIN: the device's refresh token + the PIN.
 
-    Wrong PINs lock the session progressively; the 10th wrong PIN revokes it.
+    Wrong PINs lock the device's PIN unlock progressively (offline failures reported in
+    `failed_offline` count too); the 10th wrong PIN ends PIN unlock on the device until the
+    next sign-in there. Nothing is revoked and nothing is wiped.
     """
     credential = _refresh_credential(request, runtime, body.refresh_token, kerp_refresh)
     if body.refresh_token is not None and not credential.native:
@@ -298,6 +310,7 @@ def pin_unlock(
             refresh_token=credential.token,
             pin=body.pin,
             device_id=request_device_id(request),
+            failed_offline=body.failed_offline,
         )
     except AuthenticationError as exc:
         raise unauthorized(invalid_token=True) from exc
@@ -311,7 +324,7 @@ def pin_unlock(
 @router.post(
     f"{PREFIX}/refresh",
     **_TOKEN_ROUTE,
-    responses={**_COOKIE_RESPONSES, **_DEVICE_REVOKED_RESPONSE},
+    responses={**_COOKIE_RESPONSES, **_PIN_RESPONSE},
 )
 def refresh(
     session: DbSession,
@@ -325,7 +338,9 @@ def refresh(
     """Rotate: the refresh token is spent and a new pair is issued. Reuse revokes the session.
 
     The new refresh token keeps the session's end (sign-in + 12 h); after it, sign in again.
-    The web SPA sends the cookie; an allow-listed native app sends ``refresh_token``.
+    The web SPA sends the cookie; an allow-listed native app sends ``refresh_token``. A
+    session of a device with a PIN that was idle too long gets `401 {code: PIN_REQUIRED}`
+    (the token is not spent: unlock with it and the PIN).
     """
     body_token = body.refresh_token if body is not None else None
     credential = _refresh_credential(request, runtime, body_token, kerp_refresh)

@@ -1,6 +1,7 @@
 """Progressive lockout and the field-worker auth state in the store (T-0009, diff §4).
 
-The lockout and the magic-link / PIN entries live in the same store as the revocation list:
+The lockout (the field PIN's per device, T-0038) and the magic-link entries live in the same
+store as the revocation list:
 Redis in production (``fakeredis`` here), process memory in development. Both stores run
 the same contract.
 """
@@ -9,7 +10,9 @@ import hashlib
 import threading
 import uuid
 from collections.abc import Callable
+from dataclasses import replace
 from datetime import timedelta
+from typing import Any
 
 import fakeredis
 import pytest
@@ -44,6 +47,10 @@ POLICY = LockoutPolicy(
 )
 
 
+def fake_redis_store() -> RedisRevocationStore:
+    return RedisRevocationStore(fakeredis.FakeRedis())
+
+
 @pytest.fixture(params=["redis", "memory"])
 def store(request: pytest.FixtureRequest) -> RevocationStore:
     if request.param == "redis":
@@ -70,10 +77,11 @@ def test_exhausted_only_past_the_hard_cap() -> None:
 
 
 def test_shipped_policies() -> None:
-    # PIN: 4 guesses back to back, then 30 s doubling to 15 min; 10 in total per session.
+    # PIN: 4 guesses back to back, then 30 s doubling to 15 min; 10 in total per device until
+    # a sign-in on it (T-0038; the numbers are T-0009's).
     assert PIN_POLICY.free_attempts == 3
     assert PIN_POLICY.max_attempts == 10
-    # The cap is per session: the default window covers the longest refresh lifetime (90 d).
+    # The default window covers the longest refresh lifetime (90 d) plus the margin.
     assert PIN_POLICY.window >= timedelta(days=90) + PIN_TTL_MARGIN
     assert PIN_POLICY.delay_after(4) == timedelta(seconds=30)
     assert PIN_POLICY.delay_after(9) == timedelta(minutes=15)
@@ -113,6 +121,46 @@ def test_policy_rejects_nonsense(kwargs: dict[str, object]) -> None:
 
 
 # --- lockout over a store -------------------------------------------------------------------
+
+
+def test_no_lock_is_armed_from_the_hard_cap_on() -> None:
+    """Past the cap nothing is checked (the caller refuses as exhausted), so no lock either."""
+    assert POLICY.lock_after(5) == POLICY.delay_after(5) == timedelta(minutes=2)
+    assert POLICY.lock_after(6) == timedelta(0)
+    assert POLICY.lock_after(10_000) == timedelta(0)
+    assert LOGIN_POLICY.lock_after(10_000) == LOGIN_POLICY.max_delay  # no cap: always locks
+    assert PIN_POLICY.lock_after(9) == timedelta(minutes=15)
+    assert PIN_POLICY.lock_after(10) == timedelta(0)
+
+
+def test_attempts_past_the_cap_are_numbered_without_a_lock(store: RevocationStore) -> None:
+    lockout = ProgressiveLockout(store, replace(POLICY, free_attempts=10), "pin")
+    for expected in range(1, 9):
+        assert lockout.begin("s") == expected
+    assert POLICY.exhausted(lockout.begin("s"))  # 9: refused by the caller, no 429
+
+
+@pytest.mark.parametrize("make", [InMemoryRevocationStore, fake_redis_store])
+def test_extra_failures_are_counted_before_the_attempt(make: Any) -> None:
+    lockout = ProgressiveLockout(make(), POLICY, "pin-device")
+    # 2 reported + this one = attempt 3, past the 2 free ones: it arms the 30 s lock.
+    assert lockout.begin("s", extra=2) == 3
+    with pytest.raises(LockedOutError) as locked:
+        lockout.begin("s", extra=4)  # refused while locked, and the 4 are not counted
+    assert 0 < locked.value.retry_after <= 30
+    lockout.succeeded("s")
+    assert lockout.begin("s", extra=-5) == 1  # clamped at 0
+    assert lockout.begin("t", extra=10_000) == POLICY.max_attempts + 1  # clamped at the cap
+
+
+def test_extra_failures_keep_the_running_window() -> None:
+    client = fakeredis.FakeRedis()
+    store = RedisRevocationStore(client)
+    assert store.begin_attempt("k", timedelta(hours=1), _no_delay, 3) == (4, 0)
+    assert 0 < client.ttl(f"{KEY_PREFIX}lockout:k:n") <= 3600
+    client.expire(f"{KEY_PREFIX}lockout:k:n", 100)
+    assert store.begin_attempt("k", timedelta(hours=1), _no_delay, 2) == (7, 0)
+    assert 0 < client.ttl(f"{KEY_PREFIX}lockout:k:n") <= 100
 
 
 def test_attempts_are_numbered_and_lock_after_the_free_ones(store: RevocationStore) -> None:
@@ -360,35 +408,28 @@ def test_magic_link_can_be_peeked_without_spending_it(store: RevocationStore) ->
     assert store.peek_magic_link("never") is None
 
 
-def test_pin_hash_is_stored_per_session(store: RevocationStore) -> None:
-    session, other = uuid.uuid4(), uuid.uuid4()
-    assert store.get_pin(session) is None
-    store.set_pin(session, "scrypt$hash", TTL)
-    assert store.get_pin(session) == "scrypt$hash"
-    assert store.get_pin(other) is None
-
-
-def test_magic_link_and_pin_entries_expire() -> None:
+def test_magic_link_entries_expire() -> None:
     clock = FakeClock()
     store = InMemoryRevocationStore(clock=clock)
-    session = uuid.uuid4()
     store.put_magic_link("d", b"p", timedelta(seconds=10))
-    store.set_pin(session, "h", timedelta(seconds=20))
-    clock.now += 11
+    clock.now += 9
+    assert store.peek_magic_link("d") == b"p"
+    clock.now += 2
     assert store.take_magic_link("d") is None
-    assert store.get_pin(session) == "h"
-    clock.now += 10
-    assert store.get_pin(session) is None
 
 
-def test_redis_magic_link_and_pin_entries_carry_a_ttl() -> None:
+def test_redis_magic_link_entries_carry_a_ttl() -> None:
     client = fakeredis.FakeRedis()
     store = RedisRevocationStore(client)
-    session = uuid.uuid4()
     store.put_magic_link("d", b"p", timedelta(minutes=15))
-    store.set_pin(session, "h", timedelta(days=15))
     assert 0 < client.ttl(f"{KEY_PREFIX}magic:d") <= 900
-    assert client.ttl(f"{KEY_PREFIX}pin:{session}") > 14 * 86400
+
+
+def test_the_store_keeps_no_pin_any_more() -> None:
+    """T-0038: the PIN hash is on the device row (``oe_identity_device.pin_hash``)."""
+    for store in (InMemoryRevocationStore(), RedisRevocationStore(fakeredis.FakeRedis())):
+        assert not hasattr(store, "set_pin")
+        assert not hasattr(store, "get_pin")
 
 
 TTL = timedelta(minutes=15)
@@ -400,8 +441,6 @@ TTL = timedelta(minutes=15)
         lambda s: s.put_magic_link("d", b"p", TTL),
         lambda s: s.take_magic_link("d"),
         lambda s: s.peek_magic_link("d"),
-        lambda s: s.set_pin(uuid.uuid4(), "h", TTL),
-        lambda s: s.get_pin(uuid.uuid4()),
         lambda s: s.begin_attempt("k", TTL, _no_delay),
         lambda s: s.clear_failures("k"),
     ],
