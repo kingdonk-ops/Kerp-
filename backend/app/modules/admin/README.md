@@ -65,6 +65,10 @@ everyone but a `system_admin` (deleted: 404 for all). Request bodies forbid unkn
 (ADR 0009, TD-265). New accounts go through `app.core.auth.service.create_user`, which derives
 `is_internal`; users are read only through `app.core.auth.service`.
 
+Deployment settings (offline window, offline grace, clock-skew limit, new-project defaults) are
+edited by System admins too, but live in the `settings` module (`/api/v1/settings/deployment`,
+T-0044), which the projects module depends on.
+
 **E-mail lookup** (so a PER-09 can assign an existing account without enumerating the
 tenant): exact, case-insensitive match only; inactive accounts are not found; per-caller
 rate limit (`LOOKUP_POLICY`: 20 back to back, then 1 min doubling to 15 min, per hour; 429

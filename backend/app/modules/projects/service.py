@@ -13,6 +13,10 @@ written through the membership store (``app.core.auth.memberships``).
 Modules that set a new project up (the validation module copies the tenant's default rule
 sets into it, ADR 0004 §2.3) register a **created listener**; ``create_project`` calls it in
 the same session and transaction, so a project never exists without its setup.
+
+Fields the creator leaves out (status, site timezone, currency, locale) take the deployment's
+defaults for new projects from the settings module (T-0044, diff §4.4); the service always
+passes all four explicitly, so the column defaults are only fallback literals.
 """
 
 from __future__ import annotations
@@ -32,7 +36,8 @@ from app.core.auth.access import Grant, Persona
 from app.core.tenancy.rls import session_tenancy
 from app.core.tenancy.scope import get_or_404
 from app.modules.projects.models import Project
-from app.modules.projects.schemas import ProjectCreate, ProjectUpdate
+from app.modules.projects.schemas import DEFAULTED_FIELDS, ProjectCreate, ProjectUpdate
+from app.modules.settings import service as deployment_settings
 
 __all__ = [
     "DuplicateProjectCodeError",
@@ -97,12 +102,19 @@ def create_project(
     creator_id: uuid.UUID | None = None,
 ) -> Project:
     """Create the project; ``creator_id`` (the Project Admin creating it through the API) is
-    granted PER-09 on it in the same transaction. Provisioning scripts pass none."""
+    granted PER-09 on it in the same transaction. Provisioning scripts pass none. Omitted
+    status, site timezone, currency and locale take the deployment defaults (T-0044)."""
+    tenant_id = _tenant_id(session)
+    defaults = deployment_settings.project_defaults(session)
+    values = data.model_dump(exclude={"spatial_bounds"})
+    for name in DEFAULTED_FIELDS:
+        if values[name] is None:
+            values[name] = getattr(defaults, name)
     project = Project(
         id=uuid.uuid4(),
-        tenant_id=_tenant_id(session),
+        tenant_id=tenant_id,
         project_id=None,
-        **data.model_dump(exclude={"spatial_bounds"}),
+        **values,
         spatial_bounds=data.spatial_bounds.as_geojson() if data.spatial_bounds else None,
         created_by=actor_id,
         updated_by=actor_id,

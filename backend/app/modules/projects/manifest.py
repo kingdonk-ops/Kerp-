@@ -2,5 +2,8 @@
 
 from app.core.module_loader.manifest import ModuleManifest
 
-# Every other module hangs off a project, so a project cannot switch this one off.
-MANIFEST = ModuleManifest(name="projects", version="0.1.0", toggleable=False)
+# Every other module hangs off a project, so a project cannot switch this one off. New projects
+# take their defaults from the deployment settings (settings module, T-0044).
+MANIFEST = ModuleManifest(
+    name="projects", version="0.1.0", depends_on=("settings",), toggleable=False
+)

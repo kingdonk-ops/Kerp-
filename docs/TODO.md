@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 175 · **Closed:** 115
+**Open:** 178 · **Closed:** 115
 
 ## decision (2)
 
@@ -12,7 +12,7 @@
 | [TD-096](../tracker/todo/TD-096.md) | Approved coating ITR dropped the residual-dust rating row the ITP requires; Grating and Gridmesh ITR has no approved version: confirm with the client before shipping default templates | T-0113 | planner |
 | [TD-293](../tracker/todo/TD-293.md) | Do pilot crews share tablets? Confirm with the pilot team before go-live; if yes, add a shared-device task (device row per (device_id, user), whole-device wipe warning) | T-0143 | planner |
 
-## spec-gap (37)
+## spec-gap (38)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -53,8 +53,9 @@
 | [TD-249](../tracker/todo/TD-249.md) | GET /auth/me (and the JWT tid claim) still expose the tenant id to the SPA: confirm diff 4.1 'never see the tenant' allows it or drop tenant_id from MeResponse | T-0037 | implementer |
 | [TD-268](../tracker/todo/TD-268.md) | Confirm T-0034 rule-store interpretations: tenant persona = held on any project (no tenant roles yet), reset allowed on locked rules, projects cannot lock own rules, tenant edits a locked rule only after unlock | T-0034 | implementer |
 | [TD-270](../tracker/todo/TD-270.md) | Membership-based policy needs app.member_project_ids: spec says visible when the project is in app.allowed_project_ids or app.is_system_admin, but the allowed list holds only portfolio projects | T-0014 | implementer |
+| [TD-295](../tracker/todo/TD-295.md) | T-0044 says module admin but the route /api/v1/settings/deployment and the projects->settings dependency need a separate settings module | T-0044 | implementer |
 
-## missed (4)
+## missed (5)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -62,6 +63,7 @@
 | [TD-125](../tracker/todo/TD-125.md) | Booking modules must call work_anchor_for and return 422 when the path has no work anchor (progress, time lines against a work anchor, completion gate) | T-0101, T-0116, T-0124, E-04-03, E-04-05 | reviewer |
 | [TD-131](../tracker/todo/TD-131.md) | Add a root .env.example for the dev stack (the implementer agent's permission rules block writing .env* files) | T-0003 | implementer |
 | [TD-208](../tracker/todo/TD-208.md) | Uploads infra: provision the kerp-vault bucket (CORS for browser PUT/GET, lifecycle on staging/), wire KERP_S3_* in compose, add MinIO to CI for the gated round-trip test | T-0016 | implementer |
+| [TD-297](../tracker/todo/TD-297.md) | Admin UI screen for deployment settings (Admin > System) is not planned in any task | T-0044 | implementer |
 
 ## deferred (35)
 
@@ -103,7 +105,7 @@
 | [TD-278](../tracker/todo/TD-278.md) | Rule 'Try it' on a recent real context (ADR 0004 §6): pick a recent record/event of the set's kind and evaluate against it; T-0036 only evaluates supplied sample contexts | T-0036 | implementer |
 | [TD-288](../tracker/todo/TD-288.md) | pending_updates on a set with no parent default answers 409 instead of an empty offer | T-0036 | reviewer |
 
-## later (74)
+## later (75)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -181,6 +183,7 @@
 | [TD-289](../tracker/todo/TD-289.md) | drift_report runs one list_rules query per set per project (N+1) | T-0036 | reviewer |
 | [TD-290](../tracker/todo/TD-290.md) | Map RevocationUnavailableError to 503 in the device endpoints and resolve_request_device | T-0043 | reviewer |
 | [TD-294](../tracker/todo/TD-294.md) | Project delete revokes its memberships (T-0039, TD-184): a future project restore must re-grant them, and memberships on projects soft-deleted before T-0039 (dev databases only) stay live until revoked | T-0039 | implementer |
+| [TD-296](../tracker/todo/TD-296.md) | System-admin-only write RLS policy for oe_settings_deployment (defence in depth) | T-0044 | implementer |
 
 ## bug (3)
 

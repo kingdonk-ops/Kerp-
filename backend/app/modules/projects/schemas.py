@@ -8,15 +8,11 @@
 
 from __future__ import annotations
 
-import re
 import uuid
 from datetime import datetime
-from functools import cache
-from importlib.resources import files
 from typing import Annotated, Any, Final, Literal, Self
 
 from pydantic import (
-    AfterValidator,
     BaseModel,
     ConfigDict,
     Field,
@@ -25,21 +21,8 @@ from pydantic import (
     model_validator,
 )
 
-from app.modules.projects.models import DEFAULT_CURRENCY, DEFAULT_LOCALE, DEFAULT_TIMEZONE
+from app.core.locale import Currency, Locale, TimeZone
 
-# Active ISO 4217 codes (precious metals, SDR and test codes excluded).
-_ISO_4217_CODES: Final = """
-    AED AFN ALL AMD ANG AOA ARS AUD AWG AZN BAM BBD BDT BGN BHD BIF BMD BND BOB BOV BRL BSD BTN
-    BWP BYN BZD CAD CDF CHE CHF CHW CLF CLP CNY COP COU CRC CUC CUP CVE CZK DJF DKK DOP DZD EGP
-    ERN ETB EUR FJD FKP GBP GEL GHS GIP GMD GNF GTQ GYD HKD HNL HTG HUF IDR ILS INR IQD IRR ISK
-    JMD JOD JPY KES KGS KHR KMF KPW KRW KWD KYD KZT LAK LBP LKR LRD LSL LYD MAD MDL MGA MKD MMK
-    MNT MOP MRU MUR MVR MWK MXN MXV MYR MZN NAD NGN NIO NOK NPR NZD OMR PAB PEN PGK PHP PKR PLN
-    PYG QAR RON RSD RUB RWF SAR SBD SCR SDG SEK SGD SHP SLE SLL SOS SRD SSP STN SVC SYP SZL THB
-    TJS TMT TND TOP TRY TTD TWD TZS UAH UGX USD USN UYI UYU UYW UZS VED VES VND VUV WST XAF XCD
-    XCG XOF XPF YER ZAR ZMW ZWG ZWL
-"""
-ISO_4217: Final = frozenset(_ISO_4217_CODES.split())
-_LOCALE: Final = re.compile(r"^[a-z]{2,3}(-[A-Z][a-z]{3})?(-([A-Z]{2}|[0-9]{3}))?$")
 MAX_RINGS: Final = 100
 MAX_RING_POSITIONS: Final = 10_000
 # All rings together (T-0060): a site boundary fits easily, and a body can no longer ask for
@@ -47,42 +30,6 @@ MAX_RING_POSITIONS: Final = 10_000
 MAX_TOTAL_POSITIONS: Final = 10_000
 
 
-# In the tzdata zone list but not a real location; browsers' Intl rejects it.
-_NOT_SITE_ZONES: Final = frozenset({"Factory"})
-
-
-@cache
-def _zones() -> frozenset[str]:
-    """IANA zone names from the ``tzdata`` package, not from the host's ``TZPATH``.
-
-    ``zoneinfo.available_timezones()`` lists every file under the host's zoneinfo directory,
-    including ``localtime`` and ``posixrules``, whose meaning depends on the host.
-    """
-    names = (files("tzdata") / "zones").read_text(encoding="utf-8").split()
-    return frozenset(names) - _NOT_SITE_ZONES
-
-
-def _iana(value: str) -> str:
-    if value not in _zones():
-        raise ValueError(f"{value!r} is not an IANA timezone (e.g. 'Australia/Perth')")
-    return value
-
-
-def _currency(value: str) -> str:
-    if value not in ISO_4217:
-        raise ValueError(f"{value!r} is not an active ISO 4217 currency code (e.g. 'AUD')")
-    return value
-
-
-def _locale(value: str) -> str:
-    if not _LOCALE.match(value):
-        raise ValueError(f"{value!r} is not a BCP 47 locale tag (e.g. 'en-AU')")
-    return value
-
-
-TimeZone = Annotated[str, AfterValidator(_iana)]
-Currency = Annotated[str, AfterValidator(_currency)]
-Locale = Annotated[str, AfterValidator(_locale)]
 Code = Annotated[
     str, StringConstraints(strip_whitespace=True, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,31}$")
 ]
@@ -134,18 +81,34 @@ class PolygonGeoJSON(BaseModel):
         return {"type": self.type, "coordinates": [[list(p) for p in r] for r in self.coordinates]}
 
 
+# Fields of ``ProjectCreate`` that, when omitted, take the deployment's default (T-0044).
+DEFAULTED_FIELDS: Final = ("status", "site_timezone", "currency_code", "locale")
+
+
 class ProjectCreate(BaseModel):
-    """``POST /projects``. The tenant comes from the token, never from the body."""
+    """``POST /projects``. The tenant comes from the token, never from the body.
+
+    ``status``, ``site_timezone``, ``currency_code`` and ``locale`` may be omitted: the service
+    then takes the deployment's defaults for new projects (settings module, T-0044). They
+    cannot be ``null``.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
     code: Code
     name: Name
-    status: Status = "ACTIVE"
-    site_timezone: TimeZone = DEFAULT_TIMEZONE
+    status: Status | None = None
+    site_timezone: TimeZone | None = None
     spatial_bounds: PolygonGeoJSON | None = None
-    currency_code: Currency = DEFAULT_CURRENCY
-    locale: Locale = DEFAULT_LOCALE
+    currency_code: Currency | None = None
+    locale: Locale | None = None
+
+    @model_validator(mode="after")
+    def _not_null(self) -> Self:
+        for name in DEFAULTED_FIELDS:
+            if name in self.model_fields_set and getattr(self, name) is None:
+                raise ValueError(f"{name} cannot be null (omit it to use the deployment default)")
+        return self
 
 
 class ProjectUpdate(BaseModel):
