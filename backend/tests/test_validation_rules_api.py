@@ -442,6 +442,8 @@ def test_try_it_on_the_project_and_tenant_layers(api: Api) -> None:
     assert api.client.post(f"{photo}/try", json=bad, headers=api.as_("qa")).status_code == 422
     reserved = {"context": {"params": {}}}
     assert api.client.post(f"{photo}/try", json=reserved, headers=api.as_("qa")).status_code == 422
+    huge = {"context": {"fields": {"note": "x" * (64 * 1024)}}}
+    assert api.client.post(f"{photo}/try", json=huge, headers=api.as_("qa")).status_code == 422
     ghost = api.project_rule(CHECK, "ghost") + "/try"
     assert api.client.post(ghost, json=body, headers=api.as_("qa")).status_code == 404
     rules = api.client.get(f"{API}/projects/{api.project}/rule-sets", headers=api.as_("qa"))

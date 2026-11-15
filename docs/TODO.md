@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 165 · **Closed:** 112
+**Open:** 168 · **Closed:** 112
 
 ## decision (1)
 
@@ -63,7 +63,7 @@
 | [TD-131](../tracker/todo/TD-131.md) | Add a root .env.example for the dev stack (the implementer agent's permission rules block writing .env* files) | T-0003 | implementer |
 | [TD-208](../tracker/todo/TD-208.md) | Uploads infra: provision the kerp-vault bucket (CORS for browser PUT/GET, lifecycle on staging/), wire KERP_S3_* in compose, add MinIO to CI for the gated round-trip test | T-0016 | implementer |
 
-## deferred (34)
+## deferred (35)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -101,8 +101,9 @@
 | [TD-269](../tracker/todo/TD-269.md) | Store a project's chosen client pack so rule sets of a module enabled later are copied from that pack (T-0034 copies only base sets on module enable) | T-0108 | implementer |
 | [TD-273](../tracker/todo/TD-273.md) | Membership assignment does not validate site_node_id (PER-07 Asset-Site scope) against the asset hierarchy; no asset module exists yet | T-0014 | implementer |
 | [TD-278](../tracker/todo/TD-278.md) | Rule 'Try it' on a recent real context (ADR 0004 §6): pick a recent record/event of the set's kind and evaluate against it; T-0036 only evaluates supplied sample contexts | T-0036 | implementer |
+| [TD-288](../tracker/todo/TD-288.md) | pending_updates on a set with no parent default answers 409 instead of an empty offer | T-0036 | reviewer |
 
-## later (69)
+## later (70)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -175,13 +176,15 @@
 | [TD-277](../tracker/todo/TD-277.md) | setup_github.sh: set fork PR workflow approval to 'all external contributors' (TD-223 mitigation) instead of relying on a manual Settings step | T-0067 | planner |
 | [TD-279](../tracker/todo/TD-279.md) | Offer whole rule sets a running project lacks (a set first shipped, or first added to the tenant layer, after the project was created): today such a gate falls back to the tenant set via resolve_rule_set and no per-project copy is offered | T-0036 | implementer |
 | [TD-280](../tracker/todo/TD-280.md) | Frontend Rules screen: 'Updates available' badge and per-rule diff with accept, tenant drift report view, and 'Try it' panel on the T-0036 API | T-0036 | implementer |
+| [TD-289](../tracker/todo/TD-289.md) | drift_report runs one list_rules query per set per project (N+1) | T-0036 | reviewer |
 
-## bug (2)
+## bug (3)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
 | [TD-159](../tracker/todo/TD-159.md) | Site filter from the bound project is applied to all site-scoped rows: a PER-07 on A who is PER-01 on B loses B's site-scoped rows (over-restrictive) | T-0010 | reviewer |
 | [TD-252](../tracker/todo/TD-252.md) | tracker.py new-todo cannot see open PRs in cloud sessions: gh pr list uses GraphQL (blocked), so TODO ids collide | T-0029 | coordinator |
+| [TD-287](../tracker/todo/TD-287.md) | Upgrade offer: a soft-deleted own rule holding a new default's key shows key_in_use forever | T-0036 | reviewer |
 
 ## risk (17)
 

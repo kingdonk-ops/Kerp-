@@ -173,15 +173,17 @@ copies only lose their lock after a tenant unlock).
 
 `pending_updates(session, set_id)` diffs a set against the **current** default of its parent
 layer (project → tenant, tenant → system), rule by rule; it writes nothing. Each project rule
-is matched to its default through `origin_rule_key`, and `origin_version` (the default's
-version when it was copied) tells whether the default has moved on since.
+(live or soft-deleted) is matched to the default with the same `rule_key`;
+`origin_rule_key` only tells a copied rule (set) from one the set added itself (NULL), and
+`origin_version` (the default's version when it was copied) tells whether the default has
+moved on since the copy.
 
 | `change` | When | Accept |
 |---|---|---|
 | `new` | the default has a rule the set lacks | adds a copy |
 | `changed` | the default's version is newer than `origin_version` **and** its values differ from the set's rule (`fields` names them: the project's own edits show up here too) | replaces the rule with a copy of the default |
 | `removed` | the set has a copied rule whose default was deleted | soft-deletes it |
-| `removed_by_project` / `removed_by_tenant` | the set deleted the rule and the default has changed since | refused (409): a deleted rule is never re-added; **reset** brings it back on purpose |
+| `removed_by_project` / `removed_by_tenant` | the set deleted its copy and the default's version is newer than the copy's `origin_version` (changed since the **copy**, not since the delete — a default changed before the delete is listed too); once listed it stays on offer until the set is reset | refused (409): a deleted rule is never re-added; **reset** brings it back on purpose |
 | `key_in_use` | the set added its own rule under the key of a new default | refused (409) |
 
 `accept_update(session, set_id, rule_key)` applies that one rule only: versioned (rule and
@@ -214,6 +216,9 @@ and returns a `TryResult`; it writes **nothing** (no finding, version or ledger 
   params). `outcome` is `pass` (`true`), `fail` (any other value) or `error`, with the `value`
   or the CEL `error`. A `check` rule that does not pass also returns the `finding`
   `run_checks` would log (same message rules).
+  The sample is at most `MAX_SAMPLE_DEPTH` (32) levels of nested objects/lists deep (the
+  context itself is level 1) and `MAX_SAMPLE_CONTEXT_BYTES` (64 KiB) as compact JSON, as
+  job payloads; beyond either it is refused (422).
 - Regex kinds: the context is `{"text": "..."}` (at most 20 000 characters). `autolink`
   returns every match (up to 100) with its named groups; `p6_grammar` a full match.
 - A malformed sample is `SampleContextError` (422).

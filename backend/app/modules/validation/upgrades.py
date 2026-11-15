@@ -16,6 +16,7 @@ call these functions, never the tables.
 from __future__ import annotations
 
 import dataclasses
+import json
 import uuid
 from collections.abc import Mapping
 from typing import Any, Final
@@ -54,6 +55,8 @@ from app.modules.validation.service import (
 )
 
 __all__ = [
+    "MAX_SAMPLE_CONTEXT_BYTES",
+    "MAX_SAMPLE_DEPTH",
     "MAX_SAMPLE_TEXT",
     "SampleContextError",
     "accept_update",
@@ -64,6 +67,8 @@ __all__ = [
 
 ACCEPTABLE: Final = frozenset({"new", "changed", "removed"})
 MAX_SAMPLE_TEXT: Final = 20_000  # characters of sample text a regex rule is tried on
+MAX_SAMPLE_CONTEXT_BYTES: Final = 64 * 1024  # compact JSON of a CEL sample (as job payloads)
+MAX_SAMPLE_DEPTH: Final = 32  # nested objects/lists in a CEL sample, the context itself = 1
 MAX_MATCHES: Final = 100  # matches returned by "Try it" on an autolink rule
 
 
@@ -149,9 +154,10 @@ def pending_updates(session: Session, rule_set_id: uuid.UUID) -> RuleSetUpdatesR
     ``new``: a default the set lacks. ``changed``: the default has a newer version than the
     one the rule was copied from and its values differ (``fields`` names them).
     ``removed``: the default no longer has a rule the set copied. ``removed_by_<layer>``: the
-    set deleted the rule and the default has changed since — shown, never re-added
-    (ADR 0004 §3). ``key_in_use``: the set added its own rule under a default's key. Only the
-    first three can be accepted. Reads only; nothing is applied.
+    set deleted its copy and the default has changed since the copy (not necessarily since
+    the delete) — shown until the set is reset, never re-added (ADR 0004 §3).
+    ``key_in_use``: the set added its own rule under a default's key. Only the first three can
+    be accepted. Reads only; nothing is applied.
     """
     _context(session)
     rule_set = get_or_404(session, RuleSet, rule_set_id)
@@ -345,6 +351,7 @@ def _try_cel(
 ) -> TryResult:
     if "params" in context:
         raise SampleContextError("'params' is reserved for the rule's own params")
+    _bounded_sample(context)
     try:
         result = evaluate(rule.expression, {**context, "params": dict(rule.params)})
     except (TypeError, ValueError) as exc:
@@ -370,6 +377,28 @@ def _try_cel(
     return TryResult.model_validate(
         {**base, "outcome": outcome, "value": value, "error": error, "finding": finding}
     )
+
+
+def _bounded_sample(context: Mapping[str, Any]) -> None:
+    """Refuse a CEL sample nested deeper than ``MAX_SAMPLE_DEPTH`` or larger than
+    ``MAX_SAMPLE_CONTEXT_BYTES`` as compact JSON. Depth is checked first and iteratively, so
+    the size check's ``json.dumps`` never meets deep nesting."""
+    stack: list[tuple[Any, int]] = [(context, 1)]
+    while stack:
+        node, depth = stack.pop()
+        if depth > MAX_SAMPLE_DEPTH:
+            raise SampleContextError(f"sample context nested deeper than {MAX_SAMPLE_DEPTH} levels")
+        children = node.values() if isinstance(node, Mapping) else node
+        stack.extend((c, depth + 1) for c in children if isinstance(c, Mapping | list))
+    try:
+        size = len(json.dumps(context, separators=(",", ":"), ensure_ascii=False).encode())
+    except (TypeError, ValueError) as exc:
+        raise SampleContextError(f"the sample context is not valid KERP CEL JSON: {exc}") from exc
+    if size > MAX_SAMPLE_CONTEXT_BYTES:
+        limit = MAX_SAMPLE_CONTEXT_BYTES // 1024
+        raise SampleContextError(
+            f"sample context is {size} bytes as compact JSON; the limit is {limit} KiB"
+        )
 
 
 def _try_regex(

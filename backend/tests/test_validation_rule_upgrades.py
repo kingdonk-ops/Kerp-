@@ -39,6 +39,8 @@ from app.modules.validation.service import (
     sync_system_layer,
 )
 from app.modules.validation.upgrades import (
+    MAX_SAMPLE_CONTEXT_BYTES,
+    MAX_SAMPLE_DEPTH,
     SampleContextError,
     accept_update,
     drift_report,
@@ -547,6 +549,31 @@ def test_try_a_draft_compiles_it_first(
             try_rule(s, set_id, "ghost", {})
     assert "draft" not in rules_of(db, ctx, set_id)
     assert _counts(db, ctx, set_id) == before
+
+
+def test_try_bounds_the_cel_sample_context(
+    db: Database, project: tuple[uuid.UUID, uuid.UUID, uuid.UUID]
+) -> None:
+    project_id, set_id, _ = project
+    ctx = in_project(project_id)
+    nested: dict[str, Any] = {"photos": 1.0}
+    for _ in range(MAX_SAMPLE_DEPTH - 3):  # context > fields > deep: exactly at the limit
+        nested = {"n": nested}
+    at_limit = {"fields": {"photos": 1.0, "deep": nested}}
+    too_deep = {"fields": {"photos": 1.0, "deep": {"n": nested}}}
+    in_a_list = {"fields": {"photos": 1.0, "deep": [nested]}}
+    filler = "x" * (MAX_SAMPLE_CONTEXT_BYTES - 64)
+    fits = {"fields": {"photos": 1.0, "note": filler}}
+    too_big = {"fields": {"photos": 1.0, "note": filler + "x" * 64}}
+    with db.unit_of_work(ctx) as s:
+        assert try_rule(s, set_id, "photo", at_limit).outcome == "pass"
+        assert try_rule(s, set_id, "photo", fits).outcome == "pass"
+        with pytest.raises(SampleContextError, match="nested deeper"):
+            try_rule(s, set_id, "photo", too_deep)
+        with pytest.raises(SampleContextError, match="nested deeper"):
+            try_rule(s, set_id, "photo", in_a_list)
+        with pytest.raises(SampleContextError, match="bytes as compact JSON"):
+            try_rule(s, set_id, "photo", too_big)
 
 
 def test_try_a_non_check_cel_rule_returns_its_value_without_a_finding(db: Database) -> None:
