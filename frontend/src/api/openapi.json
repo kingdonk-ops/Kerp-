@@ -2317,6 +2317,210 @@
         }
       }
     },
+    "/api/v1/validation/rule-sets/{rule_set_id}/updates": {
+      "get": {
+        "tags": [
+          "validation"
+        ],
+        "summary": "Tenant Rule Set Updates",
+        "operationId": "tenant_rule_set_updates_api_v1_validation_rule_sets__rule_set_id__updates_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "rule_set_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Rule Set Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleSetUpdatesRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/validation/rule-sets/{rule_set_id}/updates/{rule_key}/accept": {
+      "post": {
+        "tags": [
+          "validation"
+        ],
+        "summary": "Accept Tenant Update",
+        "operationId": "accept_tenant_update_api_v1_validation_rule_sets__rule_set_id__updates__rule_key__accept_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "rule_set_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Rule Set Id"
+            }
+          },
+          {
+            "name": "rule_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9_.-]{0,119}$",
+              "title": "Rule Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleSetRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/validation/rule-sets/{rule_set_id}/rules/{rule_key}/try": {
+      "post": {
+        "tags": [
+          "validation"
+        ],
+        "summary": "Try Tenant Rule",
+        "operationId": "try_tenant_rule_api_v1_validation_rule_sets__rule_set_id__rules__rule_key__try_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "rule_set_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Rule Set Id"
+            }
+          },
+          {
+            "name": "rule_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9_.-]{0,119}$",
+              "title": "Rule Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TryRuleInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TryResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/validation/drift-report": {
+      "get": {
+        "tags": [
+          "validation"
+        ],
+        "summary": "Drift Report",
+        "operationId": "drift_report_api_v1_validation_drift_report_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DriftEntryRead"
+                  },
+                  "type": "array",
+                  "title": "Response Drift Report Api V1 Validation Drift Report Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/validation/rule-sets/{rule_set_id}/rules/{rule_key}/unlock-requests": {
       "post": {
         "tags": [
@@ -3002,6 +3206,210 @@
           }
         }
       }
+    },
+    "/api/v1/validation/projects/{project_id}/rule-sets/{rule_set_id}/updates": {
+      "get": {
+        "tags": [
+          "validation"
+        ],
+        "summary": "Project Rule Set Updates",
+        "operationId": "project_rule_set_updates_api_v1_validation_projects__project_id__rule_sets__rule_set_id__updates_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "rule_set_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Rule Set Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleSetUpdatesRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/validation/projects/{project_id}/rule-sets/{rule_set_id}/updates/{rule_key}/accept": {
+      "post": {
+        "tags": [
+          "validation"
+        ],
+        "summary": "Accept Project Update",
+        "operationId": "accept_project_update_api_v1_validation_projects__project_id__rule_sets__rule_set_id__updates__rule_key__accept_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "rule_set_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Rule Set Id"
+            }
+          },
+          {
+            "name": "rule_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9_.-]{0,119}$",
+              "title": "Rule Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleSetRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/validation/projects/{project_id}/rule-sets/{rule_set_id}/rules/{rule_key}/try": {
+      "post": {
+        "tags": [
+          "validation"
+        ],
+        "summary": "Try Project Rule",
+        "operationId": "try_project_rule_api_v1_validation_projects__project_id__rule_sets__rule_set_id__rules__rule_key__try_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "rule_set_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Rule Set Id"
+            }
+          },
+          {
+            "name": "rule_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9_.-]{0,119}$",
+              "title": "Rule Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TryRuleInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TryResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3034,6 +3442,49 @@
         ],
         "title": "Aggregate"
       },
+      "CheckFinding": {
+        "properties": {
+          "rule_key": {
+            "type": "string",
+            "title": "Rule Key"
+          },
+          "rule_version": {
+            "type": "integer",
+            "title": "Rule Version"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "fail",
+              "error"
+            ],
+            "title": "Outcome"
+          },
+          "action": {
+            "type": "string",
+            "title": "Action"
+          },
+          "severity": {
+            "type": "string",
+            "title": "Severity"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rule_key",
+          "rule_version",
+          "outcome",
+          "action",
+          "severity",
+          "message"
+        ],
+        "title": "CheckFinding",
+        "description": "A rule of the set that did not pass. ``message`` is the user-readable reason."
+      },
       "DeliveryRead": {
         "properties": {
           "channel": {
@@ -3063,6 +3514,86 @@
           "detail"
         ],
         "title": "DeliveryRead"
+      },
+      "DriftEntryRead": {
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Project Id"
+          },
+          "rule_set_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Rule Set Id"
+          },
+          "rule_set_key": {
+            "type": "string",
+            "title": "Rule Set Key"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "rule_key": {
+            "type": "string",
+            "title": "Rule Key"
+          },
+          "drift": {
+            "type": "string",
+            "enum": [
+              "added",
+              "modified",
+              "deleted",
+              "missing",
+              "default_removed"
+            ],
+            "title": "Drift"
+          },
+          "fields": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Fields"
+          },
+          "project_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Version"
+          },
+          "default_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "project_id",
+          "rule_set_id",
+          "rule_set_key",
+          "kind",
+          "rule_key",
+          "drift",
+          "fields",
+          "project_version",
+          "default_version"
+        ],
+        "title": "DriftEntryRead",
+        "description": "A project rule that differs from the tenant default (or a default the project lacks)."
       },
       "FileRead": {
         "properties": {
@@ -4544,6 +5075,44 @@
         "title": "ProjectUpdate",
         "description": "``PATCH /projects/{id}``: only the given fields change; ``spatial_bounds: null`` clears."
       },
+      "RegexMatch": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "start": {
+            "type": "integer",
+            "title": "Start"
+          },
+          "end": {
+            "type": "integer",
+            "title": "End"
+          },
+          "groups": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Groups"
+          }
+        },
+        "type": "object",
+        "required": [
+          "text",
+          "start",
+          "end",
+          "groups"
+        ],
+        "title": "RegexMatch"
+      },
       "ResolvedColumn": {
         "properties": {
           "id": {
@@ -4888,6 +5457,144 @@
           "rules"
         ],
         "title": "RuleSetRead"
+      },
+      "RuleSetUpdatesRead": {
+        "properties": {
+          "rule_set_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Rule Set Id"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "layer": {
+            "type": "string",
+            "title": "Layer"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "default_rule_set_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Default Rule Set Id"
+          },
+          "default_layer": {
+            "type": "string",
+            "title": "Default Layer"
+          },
+          "default_version": {
+            "type": "integer",
+            "title": "Default Version"
+          },
+          "default_seed_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Seed Version"
+          },
+          "available": {
+            "type": "integer",
+            "title": "Available"
+          },
+          "updates": {
+            "items": {
+              "$ref": "#/components/schemas/RuleUpdateRead"
+            },
+            "type": "array",
+            "title": "Updates"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rule_set_id",
+          "key",
+          "kind",
+          "layer",
+          "version",
+          "default_rule_set_id",
+          "default_layer",
+          "default_version",
+          "default_seed_version",
+          "available",
+          "updates"
+        ],
+        "title": "RuleSetUpdatesRead",
+        "description": "``GET .../rule-sets/{set}/updates``: the per-rule diff against the parent default."
+      },
+      "RuleUpdateRead": {
+        "properties": {
+          "rule_key": {
+            "type": "string",
+            "title": "Rule Key"
+          },
+          "change": {
+            "type": "string",
+            "enum": [
+              "new",
+              "changed",
+              "removed",
+              "removed_by_project",
+              "removed_by_tenant",
+              "key_in_use"
+            ],
+            "title": "Change"
+          },
+          "acceptable": {
+            "type": "boolean",
+            "title": "Acceptable"
+          },
+          "fields": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Fields"
+          },
+          "current": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RuleRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "default": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RuleRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "rule_key",
+          "change",
+          "acceptable",
+          "fields",
+          "current",
+          "default"
+        ],
+        "title": "RuleUpdateRead",
+        "description": "One rule of an upgrade offer: the set's rule (``current``) next to the new default."
       },
       "SavedViewCreate": {
         "properties": {
@@ -5367,6 +6074,123 @@
         ],
         "title": "TokenResponse",
         "description": "The access token. The refresh token is never in a body: it is the ``httpOnly``\nrefresh cookie (diff §4.2, TD-203)."
+      },
+      "TryError": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "TryError"
+      },
+      "TryResult": {
+        "properties": {
+          "rule_key": {
+            "type": "string",
+            "title": "Rule Key"
+          },
+          "rule_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rule Version"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "engine": {
+            "type": "string",
+            "title": "Engine"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "pass",
+              "fail",
+              "error"
+            ],
+            "title": "Outcome"
+          },
+          "value": {
+            "title": "Value"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TryError"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "finding": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CheckFinding"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "matches": {
+            "items": {
+              "$ref": "#/components/schemas/RegexMatch"
+            },
+            "type": "array",
+            "title": "Matches"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rule_key",
+          "rule_version",
+          "kind",
+          "engine",
+          "outcome"
+        ],
+        "title": "TryResult",
+        "description": "What a rule does with a sample context (ADR 0004 §6). Never persisted.\n\nCEL rules: ``pass`` when the expression returns ``true``, ``fail`` on any other value,\n``error`` when it cannot be evaluated; ``value`` is the result (KERP CEL JSON). A ``check``\nrule that does not pass also returns the ``finding`` ``run_checks`` would log. Regex rules\n(sample ``{\"text\": ...}``): ``pass`` when the pattern matches (``autolink``: every match;\n``p6_grammar``: a full match), with the matches and their named groups."
+      },
+      "TryRuleInput": {
+        "properties": {
+          "context": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Context"
+          },
+          "rule": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RuleInput"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "TryRuleInput",
+        "description": "Body of ``POST .../rules/{rule_key}/try``: a sample context and, optionally, a draft\nrule to try instead of the stored one (nothing is saved either way)."
       },
       "UnlockRequestCreate": {
         "properties": {

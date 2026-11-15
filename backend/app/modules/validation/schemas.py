@@ -158,3 +158,98 @@ class UnlockRequestRead(BaseModel):
     decided_by: uuid.UUID | None
     decided_at: datetime | None
     created_at: datetime
+
+
+# --- upgrade offers, drift report, "Try it" (T-0036, ADR 0004 §4, §6, Consequences) ---------
+
+# ``removed_by_<layer>``: the layer deleted the rule and the default has changed since; shown,
+# never re-added (ADR 0004 §3). ``key_in_use``: the layer added its own rule under the key of
+# a new default. Neither can be accepted.
+UpdateChange = Literal[
+    "new", "changed", "removed", "removed_by_project", "removed_by_tenant", "key_in_use"
+]
+DriftKind = Literal["added", "modified", "deleted", "missing", "default_removed"]
+
+
+class RuleUpdateRead(BaseModel):
+    """One rule of an upgrade offer: the set's rule (``current``) next to the new default."""
+
+    rule_key: str
+    change: UpdateChange
+    acceptable: bool
+    fields: list[str]  # the fields that differ (``changed`` only)
+    current: RuleRead | None
+    default: RuleRead | None
+
+
+class RuleSetUpdatesRead(BaseModel):
+    """``GET .../rule-sets/{set}/updates``: the per-rule diff against the parent default."""
+
+    rule_set_id: uuid.UUID
+    key: str
+    kind: str
+    layer: str
+    version: int
+    default_rule_set_id: uuid.UUID
+    default_layer: str
+    default_version: int
+    default_seed_version: int | None
+    available: int  # how many updates can be accepted
+    updates: list[RuleUpdateRead]
+
+
+class DriftEntryRead(BaseModel):
+    """A project rule that differs from the tenant default (or a default the project lacks)."""
+
+    project_id: uuid.UUID
+    rule_set_id: uuid.UUID
+    rule_set_key: str
+    kind: str
+    rule_key: str
+    drift: DriftKind
+    fields: list[str]  # the fields that differ (``modified`` only)
+    project_version: int | None
+    default_version: int | None
+
+
+class TryRuleInput(BaseModel):
+    """Body of ``POST .../rules/{rule_key}/try``: a sample context and, optionally, a draft
+    rule to try instead of the stored one (nothing is saved either way)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    context: dict[str, Any] = Field(default_factory=dict)
+    rule: RuleInput | None = None
+
+
+class TryError(BaseModel):
+    code: str
+    message: str
+
+
+class RegexMatch(BaseModel):
+    text: str
+    start: int
+    end: int
+    groups: dict[str, str | None]
+
+
+class TryResult(BaseModel):
+    """What a rule does with a sample context (ADR 0004 §6). Never persisted.
+
+    CEL rules: ``pass`` when the expression returns ``true``, ``fail`` on any other value,
+    ``error`` when it cannot be evaluated; ``value`` is the result (KERP CEL JSON). A ``check``
+    rule that does not pass also returns the ``finding`` ``run_checks`` would log. Regex rules
+    (sample ``{"text": ...}``): ``pass`` when the pattern matches (``autolink``: every match;
+    ``p6_grammar``: a full match), with the matches and their named groups.
+    """
+
+    rule_key: str
+    rule_version: int | None  # None for a draft
+    kind: str
+    engine: str
+    outcome: Literal["pass", "fail", "error"]
+    value: Any = None
+    error: TryError | None = None
+    finding: CheckFinding | None = None
+    matches: list[RegexMatch] = Field(default_factory=list)
