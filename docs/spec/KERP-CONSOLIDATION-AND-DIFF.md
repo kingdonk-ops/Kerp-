@@ -366,6 +366,13 @@ Wins over any earlier text on tenant selection, tenant administrators and projec
   deployment's own web origin. It never decides by the client-reported device platform, so
   script running on the web origin cannot obtain a refresh token in a body (planner mechanism
   for TD-203; device-bound attestation may be added later).
+  **Confirmed (product owner, 2026-11-15; TD-285):** (a) `KERP_NATIVE_APP_ORIGINS` requires
+  `KERP_WEB_ORIGIN`: settings refuse a native allow-list without it, because the startup check
+  cannot otherwise know the origin the SPA is served from; the API's own origin never gets the
+  body transport. (b) The same `Origin` rule selects the body transport (token out and in) on
+  **every** token endpoint the Android app uses: login, refresh, magic-link redeem and PIN
+  unlock (field workers sign in by magic link and rotate by PIN unlock). On the web origin
+  `/auth/pin/unlock` refuses a refresh token in the body (422) and `/auth/refresh` ignores one.
 - **Field PIN, hybrid (TD-135, decision 8a).** The PIN belongs to the enrolled device (§4.3),
   not to a server session:
   - **Local unlock.** The app unlocks on the device with the 6-digit PIN against a key held in
@@ -457,6 +464,21 @@ Wins over any earlier text on tenant selection, tenant administrators and projec
   on its next contact the server answers `401` with `code: DEVICE_REVOKED` and the client wipes
   its local store (records, outbox, media, keys) and confirms the wipe. Unsynced work on a
   revoked device is lost; the admin UI shows the last-sync time before confirming.
+- **One account per device id, Pilot-0 (product owner, 2026-11-15; TD-283).** A `device_id`
+  belongs to the account that enrolled it; another account enrolling the same id gets `409`, and
+  a session is bound to at most one device. The client keys its local store (records, outbox,
+  media, keys) **per account**, so a revoke wipes only that account's data on the device; a
+  tablet used by several accounts uses one `device_id` per account. Whether pilot crews share
+  tablets is to be confirmed with the pilot team (TD-293); if they do, a shared-device model
+  (a device row per `(device_id, user)`, and a revoke that wipes the whole physical device with
+  a warning listing every account on it) is added before the pilot.
+- **Device hardening before the pilot (product owner, 2026-11-15; TD-286, TD-291; T-0080).**
+  Accepted for development, fixed before pilot go-live: enrolment issues a **per-device wipe
+  secret** once (returned only then, stored only as a hash) and the unauthenticated wipe
+  confirmation requires it (a wrong or missing secret gets the same answer as an unknown
+  device); sign-in checks credentials **before** any device-revocation check, and refusals for
+  unknown, active and revoked device ids are uniform to unauthenticated callers (no device-status
+  oracle). `DEVICE_REVOKED` for authenticated or device-bound sessions is unchanged.
 - **Audit.** Ledger entries made through a device carry its `device_id`.
 - **After the pilot:** biometric unlock, certificate pinning and per-device sync-health views
   (TD-204).

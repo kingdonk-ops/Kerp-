@@ -174,3 +174,24 @@ other kinds accept any snake_case action.
 
 **Freeze.** These schemas, the grammar groups and the two closed vocabularies are part of the M1
 freeze (T-0131). Adding a variable or an action after the freeze needs an amendment here.
+
+## Amendment G. Upgrade offers, "Try it", drift report: permissions and semantics (product owner, 2026-11-15, TD-281)
+
+Confirms the reading built in T-0036 (`backend/app/modules/validation/README.md`) for §4, §6, §7
+and the drift report in Consequences. Where it is more specific than the sections above, it wins.
+
+- **Read an upgrade offer:** whoever may read the set: any member of the project for a project
+  set; PER-13 or PER-01 for a tenant-layer set.
+- **Accept an offered rule, and "Try it":** only the set's editor per §7: `check` sets PER-06
+  (project) / PER-13 (tenant); other kinds PER-09 (project) / PER-01 (tenant). So PER-09 never
+  accepts an update to a `check` rule (separation of duties, §5).
+- **Drift report:** PER-13 or PER-01, limited by RLS to the projects of their portfolio.
+- **`removed_by_<layer>`:** the set deleted its copy of a rule and the default's version is newer
+  than the copy's `origin_version` (changed since the **copy**, not necessarily since the
+  delete). Once listed it stays in the offer until it is reset; it cannot be accepted, since a
+  deleted rule is only brought back by a deliberate reset (of the whole set, or of that one
+  rule: `reset_rule` also restores a deleted rule to the current default).
+- **New system sets:** a system set shipped for the first time is copied into the tenant layer
+  automatically by `sync_system_defaults` (a new key holds no tenant choice to keep), so new
+  projects get it. A changed system set is only offered to the tenant layer, never forced (§4).
+- **Routes** are keyed by the rule set's id (as the T-0034 rule routes), not by its key.

@@ -3,16 +3,16 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 176 · **Closed:** 112
+**Open:** 174 · **Closed:** 115
 
 ## decision (2)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
 | [TD-096](../tracker/todo/TD-096.md) | Approved coating ITR dropped the residual-dust rating row the ITP requires; Grating and Gridmesh ITR has no approved version: confirm with the client before shipping default templates | T-0113 | planner |
-| [TD-283](../tracker/todo/TD-283.md) | Shared field tablets: one device_id per account, or several accounts per device? | T-0043 | implementer |
+| [TD-293](../tracker/todo/TD-293.md) | Do pilot crews share tablets? Confirm with the pilot team before go-live; if yes, add a shared-device task (device row per (device_id, user), whole-device wipe warning) | T-0143 | planner |
 
-## spec-gap (39)
+## spec-gap (37)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -53,8 +53,6 @@
 | [TD-249](../tracker/todo/TD-249.md) | GET /auth/me (and the JWT tid claim) still expose the tenant id to the SPA: confirm diff 4.1 'never see the tenant' allows it or drop tenant_id from MeResponse | T-0037 | implementer |
 | [TD-268](../tracker/todo/TD-268.md) | Confirm T-0034 rule-store interpretations: tenant persona = held on any project (no tenant roles yet), reset allowed on locked rules, projects cannot lock own rules, tenant edits a locked rule only after unlock | T-0034 | implementer |
 | [TD-270](../tracker/todo/TD-270.md) | Membership-based policy needs app.member_project_ids: spec says visible when the project is in app.allowed_project_ids or app.is_system_admin, but the allowed list holds only portfolio projects | T-0014 | implementer |
-| [TD-281](../tracker/todo/TD-281.md) | ADR 0004 §4/§6/§7: confirm who reads/accepts upgrade offers, who may 'Try it', who reads the drift report, and that brand-new system sets reach the tenant layer automatically | T-0036 | implementer |
-| [TD-285](../tracker/todo/TD-285.md) | Native-origin allow-list: KERP_WEB_ORIGIN made mandatory when KERP_NATIVE_APP_ORIGINS is set; body transport also on magic-link redeem and PIN unlock | T-0043 | implementer |
 
 ## missed (4)
 
@@ -212,8 +210,8 @@
 | [TD-254](../tracker/todo/TD-254.md) | spatial_bounds 10,000-position cap also runs on reads (ProjectRead): a stored row above the cap makes GET /projects 500 for the whole tenant | T-0060 | coordinator |
 | [TD-260](../tracker/todo/TD-260.md) | a11y component tests run in the installed Google Chrome (Vitest browser mode, Playwright channel chrome): CI relies on the runner's preinstalled Chrome; set KERP_CHROME_PATH or install a browser if the image changes | T-0046 | implementer |
 | [TD-276](../tracker/todo/TD-276.md) | A PR-added or PR-edited workflow can emit a check named review-gate; accepted while the owner is the sole collaborator (revisit when a second collaborator joins) | T-0067 | planner |
-| [TD-286](../tracker/todo/TD-286.md) | wipe-confirmed is unauthenticated: anyone who knows a revoked device_id can set its wipe time | T-0043 | implementer |
-| [TD-291](../tracker/todo/TD-291.md) | Revoked-device oracle: refuse_revoked_device on login and wipe-confirmed answer for any device id | T-0043 | reviewer |
+| [TD-286](../tracker/todo/TD-286.md) | wipe-confirmed is unauthenticated: anyone who knows a revoked device_id can set its wipe time | T-0043, T-0080 | implementer |
+| [TD-291](../tracker/todo/TD-291.md) | Revoked-device oracle: refuse_revoked_device on login and wipe-confirmed answer for any device id | T-0043, T-0080 | reviewer |
 | [TD-292](../tracker/todo/TD-292.md) | Remove stale scripts/gemini_review.sh allow/deny rules from .claude/settings.json (human-only edit) | — | implementer |
 
 ## Closed
@@ -332,3 +330,6 @@
 | ✅ | [TD-264](../tracker/todo/TD-264.md) | Invites: add a short human-typeable invite code as an alternative to the invite link, or keep link-only? | Product owner, 2026-11-14: no invite code; invites are links only (e-mailed link with setup_token, copyable invite_token link as fallback, re-send rotates both). Spec diff §4.1 Re-send; tasks T-0052, T-0053, T-0059 |
 | ✅ | [TD-265](../tracker/todo/TD-265.md) | T-0014 user create/update schemas must reject is_internal, entra_oid and entra_tid with 422 and the admin user list must show is_internal read-only (T-0049 criterion; those schemas do not exist yet) | T-0014: admin UserCreate/UserUpdate use extra=forbid (is_internal, entra_oid, entra_tid, tenant_id are 422; tested), GET /api/v1/admin/users lists is_internal read-only via app.core.auth.service, and POST /api/v1/admin/users creates accounts through app.core.auth.service.create_user, which derives the flag. |
 | ✅ | [TD-271](../tracker/todo/TD-271.md) | Split TD-032 (tenant_id FK) out of T-0014: needs a tenants directory table, an FK on every table and an ADR (core-table change) | Product owner, 2026-11-15: split out as its own task T-0079 (tenants directory table + tenant_id FK on every table, ADR; phase 0, order 14, depends on T-0014). TD-032 now points at T-0079 |
+| ✅ | [TD-281](../tracker/todo/TD-281.md) | ADR 0004 §4/§6/§7: confirm who reads/accepts upgrade offers, who may 'Try it', who reads the drift report, and that brand-new system sets reach the tenant layer automatically | Product owner, 2026-11-15: implementer reading confirmed. Offers are read by whoever reads the set (any project member; PER-13/PER-01 on the tenant layer); accept and Try it only by the set's editor per ADR 0004 §7 (check: PER-06 project / PER-13 tenant; other kinds PER-09 / PER-01), so PER-09 never accepts a check update; drift report PER-13 or PER-01, limited by RLS to their portfolio projects; removed_by_<layer> = the set deleted its copy and the default changed since the copy, stays on offer until reset; a brand-new system set is copied into the tenant layer automatically by sync_system_defaults, changed sets are only offered; routes keyed by set id. Recorded in ADR 0004 Amendment G |
+| ✅ | [TD-283](../tracker/todo/TD-283.md) | Shared field tablets: one device_id per account, or several accounts per device? | Product owner, 2026-11-15: keep one account per device_id for Pilot-0 (T-0043 behaviour; another account enrolling the same id gets 409). The client keys its local store per account, so a revoke wipes only that account's data on the device (T-0143). Whether pilot crews share tablets is to be confirmed with the pilot team: TD-293 (if they do, a shared-device task is added before the pilot) |
+| ✅ | [TD-285](../tracker/todo/TD-285.md) | Native-origin allow-list: KERP_WEB_ORIGIN made mandatory when KERP_NATIVE_APP_ORIGINS is set; body transport also on magic-link redeem and PIN unlock | Product owner, 2026-11-15: both readings confirmed. (a) KERP_NATIVE_APP_ORIGINS requires KERP_WEB_ORIGIN (settings refuse otherwise) and the API's own origin never gets body transport; (b) body transport (out and in) also applies to magic-link redeem and PIN unlock by the same Origin rule; on the web origin /pin/unlock refuses a body token (422) and /refresh ignores it. Recorded in diff §4.2 |
