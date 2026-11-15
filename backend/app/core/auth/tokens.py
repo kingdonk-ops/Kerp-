@@ -9,6 +9,8 @@ Rewrite of Inspection-ERP's HS256 token layer (ADR 0001). Every token carries:
   whole session (every access and refresh token of one login) can be revoked at once.
 * ``jti``: unique per token, the key of the revocation list.
 * ``type``: ``access`` (15 minutes) or ``refresh`` (rotating, one use each).
+* ``did`` (optional): the enrolled device the session is bound to (T-0038), so the field-PIN
+  gate of ``/auth/refresh`` does not depend on the revocation store's binding (TD-142).
 * ``iat`` / ``nbf`` / ``exp``. ``iat`` and ``exp`` are fractional NumericDates (RFC 7519
   §2) with microsecond precision, so a token is ordered exactly against a password change
   (T-0061) and a rotated token keeps its session's exact end (``not_after``, diff §4.2).
@@ -48,6 +50,7 @@ class TokenClaims:
     jti: str
     issued_at: datetime
     expires_at: datetime
+    device_id: uuid.UUID | None = None
 
     def remaining(self, now: datetime | None = None) -> timedelta:
         """Time until expiry (at least zero)."""
@@ -91,8 +94,10 @@ class TokenService:
         tenant_id: uuid.UUID,
         session_id: uuid.UUID,
         not_after: datetime | None = None,
+        device_id: uuid.UUID | None = None,
     ) -> IssuedToken:
-        """``not_after`` caps the expiry (the session's end: rotation never extends it)."""
+        """``not_after`` caps the expiry (the session's end: rotation never extends it).
+        ``device_id`` is the session's bound device (the ``did`` claim), if known."""
         now = self.now()
         expires_at = now + self.ttl[token_type]
         if not_after is not None:
@@ -105,6 +110,7 @@ class TokenService:
             jti=uuid.uuid4().hex,
             issued_at=now,
             expires_at=expires_at,
+            device_id=device_id,
         )
         payload: dict[str, Any] = {
             "iss": self.issuer,
@@ -120,6 +126,8 @@ class TokenService:
             "nbf": int(now.timestamp()),
             "exp": expires_at.timestamp(),
         }
+        if device_id is not None:
+            payload["did"] = str(device_id)
         signing = self.keys.signing
         token = jwt.encode(
             payload,
@@ -158,6 +166,7 @@ class TokenService:
                 jti=_text(payload["jti"]),
                 issued_at=datetime.fromtimestamp(_number(payload["iat"]), UTC),
                 expires_at=datetime.fromtimestamp(_number(payload["exp"]), UTC),
+                device_id=_optional_uuid(payload.get("did")),
             )
         except InvalidTokenError:
             raise
@@ -169,6 +178,14 @@ def _text(value: object) -> str:
     if not isinstance(value, str) or not value:
         raise InvalidTokenError("jti must be a non-empty string")
     return value
+
+
+def _optional_uuid(value: object) -> uuid.UUID | None:
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise InvalidTokenError("did must be a string")
+    return uuid.UUID(value)
 
 
 def _number(value: object) -> float:

@@ -8,7 +8,7 @@ from typing import Annotated, Literal
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, field_validator
 
-from app.core.auth.field import PIN_LENGTH, PIN_PATTERN, is_weak_pin
+from app.core.auth.field import MAX_OFFLINE_FAILURES, PIN_LENGTH, PIN_PATTERN, is_weak_pin
 
 
 class LoginRequest(BaseModel):
@@ -34,17 +34,18 @@ def _strong_pin(pin: str) -> str:
 
 Pin = Annotated[
     str,
-    Field(pattern=PIN_PATTERN, description=f"{PIN_LENGTH}-digit PIN of this device's session"),
+    Field(pattern=PIN_PATTERN, description=f"{PIN_LENGTH}-digit PIN of this device"),
 ]
+# A PIN being set (enrolment, change): also refused when too easy to guess.
+NewPin = Annotated[Pin, AfterValidator(_strong_pin)]
 
 
 class MagicLinkRedeemRequest(BaseModel):
-    """Spend a magic link and set the PIN that will unlock the new session on this device."""
+    """Spend a magic link: a new session (on an enrolled device: bound to it, PIN kept)."""
 
     model_config = ConfigDict(extra="forbid")
 
     token: str = Field(min_length=16, max_length=256)
-    pin: Annotated[Pin, AfterValidator(_strong_pin)]
 
 
 REFRESH_TOKEN_MAX_LENGTH = 4096
@@ -70,6 +71,16 @@ class PinUnlockRequest(BaseModel):
 
     pin: Pin
     refresh_token: BodyRefreshToken = None
+    failed_offline: int = Field(
+        default=0,
+        ge=0,
+        le=MAX_OFFLINE_FAILURES,
+        description=(
+            "Wrong PINs entered on the device while offline since its last successful unlock, "
+            "not yet reported: counted before this attempt with the same escalation. Applied "
+            "only when the attempt runs (not on 429): keep the count until another answer"
+        ),
+    )
 
 
 class RefreshRequest(BaseModel):
@@ -90,6 +101,12 @@ class TokenResponse(BaseModel):
     expires_in: int = Field(description="Access token lifetime in seconds")
     refresh_expires_in: int = Field(
         description="Seconds until the login session ends (sign-in + 12 h); then sign in again"
+    )
+    session_expires_at: datetime = Field(
+        description=(
+            "When the login session ends (sign-in + 12 h, the refresh token's end): the same "
+            "on every rotation and PIN unlock. A field client starts its offline grace here"
+        )
     )
     refresh_token: str | None = Field(
         default=None,
@@ -145,6 +162,21 @@ class DeviceEnrolRequest(BaseModel):
     platform: Platform = Field(description="Shown to admins; never decides the token transport")
     os_version: VersionText = ""
     app_version: VersionText = ""
+    pin: NewPin | None = Field(
+        default=None,
+        description=(
+            "The device's field PIN, set once (the device keeps it across sign-ins). `409` "
+            "when the device already has one: change it with `PUT /devices/{device_id}/pin`"
+        ),
+    )
+
+
+class DevicePinRequest(BaseModel):
+    """A new PIN for the device (from a signed-in session of that device)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    pin: NewPin
 
 
 class DeviceRead(BaseModel):
@@ -164,9 +196,17 @@ class DeviceRead(BaseModel):
     revoked_at: datetime | None
     revoked_by: uuid.UUID | None
     wipe_confirmed_at: datetime | None
+    pin_set_at: datetime | None = Field(
+        default=None, description="When the device's field PIN was last set (null: none)"
+    )
 
     @field_validator(
-        "enrolled_at", "last_seen_at", "last_sync_at", "revoked_at", "wipe_confirmed_at"
+        "enrolled_at",
+        "last_seen_at",
+        "last_sync_at",
+        "revoked_at",
+        "wipe_confirmed_at",
+        "pin_set_at",
     )
     @classmethod
     def _utc(cls, value: datetime | None) -> datetime | None:

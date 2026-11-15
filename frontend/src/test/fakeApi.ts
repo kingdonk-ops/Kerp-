@@ -33,6 +33,8 @@ export function tokens(n: number) {
     token_type: "bearer" as const,
     expires_in: 900,
     refresh_expires_in: 43_200,
+    // Every token response states the session end (T-0038, diff §4.2); synthetic.
+    session_expires_at: "2026-01-01T12:00:00Z",
   };
 }
 

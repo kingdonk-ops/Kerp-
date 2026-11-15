@@ -135,6 +135,7 @@ DEVICE_REVOKED: Final = "revoked"
 DEVICE_STATUSES: Final = (DEVICE_ACTIVE, DEVICE_REVOKED)
 VERSION_LENGTH: Final = 64
 WIPE_SECRET_HASH_LENGTH: Final = 64  # SHA-256, hex
+PIN_HASH_LENGTH: Final = 255  # scrypt, as ``passwords.hash_password`` writes it
 
 
 def _in(column: str, values: tuple[str, ...]) -> str:
@@ -150,6 +151,8 @@ class Device(Base, BaseRecordMixin):
     revoked (the wiped client enrols again under a new ``device_id``), with who revoked it
     (``revoked_by``), when (``revoked_at``) and when the client confirmed its wipe
     (``wipe_confirmed_at``, with the wipe secret whose hash is ``wipe_secret_hash``; T-0080).
+    The field PIN belongs to the device (T-0038, diff §4.2): ``pin_hash`` (scrypt) is set
+    once at enrolment and changed only from a session of the device; ``pin_set_at`` says when.
     ``last_seen_at`` is the last authenticated request through the device,
     ``last_sync_at`` the last successful sync (set by the sync endpoints).
 
@@ -192,3 +195,8 @@ class Device(Base, BaseRecordMixin):
     wipe_secret_hash: Mapped[str | None] = mapped_column(
         String(WIPE_SECRET_HASH_LENGTH), nullable=True
     )
+    # The device's field PIN (T-0038, diff §4.2 *Field PIN, hybrid*): scrypt hash, never the
+    # PIN. ``None`` until the client sets one (enrolment): such a device's sessions are not
+    # PIN-gated. The failure counter is per device in the revocation store (``lockout.py``).
+    pin_hash: Mapped[str | None] = mapped_column(String(PIN_HASH_LENGTH), nullable=True)
+    pin_set_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

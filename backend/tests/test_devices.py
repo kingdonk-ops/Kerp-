@@ -813,7 +813,7 @@ def test_magic_link_redeem_from_a_revoked_device_is_refused(tmp_path: Path, db: 
         assert client.post(url, headers=api.bearer(tokens)).status_code == 200
         assert client.post("/api/v1/auth/magic-link", json={"email": BOB}).status_code == 202
         link = sender.sent[-1].token
-        redeem = {"token": link, "pin": PIN}
+        redeem = {"token": link}
         on_device = {DEVICE_HEADER: str(device)}
         response = client.post("/api/v1/auth/magic-link/redeem", json=redeem, headers=on_device)
         assert _revoked(response)
@@ -890,10 +890,10 @@ def test_an_invalid_magic_link_answers_alike_for_every_device_state(
     api, sender = field_api
     headers = _three_devices(api, GREG)
     spent = _link(api, sender, GREG)
-    assert api.client.post(REDEEM, json={"token": spent, "pin": PIN}).status_code == 200
+    assert api.client.post(REDEEM, json={"token": spent}).status_code == 200
     for token in ("not-a-link-" + "a" * 32, spent):
         answers = {
-            state: _refusal(api.client.post(REDEEM, json={"token": token, "pin": PIN}, headers=h))
+            state: _refusal(api.client.post(REDEEM, json={"token": token}, headers=h))
             for state, h in headers.items()
         }
         assert len(set(answers.values())) == 1, answers
@@ -915,7 +915,7 @@ def test_an_expired_magic_link_answers_alike_for_every_device_state(
         token = _link(api, sender, GREG)
         clock[0] += MAGIC_LINK_TTL.total_seconds() + 1
         answers = {
-            state: _refusal(client.post(REDEEM, json={"token": token, "pin": PIN}, headers=h))
+            state: _refusal(client.post(REDEEM, json={"token": token}, headers=h))
             for state, h in headers.items()
         }
     assert len(set(answers.values())) == 1, answers
@@ -929,7 +929,7 @@ def test_a_valid_magic_link_on_a_revoked_device_stays_unspent(
     api, sender = field_api
     headers = _three_devices(api, GREG)
     token = _link(api, sender, GREG)
-    redeem = {"token": token, "pin": PIN}
+    redeem = {"token": token}
     assert _revoked(api.client.post(REDEEM, json=redeem, headers=headers["revoked"]))
     assert _revoked(api.client.post(REDEEM, json=redeem, headers=headers["revoked"]))
     # The link was not spent: the same link then redeems from an active device, once.
@@ -946,11 +946,11 @@ def test_unlock_of_a_session_killed_by_a_device_revoke_is_device_revoked(
     seed_user(db, T1, BOB)
     with TestClient(app) as client:
         assert client.post("/api/v1/auth/magic-link", json={"email": BOB}).status_code == 202
-        redeem = {"token": sender.sent[-1].token, "pin": PIN}
+        redeem = {"token": sender.sent[-1].token}
         tokens = token_body(client.post("/api/v1/auth/magic-link/redeem", json=redeem))
         headers = {"Authorization": f"Bearer {tokens['access_token']}"}
         device = uuid.uuid4()
-        enrol = {"device_id": str(device), "platform": "android"}
+        enrol = {"device_id": str(device), "platform": "android", "pin": PIN}
         assert client.post(ENROL, json=enrol, headers=headers).status_code == 201
         assert client.post(f"{DEVICES}/{device}/revoke", headers=headers).status_code == 200
         unlock = client.post(

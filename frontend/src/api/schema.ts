@@ -98,9 +98,8 @@ export interface paths {
         put?: never;
         /**
          * Redeem Magic Link
-         * @description Spend a magic link: start a session on this device, gated by the PIN set here.
-         *
-         *     The session's refresh token then works only through `/auth/pin/unlock`.
+         * @description Spend a magic link: start a session. On an enrolled device (`X-KERP-Device-Id`) it is
+         *     bound to that device at once; the device's PIN stays as it is.
          */
         post: operations["redeem_magic_link_api_v1_auth_magic_link_redeem_post"];
         delete?: never;
@@ -120,9 +119,11 @@ export interface paths {
         put?: never;
         /**
          * Pin Unlock
-         * @description Unlock a PIN-gated session: the device's refresh token + the PIN rotate the tokens.
+         * @description Renew a session of a device with a PIN: the device's refresh token + the PIN.
          *
-         *     Wrong PINs lock the session progressively; the 10th wrong PIN revokes it.
+         *     Wrong PINs lock the device's PIN unlock progressively (offline failures reported in
+         *     `failed_offline` count too); the 10th wrong PIN ends PIN unlock on the device until the
+         *     next sign-in there. Nothing is revoked and nothing is wiped.
          */
         post: operations["pin_unlock_api_v1_auth_pin_unlock_post"];
         delete?: never;
@@ -145,7 +146,9 @@ export interface paths {
          * @description Rotate: the refresh token is spent and a new pair is issued. Reuse revokes the session.
          *
          *     The new refresh token keeps the session's end (sign-in + 12 h); after it, sign in again.
-         *     The web SPA sends the cookie; an allow-listed native app sends ``refresh_token``.
+         *     The web SPA sends the cookie; an allow-listed native app sends ``refresh_token``. A
+         *     session of a device with a PIN that was idle too long gets `401 {code: PIN_REQUIRED}`
+         *     (the token is not spent: unlock with it and the PIN).
          */
         post: operations["refresh_api_v1_auth_refresh_post"];
         delete?: never;
@@ -204,9 +207,32 @@ export interface paths {
          * Enrol
          * @description Register this field device for the signed-in user and bind the session to it.
          *
-         *     A new device gets its wipe secret in this response, once (store it per account).
+         *     A new device gets its wipe secret in this response, once (store it per account). `pin`
+         *     sets the device's field PIN, once: a sign-in on the device later keeps it.
          */
         post: operations["enrol_api_v1_devices_enrol_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/devices/{device_id}/pin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Change Pin
+         * @description Set a new field PIN for this device, from a signed-in session of the device (diff
+         *     §4.2: the PIN is changed after an online sign-in; the old PIN is not needed). Clears the
+         *     device's PIN failures.
+         */
+        put: operations["change_pin_api_v1_devices__device_id__pin_put"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1288,6 +1314,11 @@ export interface components {
              * @default
              */
             app_version: string;
+            /**
+             * Pin
+             * @description The device's field PIN, set once (the device keeps it across sign-ins). `409` when the device already has one: change it with `PUT /devices/{device_id}/pin`
+             */
+            pin?: string | null;
         };
         /** DeviceEnrolled */
         DeviceEnrolled: {
@@ -1337,10 +1368,26 @@ export interface components {
             /** Wipe Confirmed At */
             wipe_confirmed_at: string | null;
             /**
+             * Pin Set At
+             * @description When the device's field PIN was last set (null: none)
+             */
+            pin_set_at?: string | null;
+            /**
              * Wipe Secret
              * @description The device's wipe secret: only in the response of the enrolment that creates the device (`201`), never again (`null` on re-enrolment). Keep it in the keystore-backed store of this account and present it with `wipe-confirmed`
              */
             wipe_secret?: string | null;
+        };
+        /**
+         * DevicePinRequest
+         * @description A new PIN for the device (from a signed-in session of that device).
+         */
+        DevicePinRequest: {
+            /**
+             * Pin
+             * @description 6-digit PIN of this device
+             */
+            pin: string;
         };
         /** DeviceRead */
         DeviceRead: {
@@ -1389,6 +1436,11 @@ export interface components {
             revoked_by: string | null;
             /** Wipe Confirmed At */
             wipe_confirmed_at: string | null;
+            /**
+             * Pin Set At
+             * @description When the device's field PIN was last set (null: none)
+             */
+            pin_set_at?: string | null;
         };
         /** DeviceRevokeRequest */
         DeviceRevokeRequest: {
@@ -1446,6 +1498,11 @@ export interface components {
             revoked_by: string | null;
             /** Wipe Confirmed At */
             wipe_confirmed_at: string | null;
+            /**
+             * Pin Set At
+             * @description When the device's field PIN was last set (null: none)
+             */
+            pin_set_at?: string | null;
             /**
              * Role
              * @description The authority the revoke used (audited)
@@ -1752,16 +1809,11 @@ export interface components {
         };
         /**
          * MagicLinkRedeemRequest
-         * @description Spend a magic link and set the PIN that will unlock the new session on this device.
+         * @description Spend a magic link: a new session (on an enrolled device: bound to it, PIN kept).
          */
         MagicLinkRedeemRequest: {
             /** Token */
             token: string;
-            /**
-             * Pin
-             * @description 6-digit PIN of this device's session
-             */
-            pin: string;
         };
         /** MagicLinkRequest */
         MagicLinkRequest: {
@@ -1976,7 +2028,7 @@ export interface components {
         PinUnlockRequest: {
             /**
              * Pin
-             * @description 6-digit PIN of this device's session
+             * @description 6-digit PIN of this device
              */
             pin: string;
             /**
@@ -1984,6 +2036,12 @@ export interface components {
              * @description The refresh token, for the native app only (its `Origin` is on `KERP_NATIVE_APP_ORIGINS`); ignored on every other request, which uses the cookie
              */
             refresh_token?: string | null;
+            /**
+             * Failed Offline
+             * @description Wrong PINs entered on the device while offline since its last successful unlock, not yet reported: counted before this attempt with the same escalation. Applied only when the attempt runs (not on 429): keep the count until another answer
+             * @default 0
+             */
+            failed_offline: number;
         };
         /**
          * PolygonGeoJSON
@@ -2486,6 +2544,12 @@ export interface components {
              */
             refresh_expires_in: number;
             /**
+             * Session Expires At
+             * Format: date-time
+             * @description When the login session ends (sign-in + 12 h, the refresh token's end): the same on every rotation and PIN unlock. A field client starts its offline grace here
+             */
+            session_expires_at: string;
+            /**
              * Refresh Token
              * @description Native app only (`Origin` on `KERP_NATIVE_APP_ORIGINS`): the refresh token, kept in the device keystore. Absent for every other caller (cookie transport)
              */
@@ -2913,7 +2977,7 @@ export interface operations {
                     "application/json": components["schemas"]["TokenResponse"];
                 };
             };
-            /** @description Not authenticated; with `code: DEVICE_REVOKED` when `X-KERP-Device-Id` (or the session's device) is revoked: wipe the device's local data. Sign-in answers `DEVICE_REVOKED` only after the credentials are right */
+            /** @description Not authenticated. With `code`: `PIN_REQUIRED` (refresh: idle too long, unlock with the PIN), `PIN_INVALID` (unlock: wrong PIN), `PIN_EXHAUSTED` (unlock: the 10th wrong PIN, sign in again on this device), `DEVICE_REVOKED` (wipe the device) */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -2970,7 +3034,7 @@ export interface operations {
                     "application/json": components["schemas"]["TokenResponse"];
                 };
             };
-            /** @description Not authenticated; with `code: DEVICE_REVOKED` when `X-KERP-Device-Id` (or the session's device) is revoked: wipe the device's local data. Sign-in answers `DEVICE_REVOKED` only after the credentials are right */
+            /** @description Not authenticated. With `code`: `PIN_REQUIRED` (refresh: idle too long, unlock with the PIN), `PIN_INVALID` (unlock: wrong PIN), `PIN_EXHAUSTED` (unlock: the 10th wrong PIN, sign in again on this device), `DEVICE_REVOKED` (wipe the device) */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -3064,8 +3128,55 @@ export interface operations {
                     "application/json": components["schemas"]["DeviceEnrolled"];
                 };
             };
-            /** @description Another account's device, or session */
+            /** @description Another account's device, or session; `code: PIN_ALREADY_SET` when `pin` is sent for a device that has a PIN */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    change_pin_api_v1_devices__device_id__pin_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DevicePinRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not a session of this device */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not an active device of the caller */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

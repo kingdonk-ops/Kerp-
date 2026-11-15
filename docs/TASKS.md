@@ -3,11 +3,11 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 44/164 tasks done (27%) · **ready now:** 20 · **epics awaiting breakdown:** 47
+**Overall:** 45/164 tasks done (27%) · **ready now:** 21 · **epics awaiting breakdown:** 47
 
 | Phase | Tasks done | Progress |
 |---|---|---|
-| 0 · Platform foundations | 44/80 | `█████░░░░░` 55% |
+| 0 · Platform foundations | 45/80 | `█████░░░░░` 56% |
 | 1 · Asset & Quality backbone | 0/75 (+1 epics) | `░░░░░░░░░░` 0% |
 | 2 · Welding quality | 0/9 | `░░░░░░░░░░` 0% |
 | 3 · Logistics | 0/0 (+7 epics) | `░░░░░░░░░░` 0% |
@@ -31,11 +31,11 @@
 | ✅ | [T-0008](../tracker/tasks/T-0008.md) | Auth: users, RS256/EdDSA JWT + JWKS endpoint, 15-min access + rotating refresh, jti revocation in Redis | identity | M | T-0007 | #31 |
 | ✅ | [T-0037](../tracker/tasks/T-0037.md) | Auth sessions: hidden deployment tenant at login, 12-hour refresh from sign-in (daily re-login) + same-second password-change token rejection | identity | M | T-0009 | #69 |
 | ✅ | [T-0009](../tracker/tasks/T-0009.md) | Field-worker auth: magic-link + 6-digit PIN local unlock + progressive lockout | identity | M | T-0008 | #35 |
-| ▶ | [T-0038](../tracker/tasks/T-0038.md) | Field PIN hybrid rework: PIN per enrolled device, server PIN only on renewal after idle, lockout counter per device | identity | M | T-0043 |  |
+| ✅ | [T-0038](../tracker/tasks/T-0038.md) | Field PIN hybrid rework: PIN per enrolled device, server PIN only on renewal after idle, lockout counter per device | identity | M | T-0043 | #95 |
 | ✅ | [T-0043](../tracker/tasks/T-0043.md) | Device registry: enrolment, remote revoke with wipe signal, device_id on sessions and in the audit ledger (Pilot-0) | identity | M | T-0037, T-0014 | #89 |
 | ✅ | [T-0049](../tracker/tasks/T-0049.md) | Internal staff flag: is_internal derived from the company Entra link or KERP_INTERNAL_EMAIL_DOMAINS, recomputed at sign-in | identity | S | T-0037 | #83 |
 | ✅ | [T-0010](../tracker/tasks/T-0010.md) | Three-tier RBAC/ABAC: capability tiers × 15 personas × project/site scope (Asset-Site filter) + explicit multi-project read scope | identity | M | T-0008 | #39 |
-| ⬜ | [T-0054](../tracker/tasks/T-0054.md) | Entra ID SSO (identity only): OIDC code + PKCE AuthProvider, ID-token verification via tenant JWKS, match by verified e-mail then oid, same 12 h KERP session, no group-to-role mapping | identity | M | T-0037, T-0038, T-0043, T-0049 |  |
+| ▶ | [T-0054](../tracker/tasks/T-0054.md) | Entra ID SSO (identity only): OIDC code + PKCE AuthProvider, ID-token verification via tenant JWKS, match by verified e-mail then oid, same 12 h KERP session, no group-to-role mapping | identity | M | T-0037, T-0038, T-0043, T-0049 |  |
 | ✅ | [T-0080](../tracker/tasks/T-0080.md) | Device hardening before pilot: per-device wipe secret, credentials-first login device check, uniform answers | identity | S | T-0043 | #94 |
 | ✅ | [T-0011](../tracker/tasks/T-0011.md) | Module loader + manifest contract + per-project enable/disable | platform | M | T-0005 | #32 |
 | ✅ | [T-0012](../tracker/tasks/T-0012.md) | projects module: CRUD + settings (IANA timezone, spatial_bounds, currency/locale) | projects | M | T-0010, T-0011 | #43 |
@@ -159,7 +159,7 @@
 | ⬜ | [T-0158](../tracker/tasks/T-0158.md) | inspections: inspection PDF report (SAQ batch job, PyMuPDF lazy) with annotations burned in, signatures and review history | inspections | M | T-0150, T-0156, T-0116, T-0117, T-0016, T-0136, T-0167 |  |
 | ⬜ | [T-0159](../tracker/tasks/T-0159.md) | inspections: batch inspection PDF export (ZIP + index.csv, max 500) + export action on the review queue | inspections | S | T-0158, T-0153 |  |
 | ⬜ | [T-0160](../tracker/tasks/T-0160.md) | reporting: Pilot-0 dashboard tiles — progress, overdue, open defects (API + Overview screen) | reporting | M | T-0150, T-0152, T-0116, T-0117, T-0024, T-0025 |  |
-| ⬜ | [T-0162](../tracker/tasks/T-0162.md) | identity: client online signing PIN — own table, server-side per-signer rate limit and lockout, single-use co-sign token | identity | S | T-0010, T-0038 |  |
+| ▶ | [T-0162](../tracker/tasks/T-0162.md) | identity: client online signing PIN — own table, server-side per-signer rate limit and lockout, single-use co-sign token | identity | S | T-0010, T-0038 |  |
 | ⬜ | [T-0163](../tracker/tasks/T-0163.md) | signing: client co-signature ledger entries — online_pin and client_device_signed (QR assertion verified at sync), record-version binding, requires_client_signature check | signing | M | T-0119, T-0150, T-0158, T-0162, T-0173, T-0177 |  |
 | ⬜ | [T-0164](../tracker/tasks/T-0164.md) | Frontend: hand to client on the inspector's tablet — online PIN, challenge/assertion QR exchange with offline verify, provisional wet signature; PIN-gated hand-back | frontend | M | T-0162, T-0163, T-0174, T-0143, T-0165 |  |
 | ⬜ | [T-0165](../tracker/tasks/T-0165.md) | Frontend: inspector capture screen — open a downloaded inspection, answer with autosave, resume after crash, sign and submit; start an ad-hoc inspection on a downloaded Item or anchor | frontend | M | T-0149, T-0148, T-0150, T-0130, T-0047, T-0025, T-0127 |  |

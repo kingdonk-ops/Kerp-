@@ -68,21 +68,31 @@ class LockoutPolicy:
         factor = 1 << min(over - 1, 32)
         return min(self.base_delay * factor, self.max_delay)
 
+    def lock_after(self, failures: int) -> timedelta:
+        """The lock armed by failure ``failures``: ``delay_after``, except that from the hard
+        cap on nothing is checked any more, so no lock is armed (an attempt past the cap is
+        refused as exhausted straight away, not with a ``429``)."""
+        if self.max_attempts is not None and failures >= self.max_attempts:
+            return timedelta(0)
+        return self.delay_after(failures)
+
     def exhausted(self, attempt: int) -> bool:
         """Attempt number ``attempt`` is past the hard cap and must not be checked."""
         return self.max_attempts is not None and attempt > self.max_attempts
 
 
-# PIN unlock of a field-worker session: the first 4 guesses run back to back (no lock after
-# failures 1-3; failure 4 arms 30 s), then the lock doubles up to 15 min, and the 10th wrong
-# PIN revokes the session (a new magic link is needed). 10 guesses out of 10**6 PINs: the
-# chance of a lucky guess stays at 1e-5 per stolen device.
+# PIN unlock on a field device (T-0038, diff §4.2; numbers unchanged from T-0009): the first 4
+# guesses run back to back (no lock after failures 1-3; failure 4 arms 30 s), then the lock
+# doubles up to 15 min, and the 10th wrong PIN ends PIN unlock on that device until the next
+# online sign-in there (no session or device is revoked). 10 guesses out of 10**6 PINs: the
+# chance of a lucky guess stays at 1e-5 per stolen device. The counter is per device; failures
+# the device made offline are reported with the next unlock and counted first (``extra``).
 #
-# The cap must hold for the whole session, not per day. Failures only accumulate between two
-# successful unlocks, and without a success the device's refresh token cannot rotate, so the
-# counter only has to outlive that token. ``AuthService`` therefore replaces ``window`` with
-# the refresh lifetime + ``PIN_TTL_MARGIN`` of the deployment; the default here covers the
-# longest refresh lifetime allowed (90 days) plus that margin.
+# The cap must hold until a sign-in on the device clears the counter. A PIN unlock needs a
+# live refresh token of a session bound to the device, and every new binding is a sign-in
+# that clears it, so the counter only has to outlive one session. ``AuthService`` therefore
+# replaces ``window`` with the refresh lifetime + ``PIN_TTL_MARGIN`` of the deployment; the
+# default here covers the longest refresh lifetime allowed (90 days) plus that margin.
 PIN_POLICY: Final = LockoutPolicy(
     free_attempts=3,
     base_delay=timedelta(seconds=30),
@@ -135,10 +145,17 @@ class ProgressiveLockout:
     def _key(self, subject: str) -> str:
         return f"{self.scope}:{hashlib.sha256(subject.encode()).hexdigest()}"
 
-    def begin(self, subject: str) -> int:
-        """Start an attempt; returns its number (1-based). Raises ``LockedOutError``."""
+    def begin(self, subject: str, *, extra: int = 0) -> int:
+        """Start an attempt; returns its number (1-based). Raises ``LockedOutError``.
+
+        ``extra`` earlier failures the server did not see (a field device's offline PIN
+        failures, T-0038) are counted first, in the same atomic step, so this attempt's number
+        and its lock follow the same escalation. They are applied only when the attempt runs
+        (not while locked). Clamped to ``0 .. max_attempts`` (or 1000 without a cap)."""
+        ceiling = self.policy.max_attempts if self.policy.max_attempts is not None else 1000
+        extra = min(max(extra, 0), ceiling)
         attempt, remaining = self.store.begin_attempt(
-            self._key(subject), self.policy.window, self.policy.delay_after
+            self._key(subject), self.policy.window, self.policy.lock_after, extra
         )
         if remaining > 0:
             raise LockedOutError(remaining)

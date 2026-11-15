@@ -213,7 +213,7 @@ def test_magic_link_sign_in_recomputes_the_flag(tmp_path: Path, db: Database) ->
     app, _runtime = auth_app(settings, magic_links=sender)
     with TestClient(app) as client:
         assert client.post("/api/v1/auth/magic-link", json={"email": STAFF}).status_code == 202
-        redeem = {"token": sender.sent[0].token, "pin": "482916"}
+        redeem = {"token": sender.sent[0].token}
         token_body(client.post("/api/v1/auth/magic-link/redeem", json=redeem))
     assert _flag(db, staff) is True
 

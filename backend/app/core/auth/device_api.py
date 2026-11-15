@@ -4,7 +4,12 @@
   ``device_id``; the login session is bound to it. ``201`` new, with the device's
   ``wipe_secret`` (issued once, T-0080); ``200`` known (``wipe_secret: null``). Another
   account's ``device_id`` (or a session already bound to another device) is ``409``; a
-  revoked device ``401 DEVICE_REVOKED``.
+  revoked device ``401 DEVICE_REVOKED``. ``pin`` sets the device's field PIN once (T-0038,
+  diff §4.2); a device that has one answers ``409 {code: PIN_ALREADY_SET}``. Binding a new
+  session to the device (a sign-in there) clears its PIN failures.
+* ``PUT /api/v1/devices/{device_id}/pin`` (bearer, from a session bound to the device): a new
+  PIN (``204``); clears the PIN failures; audited as ``pin_changed`` (never the PIN). Not the
+  caller's active device: ``404``; another session of the caller: ``403``.
 * ``GET /api/v1/devices`` (bearer): the caller's own devices.
 * ``GET /api/v1/users/{user_id}/devices`` (bearer): a user's devices, for the user, a
   ``system_admin``, or a PER-09 of a project the user belongs to.
@@ -48,12 +53,14 @@ from app.core.auth.access import (
     load_grants,
     user_has_projects_beyond,
 )
-from app.core.auth.deps import CurrentPrincipal
-from app.core.auth.models import DEVICE_REVOKED, Device
+from app.core.auth.deps import CurrentPrincipal, get_auth_service
+from app.core.auth.models import DEVICE_ACTIVE, DEVICE_REVOKED, Device
+from app.core.auth.passwords import hash_password
 from app.core.auth.runtime import AuthRuntime, get_auth_runtime
 from app.core.auth.schemas import (
     DeviceEnrolled,
     DeviceEnrolRequest,
+    DevicePinRequest,
     DeviceRead,
     DeviceRevoked,
     DeviceRevokeRequest,
@@ -66,6 +73,7 @@ from app.core.tenancy.scope import OutOfScopeError
 
 PREFIX: Final = "/api/v1/devices"
 CROSS_PROJECT_CODE: Final = "cross_project_wipe_confirmation_required"
+PIN_ALREADY_SET_CODE: Final = "PIN_ALREADY_SET"
 # The one answer to every refused wipe confirmation (T-0080): same status and body as any
 # out-of-scope 404, whatever the reason.
 WIPE_REFUSED_STATUS: Final = status.HTTP_404_NOT_FOUND
@@ -74,6 +82,7 @@ WIPE_REFUSED_BODY: Final = {"detail": "Not Found"}
 router = APIRouter(tags=["devices"])
 
 RuntimeDep = Annotated[AuthRuntime, Depends(get_auth_runtime)]
+AuthServiceDep = Annotated[users.AuthService, Depends(get_auth_service)]
 Role = Literal["self", "system_admin", "per_09"]
 
 
@@ -137,7 +146,12 @@ def _read(device: Device) -> DeviceRead:
             "description": "Enrolled: the only response that carries the `wipe_secret`",
             "model": DeviceEnrolled,
         },
-        status.HTTP_409_CONFLICT: {"description": "Another account's device, or session"},
+        status.HTTP_409_CONFLICT: {
+            "description": (
+                "Another account's device, or session; `code: PIN_ALREADY_SET` when `pin` is "
+                "sent for a device that has a PIN"
+            )
+        },
     },
 )
 def enrol(
@@ -145,25 +159,46 @@ def enrol(
     principal: CurrentPrincipal,
     session: DbSession,
     runtime: RuntimeDep,
+    service: AuthServiceDep,
     response: Response,
 ) -> DeviceEnrolled:
     """Register this field device for the signed-in user and bind the session to it.
 
-    A new device gets its wipe secret in this response, once (store it per account)."""
+    A new device gets its wipe secret in this response, once (store it per account). `pin`
+    sets the device's field PIN, once: a sign-in on the device later keeps it."""
+    session_id = principal.claims.session_id
+    # A session bound at sign-in carries ``did``: it is never "newly bound", even when the
+    # store's binding was evicted, so re-enrolling cannot clear the PIN counter (TD-142 class).
+    newly_bound = (
+        principal.claims.device_id is None and runtime.store.session_device(session_id) is None
+    )
+    pin_hash = hash_password(body.pin) if body.pin is not None else None
     try:
         device, wipe_secret = devices.enrol(
             session,
             runtime.store,
             user_id=principal.user_id,
-            session_id=principal.claims.session_id,
+            session_id=session_id,
             session_ttl=runtime.tokens.ttl["refresh"],
             device_id=body.device_id,
             platform=body.platform,
             os_version=body.os_version,
             app_version=body.app_version,
+            pin_hash=pin_hash,
         )
     except devices.DeviceConflictError as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+    except devices.DevicePinAlreadySetError as exc:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            {
+                "code": PIN_ALREADY_SET_CODE,
+                "message": "The device already has a PIN: change it with PUT .../pin",
+            },
+        ) from exc
+    if newly_bound:
+        # A new session on the device is a sign-in there: it ends a "10th wrong PIN" stop.
+        service.clear_pin_failures(principal.tenant_id, device.device_id)
     if wipe_secret is not None:  # created now; the secret never enters the ledger
         payload = {
             "action": "enrol",
@@ -182,7 +217,52 @@ def enrol(
             device_id=device.device_id,
         )
         response.status_code = status.HTTP_201_CREATED
+    if pin_hash is not None:
+        _audit_pin(session, device, "pin_set", principal.user_id)
     return DeviceEnrolled.model_validate({**_read(device).model_dump(), "wipe_secret": wipe_secret})
+
+
+def _audit_pin(session: Session, device: Device, action: str, actor_id: uuid.UUID) -> None:
+    """A PIN set or change on the device's chain: who and when, never the PIN or its hash."""
+    audit.append(
+        session,
+        f"device:{device.device_id}",
+        {"action": action, "device_id": str(device.device_id), "user_id": str(device.user_id)},
+        actor_id=actor_id,
+        source="api",
+        device_id=device.device_id,
+    )
+
+
+@router.put(
+    f"{PREFIX}/{{device_id}}/pin",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses={
+        status.HTTP_403_FORBIDDEN: {"description": "Not a session of this device"},
+        status.HTTP_404_NOT_FOUND: {"description": "Not an active device of the caller"},
+    },
+)
+def change_pin(
+    device_id: uuid.UUID,
+    body: DevicePinRequest,
+    principal: CurrentPrincipal,
+    session: DbSession,
+    runtime: RuntimeDep,
+    service: AuthServiceDep,
+) -> Response:
+    """Set a new field PIN for this device, from a signed-in session of the device (diff
+    §4.2: the PIN is changed after an online sign-in; the old PIN is not needed). Clears the
+    device's PIN failures."""
+    device = devices.find_device(session, device_id)
+    if device is None or device.user_id != principal.user_id or device.status != DEVICE_ACTIVE:
+        raise OutOfScopeError("device not found")
+    claims = principal.claims
+    if device_id not in (claims.device_id, runtime.store.session_device(claims.session_id)):
+        raise _forbidden()
+    devices.set_pin(session, device, hash_password(body.pin), actor_id=principal.user_id)
+    service.clear_pin_failures(principal.tenant_id, device_id)
+    _audit_pin(session, device, "pin_changed", principal.user_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get(PREFIX, response_model=list[DeviceRead])

@@ -3,14 +3,16 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 178 · **Closed:** 117
+**Open:** 181 · **Closed:** 118
 
-## decision (2)
+## decision (4)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
 | [TD-096](../tracker/todo/TD-096.md) | Approved coating ITR dropped the residual-dust rating row the ITP requires; Grating and Gridmesh ITR has no approved version: confirm with the client before shipping default templates | T-0113 | planner |
 | [TD-293](../tracker/todo/TD-293.md) | Do pilot crews share tablets? Confirm with the pilot team before go-live; if yes, add a shared-device task (device row per (device_id, user), whole-device wipe warning) | T-0143 | planner |
+| [TD-300](../tracker/todo/TD-300.md) | Field PIN idle is measured from the session's last renewal (refresh token iat), not from its last authenticated request | T-0038 | implementer |
+| [TD-301](../tracker/todo/TD-301.md) | Field PIN API details not in the spec: PIN set via enrolment (409 PIN_ALREADY_SET), PUT /devices/{id}/pin from a bound session without the old PIN, 401 codes PIN_INVALID/PIN_EXHAUSTED, failed_offline only on unlock | T-0038 | implementer |
 
 ## spec-gap (38)
 
@@ -106,7 +108,7 @@
 | [TD-288](../tracker/todo/TD-288.md) | pending_updates on a set with no parent default answers 409 instead of an empty offer | T-0036 | reviewer |
 | [TD-298](../tracker/todo/TD-298.md) | Rate-limit the unauthenticated wipe-confirmed endpoint (every refusal appends an audit entry) | T-0080 | implementer |
 
-## later (75)
+## later (76)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -185,6 +187,7 @@
 | [TD-290](../tracker/todo/TD-290.md) | Map RevocationUnavailableError to 503 in the device endpoints and resolve_request_device | T-0043 | reviewer |
 | [TD-294](../tracker/todo/TD-294.md) | Project delete revokes its memberships (T-0039, TD-184): a future project restore must re-grant them, and memberships on projects soft-deleted before T-0039 (dev databases only) stay live until revoked | T-0039 | implementer |
 | [TD-296](../tracker/todo/TD-296.md) | System-admin-only write RLS policy for oe_settings_deployment (defence in depth) | T-0044 | implementer |
+| [TD-302](../tracker/todo/TD-302.md) | Use the did token claim in CurrentPrincipal device resolution so DEVICE_REVOKED and last_seen survive an evicted device:sid binding | T-0038 | implementer |
 
 ## bug (3)
 
@@ -202,7 +205,6 @@
 | [TD-102](../tracker/todo/TD-102.md) | Eligibility API is frozen at M1 (T-0131) but must accept a requirement set (role baseline + client/site overlays + task-bound rules) | T-0131, T-0118 | planner |
 | [TD-111](../tracker/todo/TD-111.md) | All coastal input files (planning, comm matrix, registers, reports, templates) contain real client and personal data: extend TD-069 beyond the inspection exports | T-0113, T-0107 | planner |
 | [TD-132](../tracker/todo/TD-132.md) | docker-compose dev stack never run end to end (no Docker on the T-0003 implementer machine): verify make test-pg once | T-0003 | implementer |
-| [TD-142](../tracker/todo/TD-142.md) | PIN gating fails open if Redis evicts the pin:<sid> key: add an amr=["pin"] token claim or require maxmemory-policy noeviction | T-0009 | implementer |
 | [TD-154](../tracker/todo/TD-154.md) | Migrations 0002-0005 call the live rls_policy_sql, so changing it rewrites history | T-0010 | implementer |
 | [TD-158](../tracker/todo/TD-158.md) | require_hold_release passes a PER-07 for any site; endpoints must also check can_release_hold against the hold's site (add a load-and-check helper) | T-0010 | reviewer |
 | [TD-176](../tracker/todo/TD-176.md) | No availability target or HA design for the production API (clean-room asks 99.5 %; offline client tolerates outages) | — | clean-room-gap-analysis |
@@ -217,6 +219,7 @@
 | [TD-276](../tracker/todo/TD-276.md) | A PR-added or PR-edited workflow can emit a check named review-gate; accepted while the owner is the sole collaborator (revisit when a second collaborator joins) | T-0067 | planner |
 | [TD-292](../tracker/todo/TD-292.md) | Remove stale scripts/gemini_review.sh allow/deny rules from .claude/settings.json (human-only edit) | — | implementer |
 | [TD-299](../tracker/todo/TD-299.md) | Sign-in with valid credentials answers DEVICE_REVOKED for a revoked device of another account | T-0080 | implementer |
+| [TD-303](../tracker/todo/TD-303.md) | Field PIN gate can fail open if Redis evicts device:sid before the first rotation of a session bound by enrolment (its first refresh token has no did claim) | T-0038 | implementer |
 
 ## Closed
 
@@ -289,6 +292,7 @@
 | ✅ | [TD-136](../tracker/todo/TD-136.md) | Restrict magic-link sign-in to the Field Worker persona (PER-14) once T-0010 personas exist | Product owner, 2026-11-14: KERP sign-in magic links are limited to Field Workers (PER-14 on at least one project, or a pending invite naming PER-14); anyone else gets the same neutral 202 and no link. Spec diff §4.2 (Magic links for Field Workers only); task T-0057, invite carry-through in T-0052; PER-15 / phase-7 portal question in TD-261 |
 | ✅ | [TD-139](../tracker/todo/TD-139.md) | Confirm per-kind rule context schemas and action vocabularies (validation compiler) | 9a: rule context schemas, p6_grammar groups and action vocabularies confirmed as built and recorded in ADR 0004 Addendum F; frozen by T-0131 (user, 2026-11-13) |
 | ✅ | [TD-141](../tracker/todo/TD-141.md) | Rule store: explicit per-rule version column, findings log only non-passing rules | per-rule version column; findings log only failed/errored rules. (user, 2026-11-13) |
+| ✅ | [TD-142](../tracker/todo/TD-142.md) | PIN gating fails open if Redis evicts the pin:<sid> key: add an amr=["pin"] token claim or require maxmemory-policy noeviction | T-0038: PIN hash on the device row; the session device travels as the did token claim, so an evicted store binding no longer opens the gate (residual: first refresh token of a session bound by enrolment) |
 | ✅ | [TD-148](../tracker/todo/TD-148.md) | Module-to-navigation-group mapping for the 8-group IA is unspecified | 6a: module -> nav group mapping written into diff §6.1 (items may move later) (user, 2026-11-13) |
 | ✅ | [TD-151](../tracker/todo/TD-151.md) | Persona matrix interpretation: default-tier labels vs V/C/E/A/S, PER-03 progress sign-off, PER-09 combined with a hold-authority persona | 2a: T-0010 tier mapping confirmed (edge §5.2 amendment); PER-09 + hold-authority persona allowed with a warning at assignment and an audit-ledger entry; no admin role confers hold release or sign-off without a qualified persona and credentials (TD-099/TD-100). Spec diff §4.1, edge §5; tasks T-0014, T-0026, T-0039 (user, 2026-11-13) |
 | ✅ | [TD-152](../tracker/todo/TD-152.md) | T-0014 membership-based policy must keep the caller's own memberships readable by the scope resolver | T-0014 / PR #86: auth_project_membership read policy (migration 0015) admits user_id = app.current_user_id, and resolve_request_scope binds the token sub as app.current_user_id in its tenant-level unit of work, so the resolver reads the caller's own memberships (tests/test_rls_admin.py, test_a_plain_tenant_session_sees_no_project_or_foreign_membership; tests/test_admin.py scope resolver tests on PostgreSQL as kerp_app). |
