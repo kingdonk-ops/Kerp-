@@ -98,3 +98,21 @@ def set_user_grants(
         )
     session.flush()
     return added, removed
+
+
+def revoke_project(
+    session: Session, project_id: uuid.UUID, *, actor_id: uuid.UUID | None = None
+) -> list[tuple[uuid.UUID, Grant]]:
+    """Revoke every live grant on ``project_id`` (the project is being deleted: memberships of
+    a deleted project confer nothing, diff §4.1, TD-184); returns ``(user, grant)`` pairs."""
+    rows = session.scalars(
+        select(ProjectMembership).where(
+            ProjectMembership.tenant_id == _tenant_id(session),
+            ProjectMembership.member_project_id == project_id,
+        )
+    ).all()
+    for row in rows:
+        row.soft_delete()
+        row.updated_by = actor_id
+    session.flush()
+    return [(row.user_id, _grant(row)) for row in rows]

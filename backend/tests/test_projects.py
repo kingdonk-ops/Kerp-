@@ -15,10 +15,10 @@ from alembic.autogenerate import compare_metadata
 from alembic.runtime.migration import MigrationContext
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
-from sqlalchemy import Column, MetaData, Table, event, text
+from sqlalchemy import Column, MetaData, Table, event, select, text
 
 from app.core.audit.service import chain_entries
-from app.core.auth.access import Persona
+from app.core.auth.access import CREATE_PROJECTS, Persona
 from app.core.auth.models import MEMBERSHIP_TABLE, ProjectMembership
 from app.core.db import Base, Database, contract_violations
 from app.core.geo import GeoJSONGeometry
@@ -26,8 +26,9 @@ from app.core.module_loader.loader import discover_modules
 from app.core.tenancy.context import TenancyContext
 from app.core.tenancy.rls import RLS_EXEMPT, bind_connection, rls_tables
 from app.core.tenancy.scope import OutOfScopeError
+from app.modules.admin import service as admin
 from app.modules.projects import service
-from app.modules.projects.models import TABLE
+from app.modules.projects.models import TABLE, Project
 from app.modules.projects.schemas import (
     MAX_RINGS,
     MAX_TOTAL_POSITIONS,
@@ -415,6 +416,8 @@ class Api:
             self.home = service.create_project(s, _create(code="HOME")).id
         _grant(db, self.users[ALICE], self.home, Persona.PROJECT_ADMINISTRATOR)
         _grant(db, self.users[BOB], self.home, Persona.PROJECT_MANAGER)
+        with db.unit_of_work(CTX_T1) as s:  # ALICE is a Project Admin (T-0039)
+            admin.grant(s, self.users[ALICE], CREATE_PROJECTS, actor_id=None)
 
     def headers(self, email: str) -> dict[str, str]:
         body = {"email": email, "password": PASSWORD}
@@ -459,10 +462,60 @@ def test_an_administrator_creates_a_project_with_settings(api: Api) -> None:
         assert service.get_project(s, uuid.UUID(created["id"])).site_timezone == "America/Edmonton"
 
 
-def test_creating_needs_the_admin_capability(api: Api) -> None:
+def test_creating_needs_the_create_projects_grant(api: Api) -> None:
+    """TD-184: PER-09 on a project is not enough; only Project Admins create projects."""
+    _grant(api.db, api.users[BOB], api.home, Persona.PROJECT_ADMINISTRATOR)
     body = {"code": "NOPE", "name": "Nope"}
-    assert api.client.post(PROJECTS, json=body, headers=api.headers(BOB)).status_code == 403
-    assert api.client.post(PROJECTS, json=body, headers=api.headers(CAROL)).status_code == 403
+    for email in (BOB, CAROL):  # PER-02 + PER-09 of HOME / no project
+        assert api.client.post(PROJECTS, json=body, headers=api.headers(email)).status_code == 403
+    with api.db.unit_of_work(CTX_T1) as s:
+        assert s.scalars(select(Project).where(Project.code == "NOPE")).first() is None
+
+
+def test_the_creator_administers_the_new_project_at_once(api: Api) -> None:
+    """The creator is PER-09 on the new project, granted in the creating transaction."""
+    headers = api.headers(ALICE)
+    created = api.client.post(PROJECTS, json={"code": "NEW", "name": "New"}, headers=headers)
+    assert created.status_code == 201, created.text
+    url = f"{PROJECTS}/{created.json()['id']}"
+    assert api.client.get(url, headers=headers).json()["code"] == "NEW"
+    renamed = api.client.patch(url, json={"name": "Renamed"}, headers=headers)
+    assert renamed.status_code == 200, renamed.text
+    assert renamed.json()["name"] == "Renamed"
+    project = uuid.UUID(created.json()["id"])
+    with api.db.unit_of_work(CTX_T1) as s:
+        rows = s.scalars(
+            select(ProjectMembership).where(ProjectMembership.member_project_id == project)
+        ).all()
+        assert [(r.user_id, r.persona, r.created_by) for r in rows] == [
+            (api.users[ALICE], "PER-09", api.users[ALICE])
+        ]
+        entry, *_ = chain_entries(s, f"project:{project}")
+    assert entry.payload == {"action": "create", "code": "NEW", "creator_grants": ["PER-09"]}
+
+
+def test_a_failed_creation_grants_nothing(api: Api) -> None:
+    duplicate = {"code": "HOME", "name": "Again"}
+    assert api.client.post(PROJECTS, json=duplicate, headers=api.headers(ALICE)).status_code == 409
+    with api.db.unit_of_work(CTX_T1) as s:
+        rows = s.scalars(
+            select(ProjectMembership).where(ProjectMembership.user_id == api.users[ALICE])
+        ).all()
+        assert [r.member_project_id for r in rows] == [api.home]
+
+
+def test_deleting_a_project_revokes_its_memberships(api: Api) -> None:
+    assert (
+        api.client.delete(f"{PROJECTS}/{api.home}", headers=api.headers(ALICE)).status_code == 204
+    )
+    with api.db.unit_of_work(CTX_T1) as s:
+        assert s.scalars(select(ProjectMembership)).all() == []
+        [*_, entry] = chain_entries(s, f"project:{api.home}")
+    assert entry.payload == {
+        "action": "delete",
+        "code": "HOME",
+        "revoked_memberships": sorted([f"{api.users[ALICE]}:PER-09", f"{api.users[BOB]}:PER-02"]),
+    }
 
 
 def test_invalid_settings_are_422_and_a_duplicate_code_is_409(api: Api) -> None:
@@ -474,8 +527,7 @@ def test_invalid_settings_are_422_and_a_duplicate_code_is_409(api: Api) -> None:
     assert response.status_code == 409
     assert "HOME" in response.json()["detail"]
     second = api.client.post(PROJECTS, json={"code": "SECOND", "name": "Second"}, headers=headers)
-    url = f"{PROJECTS}/{second.json()['id']}"
-    _grant(api.db, api.users[ALICE], uuid.UUID(second.json()["id"]), Persona.PROJECT_ADMINISTRATOR)
+    url = f"{PROJECTS}/{second.json()['id']}"  # the creator is PER-09 on it
     assert api.client.patch(url, json={"code": "HOME"}, headers=headers).status_code == 409
 
 

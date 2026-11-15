@@ -1,4 +1,4 @@
-# admin — users, project memberships, admin grants (T-0014)
+# admin — users, project memberships, admin grants (T-0014, T-0039)
 
 The administration surface of the access model (diff §4.1; TD-120, TD-184, TD-151). The tenant
 stays in code and RLS but is never taken or returned by this API.
@@ -6,8 +6,8 @@ stays in code and RLS but is never taken or returned by this API.
 | File | What |
 |---|---|
 | `models.py` | `oe_admin_grant` (`BaseRecordMixin`, tenant-level, own `admin_grant` RLS policy; migration `0015`) |
-| `schemas.py` | `UserCreate` / `UserUpdate` / `UserRead`, `UserLookupRequest` / `UserSummary`, `GrantIn` / `MemberAssign` / `MemberRead` / `MemberAssigned` |
-| `service.py` | `own_admin_grants` (registered as core's admin-grant lookup), `grant` / `revoke`, `create_user` / `update_user` / `lookup_user`, `project_members` / `assign_member` / `remove_member` |
+| `schemas.py` | `UserCreate` / `UserUpdate` / `UserRead`, `UserLookupRequest` / `UserSummary`, `GrantIn` / `MemberAssign` / `MemberRead` / `MemberAssigned`, `AdminGrantKind` / `AdminGrantIn` / `AdminGrantRead` |
+| `service.py` | `own_admin_grants` (registered as core's admin-grant lookup), `list_grants` / `grant` / `revoke`, `create_user` / `update_user` / `lookup_user`, `project_members` / `assign_member` / `remove_member` |
 | `router.py` | `/api/v1/admin/...` (below) |
 
 ## Admin grants
@@ -17,9 +17,19 @@ Neither is a persona or a membership, and neither confers any capability (no `A`
 release; TD-151). Revoking soft-deletes (partial unique index on live rows). Policy
 (edge spec §6 amendments): a user reads their own rows (`app.current_user_id`); an
 `app.is_system_admin` session reads and writes all of them; nobody else writes. The ORM
-guard refuses the same writes on SQLite. The appointment API is T-0039; `service.grant` /
-`service.revoke` (audited) are what it and provisioning scripts call, from a session bound
-with `is_system_admin=True`.
+guard refuses the same writes on SQLite. `service.grant` / `service.revoke` (audited) are
+what the appointment API (`/grants`, below) and provisioning scripts call, from a session
+bound with `is_system_admin=True`. `revoke` refuses the last live `system_admin` of the
+tenant (`LastSystemAdminError`, 409); it locks the live rows of the kind first, so two System
+admins removing each other at once cannot both succeed.
+
+**What the grants allow** (diff §4.1, T-0039). `system_admin`: this module's System-admin
+endpoints. `create_projects` ("Project Admin"): `POST /api/v1/projects`, nothing else; the
+projects module reads it through `access.CallerAdminGrants` (loaded with the scope at
+authentication) and grants the creator PER-09 on the new project in the creating
+transaction. Revoking `create_projects` keeps the user's PER-09 memberships. Deleting a project
+revokes every membership on it (`memberships.revoke_project`), so memberships of a deleted
+project confer nothing (`load_grants`, allowed project list, admin checks; TD-184).
 
 **At authentication** `app.core.auth.access.resolve_request_scope` loads the caller's own
 grants in the same unit of work that reads their memberships and binds `system_admin` as
@@ -45,6 +55,9 @@ never from a claim, parameter or header.
 | `GET /projects/{p}/members` | PER-09 of `p`, `system_admin` | members of `p` with their personas and sites |
 | `PUT /projects/{p}/members/{user}` | PER-09 of `p`, `system_admin` | set the user's complete persona set on `p` |
 | `DELETE /projects/{p}/members/{user}` | PER-09 of `p`, `system_admin` | revoke all of the user's personas on `p` |
+| `GET /grants[?user_id=]` | `system_admin` | live tenant-level grants `{user_id, email, display_name, grant}`, by e-mail |
+| `POST /grants` | `system_admin` | `{user_id, grant}` with `grant` `system_admin` or `create_projects`: 201, 200 if already held, 404 unknown user |
+| `DELETE /grants/{user}/{grant}` | `system_admin` | revoke: 204, 404 if not held, 409 for the last `system_admin` |
 
 Everyone else gets 403; a project the caller is not a member of (or a deleted one) is 404 for
 everyone but a `system_admin` (deleted: 404 for all). Request bodies forbid unknown fields

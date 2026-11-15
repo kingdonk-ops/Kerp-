@@ -10,8 +10,12 @@ bound with, loaded from the grants table at authentication, never from the reque
   ``p`` or a ``system_admin``. A non-member of ``p`` (or a deleted project) gets 404, a
   member without PER-09 403.
 
-No endpoint takes or returns a tenant id. Tenant-level grants are not assignable here
-(T-0039 adds their API, ``system_admin`` only).
+* ``GET/POST /grants``, ``DELETE /grants/{user}/{grant}``: ``system_admin`` only (else 403):
+  appoint and remove System admins and Project Admins (``create_projects``); the last System
+  admin cannot be removed (409). Every grant and revoke is audited (T-0039, diff §4.1).
+
+No endpoint takes or returns a tenant id. Tenant-level grants are not personas: they are
+never assignable through the membership endpoints.
 """
 
 from __future__ import annotations
@@ -33,10 +37,14 @@ from app.core.auth.access import (
 )
 from app.core.auth.deps import CurrentPrincipal
 from app.core.auth.lockout import LockedOutError, LockoutPolicy, ProgressiveLockout
+from app.core.auth.models import User
 from app.core.auth.runtime import AuthRuntime, get_auth_runtime
 from app.core.db import DbSession
 from app.modules.admin import service
 from app.modules.admin.schemas import (
+    AdminGrantIn,
+    AdminGrantKind,
+    AdminGrantRead,
     GrantRead,
     MemberAssign,
     MemberAssigned,
@@ -213,4 +221,54 @@ def remove_member(
         service.remove_member(session, project_id, user_id, actor_id=principal.user_id)
     except service.NotAMemberError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Not Found") from exc
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# --- tenant-level admin grants (T-0039) -----------------------------------------------------
+
+
+def _admin_grant(user: User, kind: str) -> AdminGrantRead:
+    return AdminGrantRead(
+        user_id=user.id,
+        email=user.email,
+        display_name=user.display_name,
+        grant=AdminGrantKind(kind),
+    )
+
+
+@router.get("/grants", response_model=list[AdminGrantRead], dependencies=[SystemAdminOnly])
+def list_grants(session: DbSession, user_id: uuid.UUID | None = None) -> list[AdminGrantRead]:
+    return [_admin_grant(u, kind) for u, kind in service.list_grants(session, user_id)]
+
+
+@router.post(
+    "/grants",
+    response_model=AdminGrantRead,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[SystemAdminOnly],
+    responses={status.HTTP_200_OK: {"model": AdminGrantRead, "description": "Already held"}},
+)
+def grant(
+    body: AdminGrantIn, principal: CurrentPrincipal, session: DbSession, response: Response
+) -> AdminGrantRead:
+    user = auth_service.get_user(session, body.user_id)
+    if not service.grant(session, user.id, body.grant.value, actor_id=principal.user_id):
+        response.status_code = status.HTTP_200_OK
+    return _admin_grant(user, body.grant.value)
+
+
+@router.delete(
+    "/grants/{user_id}/{grant}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[SystemAdminOnly],
+)
+def revoke(
+    user_id: uuid.UUID, grant: AdminGrantKind, principal: CurrentPrincipal, session: DbSession
+) -> Response:
+    try:
+        revoked = service.revoke(session, user_id, grant.value, actor_id=principal.user_id)
+    except service.LastSystemAdminError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+    if not revoked:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Not Found")
     return Response(status_code=status.HTTP_204_NO_CONTENT)

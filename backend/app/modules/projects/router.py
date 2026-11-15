@@ -7,8 +7,9 @@ project is the one in the path:
 * list / read: projects the caller is a member of; any other project (another tenant's,
   a non-member's, a deleted one) is 404.
 * edit / delete: the ``admin`` capability on that project (Project Administrator), else 403.
-* create: the ``admin`` capability on at least one project of the tenant, until T-0014 adds
-  the tenant administrator (TD-184).
+* create: the caller's tenant-level ``create_projects`` grant ("Project Admin", appointed by
+  a System admin through ``/api/v1/admin/grants``), else 403 (diff §4.1, TD-184, T-0039). The
+  creator is granted PER-09 on the new project in the same transaction.
 """
 
 from __future__ import annotations
@@ -17,7 +18,15 @@ import uuid
 
 from fastapi import APIRouter, HTTPException, Response, status
 
-from app.core.auth.access import CallerGrants, Capability, Grant, ProjectAccess, project_access
+from app.core.auth.access import (
+    CREATE_PROJECTS,
+    CallerAdminGrants,
+    CallerGrants,
+    Capability,
+    Grant,
+    ProjectAccess,
+    project_access,
+)
 from app.core.auth.deps import CurrentPrincipal
 from app.core.db import DbSession
 from app.modules.projects import service
@@ -52,13 +61,17 @@ def list_projects(grants: CallerGrants, session: DbSession) -> list[ProjectRead]
 
 @router.post("", response_model=ProjectRead, status_code=status.HTTP_201_CREATED)
 def create_project(
-    body: ProjectCreate, principal: CurrentPrincipal, grants: CallerGrants, session: DbSession
+    body: ProjectCreate,
+    principal: CurrentPrincipal,
+    admin_grants: CallerAdminGrants,
+    session: DbSession,
 ) -> ProjectRead:
-    projects = {g.project_id for g in grants}
-    if not any(project_access(grants, p).has(Capability.ADMINISTER) for p in projects):
+    if CREATE_PROJECTS not in admin_grants:
         raise _forbidden()
     try:
-        project = service.create_project(session, body, actor_id=principal.user_id)
+        project = service.create_project(
+            session, body, actor_id=principal.user_id, creator_id=principal.user_id
+        )
     except service.DuplicateProjectCodeError as exc:
         raise _conflict(exc) from exc
     return ProjectRead.model_validate(project)

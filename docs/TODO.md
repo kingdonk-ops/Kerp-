@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 174 · **Closed:** 115
+**Open:** 175 · **Closed:** 115
 
 ## decision (2)
 
@@ -103,7 +103,7 @@
 | [TD-278](../tracker/todo/TD-278.md) | Rule 'Try it' on a recent real context (ADR 0004 §6): pick a recent record/event of the set's kind and evaluate against it; T-0036 only evaluates supplied sample contexts | T-0036 | implementer |
 | [TD-288](../tracker/todo/TD-288.md) | pending_updates on a set with no parent default answers 409 instead of an empty offer | T-0036 | reviewer |
 
-## later (73)
+## later (74)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -180,6 +180,7 @@
 | [TD-284](../tracker/todo/TD-284.md) | Dedicated RLS policy for oe_identity_device (owner, system_admin, PER-09 of a shared project) | T-0043 | implementer |
 | [TD-289](../tracker/todo/TD-289.md) | drift_report runs one list_rules query per set per project (N+1) | T-0036 | reviewer |
 | [TD-290](../tracker/todo/TD-290.md) | Map RevocationUnavailableError to 503 in the device endpoints and resolve_request_device | T-0043 | reviewer |
+| [TD-294](../tracker/todo/TD-294.md) | Project delete revokes its memberships (T-0039, TD-184): a future project restore must re-grant them, and memberships on projects soft-deleted before T-0039 (dev databases only) stay live until revoked | T-0039 | implementer |
 
 ## bug (3)
 

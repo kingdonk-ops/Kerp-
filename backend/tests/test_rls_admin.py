@@ -6,6 +6,7 @@ real PostgreSQL and the ``NOSUPERUSER NOBYPASSRLS`` role ``kerp_app`` (CI's Post
 All data is synthetic.
 """
 
+import threading
 import uuid
 from collections.abc import Iterator
 from pathlib import Path
@@ -240,3 +241,35 @@ def test_membership_writes_need_the_project_in_view(db: Database, seed: Seed) ->
     )
     with pytest.raises(DBAPIError, match=RLS_ERROR):
         _execute(db, bob, move, elsewhere=uuid.uuid4(), a=seed.a)
+
+
+def test_two_system_admins_cannot_remove_each_other_at_once(db: Database) -> None:
+    """T-0039: ``revoke`` locks every live ``system_admin`` row, so the second of two
+    concurrent mutual revokes waits for the first, then sees only one admin left (409)."""
+    alice, bob = seed_user(db, T1, ALICE), seed_user(db, T1, BOB)
+    with db.unit_of_work(ROOT) as s:
+        admin.grant(s, alice, SYSTEM_ADMIN, actor_id=None)
+        admin.grant(s, bob, SYSTEM_ADMIN, actor_id=None)
+    outcome: list[object] = []
+    first_holds_lock = threading.Event()
+
+    def second() -> None:
+        first_holds_lock.wait(10)
+        try:
+            with db.unit_of_work(ROOT) as s:
+                outcome.append(admin.revoke(s, alice, SYSTEM_ADMIN, actor_id=bob))
+        except admin.LastSystemAdminError as exc:
+            outcome.append(exc)
+
+    worker = threading.Thread(target=second)
+    worker.start()
+    with db.unit_of_work(ROOT) as s:
+        assert admin.revoke(s, bob, SYSTEM_ADMIN, actor_id=alice)
+        first_holds_lock.set()
+        worker.join(0.5)
+        assert worker.is_alive()  # blocked on the row locks until this commits
+    worker.join(10)
+    assert len(outcome) == 1
+    assert isinstance(outcome[0], admin.LastSystemAdminError)
+    rows = _rows(db, ROOT, "SELECT user_id FROM oe_admin_grant WHERE deleted_at IS NULL")
+    assert [r[0] for r in rows] == [alice]

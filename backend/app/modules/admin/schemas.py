@@ -10,11 +10,12 @@ tenant-level grants are not personas and cannot be assigned here.
 from __future__ import annotations
 
 import uuid
+from enum import StrEnum
 from typing import Annotated, Final, Self
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
-from app.core.auth.access import PERSONAS, Persona, Scope
+from app.core.auth.access import CREATE_PROJECTS, PERSONAS, SYSTEM_ADMIN, Persona, Scope
 
 MAX_GRANTS: Final = len(Persona)
 
@@ -133,3 +134,29 @@ class MemberAssigned(MemberRead):
     sod_warning: bool = Field(
         description="PER-09 together with a hold-authority persona (confirmed with confirm_sod)"
     )
+
+
+# --- tenant-level admin grants (T-0039) -----------------------------------------------------
+
+
+class AdminGrantKind(StrEnum):
+    """The two tenant-level grants (``access.ADMIN_GRANTS``); neither is a persona."""
+
+    SYSTEM_ADMIN = SYSTEM_ADMIN
+    CREATE_PROJECTS = CREATE_PROJECTS
+
+
+class AdminGrantIn(BaseModel):
+    """``POST /admin/grants``: give ``grant`` to the user (``system_admin`` callers only)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    user_id: uuid.UUID
+    grant: AdminGrantKind
+
+
+class AdminGrantRead(BaseModel):
+    user_id: uuid.UUID
+    email: str
+    display_name: str
+    grant: AdminGrantKind
