@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 161 · **Closed:** 112
+**Open:** 162 · **Closed:** 112
 
 ## decision (1)
 
@@ -179,7 +179,7 @@
 | [TD-159](../tracker/todo/TD-159.md) | Site filter from the bound project is applied to all site-scoped rows: a PER-07 on A who is PER-01 on B loses B's site-scoped rows (over-restrictive) | T-0010 | reviewer |
 | [TD-252](../tracker/todo/TD-252.md) | tracker.py new-todo cannot see open PRs in cloud sessions: gh pr list uses GraphQL (blocked), so TODO ids collide | T-0029 | coordinator |
 
-## risk (17)
+## risk (18)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -200,6 +200,7 @@
 | [TD-254](../tracker/todo/TD-254.md) | spatial_bounds 10,000-position cap also runs on reads (ProjectRead): a stored row above the cap makes GET /projects 500 for the whole tenant | T-0060 | coordinator |
 | [TD-260](../tracker/todo/TD-260.md) | a11y component tests run in the installed Google Chrome (Vitest browser mode, Playwright channel chrome): CI relies on the runner's preinstalled Chrome; set KERP_CHROME_PATH or install a browser if the image changes | T-0046 | implementer |
 | [TD-276](../tracker/todo/TD-276.md) | A PR-added or PR-edited workflow can emit a check named review-gate; accepted while the owner is the sole collaborator (revisit when a second collaborator joins) | T-0067 | planner |
+| [TD-292](../tracker/todo/TD-292.md) | Remove stale scripts/gemini_review.sh allow/deny rules from .claude/settings.json (human-only edit) | — | implementer |
 
 ## Closed
 
