@@ -5,6 +5,11 @@ project (the request session until TD-122; ``Database.unit_of_work(TenancyContex
 elsewhere). A project-bound session cannot create or change it (``OutOfScopeError``).
 Each change is appended to the audit chain ``project:<id>``. Authorisation is the router's.
 
+The creator named by the router (``creator_id``) is granted PER-09 Project Administrator on the
+new project in the same transaction (diff §4.1, T-0039); deleting a project revokes every
+membership on it, so memberships of a deleted project confer nothing (TD-184). Memberships are
+written through the membership store (``app.core.auth.memberships``).
+
 Modules that set a new project up (the validation module copies the tenant's default rule
 sets into it, ADR 0004 §2.3) register a **created listener**; ``create_project`` calls it in
 the same session and transaction, so a project never exists without its setup.
@@ -22,6 +27,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.audit import service as audit
+from app.core.auth import memberships
+from app.core.auth.access import Grant, Persona
 from app.core.tenancy.rls import session_tenancy
 from app.core.tenancy.scope import get_or_404
 from app.modules.projects.models import Project
@@ -83,8 +90,14 @@ def _audit(
 
 
 def create_project(
-    session: Session, data: ProjectCreate, *, actor_id: uuid.UUID | None = None
+    session: Session,
+    data: ProjectCreate,
+    *,
+    actor_id: uuid.UUID | None = None,
+    creator_id: uuid.UUID | None = None,
 ) -> Project:
+    """Create the project; ``creator_id`` (the Project Admin creating it through the API) is
+    granted PER-09 on it in the same transaction. Provisioning scripts pass none."""
     project = Project(
         id=uuid.uuid4(),
         tenant_id=_tenant_id(session),
@@ -96,7 +109,12 @@ def create_project(
     )
     session.add(project)
     _flush(session, project.code)
-    _audit(session, project, "create", actor_id)
+    extra: dict[str, list[str]] = {}
+    if creator_id is not None:
+        creator = Grant(project.id, Persona.PROJECT_ADMINISTRATOR)
+        memberships.set_user_grants(session, project.id, creator_id, [creator], actor_id=actor_id)
+        extra["creator_grants"] = [creator.persona.value]
+    _audit(session, project, "create", actor_id, **extra)
     for listener in list(_CREATED_LISTENERS):
         listener(session, project)
     return project
@@ -143,12 +161,15 @@ def update_project(
 def delete_project(
     session: Session, project_id: uuid.UUID, *, actor_id: uuid.UUID | None = None
 ) -> None:
-    """Soft-delete the project; it then 404s everywhere (its code stays taken)."""
+    """Soft-delete the project and revoke every membership on it; it then 404s everywhere
+    (its code stays taken)."""
     project = get_project(session, project_id)
+    revoked = memberships.revoke_project(session, project_id, actor_id=actor_id)
     project.soft_delete()
     project.updated_by = actor_id
     session.flush()
-    _audit(session, project, "delete", actor_id)
+    gone = sorted(f"{user}:{grant.persona.value}" for user, grant in revoked)
+    _audit(session, project, "delete", actor_id, revoked_memberships=gone)
 
 
 def site_zone(project: Project) -> ZoneInfo:

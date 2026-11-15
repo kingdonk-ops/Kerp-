@@ -26,12 +26,14 @@ from app.core.auth import memberships
 from app.core.auth import service as users
 from app.core.auth.access import (
     ADMIN_GRANTS,
+    SYSTEM_ADMIN,
     Grant,
     register_admin_grant_lookup,
     sod_warning,
 )
 from app.core.auth.models import User, normalize_email
 from app.core.tenancy.rls import session_tenancy
+from app.core.tenancy.scope import OutOfScopeError
 from app.modules.admin.models import AdminGrant
 from app.modules.admin.schemas import UserCreate, UserUpdate
 from app.modules.projects import service as projects
@@ -46,6 +48,10 @@ class DuplicateUserError(ValueError):
 
 class SodConfirmationError(ValueError):
     """PER-09 + hold-authority persona without ``confirm_sod`` (409, TD-151)."""
+
+
+class LastSystemAdminError(ValueError):
+    """Revoking this ``system_admin`` grant would leave the deployment without one (409)."""
 
 
 class NotAMemberError(LookupError):
@@ -108,7 +114,7 @@ register_admin_grant_lookup(own_admin_grants)
 
 def grant(session: Session, user_id: uuid.UUID, kind: str, *, actor_id: uuid.UUID | None) -> bool:
     """Grant ``kind`` (``system_admin`` sessions only: the RLS policy and the ORM guard refuse
-    anyone else). ``False`` when the user already holds it. T-0039 adds the API."""
+    anyone else). ``False`` when the user already holds it. Called by ``/admin/grants``."""
     if kind not in ADMIN_GRANTS:
         raise ValueError(f"unknown admin grant {kind!r}")
     tenant_id = _tenant_id(session)
@@ -131,21 +137,42 @@ def grant(session: Session, user_id: uuid.UUID, kind: str, *, actor_id: uuid.UUI
 
 
 def revoke(session: Session, user_id: uuid.UUID, kind: str, *, actor_id: uuid.UUID | None) -> bool:
-    """Revoke ``kind`` (soft delete). ``False`` when the user does not hold it."""
-    row = session.scalars(
-        select(AdminGrant).where(
-            AdminGrant.tenant_id == _tenant_id(session),
-            AdminGrant.user_id == user_id,
-            AdminGrant.kind == kind,
-        )
-    ).one_or_none()
+    """Revoke ``kind`` (soft delete). ``False`` when the user does not hold it;
+    ``LastSystemAdminError`` for the last ``system_admin`` (diff §4.1). Revoking
+    ``create_projects`` leaves the user's PER-09 memberships alone."""
+    context = session_tenancy(session)
+    if context is None or not context.is_system_admin:
+        # As the write policy would; checked first because PostgreSQL silently drops rows a
+        # ``FOR UPDATE`` may not update instead of refusing them.
+        raise OutOfScopeError("AdminGrant not found")
+    query = select(AdminGrant).where(
+        AdminGrant.tenant_id == _tenant_id(session), AdminGrant.kind == kind
+    )
+    # Lock every live row of the kind so two System admins revoking each other at the same
+    # time cannot both pass the last-admin check (PostgreSQL; SQLite refuses the 2nd writer).
+    rows = session.scalars(query.with_for_update()).all()
+    row = next((r for r in rows if r.user_id == user_id), None)
     if row is None:
         return False
+    if kind == SYSTEM_ADMIN and len(rows) == 1:
+        raise LastSystemAdminError("the last System admin cannot be removed")
     row.soft_delete()
     row.updated_by = actor_id
     session.flush()
     _append(session, f"admin-grant:{user_id}", {"action": "revoke", "grant": kind}, actor_id)
     return True
+
+
+def list_grants(session: Session, user_id: uuid.UUID | None = None) -> list[tuple[User, str]]:
+    """Every live grant of the tenant (or of ``user_id``) with its account, by e-mail and kind.
+    ``system_admin`` sessions only: anyone else sees just their own rows (RLS)."""
+    query = select(AdminGrant).where(AdminGrant.tenant_id == _tenant_id(session))
+    if user_id is not None:
+        query = query.where(AdminGrant.user_id == user_id)
+    rows = session.scalars(query).all()
+    accounts = users.users_by_id(session, {r.user_id for r in rows})
+    found = [(accounts[r.user_id], r.kind) for r in rows if r.user_id in accounts]
+    return sorted(found, key=lambda pair: (pair[0].email, pair[1]))
 
 
 # --- users ----------------------------------------------------------------------------------
@@ -276,12 +303,14 @@ def remove_member(
 
 __all__ = [
     "DuplicateUserError",
+    "LastSystemAdminError",
     "Member",
     "NotAMemberError",
     "SodConfirmationError",
     "assign_member",
     "create_user",
     "grant",
+    "list_grants",
     "lookup_user",
     "own_admin_grants",
     "project_members",

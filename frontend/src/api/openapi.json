@@ -1417,6 +1417,168 @@
         }
       }
     },
+    "/api/v1/admin/grants": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "List Grants",
+        "operationId": "list_grants_api_v1_admin_grants_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "User Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AdminGrantRead"
+                  },
+                  "title": "Response List Grants Api V1 Admin Grants Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Grant",
+        "operationId": "grant_api_v1_admin_grants_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminGrantIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminGrantRead"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Already held",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminGrantRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/grants/{user_id}/{grant}": {
+      "delete": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Revoke",
+        "operationId": "revoke_api_v1_admin_grants__user_id___grant__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "User Id"
+            }
+          },
+          {
+            "name": "grant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/AdminGrantKind"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/me/projects": {
       "get": {
         "tags": [
@@ -3710,6 +3872,63 @@
   },
   "components": {
     "schemas": {
+      "AdminGrantIn": {
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "User Id"
+          },
+          "grant": {
+            "$ref": "#/components/schemas/AdminGrantKind"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "user_id",
+          "grant"
+        ],
+        "title": "AdminGrantIn",
+        "description": "``POST /admin/grants``: give ``grant`` to the user (``system_admin`` callers only)."
+      },
+      "AdminGrantKind": {
+        "type": "string",
+        "enum": [
+          "system_admin",
+          "create_projects"
+        ],
+        "title": "AdminGrantKind",
+        "description": "The two tenant-level grants (``access.ADMIN_GRANTS``); neither is a persona."
+      },
+      "AdminGrantRead": {
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "User Id"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "grant": {
+            "$ref": "#/components/schemas/AdminGrantKind"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "email",
+          "display_name",
+          "grant"
+        ],
+        "title": "AdminGrantRead"
+      },
       "Aggregate": {
         "properties": {
           "column": {

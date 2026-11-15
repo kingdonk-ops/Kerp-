@@ -21,8 +21,8 @@ rewritten (HS256 → RS256/EdDSA + JWKS + `jti` revocation in Redis).
 | `field.py` | Magic-link tokens + delivery seam, PIN rules (T-0009) |
 | `lockout.py` | `ProgressiveLockout` + policies, Redis-backed (T-0009) |
 | `models.py` | `auth_user` table (tenant-level rows, RLS) — migration `0003`, internal staff flag + Entra link in `0013` (T-0049, ADR 0009); `auth_project_membership` (T-0010) — migration `0006`, persona CHECK widened for PER-16 in `0012` (T-0076), membership-based RLS in `0015` (T-0014); `oe_identity_device` (T-0043) — migration `0016` |
-| `memberships.py` | The membership store's write side (`project_grants`, `set_user_grants`; revoke = soft delete, re-grant revives), used by the admin module (T-0014) |
-| `access.py` | Persona matrix, capability tiers, SoD, scope resolution, `require_capability` / `require_hold_release` guards (T-0010); admin-grant lookup seam, `is_system_admin` binding, `CallerIsSystemAdmin`, `sod_warning` (T-0014) |
+| `memberships.py` | The membership store's write side (`project_grants`, `set_user_grants`, `revoke_project`; revoke = soft delete, re-grant revives), used by the admin module (T-0014) and the projects module (creator PER-09, revoke on delete; T-0039) |
+| `access.py` | Persona matrix, capability tiers, SoD, scope resolution, `require_capability` / `require_hold_release` guards (T-0010); admin-grant lookup seam, `is_system_admin` binding, `CallerIsSystemAdmin`, `sod_warning` (T-0014); `CallerAdminGrants` (the caller's own `system_admin` / `create_projects`, cached with the scope; T-0039) |
 | `devices.py` | Device registry (`oe_identity_device`): enrol + session binding, `resolve_request_device` (last seen, revoked → `DEVICE_REVOKED`), revoke, wipe confirmation, `record_sync` for the sync endpoints (T-0043) |
 | `device_api.py` | Device endpoints: enrol, own / per-user lists, revoke (self, `system_admin`, PER-09 of a shared project; cross-project wipe warning), wipe-confirmed (T-0043) |
 | `device_signal.py` | `X-KERP-Device-Id` header, `DeviceRevokedError` → `401` with `code: DEVICE_REVOKED` (no database) |

@@ -44,9 +44,14 @@ request's scope was resolved from, so they are read once per request, T-0071):
 
 - list and read: projects the caller is a member of; everything else is 404;
 - edit and delete: the `admin` capability (Project Administrator, PER-09) on that project, else 403;
-- create: the `admin` capability on at least one project of the tenant (interim, TD-184). The
-  first project of a tenant is created through `service.create_project`. Creating grants no
-  membership.
+- create: the tenant-level `create_projects` grant ("Project Admin", appointed by a System
+  admin through `/api/v1/admin/grants`; `access.CallerAdminGrants`), else 403 (diff §4.1,
+  TD-184, T-0039). The creator is granted PER-09 on the new project in the same transaction
+  (`create_project(..., creator_id=)`, through `app.core.auth.memberships`), so they read and
+  edit it from the next request on. Provisioning scripts call `service.create_project`
+  without a creator.
+- delete: also revokes every membership on the project (`memberships.revoke_project`;
+  audited as `revoked_memberships`), so memberships of a deleted project confer nothing.
 
 ## Setting a new project up
 

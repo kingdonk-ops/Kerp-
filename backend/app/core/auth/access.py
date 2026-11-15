@@ -302,6 +302,8 @@ def sod_warning(personas: Iterable[Persona]) -> bool:
 # ``request.state`` attribute holding ``(tenant_id, user_id, grants)`` once the request's
 # scope has been resolved, so guards and routers do not query the memberships again (T-0071).
 GRANTS_STATE: Final = "kerp_grants"
+# The same for the caller's tenant-level admin grants (T-0039).
+ADMIN_GRANTS_STATE: Final = "kerp_admin_grants"
 
 
 def resolve_request_scope(
@@ -322,9 +324,11 @@ def resolve_request_scope(
     own = TenancyContext(tenant_id=base.tenant_id, user_id=base.user_id)
     with database.unit_of_work(own) as session:
         grants = load_grants(session, base.tenant_id, base.user_id)
-        is_admin = SYSTEM_ADMIN in caller_admin_grants(session, base.tenant_id, base.user_id)
+        admin_grants = caller_admin_grants(session, base.tenant_id, base.user_id)
     if state is not None:
         setattr(state, GRANTS_STATE, (base.tenant_id, base.user_id, tuple(grants)))
+        setattr(state, ADMIN_GRANTS_STATE, (base.tenant_id, base.user_id, admin_grants))
+    is_admin = SYSTEM_ADMIN in admin_grants
     return resolve_scope(grants, replace(base, is_system_admin=is_admin), base.project_id)
 
 
@@ -374,6 +378,21 @@ def get_caller_is_system_admin(principal: CurrentPrincipal, session: DbSession) 
 
 
 CallerIsSystemAdmin = Annotated[bool, Depends(get_caller_is_system_admin)]
+
+
+def get_caller_admin_grants(
+    request: Request, principal: CurrentPrincipal, session: DbSession
+) -> frozenset[str]:
+    """The caller's own tenant-level admin grants (``create_projects`` gates project creation,
+    T-0039): the ones loaded when the request's scope was resolved, else looked up. Never
+    from the request. They confer no capability (``caller_admin_grants``)."""
+    cached = getattr(request.state, ADMIN_GRANTS_STATE, None)
+    if cached is not None and cached[:2] == (principal.tenant_id, principal.user_id):
+        return frozenset(cached[2])
+    return caller_admin_grants(session, principal.tenant_id, principal.user_id)
+
+
+CallerAdminGrants = Annotated[frozenset[str], Depends(get_caller_admin_grants)]
 
 
 def get_project_access(grants: CallerGrants, session: DbSession) -> ProjectAccess:

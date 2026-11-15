@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 41/164 tasks done (25%) · **ready now:** 21 · **epics awaiting breakdown:** 47
+**Overall:** 41/164 tasks done (25%) · **ready now:** 20 · **epics awaiting breakdown:** 47
 
 | Phase | Tasks done | Progress |
 |---|---|---|
@@ -40,7 +40,7 @@
 | ✅ | [T-0011](../tracker/tasks/T-0011.md) | Module loader + manifest contract + per-project enable/disable | platform | M | T-0005 | #32 |
 | ✅ | [T-0012](../tracker/tasks/T-0012.md) | projects module: CRUD + settings (IANA timezone, spatial_bounds, currency/locale) | projects | M | T-0010, T-0011 | #43 |
 | ✅ | [T-0014](../tracker/tasks/T-0014.md) | admin module: user + project-membership administration API (PER-09 on its projects), admin grants table, membership-based RLS on projects and tenant-level tables | admin | M | T-0010, T-0011, T-0012 | #86 |
-| ▶ | [T-0039](../tracker/tasks/T-0039.md) | System admin appoints Project Admins: system_admin/create_projects grant API, project creation gated on create_projects, creator gets PER-09 | admin | S | T-0014 |  |
+| 🟦 | [T-0039](../tracker/tasks/T-0039.md) | System admin appoints Project Admins: system_admin/create_projects grant API, project creation gated on create_projects, creator gets PER-09 | admin | S | T-0014 |  |
 | ⬜ | [T-0044](../tracker/tasks/T-0044.md) | Deployment (tenant) settings: offline window (default 7, max 14 days) and new-project defaults (status, timezone, currency, locale) | admin | S | T-0039 |  |
 | ▶ | [T-0073](../tracker/tasks/T-0073.md) | Team-derived project grants in core auth: membership rows keyed by source (direct \| team_link), sync/revoke API, load_grants union, PER-09 sees but cannot edit team rows | identity | M | T-0010, T-0014, T-0076 |  |
 | ✅ | [T-0076](../tracker/tasks/T-0076.md) | PER-16 Project Viewer persona: Viewer tier (V only), single-project scope, in the core persona/capability model and membership CHECK | identity | S | T-0010 | #76 |

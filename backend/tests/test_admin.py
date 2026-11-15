@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 from sqlalchemy import select
@@ -20,6 +21,8 @@ from sqlalchemy import select
 from app.core.audit.service import chain_entries
 from app.core.auth import access
 from app.core.auth.access import (
+    ADMIN_GRANTS,
+    CREATE_PROJECTS,
     HOLD_AUTHORITY,
     PERSONAS,
     SYSTEM_ADMIN,
@@ -50,7 +53,13 @@ from app.core.tenancy.rls import (
 from app.core.tenancy.scope import OutOfScopeError
 from app.modules.admin import service
 from app.modules.admin.models import TABLE, AdminGrant
-from app.modules.admin.schemas import GrantIn, MemberAssign, UserCreate, UserUpdate
+from app.modules.admin.schemas import (
+    AdminGrantKind,
+    GrantIn,
+    MemberAssign,
+    UserCreate,
+    UserUpdate,
+)
 from app.modules.projects import service as projects
 from app.modules.projects.models import Project
 from app.modules.projects.schemas import ProjectCreate
@@ -68,6 +77,7 @@ from tests.auth_support import (
 from tests.db_support import database_url
 
 ADMIN = "/api/v1/admin"
+GRANTS = f"{ADMIN}/grants"
 ROOT = TenancyContext(tenant_id=T1, is_system_admin=True)  # provisioning / scripts
 CAROL = "carol@example.test"
 DAVE = "dave@example.test"
@@ -343,8 +353,11 @@ def test_every_endpoint_needs_a_token(api: Api) -> None:
         ("PUT", f"{ADMIN}/projects/{api.home}/members/{uuid.uuid4()}"),
         ("DELETE", f"{ADMIN}/projects/{api.home}/members/{uuid.uuid4()}"),
         ("GET", "/api/v1/me/projects"),
+        ("GET", f"{ADMIN}/grants"),
+        ("POST", f"{ADMIN}/grants"),
+        ("DELETE", f"{ADMIN}/grants/{uuid.uuid4()}/create_projects"),
     ]
-    assert [api.client.request(m, u, json={}).status_code for m, u in calls] == [401] * 8
+    assert [api.client.request(m, u, json={}).status_code for m, u in calls] == [401] * 11
 
 
 def test_a_system_admin_lists_creates_and_deactivates_users(api: Api) -> None:
@@ -539,6 +552,143 @@ def test_project_administrator_plus_hold_authority_needs_confirmation(api: Api) 
     assert viewer.json()["sod_warning"] is False
 
 
+# --- appointing System admins and Project Admins (T-0039) -----------------------------------
+
+
+def test_a_system_admin_appoints_and_removes_project_admins(api: Api) -> None:
+    root, dave = api.headers(ALICE), str(api.users[DAVE])
+    body = {"user_id": dave, "grant": "create_projects"}
+    created = api.client.post(GRANTS, json=body, headers=root)
+    assert created.status_code == 201, created.text
+    assert created.json() == {
+        "user_id": dave,
+        "email": DAVE,
+        "display_name": "",
+        "grant": "create_projects",
+    }
+    assert api.client.post(GRANTS, json=body, headers=root).status_code == 200  # already held
+    listed = api.client.get(GRANTS, headers=root).json()
+    assert [(g["email"], g["grant"]) for g in listed] == [
+        (ALICE, "system_admin"),
+        (DAVE, "create_projects"),
+    ]
+    only = api.client.get(GRANTS, params={"user_id": dave}, headers=root).json()
+    assert [g["grant"] for g in only] == ["create_projects"]
+    url = f"{GRANTS}/{dave}/create_projects"
+    assert api.client.delete(url, headers=root).status_code == 204
+    assert api.client.delete(url, headers=root).status_code == 404  # not held any more
+    assert [g["grant"] for g in api.client.get(GRANTS, headers=root).json()] == ["system_admin"]
+    with api.db.unit_of_work(ROOT) as s:
+        entries = chain_entries(s, f"admin-grant:{dave}")
+        assert [(e.payload, e.created_by) for e in entries] == [
+            ({"action": "grant", "grant": "create_projects"}, api.users[ALICE]),
+            ({"action": "revoke", "grant": "create_projects"}, api.users[ALICE]),
+        ]
+
+
+def test_grant_bodies_take_only_known_grants_and_users(api: Api) -> None:
+    root, dave = api.headers(ALICE), str(api.users[DAVE])
+    for bad in (
+        {"user_id": dave, "grant": "PER-09"},
+        {"user_id": dave, "grant": "create_projects", "tenant_id": str(T1)},
+        {"grant": "create_projects"},
+    ):
+        assert api.client.post(GRANTS, json=bad, headers=root).status_code == 422
+    assert api.client.delete(f"{GRANTS}/{dave}/PER-09", headers=root).status_code == 422
+    unknown = {"user_id": str(uuid.uuid4()), "grant": "system_admin"}
+    assert api.client.post(GRANTS, json=unknown, headers=root).status_code == 404
+
+
+def test_the_grant_api_is_for_system_admins_only(api: Api) -> None:
+    with api.db.unit_of_work(ROOT) as s:  # a Project Admin cannot appoint anyone either
+        service.grant(s, api.users[DAVE], CREATE_PROJECTS, actor_id=None)
+    body = {"user_id": str(api.users[CAROL]), "grant": "create_projects"}
+    for email in (BOB, CAROL, DAVE):
+        headers = api.headers(email)
+        assert api.client.get(GRANTS, headers=headers).status_code == 403
+        assert api.client.post(GRANTS, json=body, headers=headers).status_code == 403
+        url = f"{GRANTS}/{api.users[ALICE]}/system_admin"
+        assert api.client.delete(url, headers=headers).status_code == 403
+    assert api.chain(f"admin-grant:{api.users[CAROL]}") == []
+
+
+def test_the_last_system_admin_cannot_be_revoked(api: Api) -> None:
+    root, alice, bob = api.headers(ALICE), api.users[ALICE], api.users[BOB]
+    own = f"{GRANTS}/{alice}/system_admin"
+    last = api.client.delete(own, headers=root)
+    assert last.status_code == 409
+    body = {"user_id": str(bob), "grant": "system_admin"}
+    assert api.client.post(GRANTS, json=body, headers=root).status_code == 201
+    assert api.client.delete(own, headers=root).status_code == 204  # BOB is still one
+    assert api.client.get(GRANTS, headers=root).status_code == 403  # not any more
+    bob_root = api.headers(BOB)
+    assert api.client.delete(f"{GRANTS}/{bob}/system_admin", headers=bob_root).status_code == 409
+    with api.db.unit_of_work(ROOT) as s:
+        assert caller_admin_grants(s, T1, bob) == {SYSTEM_ADMIN}
+
+
+def test_a_project_admin_creates_projects_and_keeps_them_when_the_grant_goes(api: Api) -> None:
+    root, dave = api.headers(ALICE), api.headers(DAVE)
+    new = {"code": "NEW", "name": "Synthetic NEW"}
+    assert api.client.post("/api/v1/projects", json=new, headers=dave).status_code == 403
+    body = {"user_id": str(api.users[DAVE]), "grant": "create_projects"}
+    assert api.client.post(GRANTS, json=body, headers=root).status_code == 201
+    created = api.client.post("/api/v1/projects", json=new, headers=dave)
+    assert created.status_code == 201, created.text
+    project = uuid.UUID(created.json()["id"])
+    url = f"{GRANTS}/{api.users[DAVE]}/create_projects"
+    assert api.client.delete(url, headers=root).status_code == 204
+    # The PER-09 the creation granted stays: DAVE still administers NEW, creates no more.
+    renamed = api.client.patch(
+        f"/api/v1/projects/{project}", json={"name": "Renamed"}, headers=dave
+    )
+    assert renamed.status_code == 200, renamed.text
+    assert [m["email"] for m in api.members(project, DAVE).json()] == [DAVE]
+    other = {"code": "MORE", "name": "Synthetic MORE"}
+    assert api.client.post("/api/v1/projects", json=other, headers=dave).status_code == 403
+
+
+def test_admin_grants_confer_no_approval_or_signature(api: Api) -> None:
+    """``system_admin`` + ``create_projects`` + the creator's PER-09: still no ``A``/``S``,
+    no hold release (diff §4.1, edge spec §5 Admins)."""
+    with api.db.unit_of_work(ROOT) as s:
+        service.grant(s, api.users[ALICE], CREATE_PROJECTS, actor_id=None)
+    new = {"code": "OWN", "name": "Synthetic OWN"}
+    created = api.client.post("/api/v1/projects", json=new, headers=api.headers(ALICE))
+    assert created.status_code == 201, created.text
+    project = uuid.UUID(created.json()["id"])
+    with api.db.unit_of_work(TenancyContext(tenant_id=T1, user_id=api.users[ALICE])) as s:
+        assert caller_admin_grants(s, T1, api.users[ALICE]) == set(ADMIN_GRANTS)
+        mine = access.project_access(access.load_grants(s, T1, api.users[ALICE]), project)
+    assert mine.personas == {Persona.PROJECT_ADMINISTRATOR}
+    for capability in (Capability.APPROVE, Capability.SIGN):
+        with pytest.raises(HTTPException) as refused:
+            access.require_capability(capability)(mine)
+        assert refused.value.status_code == 403
+    for kind in HoldKind:
+        assert not mine.can_release_hold(kind)
+        with pytest.raises(HTTPException):
+            access.require_hold_release(kind)(mine)
+
+
+def test_memberships_on_a_deleted_project_confer_nothing(api: Api) -> None:
+    """TD-184: a PER-09 whose only project was deleted has no admin capability left."""
+    bob = api.headers(BOB)
+    lookup = f"{ADMIN}/users/lookup"
+    assert api.client.post(lookup, json={"email": DAVE}, headers=bob).status_code == 200
+    assert api.client.delete(f"/api/v1/projects/{api.home}", headers=bob).status_code == 204
+    scope = resolve_request_scope(api.db, TenancyContext(tenant_id=T1, user_id=api.users[BOB]))
+    assert scope.member_project_ids == frozenset()
+    assert scope.allowed_project_ids == frozenset()
+    with api.db.unit_of_work(ROOT) as s:
+        assert access.load_grants(s, T1, api.users[BOB]) == []
+        assert access.load_grants(s, T1, api.users[CAROL]) == [
+            Grant(api.away, Persona.PROJECT_MANAGER)
+        ]
+    assert api.client.post(lookup, json={"email": DAVE}, headers=bob).status_code == 403
+    assert api.client.get("/api/v1/me/projects", headers=bob).json() == []
+
+
 def test_me_projects_lists_the_callers_live_projects(api: Api) -> None:
     third = _project(api.db, "AAA")
     with api.db.unit_of_work(ROOT) as s:
@@ -583,3 +733,7 @@ def test_migration_0015_inlines_exactly_the_live_policy_sql() -> None:
     grant_policy = table_policy(tables[TABLE])
     assert grant_policy is not None
     assert creates(rls_policy_sql(TABLE, grant_policy)) == creates(migration._admin_grant_sql())
+
+
+def test_the_grant_kinds_are_exactly_the_admin_grants() -> None:
+    assert [k.value for k in AdminGrantKind] == list(ADMIN_GRANTS)
