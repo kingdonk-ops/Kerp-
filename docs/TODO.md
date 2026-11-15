@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 175 · **Closed:** 112
+**Open:** 176 · **Closed:** 112
 
 ## decision (2)
 
@@ -191,7 +191,7 @@
 | [TD-252](../tracker/todo/TD-252.md) | tracker.py new-todo cannot see open PRs in cloud sessions: gh pr list uses GraphQL (blocked), so TODO ids collide | T-0029 | coordinator |
 | [TD-287](../tracker/todo/TD-287.md) | Upgrade offer: a soft-deleted own rule holding a new default's key shows key_in_use forever | T-0036 | reviewer |
 
-## risk (19)
+## risk (20)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -214,6 +214,7 @@
 | [TD-276](../tracker/todo/TD-276.md) | A PR-added or PR-edited workflow can emit a check named review-gate; accepted while the owner is the sole collaborator (revisit when a second collaborator joins) | T-0067 | planner |
 | [TD-286](../tracker/todo/TD-286.md) | wipe-confirmed is unauthenticated: anyone who knows a revoked device_id can set its wipe time | T-0043 | implementer |
 | [TD-291](../tracker/todo/TD-291.md) | Revoked-device oracle: refuse_revoked_device on login and wipe-confirmed answer for any device id | T-0043 | reviewer |
+| [TD-292](../tracker/todo/TD-292.md) | Remove stale scripts/gemini_review.sh allow/deny rules from .claude/settings.json (human-only edit) | — | implementer |
 
 ## Closed
 
