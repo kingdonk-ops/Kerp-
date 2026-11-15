@@ -169,16 +169,20 @@ its `platform` (`android | ios | web`), OS and app version. `oe_identity_device`
   endpoints).
 - **Revoke.** A `system_admin`, a PER-09 of a project the device's user belongs to, or the user
   (user decision Q4a). Others: `403` for a member of a shared project without PER-09, else
-  `404`. The revoke marks the row revoked and immediately revokes every session bound to the
-  device (`revoked:sid:*`) with a marker (`revoked:device-sid:*`). When the revoker acts as
-  PER-09 and the device's user also belongs to projects the revoker does not administer, the
-  API answers `409 {code: cross_project_wipe_confirmation_required, last_sync_at}` until
-  repeated with `confirm_cross_project_wipe: true` (the wipe deletes unsynced work of those
-  projects too; planner mitigation for Q4a). The other projects are looked up server-side
-  (`access.user_project_ids`) and never named in the answer. Audited on the tenant-level chain
-  `device:<device_id>`: actor, `role` (`self` / `system_admin` / `per_09` with `project_ids`),
-  `cross_project_warning`, `warning_confirmed`, `sessions_revoked`. Revoking again changes
-  nothing and is not audited again.
+  `404`. The revoke marks the row revoked, commits it with its audit entry, and only then
+  revokes every session bound to the device (`revoked:sid:*`) with a marker
+  (`revoked:device-sid:*`): a failed commit never tells a still-active device to wipe, and if
+  the kill fails after the commit, the per-request check of the bound device's row still
+  refuses those sessions. When the revoker acts as PER-09 and the device's user also belongs to
+  projects the revoker does not administer, the API answers
+  `409 {code: cross_project_wipe_confirmation_required, last_sync_at}` until repeated with
+  `confirm_cross_project_wipe: true` (the wipe deletes unsynced work of those projects too;
+  planner mitigation for Q4a). The other projects are looked up server-side
+  (`access.user_has_projects_beyond`, a yes/no answer) and never named in the answer. Audited
+  on the tenant-level chain `device:<device_id>`: actor, `role` (`self` / `system_admin` /
+  `per_09` with `project_ids`), `cross_project_warning`, `warning_confirmed`,
+  `sessions_revoked` (the sessions bound at the revoke). Revoking again changes nothing and is
+  not audited again.
 - **The wipe signal.** Every later call from a revoked device is `401
   {"detail": "Device revoked", "code": "DEVICE_REVOKED"}`: an access token or refresh/unlock of
   a session killed by the revoke, and any call (login, magic-link redeem, refresh, unlock,

@@ -41,7 +41,7 @@ from app.core.auth.access import (
     Grant,
     Persona,
     load_grants,
-    user_project_ids,
+    user_has_projects_beyond,
 )
 from app.core.auth.deps import CurrentPrincipal
 from app.core.auth.models import DEVICE_REVOKED, Device
@@ -233,8 +233,9 @@ def revoke(
     warn = False
     if authority.role == "per_09" and not already:
         database: Database = request.app.state.db
-        everything = user_project_ids(database, principal.tenant_id, device.user_id)
-        warn = bool(everything - authority.project_ids)
+        warn = user_has_projects_beyond(
+            database, principal.tenant_id, device.user_id, authority.project_ids
+        )
         if warn and not confirm:
             last_sync = device.last_sync_at.isoformat() if device.last_sync_at else None
             raise HTTPException(
@@ -250,14 +251,8 @@ def revoke(
                     ),
                 },
             )
-    killed = devices.revoke(
-        session,
-        runtime.store,
-        device,
-        actor_id=principal.user_id,
-        session_ttl=runtime.tokens.ttl["refresh"],
-    )
-    if not already:
+    ttl = runtime.tokens.ttl["refresh"]
+    if devices.mark_revoked(session, device, actor_id=principal.user_id):
         payload = {
             "action": "revoke",
             "device_id": str(device.device_id),
@@ -266,7 +261,7 @@ def revoke(
             "project_ids": sorted(str(p) for p in authority.project_ids),
             "cross_project_warning": warn,
             "warning_confirmed": warn and confirm,
-            "sessions_revoked": killed,
+            "sessions_revoked": runtime.store.device_session_count(device.device_id),
         }
         audit.append(
             session,
@@ -275,6 +270,12 @@ def revoke(
             actor_id=principal.user_id,
             source="api",
         )
+    # Commit the revoke before killing the sessions: a failed commit must not tell a device
+    # that is still active to wipe itself. Should the kill fail after the commit, every session
+    # bound to the device is refused anyway (``resolve_request_device`` re-checks the row).
+    # Revoking again changes nothing in the row; any session still bound is killed again.
+    session.commit()
+    runtime.store.revoke_device(device.device_id, ttl)
     return DeviceRevoked.model_validate(
         {**_read(device).model_dump(), "role": authority.role, "cross_project_warning": warn}
     )

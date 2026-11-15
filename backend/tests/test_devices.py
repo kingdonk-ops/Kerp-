@@ -13,10 +13,12 @@ from typing import Any
 import httpx
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import event
+from sqlalchemy.orm import Session
 
 from app.core.audit.service import chain_entries, verify_chain
 from app.core.auth import devices
-from app.core.auth.access import SYSTEM_ADMIN, Persona, user_project_ids
+from app.core.auth.access import SYSTEM_ADMIN, Persona, user_has_projects_beyond
 from app.core.auth.device_signal import (
     DEVICE_HEADER,
     DEVICE_REVOKED_CODE,
@@ -24,7 +26,11 @@ from app.core.auth.device_signal import (
     parse_device_id,
 )
 from app.core.auth.models import DEVICE_TABLE, Device, ProjectMembership
-from app.core.auth.revocation import InMemoryRevocationStore, RedisRevocationStore
+from app.core.auth.revocation import (
+    InMemoryRevocationStore,
+    RedisRevocationStore,
+    RevocationUnavailableError,
+)
 from app.core.auth.runtime import AuthRuntime
 from app.core.db import Base, Database, contract_violations, utcnow
 from app.core.tenancy.context import TenancyContext
@@ -471,10 +477,11 @@ def test_revoking_twice_is_idempotent_and_audited_once(api: Api) -> None:
     assert [e["action"] for e in api.chain(f"device:{device}")] == ["enrol", "revoke"]
 
 
-def test_user_project_ids_reads_every_project_of_the_user(api: Api) -> None:
-    found = user_project_ids(api.db, T1, api.users[FIONA])
-    assert found == {api.home, api.away}
-    assert user_project_ids(api.db, T1, api.users[DAVE]) == frozenset()
+def test_user_has_projects_beyond_answers_yes_or_no_only(api: Api) -> None:
+    fiona = api.users[FIONA]
+    assert user_has_projects_beyond(api.db, T1, fiona, frozenset({api.home}))
+    assert not user_has_projects_beyond(api.db, T1, fiona, frozenset({api.home, api.away}))
+    assert not user_has_projects_beyond(api.db, T1, api.users[DAVE], frozenset())
 
 
 # --- revoke: effect on the device -------------------------------------------------------------
@@ -495,6 +502,52 @@ def test_revoke_kills_every_session_of_the_device_at_once(api: Api) -> None:
         assert call.headers["WWW-Authenticate"].startswith("Bearer")
         assert _revoked(refresh(api.client, tokens["refresh_token"]))
     assert api.client.get(ME, headers=api.bearer(elsewhere)).status_code == 200
+
+
+def test_a_failed_revoke_commit_leaves_the_device_active_and_its_sessions_alive(
+    api: Api,
+) -> None:
+    tokens, device = api.device_on(GREG)
+    admin = api.login(ALICE)
+
+    def fail(session: Session) -> None:
+        # Only the commit that would persist the revoke fails.
+        held = session.identity_map.values()
+        if any(isinstance(o, Device) and o.status == "revoked" for o in held):
+            raise RuntimeError("synthetic commit failure")
+
+    event.listen(Session, "before_commit", fail)
+    try:
+        assert api.revoke(admin, device).status_code == 500
+    finally:
+        event.remove(Session, "before_commit", fail)
+    assert api.row(device).status == "active"
+    assert [e["action"] for e in api.chain(f"device:{device}")] == ["enrol"]
+    assert api.client.get(ME, headers=api.bearer(tokens)).status_code == 200
+    assert refresh(api.client, tokens["refresh_token"]).status_code == 200
+    assert api.runtime.store.device_session_count(device) == 1
+
+
+def test_a_failed_session_kill_after_the_commit_still_refuses_the_device(
+    api: Api, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    tokens, device = api.device_on(GREG)
+    admin = api.login(ALICE)
+
+    def unavailable(device_id: uuid.UUID, ttl: timedelta) -> int:
+        raise RevocationUnavailableError("synthetic outage")
+
+    monkeypatch.setattr(api.runtime.store, "revoke_device", unavailable)
+    assert api.revoke(admin, device).status_code == 500  # 503 mapping: TD-290
+    monkeypatch.undo()
+    assert api.row(device).status == "revoked"  # committed before the kill
+    (entry,) = [e for e in api.chain(f"device:{device}") if e["action"] == "revoke"]
+    assert entry["sessions_revoked"] == 1
+    assert _revoked(api.client.get(ME, headers=api.bearer(tokens)))  # per-request re-check
+    # Revoking again kills whatever is still bound, without a second audit entry.
+    assert api.revoke(admin, device).status_code == 200
+    assert api.runtime.store.device_session_count(device) == 0
+    assert [e["action"] for e in api.chain(f"device:{device}")] == ["enrol", "revoke"]
 
 
 def test_any_later_call_from_the_revoked_device_is_device_revoked(api: Api) -> None:
@@ -642,7 +695,9 @@ def test_store_binds_sessions_to_a_device_and_revokes_them_together(make_store: 
     store.bind_device(c, other, ttl)
     assert (store.session_device(a), store.session_device(c)) == (device, other)
     assert store.session_device(uuid.uuid4()) is None
+    assert store.device_session_count(device) == 2
     assert store.revoke_device(device, ttl) == 2
+    assert store.device_session_count(device) == 0
     assert store.is_revoked("jti", a)
     assert store.is_revoked("jti", b)
     assert store.revoked_by_device(a)

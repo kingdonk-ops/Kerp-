@@ -16,9 +16,9 @@ tenant-level record. The tenant comes from the session binding, never from an ar
   that names an enrolled device of its user in ``X-KERP-Device-Id``, runs "through" that
   device: ``last_seen_at`` is updated (at most once a minute) and the audit ledger records
   the device. A revoked device gets ``DeviceRevokedError`` and the calling session dies.
-* **Revoke** (``revoke``): status ``revoked`` with who and when; every session bound to the
-  device is revoked at once (``revoke_device``), marked so that its next call is answered
-  ``DEVICE_REVOKED``.
+* **Revoke** (``mark_revoked``): status ``revoked`` with who and when; once that is
+  committed, every session bound to the device is revoked at once (``revoke_device``),
+  marked so that its next call is answered ``DEVICE_REVOKED``.
 """
 
 from __future__ import annotations
@@ -155,26 +155,23 @@ def record_sync(session: Session, device_id: uuid.UUID, *, user_id: uuid.UUID) -
     return device
 
 
-def revoke(
-    session: Session,
-    store: RevocationStore,
-    device: Device,
-    *,
-    actor_id: uuid.UUID,
-    session_ttl: timedelta,
-) -> int:
-    """Revoke ``device`` and kill every session bound to it; returns how many.
+def mark_revoked(session: Session, device: Device, *, actor_id: uuid.UUID) -> bool:
+    """Set ``device`` revoked with who and when; ``False`` when it was revoked before.
 
-    Already revoked: nothing changes in the row, any session still bound is killed again.
+    Only the row: the caller commits it, *then* kills the device's sessions
+    (``RevocationStore.revoke_device``). That order keeps a failed commit from telling a
+    still-active device to wipe; if the kill fails after the commit, the per-request check
+    (``resolve_request_device``) still refuses every session bound to the revoked device.
     """
-    if device.status != DEVICE_REVOKED:
-        now = utcnow()
-        device.status = DEVICE_REVOKED
-        device.revoked_at = now
-        device.revoked_by = actor_id
-        device.updated_by = actor_id
-        session.flush()
-    return store.revoke_device(device.device_id, session_ttl)
+    if device.status == DEVICE_REVOKED:
+        return False
+    now = utcnow()
+    device.status = DEVICE_REVOKED
+    device.revoked_at = now
+    device.revoked_by = actor_id
+    device.updated_by = actor_id
+    session.flush()
+    return True
 
 
 def confirm_wipe(session: Session, device: Device) -> bool:

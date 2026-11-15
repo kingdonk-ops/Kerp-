@@ -90,6 +90,8 @@ class RevocationStore(Protocol):
 
     def session_device(self, session_id: uuid.UUID) -> uuid.UUID | None: ...
 
+    def device_session_count(self, device_id: uuid.UUID) -> int: ...
+
     def revoke_device(self, device_id: uuid.UUID, ttl: timedelta) -> int: ...
 
     def revoke_device_session(self, session_id: uuid.UUID, ttl: timedelta) -> None: ...
@@ -271,6 +273,10 @@ class RedisRevocationStore:
             _as_bytes(self._call(lambda: self._client.get(_device_of_key(session_id))))
         )
 
+    def device_session_count(self, device_id: uuid.UUID) -> int:
+        """How many sessions are bound to the device now (read-only)."""
+        return int(str(self._call(lambda: self._client.scard(_device_sessions_key(device_id)))))
+
     def revoke_device(self, device_id: uuid.UUID, ttl: timedelta) -> int:
         """Kill every session bound to the device; returns how many were bound."""
         members = _device_sessions_key(device_id)
@@ -411,6 +417,11 @@ class InMemoryRevocationStore:
     def session_device(self, session_id: uuid.UUID) -> uuid.UUID | None:
         with self._lock:
             return _uuid_or_none(self._get(_device_of_key(session_id)))
+
+    def device_session_count(self, device_id: uuid.UUID) -> int:
+        with self._lock:
+            current = self._get(_device_sessions_key(device_id))
+        return len(current.decode().split(",")) if current else 0
 
     def revoke_device(self, device_id: uuid.UUID, ttl: timedelta) -> int:
         with self._lock:
