@@ -203,6 +203,8 @@ export interface paths {
         /**
          * Enrol
          * @description Register this field device for the signed-in user and bind the session to it.
+         *
+         *     A new device gets its wipe secret in this response, once (store it per account).
          */
         post: operations["enrol_api_v1_devices_enrol_post"];
         delete?: never;
@@ -282,7 +284,8 @@ export interface paths {
         put?: never;
         /**
          * Wipe Confirmed
-         * @description The revoked device confirms it wiped its local store (records, outbox, media, keys).
+         * @description The revoked device confirms it wiped its local store (records, outbox, media, keys),
+         *     with the wipe secret its enrolment returned.
          */
         post: operations["wipe_confirmed_api_v1_devices__device_id__wipe_confirmed_post"];
         delete?: never;
@@ -1285,6 +1288,59 @@ export interface components {
              * @default
              */
             app_version: string;
+        };
+        /** DeviceEnrolled */
+        DeviceEnrolled: {
+            /**
+             * Device Id
+             * Format: uuid
+             */
+            device_id: string;
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+            /**
+             * Platform
+             * @enum {string}
+             */
+            platform: "android" | "ios" | "web";
+            /** Os Version */
+            os_version: string;
+            /** App Version */
+            app_version: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "active" | "revoked";
+            /**
+             * Enrolled At
+             * Format: date-time
+             */
+            enrolled_at: string;
+            /**
+             * Last Seen At
+             * Format: date-time
+             */
+            last_seen_at: string;
+            /**
+             * Last Sync At
+             * @description Last successful sync: work changed on the device after it is lost on revoke
+             */
+            last_sync_at: string | null;
+            /** Revoked At */
+            revoked_at: string | null;
+            /** Revoked By */
+            revoked_by: string | null;
+            /** Wipe Confirmed At */
+            wipe_confirmed_at: string | null;
+            /**
+             * Wipe Secret
+             * @description The device's wipe secret: only in the response of the enrolment that creates the device (`201`), never again (`null` on re-enrolment). Keep it in the keystore-backed store of this account and present it with `wipe-confirmed`
+             */
+            wipe_secret?: string | null;
         };
         /** DeviceRead */
         DeviceRead: {
@@ -2648,6 +2704,14 @@ export interface components {
              */
             visible: boolean;
         };
+        /** WipeConfirmRequest */
+        WipeConfirmRequest: {
+            /**
+             * Wipe Secret
+             * @description The secret enrolment returned. Required: without it, or with a wrong one, the answer is the uniform refusal
+             */
+            wipe_secret?: string | null;
+        };
     };
     responses: never;
     parameters: never;
@@ -2719,7 +2783,7 @@ export interface operations {
                     "application/json": components["schemas"]["TokenResponse"];
                 };
             };
-            /** @description Not authenticated; with `code: DEVICE_REVOKED` when `X-KERP-Device-Id` (or the session's device) is revoked: wipe the device's local data */
+            /** @description Not authenticated; with `code: DEVICE_REVOKED` when `X-KERP-Device-Id` (or the session's device) is revoked: wipe the device's local data. Sign-in answers `DEVICE_REVOKED` only after the credentials are right */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -2806,7 +2870,7 @@ export interface operations {
                     "application/json": components["schemas"]["TokenResponse"];
                 };
             };
-            /** @description Not authenticated; with `code: DEVICE_REVOKED` when `X-KERP-Device-Id` (or the session's device) is revoked: wipe the device's local data */
+            /** @description Not authenticated; with `code: DEVICE_REVOKED` when `X-KERP-Device-Id` (or the session's device) is revoked: wipe the device's local data. Sign-in answers `DEVICE_REVOKED` only after the credentials are right */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -2849,7 +2913,7 @@ export interface operations {
                     "application/json": components["schemas"]["TokenResponse"];
                 };
             };
-            /** @description Not authenticated; with `code: DEVICE_REVOKED` when `X-KERP-Device-Id` (or the session's device) is revoked: wipe the device's local data */
+            /** @description Not authenticated; with `code: DEVICE_REVOKED` when `X-KERP-Device-Id` (or the session's device) is revoked: wipe the device's local data. Sign-in answers `DEVICE_REVOKED` only after the credentials are right */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -2906,7 +2970,7 @@ export interface operations {
                     "application/json": components["schemas"]["TokenResponse"];
                 };
             };
-            /** @description Not authenticated; with `code: DEVICE_REVOKED` when `X-KERP-Device-Id` (or the session's device) is revoked: wipe the device's local data */
+            /** @description Not authenticated; with `code: DEVICE_REVOKED` when `X-KERP-Device-Id` (or the session's device) is revoked: wipe the device's local data. Sign-in answers `DEVICE_REVOKED` only after the credentials are right */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -2988,16 +3052,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DeviceRead"];
+                    "application/json": components["schemas"]["DeviceEnrolled"];
                 };
             };
-            /** @description Enrolled */
+            /** @description Enrolled: the only response that carries the `wipe_secret` */
             201: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DeviceRead"];
+                    "application/json": components["schemas"]["DeviceEnrolled"];
                 };
             };
             /** @description Another account's device, or session */
@@ -3134,7 +3198,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["WipeConfirmRequest"] | null;
+            };
+        };
         responses: {
             /** @description Successful Response */
             204: {
@@ -3143,15 +3211,8 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Unknown device */
+            /** @description Refused: the one answer for an unknown device, a device that is not revoked, and a wrong or missing wipe secret */
             404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description The device is not revoked */
-            409: {
                 headers: {
                     [name: string]: unknown;
                 };

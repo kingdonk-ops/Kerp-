@@ -134,6 +134,7 @@ DEVICE_ACTIVE: Final = "active"
 DEVICE_REVOKED: Final = "revoked"
 DEVICE_STATUSES: Final = (DEVICE_ACTIVE, DEVICE_REVOKED)
 VERSION_LENGTH: Final = 64
+WIPE_SECRET_HASH_LENGTH: Final = 64  # SHA-256, hex
 
 
 def _in(column: str, values: tuple[str, ...]) -> str:
@@ -148,8 +149,9 @@ class Device(Base, BaseRecordMixin):
     belongs to the user who enrolled it. ``active`` until revoked; a revoked device stays
     revoked (the wiped client enrols again under a new ``device_id``), with who revoked it
     (``revoked_by``), when (``revoked_at``) and when the client confirmed its wipe
-    (``wipe_confirmed_at``). ``last_seen_at`` is the last authenticated request through the
-    device, ``last_sync_at`` the last successful sync (set by the sync endpoints).
+    (``wipe_confirmed_at``, with the wipe secret whose hash is ``wipe_secret_hash``; T-0080).
+    ``last_seen_at`` is the last authenticated request through the device,
+    ``last_sync_at`` the last successful sync (set by the sync endpoints).
 
     A tenant-level row under the standard policy; the device service decides who sees or
     revokes which device (owner, ``system_admin``, PER-09 of a project the owner belongs to).
@@ -183,4 +185,10 @@ class Device(Base, BaseRecordMixin):
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     wipe_confirmed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
+    )
+    # SHA-256 (hex) of the per-device wipe secret issued once at enrolment (T-0080); never the
+    # secret itself. ``None`` for a device enrolled before migration ``0018``: it cannot
+    # confirm its wipe.
+    wipe_secret_hash: Mapped[str | None] = mapped_column(
+        String(WIPE_SECRET_HASH_LENGTH), nullable=True
     )

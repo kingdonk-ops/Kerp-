@@ -1,7 +1,8 @@
 """Device registry API (T-0043, diff §4.3): enrol, list, revoke, wipe confirmation.
 
 * ``POST /api/v1/devices/enrol`` (bearer): the signed-in field client registers its
-  ``device_id``; the login session is bound to it. ``201`` new, ``200`` known. Another
+  ``device_id``; the login session is bound to it. ``201`` new, with the device's
+  ``wipe_secret`` (issued once, T-0080); ``200`` known (``wipe_secret: null``). Another
   account's ``device_id`` (or a session already bound to another device) is ``409``; a
   revoked device ``401 DEVICE_REVOKED``.
 * ``GET /api/v1/devices`` (bearer): the caller's own devices.
@@ -15,9 +16,12 @@
   actor, the role used (``self`` / ``system_admin`` / ``per_09`` + projects) and whether
   the warning was confirmed.
 * ``POST /api/v1/devices/{device_id}/wipe-confirmed`` (no bearer: the device's sessions
-  are dead): the revoked client reports its wipe. ``204``; an unknown device ``404``, an
-  active one ``409``. The device is named only by its ``device_id``, a random id the
-  client generated; the call changes nothing but the wipe time of a revoked device.
+  are dead): the revoked client reports its wipe with its ``wipe_secret`` (T-0080). ``204``
+  for a revoked device with the right secret (``wipe_confirmed_at`` set once). Everything
+  else (unknown id, active device, wrong or missing secret, a device enrolled without a
+  secret) gets one uniform ``404 {"detail": "Not Found"}`` after comparable work, so the
+  answer reveals no device status (TD-286, TD-291). Confirmations and refusals are audited
+  on ``device:<device_id>``, never with the secret.
 
 Authorisation lives here; the registry itself is ``devices.py``. The caller's
 ``system_admin`` flag is the one bound at authentication (never from the request).
@@ -30,6 +34,7 @@ from dataclasses import dataclass
 from typing import Annotated, Final, Literal
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Request, Response, status
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from app.core.audit import service as audit
@@ -47,10 +52,12 @@ from app.core.auth.deps import CurrentPrincipal
 from app.core.auth.models import DEVICE_REVOKED, Device
 from app.core.auth.runtime import AuthRuntime, get_auth_runtime
 from app.core.auth.schemas import (
+    DeviceEnrolled,
     DeviceEnrolRequest,
     DeviceRead,
     DeviceRevoked,
     DeviceRevokeRequest,
+    WipeConfirmRequest,
 )
 from app.core.db import Database, DbSession
 from app.core.tenancy.context import TenancyContext
@@ -59,6 +66,10 @@ from app.core.tenancy.scope import OutOfScopeError
 
 PREFIX: Final = "/api/v1/devices"
 CROSS_PROJECT_CODE: Final = "cross_project_wipe_confirmation_required"
+# The one answer to every refused wipe confirmation (T-0080): same status and body as any
+# out-of-scope 404, whatever the reason.
+WIPE_REFUSED_STATUS: Final = status.HTTP_404_NOT_FOUND
+WIPE_REFUSED_BODY: Final = {"detail": "Not Found"}
 
 router = APIRouter(tags=["devices"])
 
@@ -120,9 +131,12 @@ def _read(device: Device) -> DeviceRead:
 
 @router.post(
     f"{PREFIX}/enrol",
-    response_model=DeviceRead,
+    response_model=DeviceEnrolled,
     responses={
-        status.HTTP_201_CREATED: {"description": "Enrolled", "model": DeviceRead},
+        status.HTTP_201_CREATED: {
+            "description": "Enrolled: the only response that carries the `wipe_secret`",
+            "model": DeviceEnrolled,
+        },
         status.HTTP_409_CONFLICT: {"description": "Another account's device, or session"},
     },
 )
@@ -132,10 +146,12 @@ def enrol(
     session: DbSession,
     runtime: RuntimeDep,
     response: Response,
-) -> DeviceRead:
-    """Register this field device for the signed-in user and bind the session to it."""
+) -> DeviceEnrolled:
+    """Register this field device for the signed-in user and bind the session to it.
+
+    A new device gets its wipe secret in this response, once (store it per account)."""
     try:
-        device, created = devices.enrol(
+        device, wipe_secret = devices.enrol(
             session,
             runtime.store,
             user_id=principal.user_id,
@@ -148,7 +164,7 @@ def enrol(
         )
     except devices.DeviceConflictError as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
-    if created:
+    if wipe_secret is not None:  # created now; the secret never enters the ledger
         payload = {
             "action": "enrol",
             "device_id": str(device.device_id),
@@ -166,7 +182,7 @@ def enrol(
             device_id=device.device_id,
         )
         response.status_code = status.HTTP_201_CREATED
-    return _read(device)
+    return DeviceEnrolled.model_validate({**_read(device).model_dump(), "wipe_secret": wipe_secret})
 
 
 @router.get(PREFIX, response_model=list[DeviceRead])
@@ -285,31 +301,50 @@ def revoke(
     f"{PREFIX}/{{device_id}}/wipe-confirmed",
     status_code=status.HTTP_204_NO_CONTENT,
     responses={
-        status.HTTP_404_NOT_FOUND: {"description": "Unknown device"},
-        status.HTTP_409_CONFLICT: {"description": "The device is not revoked"},
+        WIPE_REFUSED_STATUS: {
+            "description": (
+                "Refused: the one answer for an unknown device, a device that is not revoked, "
+                "and a wrong or missing wipe secret"
+            )
+        },
     },
 )
-def wipe_confirmed(device_id: uuid.UUID, session: DbSession, runtime: RuntimeDep) -> Response:
-    """The revoked device confirms it wiped its local store (records, outbox, media, keys)."""
+def wipe_confirmed(
+    device_id: uuid.UUID,
+    session: DbSession,
+    runtime: RuntimeDep,
+    body: Annotated[WipeConfirmRequest | None, Body()] = None,
+) -> Response:
+    """The revoked device confirms it wiped its local store (records, outbox, media, keys),
+    with the wipe secret its enrolment returned."""
     tenant = runtime.settings.default_tenant_id
     if tenant is None:
-        raise OutOfScopeError("no tenant")
+        return JSONResponse(WIPE_REFUSED_BODY, status_code=WIPE_REFUSED_STATUS)
     bind_tenancy(session, TenancyContext(tenant_id=tenant))
-    device = _device_or_404(session, device_id)
-    try:
-        recorded = devices.confirm_wipe(session, device)
-    except ValueError as exc:
-        raise HTTPException(status.HTTP_409_CONFLICT, "Device is not revoked") from exc
-    if recorded:
+    outcome = devices.confirm_wipe(session, device_id, body.wipe_secret if body else None)
+    chain = f"device:{device_id}"
+    if outcome.refused is not None:
+        # Audited (never the secret), then the uniform answer. The refusal is a normal
+        # response, not an exception, so the request's unit of work keeps the entry.
+        payload: dict[str, object] = {
+            "action": "wipe_refused",
+            "device_id": str(device_id),
+            "reason": outcome.refused,
+        }
+        if outcome.device is not None:
+            payload["user_id"] = str(outcome.device.user_id)
+        audit.append(session, chain, payload, source="api")
+        return JSONResponse(WIPE_REFUSED_BODY, status_code=WIPE_REFUSED_STATUS)
+    if outcome.recorded and outcome.device is not None:
         audit.append(
             session,
-            f"device:{device.device_id}",
+            chain,
             {
                 "action": "wipe_confirmed",
-                "device_id": str(device.device_id),
-                "user_id": str(device.user_id),
+                "device_id": str(device_id),
+                "user_id": str(outcome.device.user_id),
             },
             source="api",
-            device_id=device.device_id,
+            device_id=device_id,
         )
     return Response(status_code=status.HTTP_204_NO_CONTENT)

@@ -351,6 +351,15 @@ def test_magic_link_can_be_taken_exactly_once(store: RevocationStore) -> None:
     assert store.take_magic_link("never") is None
 
 
+def test_magic_link_can_be_peeked_without_spending_it(store: RevocationStore) -> None:
+    store.put_magic_link("d1", b"payload", TTL)
+    assert store.peek_magic_link("d1") == b"payload"
+    assert store.peek_magic_link("d1") == b"payload"
+    assert store.take_magic_link("d1") == b"payload"
+    assert store.peek_magic_link("d1") is None
+    assert store.peek_magic_link("never") is None
+
+
 def test_pin_hash_is_stored_per_session(store: RevocationStore) -> None:
     session, other = uuid.uuid4(), uuid.uuid4()
     assert store.get_pin(session) is None
@@ -390,6 +399,7 @@ TTL = timedelta(minutes=15)
     [
         lambda s: s.put_magic_link("d", b"p", TTL),
         lambda s: s.take_magic_link("d"),
+        lambda s: s.peek_magic_link("d"),
         lambda s: s.set_pin(uuid.uuid4(), "h", TTL),
         lambda s: s.get_pin(uuid.uuid4()),
         lambda s: s.begin_attempt("k", TTL, _no_delay),

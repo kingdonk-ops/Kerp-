@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 178 · **Closed:** 115
+**Open:** 178 · **Closed:** 117
 
 ## decision (2)
 
@@ -65,7 +65,7 @@
 | [TD-208](../tracker/todo/TD-208.md) | Uploads infra: provision the kerp-vault bucket (CORS for browser PUT/GET, lifecycle on staging/), wire KERP_S3_* in compose, add MinIO to CI for the gated round-trip test | T-0016 | implementer |
 | [TD-297](../tracker/todo/TD-297.md) | Admin UI screen for deployment settings (Admin > System) is not planned in any task | T-0044 | implementer |
 
-## deferred (35)
+## deferred (36)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -104,6 +104,7 @@
 | [TD-273](../tracker/todo/TD-273.md) | Membership assignment does not validate site_node_id (PER-07 Asset-Site scope) against the asset hierarchy; no asset module exists yet | T-0014 | implementer |
 | [TD-278](../tracker/todo/TD-278.md) | Rule 'Try it' on a recent real context (ADR 0004 §6): pick a recent record/event of the set's kind and evaluate against it; T-0036 only evaluates supplied sample contexts | T-0036 | implementer |
 | [TD-288](../tracker/todo/TD-288.md) | pending_updates on a set with no parent default answers 409 instead of an empty offer | T-0036 | reviewer |
+| [TD-298](../tracker/todo/TD-298.md) | Rate-limit the unauthenticated wipe-confirmed endpoint (every refusal appends an audit entry) | T-0080 | implementer |
 
 ## later (75)
 
@@ -193,7 +194,7 @@
 | [TD-252](../tracker/todo/TD-252.md) | tracker.py new-todo cannot see open PRs in cloud sessions: gh pr list uses GraphQL (blocked), so TODO ids collide | T-0029 | coordinator |
 | [TD-287](../tracker/todo/TD-287.md) | Upgrade offer: a soft-deleted own rule holding a new default's key shows key_in_use forever | T-0036 | reviewer |
 
-## risk (20)
+## risk (19)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -214,9 +215,8 @@
 | [TD-254](../tracker/todo/TD-254.md) | spatial_bounds 10,000-position cap also runs on reads (ProjectRead): a stored row above the cap makes GET /projects 500 for the whole tenant | T-0060 | coordinator |
 | [TD-260](../tracker/todo/TD-260.md) | a11y component tests run in the installed Google Chrome (Vitest browser mode, Playwright channel chrome): CI relies on the runner's preinstalled Chrome; set KERP_CHROME_PATH or install a browser if the image changes | T-0046 | implementer |
 | [TD-276](../tracker/todo/TD-276.md) | A PR-added or PR-edited workflow can emit a check named review-gate; accepted while the owner is the sole collaborator (revisit when a second collaborator joins) | T-0067 | planner |
-| [TD-286](../tracker/todo/TD-286.md) | wipe-confirmed is unauthenticated: anyone who knows a revoked device_id can set its wipe time | T-0043, T-0080 | implementer |
-| [TD-291](../tracker/todo/TD-291.md) | Revoked-device oracle: refuse_revoked_device on login and wipe-confirmed answer for any device id | T-0043, T-0080 | reviewer |
 | [TD-292](../tracker/todo/TD-292.md) | Remove stale scripts/gemini_review.sh allow/deny rules from .claude/settings.json (human-only edit) | — | implementer |
+| [TD-299](../tracker/todo/TD-299.md) | Sign-in with valid credentials answers DEVICE_REVOKED for a revoked device of another account | T-0080 | implementer |
 
 ## Closed
 
@@ -337,3 +337,5 @@
 | ✅ | [TD-281](../tracker/todo/TD-281.md) | ADR 0004 §4/§6/§7: confirm who reads/accepts upgrade offers, who may 'Try it', who reads the drift report, and that brand-new system sets reach the tenant layer automatically | Product owner, 2026-11-15: implementer reading confirmed. Offers are read by whoever reads the set (any project member; PER-13/PER-01 on the tenant layer); accept and Try it only by the set's editor per ADR 0004 §7 (check: PER-06 project / PER-13 tenant; other kinds PER-09 / PER-01), so PER-09 never accepts a check update; drift report PER-13 or PER-01, limited by RLS to their portfolio projects; removed_by_<layer> = the set deleted its copy and the default changed since the copy, stays on offer until reset; a brand-new system set is copied into the tenant layer automatically by sync_system_defaults, changed sets are only offered; routes keyed by set id. Recorded in ADR 0004 Amendment G |
 | ✅ | [TD-283](../tracker/todo/TD-283.md) | Shared field tablets: one device_id per account, or several accounts per device? | Product owner, 2026-11-15: keep one account per device_id for Pilot-0 (T-0043 behaviour; another account enrolling the same id gets 409). The client keys its local store per account, so a revoke wipes only that account's data on the device (T-0143). Whether pilot crews share tablets is to be confirmed with the pilot team: TD-293 (if they do, a shared-device task is added before the pilot) |
 | ✅ | [TD-285](../tracker/todo/TD-285.md) | Native-origin allow-list: KERP_WEB_ORIGIN made mandatory when KERP_NATIVE_APP_ORIGINS is set; body transport also on magic-link redeem and PIN unlock | Product owner, 2026-11-15: both readings confirmed. (a) KERP_NATIVE_APP_ORIGINS requires KERP_WEB_ORIGIN (settings refuse otherwise) and the API's own origin never gets body transport; (b) body transport (out and in) also applies to magic-link redeem and PIN unlock by the same Origin rule; on the web origin /pin/unlock refuses a body token (422) and /refresh ignores it. Recorded in diff §4.2 |
+| ✅ | [TD-286](../tracker/todo/TD-286.md) | wipe-confirmed is unauthenticated: anyone who knows a revoked device_id can set its wipe time | Fixed by T-0080 (T-0080 PR): per-device wipe secret issued once at enrolment, stored as SHA-256; wipe-confirmed requires it, uniform 404 for every refusal |
+| ✅ | [TD-291](../tracker/todo/TD-291.md) | Revoked-device oracle: refuse_revoked_device on login and wipe-confirmed answer for any device id | Fixed by T-0080 (T-0080 PR): sign-in checks credentials before the device; wipe-confirmed answers uniformly |

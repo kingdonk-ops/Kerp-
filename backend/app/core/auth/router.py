@@ -14,7 +14,9 @@ token from such a request is ignored. The web origin can never be on the list (s
 check), and a request from the API's own origin never gets the body transport either.
 
 Every token endpoint also reads ``X-KERP-Device-Id``: a revoked device is answered ``401``
-with ``code: DEVICE_REVOKED`` (diff §4.3).
+with ``code: DEVICE_REVOKED`` (diff §4.3). Sign-in (login, magic-link redeem) checks the
+credentials first, so with wrong credentials every device state gets the same ``401``
+(T-0080, TD-291).
 """
 
 from __future__ import annotations
@@ -151,7 +153,8 @@ _DEVICE_REVOKED_RESPONSE: Final[dict[int | str, dict[str, Any]]] = {
     status.HTTP_401_UNAUTHORIZED: {
         "description": (
             f"Not authenticated; with `code: DEVICE_REVOKED` when `{DEVICE_HEADER}` (or the "
-            "session's device) is revoked: wipe the device's local data"
+            "session's device) is revoked: wipe the device's local data. Sign-in answers "
+            "`DEVICE_REVOKED` only after the credentials are right"
         )
     }
 }

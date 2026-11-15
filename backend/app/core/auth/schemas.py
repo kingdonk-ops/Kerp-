@@ -176,6 +176,29 @@ class DeviceRead(BaseModel):
         return value
 
 
+class DeviceEnrolled(DeviceRead):
+    wipe_secret: str | None = Field(
+        default=None,
+        description=(
+            "The device's wipe secret: only in the response of the enrolment that creates the "
+            "device (`201`), never again (`null` on re-enrolment). Keep it in the keystore-backed "
+            "store of this account and present it with `wipe-confirmed`"
+        ),
+    )
+
+
+class WipeConfirmRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    wipe_secret: str | None = Field(
+        default=None,
+        description=(
+            "The secret enrolment returned. Required: without it, or with a wrong one, the "
+            "answer is the uniform refusal"
+        ),
+    )
+
+
 class DeviceRevokeRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

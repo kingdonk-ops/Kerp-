@@ -19,7 +19,9 @@ Every failure is the same ``AuthenticationError`` (HTTP 401) so callers cannot t
 unknown account from a wrong password or a revoked session. The one exception is a revoked
 device (T-0043, diff §4.3): a call naming a revoked device (``device_id``), or a refresh of a
 session killed by a device revoke, raises ``DeviceRevokedError`` (``401`` with
-``code: DEVICE_REVOKED``), so the client knows to wipe itself.
+``code: DEVICE_REVOKED``), so the client knows to wipe itself. Sign-in checks the
+credentials (password, magic link) **before** the device (T-0080, TD-291): with wrong
+credentials an unknown, an active and a revoked device get the same answer.
 """
 
 from __future__ import annotations
@@ -237,12 +239,14 @@ class AuthService:
         self.login_lockout.begin(per_client)
         self.login_account_lockout.begin(account)
         bind_tenancy(session, TenancyContext(tenant_id=tenant))
-        refuse_revoked_device(session, device_id)
         user = self.provider.authenticate(session, tenant, credentials)
         if user is None:
             raise AuthenticationError("invalid credentials")
         self.login_lockout.succeeded(per_client)
         self.login_account_lockout.succeeded(account)
+        # Credentials first (T-0080, TD-291): only a caller who proved the account learns
+        # that the device it names is revoked (and is told to wipe).
+        refuse_revoked_device(session, device_id)
         self._signed_in(user)
         return self._issue_pair(user.id, tenant, uuid.uuid4())
 
@@ -287,15 +291,22 @@ class AuthService:
     ) -> TokenPair:
         """Spend a magic link: start a new session on this device, gated by ``pin``.
 
-        ``pin`` is validated by the request schema (6 digits, not a weak PIN). A revoked
-        ``device_id`` is refused before the link is spent.
+        ``pin`` is validated by the request schema (6 digits, not a weak PIN). The link is
+        validated first without spending it (T-0080): an unknown, expired or spent link is the
+        uniform ``AuthenticationError`` whatever the device. Only then is a revoked
+        ``device_id`` refused (``DeviceRevokedError``, the link stays unspent); the link is
+        spent once the device check has passed.
         """
-        tenant = self.runtime.settings.default_tenant_id
-        if device_id is not None and tenant is not None:
-            bind_tenancy(session, TenancyContext(tenant_id=tenant))
+        digest = magic_link_digest(token)
+        pending = self.runtime.store.peek_magic_link(digest)
+        if pending is None:
+            raise AuthenticationError("unknown, expired or used magic link")
+        if device_id is not None:
+            link_tenant = uuid.UUID(json.loads(pending)["tid"])
+            bind_tenancy(session, TenancyContext(tenant_id=link_tenant))
             refuse_revoked_device(session, device_id)
-        payload = self.runtime.store.take_magic_link(magic_link_digest(token))
-        if payload is None:
+        payload = self.runtime.store.take_magic_link(digest)
+        if payload is None:  # spent or expired since the peek
             raise AuthenticationError("unknown, expired or used magic link")
         data = json.loads(payload)
         user_id, tenant_id = uuid.UUID(data["uid"]), uuid.UUID(data["tid"])
