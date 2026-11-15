@@ -42,7 +42,7 @@ hardcoded config, no `.env` file is read).
 | `KERP_MIGRATION_DATABASE_URL` | unset (= `KERP_DATABASE_URL`) | Schema-owner URL Alembic runs as |
 | `KERP_MAX_BODY_BYTES` | `1048576` (1 MiB) | Largest request body any endpoint accepts (413 above it; min 1024). File bytes go to object storage by presigned URL and are not capped by it (`app/core/body_limit.py`) |
 | `KERP_REDIS_URL` | unset | Redis URL (auth token revocation; job queue later). Required in production |
-| `KERP_JWT_*`, `KERP_ACCESS_TOKEN_MINUTES`, `KERP_REFRESH_TOKEN_HOURS`, `KERP_DEFAULT_TENANT_ID`, `KERP_WEB_ORIGIN`, `KERP_INTERNAL_EMAIL_DOMAINS` | see `app/core/auth/README.md` | Token signing keys and lifetimes, the deployment tenant (required in production: the app does not start without it), refresh-cookie origin (optional; set it behind a proxy, see Container image), the e-mail domains of internal staff (optional; comma-separated, exact match; a malformed entry refuses startup) |
+| `KERP_JWT_*`, `KERP_ACCESS_TOKEN_MINUTES`, `KERP_REFRESH_TOKEN_HOURS`, `KERP_DEFAULT_TENANT_ID`, `KERP_WEB_ORIGIN`, `KERP_NATIVE_APP_ORIGINS`, `KERP_INTERNAL_EMAIL_DOMAINS` | see `app/core/auth/README.md` | Token signing keys and lifetimes, the deployment tenant (required in production: the app does not start without it), refresh-cookie origin (optional; set it behind a proxy, see Container image), the native field app's origins (optional; body refresh-token transport and the API's CORS list; must not contain the web origin, which must then be set, or the app does not start), the e-mail domains of internal staff (optional; comma-separated, exact match; a malformed entry refuses startup) |
 | `KERP_STORAGE_BUCKET`, `KERP_S3_ENDPOINT_URL`, `KERP_S3_PUBLIC_ENDPOINT_URL`, `KERP_S3_ACCESS_KEY_ID`, `KERP_S3_SECRET_ACCESS_KEY`, `KERP_UPLOAD_*`, `KERP_DOWNLOAD_URL_SECONDS` | see `app/modules/uploads/README.md` | Object storage (S3 / MinIO) and upload limits |
 | `KERP_S3_REGION` | `ap-southeast-2` | S3 region, set per deployment (TD-171 decision 13a, diff §4.4); MinIO ignores it |
 | `KERP_LOG_LEVEL` | `INFO` | Root log level (`DEBUG`…`CRITICAL`, case-insensitive) |
@@ -170,6 +170,9 @@ A production container (the image default) needs:
   TLS-terminating proxy that is `http://<internal host>` unless uvicorn trusts the proxy's
   forwarded headers (`FORWARDED_ALLOW_IPS`), so trust the proxy or set `KERP_WEB_ORIGIN` to the
   public origin (e.g. `https://kerp.example.com`).
+- `KERP_NATIVE_APP_ORIGINS` (optional): the Capacitor Android app's origin(s), e.g.
+  `https://localhost`. Needs `KERP_WEB_ORIGIN`; containing it stops the app at startup
+  (`app/core/auth/README.md`, *Native app origins*).
 - `KERP_DATABASE_URL` for anything beyond `/health`.
 - `KERP_INTERNAL_EMAIL_DOMAINS` (optional): the company's e-mail domains, comma-separated
   (e.g. `company.example,company-group.example`). Accounts on them are internal staff and see

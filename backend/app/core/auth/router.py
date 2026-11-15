@@ -1,18 +1,32 @@
 """Auth endpoints: login, refresh, logout, me, JWKS (T-0008); magic link + PIN (T-0009).
 
-The refresh token travels only in the ``httpOnly`` refresh cookie (T-0037, diff §4.2,
-TD-203): set by every endpoint that issues tokens, read by ``/refresh`` and
-``/pin/unlock`` behind an Origin check, cleared by ``/logout``. No body carries it.
+The refresh token travels in the ``httpOnly`` refresh cookie (T-0037, diff §4.2, TD-203):
+set by every endpoint that issues tokens, read by ``/refresh`` and ``/pin/unlock`` behind an
+Origin check, cleared by ``/logout``.
+
+**Native-app body transport (T-0043, TD-203).** A request whose ``Origin`` is on the
+deployment's explicit allow-list ``KERP_NATIVE_APP_ORIGINS`` (the Capacitor Android app) gets
+the refresh token in the JSON body instead (``refresh_token``; no cookie) and sends it back
+in the body of ``/refresh`` and ``/pin/unlock``. The choice depends on the ``Origin`` header
+only: never on the client-reported device platform or a request flag. Every other request,
+including one without ``Origin`` or from the web origin, gets the cookie transport; a body
+token from such a request is ignored. The web origin can never be on the list (startup
+check), and a request from the API's own origin never gets the body transport either.
+
+Every token endpoint also reads ``X-KERP-Device-Id``: a revoked device is answered ``401``
+with ``code: DEVICE_REVOKED`` (diff §4.3).
 """
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Annotated, Any, Final
 
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Body, Cookie, Depends, HTTPException, Request, Response, status
 
 from app.core.auth.bearer import AUTH_UNAVAILABLE
 from app.core.auth.deps import CurrentPrincipal, get_auth_service, unauthorized
+from app.core.auth.device_signal import DEVICE_HEADER, request_device_id
 from app.core.auth.lockout import LockedOutError
 from app.core.auth.providers import PasswordCredentials
 from app.core.auth.revocation import RevocationUnavailableError
@@ -24,9 +38,11 @@ from app.core.auth.schemas import (
     MagicLinkRequest,
     MeResponse,
     PinUnlockRequest,
+    RefreshRequest,
     TokenResponse,
 )
 from app.core.auth.service import AuthenticationError, AuthService, TokenPair
+from app.core.config import Settings
 from app.core.db import DbSession
 
 PREFIX: Final = "/api/v1/auth"
@@ -42,27 +58,46 @@ CROSS_ORIGIN: Final = "Cross-origin request refused"
 router = APIRouter(tags=["auth"])
 
 AuthServiceDep = Annotated[AuthService, Depends(get_auth_service)]
+RuntimeDep = Annotated[AuthRuntime, Depends(get_auth_runtime)]
 
 
-def _token_response(pair: TokenPair, response: Response) -> TokenResponse:
+def _own_origin(request: Request) -> str:
+    return f"{request.url.scheme}://{request.url.netloc}".lower()
+
+
+def native_app_origin(request: Request, settings: Settings) -> bool:
+    """Whether the request comes from an allow-listed native app (``Origin`` header only).
+
+    Never the web origin or the API's own origin, even if misconfigured onto the list.
+    """
+    origin = request.headers.get("origin")
+    if not origin or origin not in settings.native_app_origins:
+        return False
+    return origin not in (settings.web_origin, _own_origin(request))
+
+
+def _token_response(pair: TokenPair, response: Response, *, native: bool) -> TokenResponse:
+    """The token response: refresh token in the cookie, or in the body for a native app."""
     # RFC 6749 §5.1: token responses must not be cached.
     response.headers["Cache-Control"] = "no-store"
     response.headers["Pragma"] = "no-cache"
     access, refresh = pair.access.claims, pair.refresh.claims
     refresh_seconds = int((refresh.expires_at - refresh.issued_at).total_seconds())
-    response.set_cookie(
-        REFRESH_COOKIE,
-        pair.refresh.token,
-        max_age=refresh_seconds,
-        path=REFRESH_COOKIE_PATH,
-        secure=True,
-        httponly=True,
-        samesite="strict",
-    )
+    if not native:
+        response.set_cookie(
+            REFRESH_COOKIE,
+            pair.refresh.token,
+            max_age=refresh_seconds,
+            path=REFRESH_COOKIE_PATH,
+            secure=True,
+            httponly=True,
+            samesite="strict",
+        )
     return TokenResponse(
         access_token=pair.access.token,
         expires_in=int((access.expires_at - access.issued_at).total_seconds()),
         refresh_expires_in=refresh_seconds,
+        refresh_token=pair.refresh.token if native else None,
     )
 
 
@@ -72,31 +107,53 @@ def _clear_refresh_cookie(response: Response) -> None:
     )
 
 
-def refresh_cookie(
-    request: Request,
-    runtime: Annotated[AuthRuntime, Depends(get_auth_runtime)],
-    kerp_refresh: Annotated[
-        str | None, Cookie(description="The refresh token (httpOnly cookie, never JS)")
-    ] = None,
-) -> str:
-    """The refresh cookie of a same-origin request (CSRF: ``SameSite=Strict`` + Origin).
+@dataclass(frozen=True, slots=True)
+class RefreshCredential:
+    """The presented refresh token and whether it came by the native body transport."""
 
-    The ``Origin`` header must be the web SPA's origin (``KERP_WEB_ORIGIN``, else the API's
-    own origin); a missing or foreign one is ``403`` before the cookie is looked at.
+    token: str
+    native: bool
+
+
+def _refresh_credential(
+    request: Request, runtime: AuthRuntime, body_token: str | None, cookie: str | None
+) -> RefreshCredential:
+    """The refresh token of a request: the body of an allow-listed native app, else the
+    cookie of a same-origin request (CSRF: ``SameSite=Strict`` + Origin).
+
+    For the cookie, the ``Origin`` header must be the web SPA's origin (``KERP_WEB_ORIGIN``,
+    else the API's own origin); a missing or foreign one is ``403`` before the cookie is
+    looked at. A body token from anywhere but a native app is ignored.
     """
-    own = f"{request.url.scheme}://{request.url.netloc}"
-    allowed = (runtime.settings.web_origin or own).rstrip("/")
+    if native_app_origin(request, runtime.settings):
+        if not body_token:
+            raise unauthorized(invalid_token=True)
+        return RefreshCredential(body_token, native=True)
+    allowed = runtime.settings.web_origin or _own_origin(request)
     if request.headers.get("origin") != allowed:
         raise HTTPException(status.HTTP_403_FORBIDDEN, CROSS_ORIGIN)
-    if not kerp_refresh or len(kerp_refresh) > REFRESH_COOKIE_MAX_LENGTH:
+    if not cookie or len(cookie) > REFRESH_COOKIE_MAX_LENGTH:
         raise unauthorized(invalid_token=True)
-    return kerp_refresh
+    return RefreshCredential(cookie, native=False)
 
 
-RefreshCookie = Annotated[str, Depends(refresh_cookie)]
+CookieToken = Annotated[
+    str | None,
+    Cookie(alias=REFRESH_COOKIE, description="The refresh token (httpOnly cookie, never JS)"),
+]
 
 _COOKIE_RESPONSES: Final[dict[int | str, dict[str, Any]]] = {
-    status.HTTP_403_FORBIDDEN: {"description": "`Origin` is not the web app's origin"}
+    status.HTTP_403_FORBIDDEN: {
+        "description": "`Origin` is neither the web app's origin nor an allow-listed native app"
+    }
+}
+_DEVICE_REVOKED_RESPONSE: Final[dict[int | str, dict[str, Any]]] = {
+    status.HTTP_401_UNAUTHORIZED: {
+        "description": (
+            f"Not authenticated; with `code: DEVICE_REVOKED` when `{DEVICE_HEADER}` (or the "
+            "session's device) is revoked: wipe the device's local data"
+        )
+    }
 }
 
 
@@ -105,9 +162,7 @@ def _unavailable() -> HTTPException:
 
 
 @router.get(JWKS_PATH, response_model=JsonWebKeySet, response_model_exclude_none=True)
-def jwks(
-    runtime: Annotated[AuthRuntime, Depends(get_auth_runtime)], response: Response
-) -> JsonWebKeySet:
+def jwks(runtime: RuntimeDep, response: Response) -> JsonWebKeySet:
     """Public keys that verify KERP tokens (RFC 7517). Contains no private material."""
     response.headers["Cache-Control"] = f"public, max-age={JWKS_MAX_AGE}"
     return JsonWebKeySet.model_validate(runtime.keys.jwks())
@@ -128,11 +183,20 @@ _LOCKED_RESPONSE: Final[dict[int | str, dict[str, Any]]] = {
 }
 
 
-@router.post(f"{PREFIX}/login", response_model=TokenResponse, responses=_LOCKED_RESPONSE)
+_TOKEN_ROUTE: Final[dict[str, Any]] = {
+    "response_model": TokenResponse,
+    "response_model_exclude_none": True,
+}
+
+
+@router.post(
+    f"{PREFIX}/login", **_TOKEN_ROUTE, responses={**_LOCKED_RESPONSE, **_DEVICE_REVOKED_RESPONSE}
+)
 def login(
     body: LoginRequest,
     session: DbSession,
     service: AuthServiceDep,
+    runtime: RuntimeDep,
     request: Request,
     response: Response,
 ) -> TokenResponse:
@@ -142,14 +206,19 @@ def login(
     # FORWARDED_ALLOW_IPS; otherwise it is the direct peer (the proxy itself).
     client = request.client.host if request.client else None
     try:
-        pair = service.login(session, credentials=credentials, client=client)
+        pair = service.login(
+            session,
+            credentials=credentials,
+            client=client,
+            device_id=request_device_id(request),
+        )
     except AuthenticationError as exc:
         raise unauthorized() from exc
     except LockedOutError as exc:
         raise _locked(exc) from exc
     except RevocationUnavailableError as exc:
         raise _unavailable() from exc
-    return _token_response(pair, response)
+    return _token_response(pair, response, native=native_app_origin(request, runtime.settings))
 
 
 @router.post(
@@ -171,65 +240,99 @@ def request_magic_link(body: MagicLinkRequest, session: DbSession, service: Auth
         raise _unavailable() from exc
 
 
-@router.post(f"{PREFIX}/magic-link/redeem", response_model=TokenResponse)
+@router.post(f"{PREFIX}/magic-link/redeem", **_TOKEN_ROUTE, responses=_DEVICE_REVOKED_RESPONSE)
 def redeem_magic_link(
-    body: MagicLinkRedeemRequest, session: DbSession, service: AuthServiceDep, response: Response
+    body: MagicLinkRedeemRequest,
+    session: DbSession,
+    service: AuthServiceDep,
+    runtime: RuntimeDep,
+    request: Request,
+    response: Response,
 ) -> TokenResponse:
     """Spend a magic link: start a session on this device, gated by the PIN set here.
 
     The session's refresh token then works only through `/auth/pin/unlock`.
     """
     try:
-        pair = service.redeem_magic_link(session, token=body.token, pin=body.pin)
+        pair = service.redeem_magic_link(
+            session, token=body.token, pin=body.pin, device_id=request_device_id(request)
+        )
     except AuthenticationError as exc:
         raise unauthorized(invalid_token=True) from exc
     except RevocationUnavailableError as exc:
         raise _unavailable() from exc
-    return _token_response(pair, response)
+    return _token_response(pair, response, native=native_app_origin(request, runtime.settings))
 
 
 @router.post(
     f"{PREFIX}/pin/unlock",
-    response_model=TokenResponse,
-    responses={**_LOCKED_RESPONSE, **_COOKIE_RESPONSES},
+    **_TOKEN_ROUTE,
+    responses={**_LOCKED_RESPONSE, **_COOKIE_RESPONSES, **_DEVICE_REVOKED_RESPONSE},
 )
 def pin_unlock(
     body: PinUnlockRequest,
-    refresh_token: RefreshCookie,
     session: DbSession,
     service: AuthServiceDep,
+    runtime: RuntimeDep,
+    request: Request,
     response: Response,
+    kerp_refresh: CookieToken = None,
 ) -> TokenResponse:
-    """Unlock a PIN-gated session: the device's refresh cookie + the PIN rotate the tokens.
+    """Unlock a PIN-gated session: the device's refresh token + the PIN rotate the tokens.
 
     Wrong PINs lock the session progressively; the 10th wrong PIN revokes it.
     """
+    credential = _refresh_credential(request, runtime, body.refresh_token, kerp_refresh)
+    if body.refresh_token is not None and not credential.native:
+        # Only the native app's body carries a refresh token (TD-203); refused as before.
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            "refresh_token is accepted from the native app only",
+        )
     try:
-        pair = service.unlock(session, refresh_token=refresh_token, pin=body.pin)
+        pair = service.unlock(
+            session,
+            refresh_token=credential.token,
+            pin=body.pin,
+            device_id=request_device_id(request),
+        )
     except AuthenticationError as exc:
         raise unauthorized(invalid_token=True) from exc
     except LockedOutError as exc:
         raise _locked(exc) from exc
     except RevocationUnavailableError as exc:
         raise _unavailable() from exc
-    return _token_response(pair, response)
+    return _token_response(pair, response, native=credential.native)
 
 
-@router.post(f"{PREFIX}/refresh", response_model=TokenResponse, responses=_COOKIE_RESPONSES)
+@router.post(
+    f"{PREFIX}/refresh",
+    **_TOKEN_ROUTE,
+    responses={**_COOKIE_RESPONSES, **_DEVICE_REVOKED_RESPONSE},
+)
 def refresh(
-    refresh_token: RefreshCookie, session: DbSession, service: AuthServiceDep, response: Response
+    session: DbSession,
+    service: AuthServiceDep,
+    runtime: RuntimeDep,
+    request: Request,
+    response: Response,
+    body: Annotated[RefreshRequest | None, Body()] = None,
+    kerp_refresh: CookieToken = None,
 ) -> TokenResponse:
-    """Rotate: the refresh cookie is spent and a new pair is issued. Reuse revokes the session.
+    """Rotate: the refresh token is spent and a new pair is issued. Reuse revokes the session.
 
     The new refresh token keeps the session's end (sign-in + 12 h); after it, sign in again.
+    The web SPA sends the cookie; an allow-listed native app sends ``refresh_token``.
     """
+    body_token = body.refresh_token if body is not None else None
+    credential = _refresh_credential(request, runtime, body_token, kerp_refresh)
     try:
-        pair = service.refresh(session, refresh_token)
+        pair = service.refresh(session, credential.token, device_id=request_device_id(request))
     except AuthenticationError as exc:
         raise unauthorized(invalid_token=True) from exc
     except RevocationUnavailableError as exc:
         raise _unavailable() from exc
-    return _token_response(pair, response)
+    return _token_response(pair, response, native=credential.native)
 
 
 @router.post(f"{PREFIX}/logout", status_code=status.HTTP_204_NO_CONTENT)

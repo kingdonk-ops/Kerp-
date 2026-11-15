@@ -66,6 +66,9 @@ class TenancyContext:
 current_tenant_id: ContextVar[uuid.UUID | None] = ContextVar("current_tenant_id", default=None)
 current_project_id: ContextVar[uuid.UUID | None] = ContextVar("current_project_id", default=None)
 current_user_id: ContextVar[uuid.UUID | None] = ContextVar("current_user_id", default=None)
+# The enrolled field device a request comes through (T-0043): set at authentication from the
+# session's device binding, never from the request alone. The audit ledger records it.
+current_device_id: ContextVar[uuid.UUID | None] = ContextVar("current_device_id", default=None)
 
 
 @contextmanager

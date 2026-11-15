@@ -24,6 +24,16 @@ Field-worker auth (T-0009) keeps its short-lived state here too:
   counter (TTL = the counting window, from the first failure) and the current lock
   (TTL = the delay). See ``lockout.py``.
 
+Device binding (T-0043, diff §4.3; the device registry itself is ``oe_identity_device``):
+
+* ``device:sid:<sid>``: the enrolled device (its client ``device_id``) a login session is
+  bound to. TTL = the refresh lifetime.
+* ``device:sids:<device_id>``: the set of sessions bound to the device, so a revoke can kill
+  every one of them at once. Its TTL is pushed out to the refresh lifetime on every bind.
+* ``revoked:device-sid:<sid>``: the session was revoked *because its device was revoked*;
+  the API then answers ``401`` with ``code: DEVICE_REVOKED`` (the client wipes itself)
+  instead of a plain ``401``. TTL = the refresh lifetime.
+
 Any store failure raises ``RevocationUnavailableError``; callers fail closed (503), they
 never treat an unreachable store as "not revoked" or "not locked".
 """
@@ -36,7 +46,7 @@ import time
 import uuid
 from collections.abc import Callable
 from datetime import timedelta
-from typing import Final, Protocol
+from typing import Final, Protocol, cast
 
 import redis
 
@@ -76,6 +86,18 @@ class RevocationStore(Protocol):
 
     def clear_failures(self, key: str) -> None: ...
 
+    def bind_device(self, session_id: uuid.UUID, device_id: uuid.UUID, ttl: timedelta) -> None: ...
+
+    def session_device(self, session_id: uuid.UUID) -> uuid.UUID | None: ...
+
+    def device_session_count(self, device_id: uuid.UUID) -> int: ...
+
+    def revoke_device(self, device_id: uuid.UUID, ttl: timedelta) -> int: ...
+
+    def revoke_device_session(self, session_id: uuid.UUID, ttl: timedelta) -> None: ...
+
+    def revoked_by_device(self, session_id: uuid.UUID) -> bool: ...
+
     def close(self) -> None: ...
 
 
@@ -101,6 +123,27 @@ def _magic_key(digest: str) -> str:
 
 def _pin_key(session_id: uuid.UUID) -> str:
     return f"{KEY_PREFIX}pin:{session_id}"
+
+
+def _device_of_key(session_id: uuid.UUID) -> str:
+    return f"{KEY_PREFIX}device:sid:{session_id}"
+
+
+def _device_sessions_key(device_id: uuid.UUID) -> str:
+    return f"{KEY_PREFIX}device:sids:{device_id}"
+
+
+def _device_revoked_key(session_id: uuid.UUID) -> str:
+    return f"{KEY_PREFIX}revoked:device-sid:{session_id}"
+
+
+def _uuid_or_none(value: bytes | None) -> uuid.UUID | None:
+    if value is None:
+        return None
+    try:
+        return uuid.UUID(value.decode())
+    except ValueError:
+        return None
 
 
 def _failures_key(key: str) -> str:
@@ -211,6 +254,58 @@ class RedisRevocationStore:
     def clear_failures(self, key: str) -> None:
         self._call(lambda: self._client.delete(_failures_key(key), _lock_key(key)))
 
+    def bind_device(self, session_id: uuid.UUID, device_id: uuid.UUID, ttl: timedelta) -> None:
+        seconds = _seconds(ttl)
+        members = _device_sessions_key(device_id)
+
+        def write() -> None:
+            pipe = self._client.pipeline(transaction=True)
+            pipe.set(_device_of_key(session_id), str(device_id).encode(), ex=seconds)
+            pipe.sadd(members, str(session_id))
+            # Every bind uses the same lifetime, so the latest bind always ends last.
+            pipe.expire(members, seconds)
+            pipe.execute()
+
+        self._call(write)
+
+    def session_device(self, session_id: uuid.UUID) -> uuid.UUID | None:
+        return _uuid_or_none(
+            _as_bytes(self._call(lambda: self._client.get(_device_of_key(session_id))))
+        )
+
+    def device_session_count(self, device_id: uuid.UUID) -> int:
+        """How many sessions are bound to the device now (read-only)."""
+        return int(str(self._call(lambda: self._client.scard(_device_sessions_key(device_id)))))
+
+    def revoke_device(self, device_id: uuid.UUID, ttl: timedelta) -> int:
+        """Kill every session bound to the device; returns how many were bound."""
+        members = _device_sessions_key(device_id)
+
+        def revoke() -> int:
+            raw = cast("set[bytes | str]", self._client.smembers(members))  # sync client
+            sessions = [uuid.UUID(m.decode() if isinstance(m, bytes) else str(m)) for m in raw]
+            pipe = self._client.pipeline(transaction=True)
+            for session_id in sessions:
+                pipe.set(_sid_key(session_id), b"1", ex=_seconds(ttl))
+                pipe.set(_device_revoked_key(session_id), b"1", ex=_seconds(ttl))
+            pipe.delete(members)
+            pipe.execute()
+            return len(sessions)
+
+        return self._call(revoke)
+
+    def revoke_device_session(self, session_id: uuid.UUID, ttl: timedelta) -> None:
+        def revoke() -> None:
+            pipe = self._client.pipeline(transaction=True)
+            pipe.set(_sid_key(session_id), b"1", ex=_seconds(ttl))
+            pipe.set(_device_revoked_key(session_id), b"1", ex=_seconds(ttl))
+            pipe.execute()
+
+        self._call(revoke)
+
+    def revoked_by_device(self, session_id: uuid.UUID) -> bool:
+        return bool(self._call(lambda: self._client.exists(_device_revoked_key(session_id))))
+
     def close(self) -> None:
         self._client.close()
 
@@ -308,6 +403,42 @@ class InMemoryRevocationStore:
         with self._lock:
             self._entries.pop(_failures_key(key), None)
             self._entries.pop(_lock_key(key), None)
+
+    def bind_device(self, session_id: uuid.UUID, device_id: uuid.UUID, ttl: timedelta) -> None:
+        with self._lock:
+            expires = self._clock() + _seconds(ttl)
+            self._entries[_device_of_key(session_id)] = (expires, str(device_id).encode())
+            members = _device_sessions_key(device_id)
+            current = self._get(members)
+            bound = set(current.decode().split(",")) if current else set()
+            bound.add(str(session_id))
+            self._entries[members] = (expires, ",".join(sorted(bound)).encode())
+
+    def session_device(self, session_id: uuid.UUID) -> uuid.UUID | None:
+        with self._lock:
+            return _uuid_or_none(self._get(_device_of_key(session_id)))
+
+    def device_session_count(self, device_id: uuid.UUID) -> int:
+        with self._lock:
+            current = self._get(_device_sessions_key(device_id))
+        return len(current.decode().split(",")) if current else 0
+
+    def revoke_device(self, device_id: uuid.UUID, ttl: timedelta) -> int:
+        with self._lock:
+            current = self._get(_device_sessions_key(device_id))
+            self._entries.pop(_device_sessions_key(device_id), None)
+        sessions = [uuid.UUID(s) for s in current.decode().split(",")] if current else []
+        for session_id in sessions:
+            self.revoke_device_session(session_id, ttl)
+        return len(sessions)
+
+    def revoke_device_session(self, session_id: uuid.UUID, ttl: timedelta) -> None:
+        self._set(_sid_key(session_id), ttl)
+        self._set(_device_revoked_key(session_id), ttl)
+
+    def revoked_by_device(self, session_id: uuid.UUID) -> bool:
+        with self._lock:
+            return self._live(_device_revoked_key(session_id))
 
     def close(self) -> None:
         with self._lock:

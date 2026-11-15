@@ -16,7 +16,10 @@
   ``LockedOutError`` (HTTP 429) without checking the secret.
 
 Every failure is the same ``AuthenticationError`` (HTTP 401) so callers cannot tell an
-unknown account from a wrong password or a revoked session.
+unknown account from a wrong password or a revoked session. The one exception is a revoked
+device (T-0043, diff §4.3): a call naming a revoked device (``device_id``), or a refresh of a
+session killed by a device revoke, raises ``DeviceRevokedError`` (``401`` with
+``code: DEVICE_REVOKED``), so the client knows to wipe itself.
 """
 
 from __future__ import annotations
@@ -30,6 +33,8 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.auth.device_signal import DeviceRevokedError
+from app.core.auth.devices import device_status
 from app.core.auth.field import (
     MAGIC_LINK_TTL,
     PIN_TTL_MARGIN,
@@ -44,7 +49,7 @@ from app.core.auth.lockout import (
     PIN_POLICY,
     ProgressiveLockout,
 )
-from app.core.auth.models import User, normalize_email
+from app.core.auth.models import DEVICE_REVOKED, User, normalize_email
 from app.core.auth.passwords import hash_password, verify_password
 from app.core.auth.providers import AuthProvider, LocalPasswordProvider, PasswordCredentials
 from app.core.auth.runtime import AuthRuntime
@@ -182,6 +187,13 @@ def load_active_user(session: Session, claims: TokenClaims) -> User:
     return user
 
 
+def refuse_revoked_device(session: Session, device_id: uuid.UUID | None) -> None:
+    """``DeviceRevokedError`` when ``device_id`` names a revoked device of the session's
+    tenant (diff §4.3). Unknown or active devices pass: enrolment happens after sign-in."""
+    if device_id is not None and device_status(session, device_id) == DEVICE_REVOKED:
+        raise DeviceRevokedError("device revoked")
+
+
 def _subject(tenant_id: uuid.UUID, email: str) -> str:
     return f"{tenant_id}:{normalize_email(email)}"
 
@@ -209,8 +221,10 @@ class AuthService:
         *,
         credentials: PasswordCredentials,
         client: str | None = None,
+        device_id: uuid.UUID | None = None,
     ) -> TokenPair:
-        """``client`` is the caller's address (``request.client.host``), the lockout key."""
+        """``client`` is the caller's address (``request.client.host``), the lockout key.
+        ``device_id`` is the device the client says it is (``X-KERP-Device-Id``)."""
         tenant = self.runtime.settings.default_tenant_id
         if tenant is None:
             raise AuthenticationError("no tenant")
@@ -223,6 +237,7 @@ class AuthService:
         self.login_lockout.begin(per_client)
         self.login_account_lockout.begin(account)
         bind_tenancy(session, TenancyContext(tenant_id=tenant))
+        refuse_revoked_device(session, device_id)
         user = self.provider.authenticate(session, tenant, credentials)
         if user is None:
             raise AuthenticationError("invalid credentials")
@@ -231,8 +246,11 @@ class AuthService:
         self._signed_in(user)
         return self._issue_pair(user.id, tenant, uuid.uuid4())
 
-    def refresh(self, session: Session, refresh_token: str) -> TokenPair:
+    def refresh(
+        self, session: Session, refresh_token: str, *, device_id: uuid.UUID | None = None
+    ) -> TokenPair:
         claims = self._live_refresh_claims(refresh_token)
+        self._refuse_revoked_device(session, claims, device_id)
         if self.runtime.store.get_pin(claims.session_id) is not None:
             # A PIN-gated (field-worker) session rotates only through ``unlock``. The token
             # is not consumed: the device can still unlock with it.
@@ -264,11 +282,18 @@ class AuthService:
             )
         )
 
-    def redeem_magic_link(self, session: Session, *, token: str, pin: str) -> TokenPair:
+    def redeem_magic_link(
+        self, session: Session, *, token: str, pin: str, device_id: uuid.UUID | None = None
+    ) -> TokenPair:
         """Spend a magic link: start a new session on this device, gated by ``pin``.
 
-        ``pin`` is validated by the request schema (6 digits, not a weak PIN).
+        ``pin`` is validated by the request schema (6 digits, not a weak PIN). A revoked
+        ``device_id`` is refused before the link is spent.
         """
+        tenant = self.runtime.settings.default_tenant_id
+        if device_id is not None and tenant is not None:
+            bind_tenancy(session, TenancyContext(tenant_id=tenant))
+            refuse_revoked_device(session, device_id)
         payload = self.runtime.store.take_magic_link(magic_link_digest(token))
         if payload is None:
             raise AuthenticationError("unknown, expired or used magic link")
@@ -287,13 +312,21 @@ class AuthService:
         self.runtime.store.set_pin(session_id, hash_password(pin), self._pin_ttl())
         return self._issue_pair(user_id, tenant_id, session_id)
 
-    def unlock(self, session: Session, *, refresh_token: str, pin: str) -> TokenPair:
+    def unlock(
+        self,
+        session: Session,
+        *,
+        refresh_token: str,
+        pin: str,
+        device_id: uuid.UUID | None = None,
+    ) -> TokenPair:
         """Rotate a PIN-gated session with the device's refresh token *and* the PIN.
 
         Neither half works alone. Wrong PINs escalate the session's lockout; the last
         allowed failure (``PIN_POLICY.max_attempts``) revokes the session.
         """
         claims = self._live_refresh_claims(refresh_token)
+        self._refuse_revoked_device(session, claims, device_id)
         session_id = claims.session_id
         pin_hash = self.runtime.store.get_pin(session_id)
         if pin_hash is None:
@@ -327,8 +360,29 @@ class AuthService:
             # The session's end is exact: no clock leeway for a token only we consume.
             raise AuthenticationError("session ended")
         if self.runtime.store.is_revoked(claims.jti, claims.session_id):
+            if self.runtime.store.revoked_by_device(claims.session_id):
+                raise DeviceRevokedError("device revoked")
             raise AuthenticationError("session revoked")
         return claims
+
+    def _refuse_revoked_device(
+        self, session: Session, claims: TokenClaims, device_id: uuid.UUID | None
+    ) -> None:
+        """A refresh or unlock from a revoked device (header, or the session's own binding)
+        kills the session and raises ``DeviceRevokedError`` before the token is spent."""
+        bound = self.runtime.store.session_device(claims.session_id)
+        candidates = {d for d in (bound, device_id) if d is not None}
+        if not candidates:
+            return
+        bind_tenancy(session, TenancyContext(tenant_id=claims.tenant_id, user_id=claims.user_id))
+        for candidate in candidates:
+            try:
+                refuse_revoked_device(session, candidate)
+            except DeviceRevokedError:
+                self.runtime.store.revoke_device_session(
+                    claims.session_id, self.runtime.tokens.ttl["refresh"]
+                )
+                raise
 
     def _rotate(self, session: Session, claims: TokenClaims) -> TokenPair:
         if not self.runtime.store.consume_refresh(claims.jti):

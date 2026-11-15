@@ -328,6 +328,24 @@ def resolve_request_scope(
     return resolve_scope(grants, replace(base, is_system_admin=is_admin), base.project_id)
 
 
+def user_has_projects_beyond(
+    database: Database,
+    tenant_id: uuid.UUID,
+    user_id: uuid.UUID,
+    project_ids: frozenset[uuid.UUID],
+) -> bool:
+    """Whether ``user_id`` holds a live membership in a project outside ``project_ids``.
+
+    Answers only yes/no, so the other projects never leave this function (T-0043: whether a
+    PER-09's device revoke wipes work of projects the PER-09 does not administer). Read in its
+    own short unit of work bound to that user (the membership policy lets a session read its
+    own rows), like ``resolve_request_scope``; read-only.
+    """
+    with database.unit_of_work(TenancyContext(tenant_id=tenant_id, user_id=user_id)) as session:
+        grants = load_grants(session, tenant_id, user_id)
+        return any(g.project_id not in project_ids for g in grants)
+
+
 # --- FastAPI guards ----------------------------------------------------------------------
 
 
