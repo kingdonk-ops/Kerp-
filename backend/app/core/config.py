@@ -206,6 +206,17 @@ class Settings(BaseSettings):
         return self
 
     @model_validator(mode="after")
+    def _pin_idle_covers_an_access_token(self) -> "Settings":
+        # T-0038: an active client refreshes once per access token; a shorter idle limit
+        # would ask for the PIN on every refresh of a session in use.
+        if self.pin_idle_minutes < self.access_token_minutes:
+            raise ValueError(
+                "KERP_PIN_IDLE_MINUTES (pin_idle_minutes) must be at least "
+                "KERP_ACCESS_TOKEN_MINUTES"
+            )
+        return self
+
+    @model_validator(mode="after")
     def _no_debug_in_production(self) -> "Settings":
         # Debug mode shows tracebacks to callers; refuse to start with it in production (T-0030).
         if self.debug and self.environment == "production":

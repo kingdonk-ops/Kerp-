@@ -572,19 +572,50 @@ def test_a_session_without_a_device_rotates_after_any_idle(h: Harness) -> None:
     assert refresh(h.client, tokens["refresh_token"]).status_code == 200
 
 
-def test_idle_limit_follows_the_setting_and_a_binding_by_enrolment(
+def _access_for(h: Harness, refresh_token: str) -> dict[str, str]:
+    """A live access token of the refresh token's session, issued now (the session's own
+    access token from a sign-in in the past has expired by PyJWT's real clock)."""
+    claims = h.runtime.tokens.verify(refresh_token, "refresh")
+    access = h.runtime.tokens.issue(
+        "access",
+        user_id=claims.user_id,
+        tenant_id=claims.tenant_id,
+        session_id=claims.session_id,
+        device_id=claims.device_id,
+    )
+    return {"access_token": access.token}
+
+
+def test_idle_limit_must_cover_an_access_token() -> None:
+    with pytest.raises(ValueError, match="pin_idle_minutes"):
+        make_settings(access_token_minutes=15, pin_idle_minutes=10)
+    assert make_settings(access_token_minutes=10, pin_idle_minutes=10).pin_idle_minutes == 10
+
+
+def test_idle_limit_follows_the_setting(
     tmp_path: Path, db: Database, users: dict[str, uuid.UUID]
 ) -> None:
-    for harness in _harness(tmp_path, db, pin_idle_minutes=5):
-        token = harness.request_link()
-        harness.tokens_clock.now = harness.tokens_clock.real - timedelta(minutes=6)
-        tokens = harness.redeem(token)  # a first sign-in, before the device exists
-        harness.tokens_clock.now = harness.tokens_clock.real
-        assert harness.enrol(tokens, uuid.uuid4()).status_code == 201  # binds this session
-        claims = harness.runtime.tokens.verify(tokens["refresh_token"], "refresh")
-        assert claims.device_id is None  # bound after the token was issued: the store binding
-        assert _code(refresh(harness.client, tokens["refresh_token"])) == PIN_REQUIRED
-        assert harness.unlock(tokens["refresh_token"]).status_code == 200
+    for harness in _harness(tmp_path, db, access_token_minutes=5, pin_idle_minutes=5):
+        _tokens, device = harness.field_device()
+        assert (
+            refresh(harness.client, harness.sign_in_on(device, 4)["refresh_token"]).status_code
+            == 200
+        )
+        assert _code(refresh(harness.client, harness.sign_in_on(device, 6)["refresh_token"])) == (
+            PIN_REQUIRED
+        )
+
+
+def test_a_session_bound_by_enrolment_is_gated_through_the_store_binding(h: Harness) -> None:
+    token = h.request_link()
+    h.tokens_clock.now = h.tokens_clock.real - timedelta(minutes=31)
+    tokens = h.redeem(token)  # a first sign-in, before the device exists
+    h.tokens_clock.now = h.tokens_clock.real
+    assert h.enrol(_access_for(h, tokens["refresh_token"]), uuid.uuid4()).status_code == 201
+    claims = h.runtime.tokens.verify(tokens["refresh_token"], "refresh")
+    assert claims.device_id is None  # bound after the token was issued: the store binding
+    assert _code(refresh(h.client, tokens["refresh_token"])) == PIN_REQUIRED
+    assert h.unlock(tokens["refresh_token"]).status_code == 200
 
 
 def test_pin_gate_does_not_depend_on_the_stores_binding(
@@ -734,6 +765,81 @@ def test_tenth_wrong_pin_ends_pin_unlock_until_a_sign_in_on_the_device(h: Harnes
     assert h.unlock(signed_in["refresh_token"]).status_code == 200
     for _ in range(3):
         assert _code(h.unlock(tokens["refresh_token"], WRONG)) == PIN_INVALID
+
+
+def _exhaust(h: Harness, refresh_token: str) -> None:
+    """Ten wrong PINs on the session's device (the 10th answers ``PIN_EXHAUSTED``)."""
+    _wrong_pins(h, refresh_token, 9)
+    h.clock.now += 15 * 60
+    assert _code(h.unlock(refresh_token, WRONG)) == PIN_EXHAUSTED
+
+
+def _evict_binding(h: Harness, refresh_token: str) -> None:
+    """Drop the session's ``device:sid`` binding as an evicting Redis would. The in-memory
+    store, because its clock (unlike fakeredis's) lets the lockout delays pass."""
+    store = h.runtime.store
+    assert isinstance(store, InMemoryRevocationStore)
+    session_id = h.session_id(refresh_token)
+    store._entries.pop(f"{KEY_PREFIX}device:sid:{session_id}")
+    assert store.session_device(session_id) is None
+
+
+@pytest.mark.parametrize("evicted", [False, True])
+def test_re_enrolling_from_a_session_bound_at_sign_in_does_not_clear_the_stop(
+    h: Harness, evicted: bool
+) -> None:
+    _first, device = h.field_device()
+    tokens = h.sign_in_on(device)  # bound at sign-in: its tokens carry ``did``
+    _exhaust(h, tokens["refresh_token"])
+    if evicted:
+        _evict_binding(h, tokens["refresh_token"])
+    assert h.enrol(tokens, device, pin=None).status_code == 200  # not a new binding
+    assert _code(h.unlock(tokens["refresh_token"])) == PIN_EXHAUSTED
+
+
+@pytest.mark.parametrize("evicted", [False, True])
+def test_re_enrolling_from_a_session_bound_by_enrolment_does_not_clear_the_stop(
+    h: Harness, evicted: bool
+) -> None:
+    tokens, device = h.field_device()  # bound by its enrolment (no ``did`` yet)
+    if evicted:
+        # After a rotation the session's tokens carry ``did``: an evicted binding then
+        # changes nothing. (Before its first rotation such a session relies on the store
+        # binding alone: the residual risk tracked in TD-303.)
+        tokens = token_body(refresh(h.client, tokens["refresh_token"]))
+    _exhaust(h, tokens["refresh_token"])
+    if evicted:
+        _evict_binding(h, tokens["refresh_token"])
+    assert h.enrol(tokens, device, pin=None).status_code == 200
+    assert _code(h.unlock(tokens["refresh_token"])) == PIN_EXHAUSTED
+
+
+def test_a_new_sessions_first_binding_by_enrolment_clears_the_stop(h: Harness) -> None:
+    first, device = h.field_device()
+    _exhaust(h, first["refresh_token"])
+    fresh = h.redeem(h.request_link())  # signed in without naming the device: unbound
+    assert _code(h.unlock(fresh["refresh_token"])) is None  # not a session of the device yet
+    assert h.enrol(fresh, device, pin=None).status_code == 200  # its first binding
+    assert h.unlock(fresh["refresh_token"]).status_code == 200
+
+
+def test_a_revoked_device_is_refused_through_the_did_claim_without_the_binding(
+    h: Harness, users: dict[str, uuid.UUID]
+) -> None:
+    """TD-142: the ``did`` claim alone still answers ``DEVICE_REVOKED`` (the revoke committed,
+    but neither the store binding nor the session kill reached Redis)."""
+    _first, device = h.field_device()
+    tokens = h.sign_in_on(device)
+    _evict_binding(h, tokens["refresh_token"])
+    with h.db.unit_of_work(ROOT) as s:
+        row = devices.find_device(s, device)
+        assert row is not None
+        assert devices.mark_revoked(s, row, actor_id=users["alice"])
+    for response in (
+        refresh(h.client, tokens["refresh_token"]),
+        h.unlock(tokens["refresh_token"]),
+    ):
+        assert _code(response) == DEVICE_REVOKED_CODE
 
 
 def test_right_pin_after_nine_wrong_ones_still_unlocks(h: Harness) -> None:

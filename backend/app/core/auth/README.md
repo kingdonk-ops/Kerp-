@@ -266,9 +266,11 @@ its own: a PIN alone never starts or renews a session.
 - **Which device.** The session's device is the token's `did` claim (set when the session is
   bound at sign-in, and carried by every rotation), else the store's binding (a session
   bound by its enrolment, until its first rotation). The gate therefore does not depend on a
-  Redis key once the claim exists (TD-142, resolved; residual: the first refresh token of a
-  session bound by enrolment rather than at sign-in relies on the binding, so clients send
-  `X-KERP-Device-Id` at sign-in). A session naming a device that is no longer an active
+  Redis key once the claim exists (TD-142, resolved). Open residual, TD-303: the first
+  refresh token of a session bound by enrolment rather than at sign-in relies on the
+  binding until its first rotation, so clients send `X-KERP-Device-Id` at sign-in and Redis
+  runs with `noeviction`. The claim also answers `DEVICE_REVOKED` on refresh and unlock
+  without the binding. A session naming a device that is no longer an active
   device of its user is refused.
 - **Answers of `/auth/pin/unlock`** (only after the refresh token checked out): `200` new
   pair; `401 {code: PIN_INVALID}` wrong PIN (ask again); `401 {code: PIN_EXHAUSTED}` the
@@ -278,8 +280,9 @@ its own: a PIN alone never starts or renews a session.
 
 **PIN lockout per device.** The numbers are T-0009's: 4 tries back to back, then 30 s
 doubling to 15 min; the **10th wrong PIN ends PIN unlock on that device** until a sign-in
-there: a new session bound to the device (sign-in naming it, or its enrolment) or a PIN
-change clears the counter. Nothing is revoked: not the session (its access token keeps
+there: a new session bound to the device (sign-in naming it, or the first enrolment of a
+session with neither a `did` claim nor a store binding) or a PIN change clears the counter.
+Re-enrolling from a session already bound clears nothing, even if its binding was evicted. Nothing is revoked: not the session (its access token keeps
 working until it expires), not the device; PIN failures never trigger a wipe. From the 10th
 failure on no lock is armed (`LockoutPolicy.lock_after`), so later attempts get
 `PIN_EXHAUSTED`, not `429`. **Offline failures:** the device counts wrong PINs made offline
@@ -426,7 +429,7 @@ session's bound project (or no bound project) → `404`; a member without the au
 | `KERP_JWT_ISSUER` / `KERP_JWT_AUDIENCE` | `kerp` / `kerp-api` | `iss` / `aud` |
 | `KERP_ACCESS_TOKEN_MINUTES` | `15` | 1–15 |
 | `KERP_REFRESH_TOKEN_HOURS` | `12` | 1–24; session length from sign-in |
-| `KERP_PIN_IDLE_MINUTES` | `30` | 1–1440; a session of a device with a PIN idle this long needs the PIN to renew (*Field workers*) |
+| `KERP_PIN_IDLE_MINUTES` | `30` | 1–1440 and at least `KERP_ACCESS_TOKEN_MINUTES` (else startup fails); a session of a device with a PIN idle this long needs the PIN to renew (*Field workers*) |
 | `KERP_DEFAULT_TENANT_ID` | unset | The deployment's one tenant (TD-120); required in production |
 | `KERP_INTERNAL_EMAIL_DOMAINS` | empty | Comma-separated e-mail domains of internal staff (exact match, no wildcards; see *Internal staff*); a malformed entry refuses startup |
 | `KERP_WEB_ORIGIN` | unset | Web SPA origin allowed on the cookie endpoints; unset = the API's own origin as the request sees it (behind a TLS-terminating proxy set this, or trust the proxy with `FORWARDED_ALLOW_IPS`); required with `KERP_NATIVE_APP_ORIGINS` |

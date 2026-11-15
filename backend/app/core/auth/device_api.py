@@ -167,7 +167,11 @@ def enrol(
     A new device gets its wipe secret in this response, once (store it per account). `pin`
     sets the device's field PIN, once: a sign-in on the device later keeps it."""
     session_id = principal.claims.session_id
-    newly_bound = runtime.store.session_device(session_id) is None
+    # A session bound at sign-in carries ``did``: it is never "newly bound", even when the
+    # store's binding was evicted, so re-enrolling cannot clear the PIN counter (TD-142 class).
+    newly_bound = (
+        principal.claims.device_id is None and runtime.store.session_device(session_id) is None
+    )
     pin_hash = hash_password(body.pin) if body.pin is not None else None
     try:
         device, wipe_secret = devices.enrol(

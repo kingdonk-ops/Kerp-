@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 180 · **Closed:** 118
+**Open:** 181 · **Closed:** 118
 
 ## decision (4)
 
@@ -197,7 +197,7 @@
 | [TD-252](../tracker/todo/TD-252.md) | tracker.py new-todo cannot see open PRs in cloud sessions: gh pr list uses GraphQL (blocked), so TODO ids collide | T-0029 | coordinator |
 | [TD-287](../tracker/todo/TD-287.md) | Upgrade offer: a soft-deleted own rule holding a new default's key shows key_in_use forever | T-0036 | reviewer |
 
-## risk (18)
+## risk (19)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -219,6 +219,7 @@
 | [TD-276](../tracker/todo/TD-276.md) | A PR-added or PR-edited workflow can emit a check named review-gate; accepted while the owner is the sole collaborator (revisit when a second collaborator joins) | T-0067 | planner |
 | [TD-292](../tracker/todo/TD-292.md) | Remove stale scripts/gemini_review.sh allow/deny rules from .claude/settings.json (human-only edit) | — | implementer |
 | [TD-299](../tracker/todo/TD-299.md) | Sign-in with valid credentials answers DEVICE_REVOKED for a revoked device of another account | T-0080 | implementer |
+| [TD-303](../tracker/todo/TD-303.md) | Field PIN gate can fail open if Redis evicts device:sid before the first rotation of a session bound by enrolment (its first refresh token has no did claim) | T-0038 | implementer |
 
 ## Closed
 
