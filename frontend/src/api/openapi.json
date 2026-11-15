@@ -81,6 +81,9 @@
           "429": {
             "description": "Locked after repeated failures; retry after `Retry-After` seconds"
           },
+          "401": {
+            "description": "Not authenticated; with `code: DEVICE_REVOKED` when `X-KERP-Device-Id` (or the session's device) is revoked: wipe the device's local data"
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -176,6 +179,9 @@
               }
             }
           },
+          "401": {
+            "description": "Not authenticated; with `code: DEVICE_REVOKED` when `X-KERP-Device-Id` (or the session's device) is revoked: wipe the device's local data"
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -200,7 +206,7 @@
           "auth"
         ],
         "summary": "Pin Unlock",
-        "description": "Unlock a PIN-gated session: the device's refresh cookie + the PIN rotate the tokens.\n\nWrong PINs lock the session progressively; the 10th wrong PIN revokes it.",
+        "description": "Unlock a PIN-gated session: the device's refresh token + the PIN rotate the tokens.\n\nWrong PINs lock the session progressively; the 10th wrong PIN revokes it.",
         "operationId": "pin_unlock_api_v1_auth_pin_unlock_post",
         "security": [
           {
@@ -252,7 +258,10 @@
             "description": "Locked after repeated failures; retry after `Retry-After` seconds"
           },
           "403": {
-            "description": "`Origin` is not the web app's origin"
+            "description": "`Origin` is neither the web app's origin nor an allow-listed native app"
+          },
+          "401": {
+            "description": "Not authenticated; with `code: DEVICE_REVOKED` when `X-KERP-Device-Id` (or the session's device) is revoked: wipe the device's local data"
           },
           "422": {
             "description": "Validation Error",
@@ -273,7 +282,7 @@
           "auth"
         ],
         "summary": "Refresh",
-        "description": "Rotate: the refresh cookie is spent and a new pair is issued. Reuse revokes the session.\n\nThe new refresh token keeps the session's end (sign-in + 12 h); after it, sign in again.",
+        "description": "Rotate: the refresh token is spent and a new pair is issued. Reuse revokes the session.\n\nThe new refresh token keeps the session's end (sign-in + 12 h); after it, sign in again.\nThe web SPA sends the cookie; an allow-listed native app sends ``refresh_token``.",
         "operationId": "refresh_api_v1_auth_refresh_post",
         "security": [
           {
@@ -300,6 +309,23 @@
             "description": "The refresh token (httpOnly cookie, never JS)"
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/RefreshRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -312,7 +338,10 @@
             }
           },
           "403": {
-            "description": "`Origin` is not the web app's origin"
+            "description": "`Origin` is neither the web app's origin nor an allow-listed native app"
+          },
+          "401": {
+            "description": "Not authenticated; with `code: DEVICE_REVOKED` when `X-KERP-Device-Id` (or the session's device) is revoked: wipe the device's local data"
           },
           "422": {
             "description": "Validation Error",
@@ -371,6 +400,273 @@
             "HTTPBearer": []
           }
         ]
+      }
+    },
+    "/api/v1/devices/enrol": {
+      "post": {
+        "tags": [
+          "devices"
+        ],
+        "summary": "Enrol",
+        "description": "Register this field device for the signed-in user and bind the session to it.",
+        "operationId": "enrol_api_v1_devices_enrol_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceEnrolRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceRead"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Enrolled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceRead"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Another account's device, or session"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/devices": {
+      "get": {
+        "tags": [
+          "devices"
+        ],
+        "summary": "My Devices",
+        "description": "The caller's own devices with their last-seen and last-sync times.",
+        "operationId": "my_devices_api_v1_devices_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DeviceRead"
+                  },
+                  "type": "array",
+                  "title": "Response My Devices Api V1 Devices Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/users/{user_id}/devices": {
+      "get": {
+        "tags": [
+          "devices"
+        ],
+        "summary": "User Devices",
+        "description": "A user's devices (the user, a ``system_admin``, or a PER-09 of a shared project).",
+        "operationId": "user_devices_api_v1_users__user_id__devices_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "User Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DeviceRead"
+                  },
+                  "title": "Response User Devices Api V1 Users  User Id  Devices Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/devices/{device_id}/revoke": {
+      "post": {
+        "tags": [
+          "devices"
+        ],
+        "summary": "Revoke",
+        "description": "Revoke a device: its sessions die now; on its next call it is told to wipe itself.",
+        "operationId": "revoke_api_v1_devices__device_id__revoke_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "device_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Device Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/DeviceRevokeRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceRevoked"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "A shared project, but no PER-09 on it"
+          },
+          "404": {
+            "description": "Unknown device, or not the caller's to see"
+          },
+          "409": {
+            "description": "PER-09 revoke that also wipes other projects' unsynced work: repeat with `confirm_cross_project_wipe: true`"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/devices/{device_id}/wipe-confirmed": {
+      "post": {
+        "tags": [
+          "devices"
+        ],
+        "summary": "Wipe Confirmed",
+        "description": "The revoked device confirms it wiped its local store (records, outbox, media, keys).",
+        "operationId": "wipe_confirmed_api_v1_devices__device_id__wipe_confirmed_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "device_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Device Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Unknown device"
+          },
+          "409": {
+            "description": "The device is not revoked"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/modules": {
@@ -3515,6 +3811,306 @@
         ],
         "title": "DeliveryRead"
       },
+      "DeviceEnrolRequest": {
+        "properties": {
+          "device_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Device Id",
+            "description": "Generated by the client once per installation"
+          },
+          "platform": {
+            "type": "string",
+            "enum": [
+              "android",
+              "ios",
+              "web"
+            ],
+            "title": "Platform",
+            "description": "Shown to admins; never decides the token transport"
+          },
+          "os_version": {
+            "type": "string",
+            "maxLength": 64,
+            "pattern": "^[\\x20-\\x7e]*$",
+            "title": "Os Version",
+            "default": ""
+          },
+          "app_version": {
+            "type": "string",
+            "maxLength": 64,
+            "pattern": "^[\\x20-\\x7e]*$",
+            "title": "App Version",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "device_id",
+          "platform"
+        ],
+        "title": "DeviceEnrolRequest",
+        "description": "A field client registers itself after sign-in (every sign-in; idempotent)."
+      },
+      "DeviceRead": {
+        "properties": {
+          "device_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Device Id"
+          },
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "User Id"
+          },
+          "platform": {
+            "type": "string",
+            "enum": [
+              "android",
+              "ios",
+              "web"
+            ],
+            "title": "Platform"
+          },
+          "os_version": {
+            "type": "string",
+            "title": "Os Version"
+          },
+          "app_version": {
+            "type": "string",
+            "title": "App Version"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "revoked"
+            ],
+            "title": "Status"
+          },
+          "enrolled_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Enrolled At"
+          },
+          "last_seen_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Last Seen At"
+          },
+          "last_sync_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Sync At",
+            "description": "Last successful sync: work changed on the device after it is lost on revoke"
+          },
+          "revoked_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked At"
+          },
+          "revoked_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked By"
+          },
+          "wipe_confirmed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wipe Confirmed At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "device_id",
+          "user_id",
+          "platform",
+          "os_version",
+          "app_version",
+          "status",
+          "enrolled_at",
+          "last_seen_at",
+          "last_sync_at",
+          "revoked_at",
+          "revoked_by",
+          "wipe_confirmed_at"
+        ],
+        "title": "DeviceRead"
+      },
+      "DeviceRevokeRequest": {
+        "properties": {
+          "confirm_cross_project_wipe": {
+            "type": "boolean",
+            "title": "Confirm Cross Project Wipe",
+            "description": "Required (else 409) when a PER-09 revokes a device whose user also belongs to other projects: the wipe also deletes their unsynced work of those projects",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "DeviceRevokeRequest"
+      },
+      "DeviceRevoked": {
+        "properties": {
+          "device_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Device Id"
+          },
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "User Id"
+          },
+          "platform": {
+            "type": "string",
+            "enum": [
+              "android",
+              "ios",
+              "web"
+            ],
+            "title": "Platform"
+          },
+          "os_version": {
+            "type": "string",
+            "title": "Os Version"
+          },
+          "app_version": {
+            "type": "string",
+            "title": "App Version"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "revoked"
+            ],
+            "title": "Status"
+          },
+          "enrolled_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Enrolled At"
+          },
+          "last_seen_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Last Seen At"
+          },
+          "last_sync_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Sync At",
+            "description": "Last successful sync: work changed on the device after it is lost on revoke"
+          },
+          "revoked_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked At"
+          },
+          "revoked_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked By"
+          },
+          "wipe_confirmed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wipe Confirmed At"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "self",
+              "system_admin",
+              "per_09"
+            ],
+            "title": "Role",
+            "description": "The authority the revoke used (audited)"
+          },
+          "cross_project_warning": {
+            "type": "boolean",
+            "title": "Cross Project Warning",
+            "description": "The device's user belongs to projects beyond the revoking PER-09's"
+          }
+        },
+        "type": "object",
+        "required": [
+          "device_id",
+          "user_id",
+          "platform",
+          "os_version",
+          "app_version",
+          "status",
+          "enrolled_at",
+          "last_seen_at",
+          "last_sync_at",
+          "revoked_at",
+          "revoked_by",
+          "wipe_confirmed_at",
+          "role",
+          "cross_project_warning"
+        ],
+        "title": "DeviceRevoked"
+      },
       "DriftEntryRead": {
         "properties": {
           "project_id": {
@@ -4761,6 +5357,20 @@
             "pattern": "^[0-9]{6}$",
             "title": "Pin",
             "description": "6-digit PIN of this device's session"
+          },
+          "refresh_token": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4096,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refresh Token",
+            "description": "The refresh token, for the native app only (its `Origin` is on `KERP_NATIVE_APP_ORIGINS`); ignored on every other request, which uses the cookie"
           }
         },
         "additionalProperties": false,
@@ -4769,7 +5379,7 @@
           "pin"
         ],
         "title": "PinUnlockRequest",
-        "description": "The PIN. The device's refresh token comes from the refresh cookie: both are\nrequired, a PIN alone is never a credential."
+        "description": "The PIN. The device's refresh token comes from the refresh cookie (the native app:\n``refresh_token`` here): both are required, a PIN alone is never a credential."
       },
       "PolygonGeoJSON": {
         "properties": {
@@ -5074,6 +5684,28 @@
         "type": "object",
         "title": "ProjectUpdate",
         "description": "``PATCH /projects/{id}``: only the given fields change; ``spatial_bounds: null`` clears."
+      },
+      "RefreshRequest": {
+        "properties": {
+          "refresh_token": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4096,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refresh Token",
+            "description": "The refresh token, for the native app only (its `Origin` is on `KERP_NATIVE_APP_ORIGINS`); ignored on every other request, which uses the cookie"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "RefreshRequest",
+        "description": "Optional body of ``/auth/refresh``: only the native app sends its refresh token here."
       },
       "RegexMatch": {
         "properties": {
@@ -6064,6 +6696,18 @@
             "type": "integer",
             "title": "Refresh Expires In",
             "description": "Seconds until the login session ends (sign-in + 12 h); then sign in again"
+          },
+          "refresh_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refresh Token",
+            "description": "Native app only (`Origin` on `KERP_NATIVE_APP_ORIGINS`): the refresh token, kept in the device keystore. Absent for every other caller (cookie transport)"
           }
         },
         "type": "object",
@@ -6073,7 +6717,7 @@
           "refresh_expires_in"
         ],
         "title": "TokenResponse",
-        "description": "The access token. The refresh token is never in a body: it is the ``httpOnly``\nrefresh cookie (diff §4.2, TD-203)."
+        "description": "The access token. The refresh token is the ``httpOnly`` refresh cookie (diff §4.2,\nTD-203); only a request from an allow-listed native-app ``Origin`` gets it in the body\n(``refresh_token``, T-0043) instead."
       },
       "TryError": {
         "properties": {

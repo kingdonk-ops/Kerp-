@@ -8,9 +8,18 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api.health import router as health_router
+from app.core.auth.device_api import router as device_router
+from app.core.auth.device_signal import (
+    DEVICE_HEADER,
+    DeviceRevokedError,
+    InvalidDeviceHeaderError,
+    device_revoked_handler,
+    invalid_device_header_handler,
+)
 from app.core.auth.router import router as auth_router
 from app.core.auth.runtime import check_startup_config, close_auth_runtime
 from app.core.body_limit import BodyLimitMiddleware
@@ -81,6 +90,20 @@ def create_app(
     # innermost, so its 413 carries a request id and the security headers (T-0060).
     app.add_middleware(BodyLimitMiddleware, max_bytes=settings.max_body_bytes)
     app.add_middleware(RequestContextMiddleware, debug=settings.debug)
+    if settings.native_app_origins:
+        # The native field app (T-0043, TD-203) calls the API cross-origin: exactly the
+        # allow-listed origins, never with credentials (its refresh token travels in the
+        # body, so no cookie is needed). The web SPA is served from KERP_WEB_ORIGIN and is
+        # never on this list (settings refuse it).
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=list(settings.native_app_origins),
+            allow_credentials=False,
+            allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+            allow_headers=["Authorization", "Content-Type", DEVICE_HEADER],
+            expose_headers=["Retry-After", "WWW-Authenticate"],
+            max_age=600,
+        )
     docs_paths = {app.docs_url, app.redoc_url, app.swagger_ui_oauth2_redirect_url}
     app.add_middleware(
         SecurityHeadersMiddleware,
@@ -91,9 +114,13 @@ def create_app(
 
     # Another tenant's or project's record is "not found", never "forbidden" (CLAUDE.md §6).
     app.add_exception_handler(OutOfScopeError, _out_of_scope_handler)
+    # A revoked field device: 401 with code DEVICE_REVOKED, the client wipes (T-0043).
+    app.add_exception_handler(DeviceRevokedError, device_revoked_handler)
+    app.add_exception_handler(InvalidDeviceHeaderError, invalid_device_header_handler)
 
     app.include_router(health_router)
     app.include_router(auth_router)  # core auth + JWKS (T-0008)
+    app.include_router(device_router)  # device registry (T-0043)
     # Domain modules (app/modules/<name>/) and the per-project toggle API (T-0011).
     install_modules(app, modules_package)
 

@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 
 from app.core.audit.hashing import (
     GENESIS_HASH,
+    HASH_VERSION,
     ChainReport,
     canonical_json,
     compute_content_hash,
@@ -29,7 +30,7 @@ from app.core.audit.hashing import (
 )
 from app.core.audit.models import AuditEntry, scope_of
 from app.core.db import RECORD_SOURCES, utcnow
-from app.core.tenancy.context import TenancyContext
+from app.core.tenancy.context import TenancyContext, current_device_id
 from app.core.tenancy.rls import session_tenancy
 
 MAX_CHAIN_KEY = 200
@@ -76,10 +77,14 @@ def append(
     *,
     source: str = "system",
     actor_id: uuid.UUID | None = None,
+    device_id: uuid.UUID | None = None,
 ) -> AuditEntry:
     """Add the next entry to ``chain_key`` in the session's scope and flush it.
 
     ``chain_key`` should embed the entity it tracks (``"inspection:<uuid>"``).
+    ``device_id`` is the enrolled field device the change came through (T-0043); unset, it
+    is the request's device (``current_device_id``, set at authentication), else ``NULL``.
+    A job replaying a device's queued work passes the device explicitly.
     """
     context = _context(session)
     if not isinstance(payload, dict):
@@ -106,6 +111,8 @@ def append(
         created_by=actor_id or context.user_id,
         source=source,
         payload=stored,
+        device_id=device_id or current_device_id.get(),
+        hash_version=HASH_VERSION,
     )
     entry.content_hash = compute_content_hash(entry)
     session.add(entry)

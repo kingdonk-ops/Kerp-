@@ -386,6 +386,8 @@ class _Fields:
     payload: dict[str, object]
     content_hash: str = ""
     deleted_at: datetime | None = None
+    device_id: uuid.UUID | None = None
+    hash_version: int = 1
 
 
 def _snapshot(entry: AuditEntry) -> _Fields:

@@ -328,6 +328,20 @@ def resolve_request_scope(
     return resolve_scope(grants, replace(base, is_system_admin=is_admin), base.project_id)
 
 
+def user_project_ids(
+    database: Database, tenant_id: uuid.UUID, user_id: uuid.UUID
+) -> frozenset[uuid.UUID]:
+    """Every project ``user_id`` holds a live membership in, whoever asks.
+
+    Read in its own short unit of work bound to that user (the membership policy lets a
+    session read its own rows), like ``resolve_request_scope``; read-only. For server-side
+    decisions only (T-0043: whether a PER-09's device revoke wipes work of projects the
+    PER-09 does not administer): never hand the ids to a caller who cannot see them.
+    """
+    with database.unit_of_work(TenancyContext(tenant_id=tenant_id, user_id=user_id)) as session:
+        return frozenset(g.project_id for g in load_grants(session, tenant_id, user_id))
+
+
 # --- FastAPI guards ----------------------------------------------------------------------
 
 
