@@ -49,10 +49,12 @@ from that binding, never from arguments.
 - **Hash:** SHA-256, lower-case hex.
   `content_hash = sha256(b"kerp-audit-ledger\n" + canonical_json(body))`, where `body` is
   `{"v": 1, tenant_id, project_id, chain_key, seq, prev_hash, created_at, created_by,
-  source, payload}`. UUIDs are strings, `created_at` is UTC ISO 8601 with microseconds
+  source, payload}` for v1 and the same plus `device_id` with `"v": 2` for v2 (below). UUIDs
+  are strings, `created_at` is UTC ISO 8601 with microseconds
   (`2026-11-10T08:30:00.123456+00:00`). The mutable mixin columns are not hashed.
-  `tests/test_audit_ledger.py::test_content_hash_known_answer` pins the format; changing it
-  needs a new `v` and must keep verifying old entries.
+  `tests/test_audit_ledger.py::test_content_hash_known_answer` pins v1 and
+  `tests/test_audit_ledger_device.py::test_v2_content_hash_known_answer` pins v2; changing the
+  format needs a new `v` and must keep verifying old entries.
 - **Canonical JSON:** sorted keys, `","`/`":"` separators, UTF-8 (`ensure_ascii=False`). The
   payload must be an object of `str`, `int`, `bool`, `null`, lists and objects. **Floats and
   NUL characters are rejected**, because they do not survive a `JSONB` round trip unchanged;
@@ -66,6 +68,31 @@ from that binding, never from arguments.
   the newest entries being removed, or a chain rewritten with recomputed hashes by the table
   owner or a superuser. Anchoring head hashes outside the database is **TD-058**.
 
+## Device id and hash versions (T-0043, ADR 0010)
+
+Diff §4.3: ledger entries made through a field device carry its `device_id`. Migration `0016`
+added two columns (additive, ADR 0010):
+
+| Column | Meaning |
+|---|---|
+| `device_id` | UUID or `NULL`: the enrolled device (`oe_identity_device.device_id`) the entry was written through. Not a foreign key |
+| `hash_version` | The `v` the entry was hashed with: `1` for every row written before `0016` (server default), `2` (`HASH_VERSION`) for new rows |
+
+v2 hashes `device_id` too (`null` when there is none), so the device cannot be added, removed
+or changed without breaking the entry's hash. `compute_content_hash` hashes each entry in its
+own version, so a chain mixing older v1 and newer v2 entries verifies; an unknown version is a
+verification problem. CHECKs: `hash_version IN (1, 2)` and `hash_version >= 2 OR device_id IS
+NULL`.
+
+`append(..., device_id=None)` records an explicit device (a job replaying a device's queued
+work passes it), else the request's device: `current_device_id`
+(`app/core/tenancy/context.py`), set by authentication from the session's bound device or an
+enrolled device of the caller named in `X-KERP-Device-Id` (`app/core/auth/devices.py`).
+Nothing in a request body can set it. Workers and scripts get `NULL` unless they pass one.
+
+The `0016` downgrade drops both columns, after which v2 entries no longer verify: development
+databases only.
+
 ## Append-only enforcement
 
 | Layer | Where | Stops |
@@ -74,6 +101,7 @@ from that binding, never from arguments.
 | `REVOKE UPDATE, DELETE, TRUNCATE ... FROM PUBLIC, CURRENT_USER` | migration `0002` (`guard.py`) | the app role: `permission denied` |
 | `BEFORE UPDATE OR DELETE` row trigger + `BEFORE TRUNCATE` statement trigger | migration `0002` (`guard.py`) | everyone except a superuser with `session_replication_role = replica`, or the owner after disabling the trigger |
 | CHECKs `deleted_at IS NULL`, `revision = 1`, `custom_fields = '{}'`, `scope_id` matches `project_id` | migration `0002` (`models.py`) | soft-deleted, revised or re-scoped rows, even from a superuser with triggers off (both dialects) |
+| CHECKs `hash_version IN (1, 2)`, `hash_version >= 2 OR device_id IS NULL` | migration `0016` (`models.py`) | unknown hash versions, a v1 row claiming a device |
 
 **Why both REVOKE and triggers.** In CI the runtime role `kerp_app` also runs the migrations,
 so it owns the table (TD-056). An owner's privileges can be revoked, and the REVOKE does apply
@@ -102,6 +130,9 @@ fails with `IntegrityError` rather than forking
   row, swapped `seq`) and the CHECKs refusing soft-delete/revision/custom-field/scope edits.
   On PostgreSQL the tampering runs as the superuser (`KERP_TEST_OWNER_URL`) with triggers
   disabled.
+- `tests/test_audit_ledger_device.py`: SQLite and PostgreSQL. The v2 known-answer hash, v1
+  unchanged, mixed v1/v2 chains, explicit and request device ids on `append`, a tampered
+  `device_id`, the version CHECKs, and v1 rows written at `0015` still verifying after `0016`.
 - `tests/test_audit_ledger_pg.py`: PostgreSQL only, as `kerp_app` (skipped elsewhere, TD-052).
   It covers REVOKE (`UPDATE`/`DELETE`/`TRUNCATE` denied, `INSERT`/`SELECT` kept), the triggers
   against a re-granted owner, `ledger_guard_problems`, RLS project scoping (project B's append

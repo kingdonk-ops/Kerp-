@@ -81,6 +81,9 @@
           "429": {
             "description": "Locked after repeated failures; retry after `Retry-After` seconds"
           },
+          "401": {
+            "description": "Not authenticated; with `code: DEVICE_REVOKED` when `X-KERP-Device-Id` (or the session's device) is revoked: wipe the device's local data"
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -176,6 +179,9 @@
               }
             }
           },
+          "401": {
+            "description": "Not authenticated; with `code: DEVICE_REVOKED` when `X-KERP-Device-Id` (or the session's device) is revoked: wipe the device's local data"
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -200,7 +206,7 @@
           "auth"
         ],
         "summary": "Pin Unlock",
-        "description": "Unlock a PIN-gated session: the device's refresh cookie + the PIN rotate the tokens.\n\nWrong PINs lock the session progressively; the 10th wrong PIN revokes it.",
+        "description": "Unlock a PIN-gated session: the device's refresh token + the PIN rotate the tokens.\n\nWrong PINs lock the session progressively; the 10th wrong PIN revokes it.",
         "operationId": "pin_unlock_api_v1_auth_pin_unlock_post",
         "security": [
           {
@@ -252,7 +258,10 @@
             "description": "Locked after repeated failures; retry after `Retry-After` seconds"
           },
           "403": {
-            "description": "`Origin` is not the web app's origin"
+            "description": "`Origin` is neither the web app's origin nor an allow-listed native app"
+          },
+          "401": {
+            "description": "Not authenticated; with `code: DEVICE_REVOKED` when `X-KERP-Device-Id` (or the session's device) is revoked: wipe the device's local data"
           },
           "422": {
             "description": "Validation Error",
@@ -273,7 +282,7 @@
           "auth"
         ],
         "summary": "Refresh",
-        "description": "Rotate: the refresh cookie is spent and a new pair is issued. Reuse revokes the session.\n\nThe new refresh token keeps the session's end (sign-in + 12 h); after it, sign in again.",
+        "description": "Rotate: the refresh token is spent and a new pair is issued. Reuse revokes the session.\n\nThe new refresh token keeps the session's end (sign-in + 12 h); after it, sign in again.\nThe web SPA sends the cookie; an allow-listed native app sends ``refresh_token``.",
         "operationId": "refresh_api_v1_auth_refresh_post",
         "security": [
           {
@@ -300,6 +309,23 @@
             "description": "The refresh token (httpOnly cookie, never JS)"
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/RefreshRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -312,7 +338,10 @@
             }
           },
           "403": {
-            "description": "`Origin` is not the web app's origin"
+            "description": "`Origin` is neither the web app's origin nor an allow-listed native app"
+          },
+          "401": {
+            "description": "Not authenticated; with `code: DEVICE_REVOKED` when `X-KERP-Device-Id` (or the session's device) is revoked: wipe the device's local data"
           },
           "422": {
             "description": "Validation Error",
@@ -371,6 +400,273 @@
             "HTTPBearer": []
           }
         ]
+      }
+    },
+    "/api/v1/devices/enrol": {
+      "post": {
+        "tags": [
+          "devices"
+        ],
+        "summary": "Enrol",
+        "description": "Register this field device for the signed-in user and bind the session to it.",
+        "operationId": "enrol_api_v1_devices_enrol_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceEnrolRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceRead"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Enrolled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceRead"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Another account's device, or session"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/devices": {
+      "get": {
+        "tags": [
+          "devices"
+        ],
+        "summary": "My Devices",
+        "description": "The caller's own devices with their last-seen and last-sync times.",
+        "operationId": "my_devices_api_v1_devices_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DeviceRead"
+                  },
+                  "type": "array",
+                  "title": "Response My Devices Api V1 Devices Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/users/{user_id}/devices": {
+      "get": {
+        "tags": [
+          "devices"
+        ],
+        "summary": "User Devices",
+        "description": "A user's devices (the user, a ``system_admin``, or a PER-09 of a shared project).",
+        "operationId": "user_devices_api_v1_users__user_id__devices_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "User Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DeviceRead"
+                  },
+                  "title": "Response User Devices Api V1 Users  User Id  Devices Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/devices/{device_id}/revoke": {
+      "post": {
+        "tags": [
+          "devices"
+        ],
+        "summary": "Revoke",
+        "description": "Revoke a device: its sessions die now; on its next call it is told to wipe itself.",
+        "operationId": "revoke_api_v1_devices__device_id__revoke_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "device_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Device Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/DeviceRevokeRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceRevoked"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "A shared project, but no PER-09 on it"
+          },
+          "404": {
+            "description": "Unknown device, or not the caller's to see"
+          },
+          "409": {
+            "description": "PER-09 revoke that also wipes other projects' unsynced work: repeat with `confirm_cross_project_wipe: true`"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/devices/{device_id}/wipe-confirmed": {
+      "post": {
+        "tags": [
+          "devices"
+        ],
+        "summary": "Wipe Confirmed",
+        "description": "The revoked device confirms it wiped its local store (records, outbox, media, keys).",
+        "operationId": "wipe_confirmed_api_v1_devices__device_id__wipe_confirmed_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "device_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Device Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Unknown device"
+          },
+          "409": {
+            "description": "The device is not revoked"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/modules": {
@@ -2317,6 +2613,210 @@
         }
       }
     },
+    "/api/v1/validation/rule-sets/{rule_set_id}/updates": {
+      "get": {
+        "tags": [
+          "validation"
+        ],
+        "summary": "Tenant Rule Set Updates",
+        "operationId": "tenant_rule_set_updates_api_v1_validation_rule_sets__rule_set_id__updates_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "rule_set_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Rule Set Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleSetUpdatesRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/validation/rule-sets/{rule_set_id}/updates/{rule_key}/accept": {
+      "post": {
+        "tags": [
+          "validation"
+        ],
+        "summary": "Accept Tenant Update",
+        "operationId": "accept_tenant_update_api_v1_validation_rule_sets__rule_set_id__updates__rule_key__accept_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "rule_set_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Rule Set Id"
+            }
+          },
+          {
+            "name": "rule_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9_.-]{0,119}$",
+              "title": "Rule Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleSetRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/validation/rule-sets/{rule_set_id}/rules/{rule_key}/try": {
+      "post": {
+        "tags": [
+          "validation"
+        ],
+        "summary": "Try Tenant Rule",
+        "operationId": "try_tenant_rule_api_v1_validation_rule_sets__rule_set_id__rules__rule_key__try_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "rule_set_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Rule Set Id"
+            }
+          },
+          {
+            "name": "rule_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9_.-]{0,119}$",
+              "title": "Rule Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TryRuleInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TryResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/validation/drift-report": {
+      "get": {
+        "tags": [
+          "validation"
+        ],
+        "summary": "Drift Report",
+        "operationId": "drift_report_api_v1_validation_drift_report_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DriftEntryRead"
+                  },
+                  "type": "array",
+                  "title": "Response Drift Report Api V1 Validation Drift Report Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/validation/rule-sets/{rule_set_id}/rules/{rule_key}/unlock-requests": {
       "post": {
         "tags": [
@@ -3002,6 +3502,210 @@
           }
         }
       }
+    },
+    "/api/v1/validation/projects/{project_id}/rule-sets/{rule_set_id}/updates": {
+      "get": {
+        "tags": [
+          "validation"
+        ],
+        "summary": "Project Rule Set Updates",
+        "operationId": "project_rule_set_updates_api_v1_validation_projects__project_id__rule_sets__rule_set_id__updates_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "rule_set_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Rule Set Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleSetUpdatesRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/validation/projects/{project_id}/rule-sets/{rule_set_id}/updates/{rule_key}/accept": {
+      "post": {
+        "tags": [
+          "validation"
+        ],
+        "summary": "Accept Project Update",
+        "operationId": "accept_project_update_api_v1_validation_projects__project_id__rule_sets__rule_set_id__updates__rule_key__accept_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "rule_set_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Rule Set Id"
+            }
+          },
+          {
+            "name": "rule_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9_.-]{0,119}$",
+              "title": "Rule Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleSetRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/validation/projects/{project_id}/rule-sets/{rule_set_id}/rules/{rule_key}/try": {
+      "post": {
+        "tags": [
+          "validation"
+        ],
+        "summary": "Try Project Rule",
+        "operationId": "try_project_rule_api_v1_validation_projects__project_id__rule_sets__rule_set_id__rules__rule_key__try_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "rule_set_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Rule Set Id"
+            }
+          },
+          {
+            "name": "rule_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9_.-]{0,119}$",
+              "title": "Rule Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TryRuleInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TryResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3034,6 +3738,49 @@
         ],
         "title": "Aggregate"
       },
+      "CheckFinding": {
+        "properties": {
+          "rule_key": {
+            "type": "string",
+            "title": "Rule Key"
+          },
+          "rule_version": {
+            "type": "integer",
+            "title": "Rule Version"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "fail",
+              "error"
+            ],
+            "title": "Outcome"
+          },
+          "action": {
+            "type": "string",
+            "title": "Action"
+          },
+          "severity": {
+            "type": "string",
+            "title": "Severity"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rule_key",
+          "rule_version",
+          "outcome",
+          "action",
+          "severity",
+          "message"
+        ],
+        "title": "CheckFinding",
+        "description": "A rule of the set that did not pass. ``message`` is the user-readable reason."
+      },
       "DeliveryRead": {
         "properties": {
           "channel": {
@@ -3063,6 +3810,386 @@
           "detail"
         ],
         "title": "DeliveryRead"
+      },
+      "DeviceEnrolRequest": {
+        "properties": {
+          "device_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Device Id",
+            "description": "Generated by the client once per installation"
+          },
+          "platform": {
+            "type": "string",
+            "enum": [
+              "android",
+              "ios",
+              "web"
+            ],
+            "title": "Platform",
+            "description": "Shown to admins; never decides the token transport"
+          },
+          "os_version": {
+            "type": "string",
+            "maxLength": 64,
+            "pattern": "^[\\x20-\\x7e]*$",
+            "title": "Os Version",
+            "default": ""
+          },
+          "app_version": {
+            "type": "string",
+            "maxLength": 64,
+            "pattern": "^[\\x20-\\x7e]*$",
+            "title": "App Version",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "device_id",
+          "platform"
+        ],
+        "title": "DeviceEnrolRequest",
+        "description": "A field client registers itself after sign-in (every sign-in; idempotent)."
+      },
+      "DeviceRead": {
+        "properties": {
+          "device_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Device Id"
+          },
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "User Id"
+          },
+          "platform": {
+            "type": "string",
+            "enum": [
+              "android",
+              "ios",
+              "web"
+            ],
+            "title": "Platform"
+          },
+          "os_version": {
+            "type": "string",
+            "title": "Os Version"
+          },
+          "app_version": {
+            "type": "string",
+            "title": "App Version"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "revoked"
+            ],
+            "title": "Status"
+          },
+          "enrolled_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Enrolled At"
+          },
+          "last_seen_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Last Seen At"
+          },
+          "last_sync_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Sync At",
+            "description": "Last successful sync: work changed on the device after it is lost on revoke"
+          },
+          "revoked_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked At"
+          },
+          "revoked_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked By"
+          },
+          "wipe_confirmed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wipe Confirmed At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "device_id",
+          "user_id",
+          "platform",
+          "os_version",
+          "app_version",
+          "status",
+          "enrolled_at",
+          "last_seen_at",
+          "last_sync_at",
+          "revoked_at",
+          "revoked_by",
+          "wipe_confirmed_at"
+        ],
+        "title": "DeviceRead"
+      },
+      "DeviceRevokeRequest": {
+        "properties": {
+          "confirm_cross_project_wipe": {
+            "type": "boolean",
+            "title": "Confirm Cross Project Wipe",
+            "description": "Required (else 409) when a PER-09 revokes a device whose user also belongs to other projects: the wipe also deletes their unsynced work of those projects",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "DeviceRevokeRequest"
+      },
+      "DeviceRevoked": {
+        "properties": {
+          "device_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Device Id"
+          },
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "User Id"
+          },
+          "platform": {
+            "type": "string",
+            "enum": [
+              "android",
+              "ios",
+              "web"
+            ],
+            "title": "Platform"
+          },
+          "os_version": {
+            "type": "string",
+            "title": "Os Version"
+          },
+          "app_version": {
+            "type": "string",
+            "title": "App Version"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "revoked"
+            ],
+            "title": "Status"
+          },
+          "enrolled_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Enrolled At"
+          },
+          "last_seen_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Last Seen At"
+          },
+          "last_sync_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Sync At",
+            "description": "Last successful sync: work changed on the device after it is lost on revoke"
+          },
+          "revoked_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked At"
+          },
+          "revoked_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked By"
+          },
+          "wipe_confirmed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wipe Confirmed At"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "self",
+              "system_admin",
+              "per_09"
+            ],
+            "title": "Role",
+            "description": "The authority the revoke used (audited)"
+          },
+          "cross_project_warning": {
+            "type": "boolean",
+            "title": "Cross Project Warning",
+            "description": "The device's user belongs to projects beyond the revoking PER-09's"
+          }
+        },
+        "type": "object",
+        "required": [
+          "device_id",
+          "user_id",
+          "platform",
+          "os_version",
+          "app_version",
+          "status",
+          "enrolled_at",
+          "last_seen_at",
+          "last_sync_at",
+          "revoked_at",
+          "revoked_by",
+          "wipe_confirmed_at",
+          "role",
+          "cross_project_warning"
+        ],
+        "title": "DeviceRevoked"
+      },
+      "DriftEntryRead": {
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Project Id"
+          },
+          "rule_set_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Rule Set Id"
+          },
+          "rule_set_key": {
+            "type": "string",
+            "title": "Rule Set Key"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "rule_key": {
+            "type": "string",
+            "title": "Rule Key"
+          },
+          "drift": {
+            "type": "string",
+            "enum": [
+              "added",
+              "modified",
+              "deleted",
+              "missing",
+              "default_removed"
+            ],
+            "title": "Drift"
+          },
+          "fields": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Fields"
+          },
+          "project_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Version"
+          },
+          "default_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "project_id",
+          "rule_set_id",
+          "rule_set_key",
+          "kind",
+          "rule_key",
+          "drift",
+          "fields",
+          "project_version",
+          "default_version"
+        ],
+        "title": "DriftEntryRead",
+        "description": "A project rule that differs from the tenant default (or a default the project lacks)."
       },
       "FileRead": {
         "properties": {
@@ -4230,6 +5357,20 @@
             "pattern": "^[0-9]{6}$",
             "title": "Pin",
             "description": "6-digit PIN of this device's session"
+          },
+          "refresh_token": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4096,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refresh Token",
+            "description": "The refresh token, for the native app only (its `Origin` is on `KERP_NATIVE_APP_ORIGINS`); ignored on every other request, which uses the cookie"
           }
         },
         "additionalProperties": false,
@@ -4238,7 +5379,7 @@
           "pin"
         ],
         "title": "PinUnlockRequest",
-        "description": "The PIN. The device's refresh token comes from the refresh cookie: both are\nrequired, a PIN alone is never a credential."
+        "description": "The PIN. The device's refresh token comes from the refresh cookie (the native app:\n``refresh_token`` here): both are required, a PIN alone is never a credential."
       },
       "PolygonGeoJSON": {
         "properties": {
@@ -4543,6 +5684,66 @@
         "type": "object",
         "title": "ProjectUpdate",
         "description": "``PATCH /projects/{id}``: only the given fields change; ``spatial_bounds: null`` clears."
+      },
+      "RefreshRequest": {
+        "properties": {
+          "refresh_token": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4096,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refresh Token",
+            "description": "The refresh token, for the native app only (its `Origin` is on `KERP_NATIVE_APP_ORIGINS`); ignored on every other request, which uses the cookie"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "RefreshRequest",
+        "description": "Optional body of ``/auth/refresh``: only the native app sends its refresh token here."
+      },
+      "RegexMatch": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "start": {
+            "type": "integer",
+            "title": "Start"
+          },
+          "end": {
+            "type": "integer",
+            "title": "End"
+          },
+          "groups": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Groups"
+          }
+        },
+        "type": "object",
+        "required": [
+          "text",
+          "start",
+          "end",
+          "groups"
+        ],
+        "title": "RegexMatch"
       },
       "ResolvedColumn": {
         "properties": {
@@ -4888,6 +6089,144 @@
           "rules"
         ],
         "title": "RuleSetRead"
+      },
+      "RuleSetUpdatesRead": {
+        "properties": {
+          "rule_set_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Rule Set Id"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "layer": {
+            "type": "string",
+            "title": "Layer"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "default_rule_set_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Default Rule Set Id"
+          },
+          "default_layer": {
+            "type": "string",
+            "title": "Default Layer"
+          },
+          "default_version": {
+            "type": "integer",
+            "title": "Default Version"
+          },
+          "default_seed_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Seed Version"
+          },
+          "available": {
+            "type": "integer",
+            "title": "Available"
+          },
+          "updates": {
+            "items": {
+              "$ref": "#/components/schemas/RuleUpdateRead"
+            },
+            "type": "array",
+            "title": "Updates"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rule_set_id",
+          "key",
+          "kind",
+          "layer",
+          "version",
+          "default_rule_set_id",
+          "default_layer",
+          "default_version",
+          "default_seed_version",
+          "available",
+          "updates"
+        ],
+        "title": "RuleSetUpdatesRead",
+        "description": "``GET .../rule-sets/{set}/updates``: the per-rule diff against the parent default."
+      },
+      "RuleUpdateRead": {
+        "properties": {
+          "rule_key": {
+            "type": "string",
+            "title": "Rule Key"
+          },
+          "change": {
+            "type": "string",
+            "enum": [
+              "new",
+              "changed",
+              "removed",
+              "removed_by_project",
+              "removed_by_tenant",
+              "key_in_use"
+            ],
+            "title": "Change"
+          },
+          "acceptable": {
+            "type": "boolean",
+            "title": "Acceptable"
+          },
+          "fields": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Fields"
+          },
+          "current": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RuleRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "default": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RuleRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "rule_key",
+          "change",
+          "acceptable",
+          "fields",
+          "current",
+          "default"
+        ],
+        "title": "RuleUpdateRead",
+        "description": "One rule of an upgrade offer: the set's rule (``current``) next to the new default."
       },
       "SavedViewCreate": {
         "properties": {
@@ -5357,6 +6696,18 @@
             "type": "integer",
             "title": "Refresh Expires In",
             "description": "Seconds until the login session ends (sign-in + 12 h); then sign in again"
+          },
+          "refresh_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refresh Token",
+            "description": "Native app only (`Origin` on `KERP_NATIVE_APP_ORIGINS`): the refresh token, kept in the device keystore. Absent for every other caller (cookie transport)"
           }
         },
         "type": "object",
@@ -5366,7 +6717,124 @@
           "refresh_expires_in"
         ],
         "title": "TokenResponse",
-        "description": "The access token. The refresh token is never in a body: it is the ``httpOnly``\nrefresh cookie (diff §4.2, TD-203)."
+        "description": "The access token. The refresh token is the ``httpOnly`` refresh cookie (diff §4.2,\nTD-203); only a request from an allow-listed native-app ``Origin`` gets it in the body\n(``refresh_token``, T-0043) instead."
+      },
+      "TryError": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "TryError"
+      },
+      "TryResult": {
+        "properties": {
+          "rule_key": {
+            "type": "string",
+            "title": "Rule Key"
+          },
+          "rule_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rule Version"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "engine": {
+            "type": "string",
+            "title": "Engine"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "pass",
+              "fail",
+              "error"
+            ],
+            "title": "Outcome"
+          },
+          "value": {
+            "title": "Value"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TryError"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "finding": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CheckFinding"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "matches": {
+            "items": {
+              "$ref": "#/components/schemas/RegexMatch"
+            },
+            "type": "array",
+            "title": "Matches"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rule_key",
+          "rule_version",
+          "kind",
+          "engine",
+          "outcome"
+        ],
+        "title": "TryResult",
+        "description": "What a rule does with a sample context (ADR 0004 §6). Never persisted.\n\nCEL rules: ``pass`` when the expression returns ``true``, ``fail`` on any other value,\n``error`` when it cannot be evaluated; ``value`` is the result (KERP CEL JSON). A ``check``\nrule that does not pass also returns the ``finding`` ``run_checks`` would log. Regex rules\n(sample ``{\"text\": ...}``): ``pass`` when the pattern matches (``autolink``: every match;\n``p6_grammar``: a full match), with the matches and their named groups."
+      },
+      "TryRuleInput": {
+        "properties": {
+          "context": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Context"
+          },
+          "rule": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RuleInput"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "TryRuleInput",
+        "description": "Body of ``POST .../rules/{rule_key}/try``: a sample context and, optionally, a draft\nrule to try instead of the stored one (nothing is saved either way)."
       },
       "UnlockRequestCreate": {
         "properties": {

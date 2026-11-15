@@ -3,15 +3,16 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 162 · **Closed:** 112
+**Open:** 176 · **Closed:** 112
 
-## decision (1)
+## decision (2)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
 | [TD-096](../tracker/todo/TD-096.md) | Approved coating ITR dropped the residual-dust rating row the ITP requires; Grating and Gridmesh ITR has no approved version: confirm with the client before shipping default templates | T-0113 | planner |
+| [TD-283](../tracker/todo/TD-283.md) | Shared field tablets: one device_id per account, or several accounts per device? | T-0043 | implementer |
 
-## spec-gap (37)
+## spec-gap (39)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -52,6 +53,8 @@
 | [TD-249](../tracker/todo/TD-249.md) | GET /auth/me (and the JWT tid claim) still expose the tenant id to the SPA: confirm diff 4.1 'never see the tenant' allows it or drop tenant_id from MeResponse | T-0037 | implementer |
 | [TD-268](../tracker/todo/TD-268.md) | Confirm T-0034 rule-store interpretations: tenant persona = held on any project (no tenant roles yet), reset allowed on locked rules, projects cannot lock own rules, tenant edits a locked rule only after unlock | T-0034 | implementer |
 | [TD-270](../tracker/todo/TD-270.md) | Membership-based policy needs app.member_project_ids: spec says visible when the project is in app.allowed_project_ids or app.is_system_admin, but the allowed list holds only portfolio projects | T-0014 | implementer |
+| [TD-281](../tracker/todo/TD-281.md) | ADR 0004 §4/§6/§7: confirm who reads/accepts upgrade offers, who may 'Try it', who reads the drift report, and that brand-new system sets reach the tenant layer automatically | T-0036 | implementer |
+| [TD-285](../tracker/todo/TD-285.md) | Native-origin allow-list: KERP_WEB_ORIGIN made mandatory when KERP_NATIVE_APP_ORIGINS is set; body transport also on magic-link redeem and PIN unlock | T-0043 | implementer |
 
 ## missed (4)
 
@@ -62,7 +65,7 @@
 | [TD-131](../tracker/todo/TD-131.md) | Add a root .env.example for the dev stack (the implementer agent's permission rules block writing .env* files) | T-0003 | implementer |
 | [TD-208](../tracker/todo/TD-208.md) | Uploads infra: provision the kerp-vault bucket (CORS for browser PUT/GET, lifecycle on staging/), wire KERP_S3_* in compose, add MinIO to CI for the gated round-trip test | T-0016 | implementer |
 
-## deferred (33)
+## deferred (35)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -99,8 +102,10 @@
 | [TD-266](../tracker/todo/TD-266.md) | Call validation seed_tenant at tenant creation and sync_system_defaults on deploy: no tenant registry or tenant-creation flow exists yet, so system default seed files are not loaded automatically | T-0034 | implementer |
 | [TD-269](../tracker/todo/TD-269.md) | Store a project's chosen client pack so rule sets of a module enabled later are copied from that pack (T-0034 copies only base sets on module enable) | T-0108 | implementer |
 | [TD-273](../tracker/todo/TD-273.md) | Membership assignment does not validate site_node_id (PER-07 Asset-Site scope) against the asset hierarchy; no asset module exists yet | T-0014 | implementer |
+| [TD-278](../tracker/todo/TD-278.md) | Rule 'Try it' on a recent real context (ADR 0004 §6): pick a recent record/event of the set's kind and evaluate against it; T-0036 only evaluates supplied sample contexts | T-0036 | implementer |
+| [TD-288](../tracker/todo/TD-288.md) | pending_updates on a set with no parent default answers 409 instead of an empty offer | T-0036 | reviewer |
 
-## later (67)
+## later (73)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -171,15 +176,22 @@
 | [TD-274](../tracker/todo/TD-274.md) | Deactivating a user (PATCH /api/v1/admin/users/{id}) can lock out the last active system_admin, including the caller | T-0014 | implementer |
 | [TD-275](../tracker/todo/TD-275.md) | Deploy: when the migration owner and runtime role are split (TD-056), grant EXECUTE on kerp_caller_admin_grants() to the runtime role | T-0014 | implementer |
 | [TD-277](../tracker/todo/TD-277.md) | setup_github.sh: set fork PR workflow approval to 'all external contributors' (TD-223 mitigation) instead of relying on a manual Settings step | T-0067 | planner |
+| [TD-279](../tracker/todo/TD-279.md) | Offer whole rule sets a running project lacks (a set first shipped, or first added to the tenant layer, after the project was created): today such a gate falls back to the tenant set via resolve_rule_set and no per-project copy is offered | T-0036 | implementer |
+| [TD-280](../tracker/todo/TD-280.md) | Frontend Rules screen: 'Updates available' badge and per-rule diff with accept, tenant drift report view, and 'Try it' panel on the T-0036 API | T-0036 | implementer |
+| [TD-282](../tracker/todo/TD-282.md) | Sync endpoints must record last_sync_at and the device of replayed mutations | T-0043 | implementer |
+| [TD-284](../tracker/todo/TD-284.md) | Dedicated RLS policy for oe_identity_device (owner, system_admin, PER-09 of a shared project) | T-0043 | implementer |
+| [TD-289](../tracker/todo/TD-289.md) | drift_report runs one list_rules query per set per project (N+1) | T-0036 | reviewer |
+| [TD-290](../tracker/todo/TD-290.md) | Map RevocationUnavailableError to 503 in the device endpoints and resolve_request_device | T-0043 | reviewer |
 
-## bug (2)
+## bug (3)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
 | [TD-159](../tracker/todo/TD-159.md) | Site filter from the bound project is applied to all site-scoped rows: a PER-07 on A who is PER-01 on B loses B's site-scoped rows (over-restrictive) | T-0010 | reviewer |
 | [TD-252](../tracker/todo/TD-252.md) | tracker.py new-todo cannot see open PRs in cloud sessions: gh pr list uses GraphQL (blocked), so TODO ids collide | T-0029 | coordinator |
+| [TD-287](../tracker/todo/TD-287.md) | Upgrade offer: a soft-deleted own rule holding a new default's key shows key_in_use forever | T-0036 | reviewer |
 
-## risk (18)
+## risk (20)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -200,6 +212,8 @@
 | [TD-254](../tracker/todo/TD-254.md) | spatial_bounds 10,000-position cap also runs on reads (ProjectRead): a stored row above the cap makes GET /projects 500 for the whole tenant | T-0060 | coordinator |
 | [TD-260](../tracker/todo/TD-260.md) | a11y component tests run in the installed Google Chrome (Vitest browser mode, Playwright channel chrome): CI relies on the runner's preinstalled Chrome; set KERP_CHROME_PATH or install a browser if the image changes | T-0046 | implementer |
 | [TD-276](../tracker/todo/TD-276.md) | A PR-added or PR-edited workflow can emit a check named review-gate; accepted while the owner is the sole collaborator (revisit when a second collaborator joins) | T-0067 | planner |
+| [TD-286](../tracker/todo/TD-286.md) | wipe-confirmed is unauthenticated: anyone who knows a revoked device_id can set its wipe time | T-0043 | implementer |
+| [TD-291](../tracker/todo/TD-291.md) | Revoked-device oracle: refuse_revoked_device on login and wipe-confirmed answer for any device id | T-0043 | reviewer |
 | [TD-292](../tracker/todo/TD-292.md) | Remove stale scripts/gemini_review.sh allow/deny rules from .claude/settings.json (human-only edit) | — | implementer |
 
 ## Closed

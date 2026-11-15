@@ -20,6 +20,7 @@ from typing import Annotated, Final
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+from app.core.auth.device_signal import DeviceRevokedError
 from app.core.auth.revocation import RevocationUnavailableError
 from app.core.auth.runtime import AuthRuntime, app_auth_runtime
 from app.core.auth.tokens import InvalidTokenError, TokenClaims
@@ -31,19 +32,24 @@ AUTH_UNAVAILABLE: Final = "Authentication temporarily unavailable"
 
 @dataclass(frozen=True, slots=True)
 class BearerResult:
-    """``claims`` of a valid, unrevoked access token; ``presented`` if any bearer was sent."""
+    """``claims`` of a valid, unrevoked access token; ``presented`` if any bearer was sent;
+    ``device_revoked`` if the token's session died because its device was revoked."""
 
     claims: TokenClaims | None
     presented: bool
+    device_revoked: bool = False
 
 
 ANONYMOUS: Final = BearerResult(claims=None, presented=False)
 
 
 def verify_access_token(runtime: AuthRuntime, token: str) -> TokenClaims:
-    """Verify an access token including revocation. Raises ``InvalidTokenError``."""
+    """Verify an access token including revocation. Raises ``InvalidTokenError``, or
+    ``DeviceRevokedError`` when the session was killed by a device revoke (T-0043)."""
     claims = runtime.tokens.verify(token, "access")
     if runtime.store.is_revoked(claims.jti, claims.session_id):
+        if runtime.store.revoked_by_device(claims.session_id):
+            raise DeviceRevokedError("device revoked")
         raise InvalidTokenError("token revoked")
     return claims
 
@@ -59,5 +65,7 @@ def get_bearer(
         return BearerResult(verify_access_token(runtime, credentials.credentials), presented=True)
     except InvalidTokenError:
         return BearerResult(claims=None, presented=True)
+    except DeviceRevokedError:
+        return BearerResult(claims=None, presented=True, device_revoked=True)
     except RevocationUnavailableError as exc:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, AUTH_UNAVAILABLE) from exc

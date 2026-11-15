@@ -10,7 +10,9 @@ Pure functions with no database access, so verification can also run over an exp
 * **Content hash:** ``sha256(b"kerp-audit-ledger\\n" + canonical_json(body)).hexdigest()``.
   ``body`` holds the version ``v`` and every immutable field of the entry: ``tenant_id``,
   ``project_id``, ``chain_key``, ``seq``, ``prev_hash``, ``created_at`` (UTC, microseconds,
-  ISO 8601), ``created_by``, ``source`` and ``payload``. The mutable mixin columns
+  ISO 8601), ``created_by``, ``source`` and ``payload``; from ``v`` = 2 (T-0043, ADR 0010)
+  also ``device_id``. Each entry stores the version it was hashed with (``hash_version``),
+  so entries written before ``v`` = 2 still verify. The mutable mixin columns
   (``updated_*``, ``deleted_at``, ``revision``, ``custom_fields``) are not hashed; the
   database refuses to change them anyway.
 * **Chain:** entry ``n`` stores ``prev_hash`` = ``content_hash`` of entry ``n - 1``. Entry 1
@@ -27,7 +29,9 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any, Final, Protocol
 
-HASH_VERSION: Final = 1
+# The version new entries are hashed with; every version in HASH_VERSIONS still verifies.
+HASH_VERSION: Final = 2
+HASH_VERSIONS: Final = frozenset({1, 2})
 HASH_DOMAIN: Final = b"kerp-audit-ledger\n"
 GENESIS_HASH: Final = "0" * 64
 
@@ -55,6 +59,10 @@ class LedgerRecord(Protocol):
     def source(self) -> str: ...
     @property
     def payload(self) -> dict[str, Any]: ...
+    @property
+    def device_id(self) -> uuid.UUID | None: ...
+    @property
+    def hash_version(self) -> int: ...
     @property
     def deleted_at(self) -> datetime | None: ...
 
@@ -101,9 +109,16 @@ def _str_or_none(value: uuid.UUID | None) -> str | None:
 
 
 def compute_content_hash(entry: LedgerRecord) -> str:
-    """SHA-256 (hex) over the canonical body of ``entry``."""
-    body = {
-        "v": HASH_VERSION,
+    """SHA-256 (hex) over the canonical body of ``entry``, in its own ``hash_version``.
+
+    ``v`` = 1 hashes the fields of T-0006; ``v`` = 2 adds ``device_id`` (``null`` for an
+    entry not written through a device). Raises ``ValueError`` for an unknown version.
+    """
+    version = entry.hash_version
+    if isinstance(version, bool) or version not in HASH_VERSIONS:
+        raise ValueError(f"unknown ledger hash version {version!r}")
+    body: dict[str, Any] = {
+        "v": version,
         "tenant_id": str(entry.tenant_id),
         "project_id": _str_or_none(entry.project_id),
         "chain_key": entry.chain_key,
@@ -114,6 +129,10 @@ def compute_content_hash(entry: LedgerRecord) -> str:
         "source": entry.source,
         "payload": entry.payload,
     }
+    if version >= 2:
+        body["device_id"] = _str_or_none(entry.device_id)
+    elif entry.device_id is not None:
+        raise ValueError("a v1 ledger entry cannot carry a device_id")
     return hashlib.sha256(HASH_DOMAIN + canonical_json(body)).hexdigest()
 
 
@@ -132,8 +151,13 @@ def verify_entries(entries: Sequence[LedgerRecord]) -> list[str]:
             problems.append(f"{label}: expected seq {expected} (entry missing or out of order)")
         elif entry.prev_hash != previous_hash:
             problems.append(f"{label}: prev_hash does not match the previous entry")
-        if compute_content_hash(entry) != entry.content_hash:
-            problems.append(f"{label}: content_hash does not match the entry")
+        try:
+            intact = compute_content_hash(entry) == entry.content_hash
+        except ValueError as exc:
+            problems.append(f"{label}: {exc}")
+        else:
+            if not intact:
+                problems.append(f"{label}: content_hash does not match the entry")
         if entry.deleted_at is not None:
             problems.append(f"{label}: entry is marked deleted")
         previous_hash, expected = entry.content_hash, entry.seq + 1

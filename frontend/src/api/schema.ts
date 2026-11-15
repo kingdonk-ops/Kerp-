@@ -120,7 +120,7 @@ export interface paths {
         put?: never;
         /**
          * Pin Unlock
-         * @description Unlock a PIN-gated session: the device's refresh cookie + the PIN rotate the tokens.
+         * @description Unlock a PIN-gated session: the device's refresh token + the PIN rotate the tokens.
          *
          *     Wrong PINs lock the session progressively; the 10th wrong PIN revokes it.
          */
@@ -142,9 +142,10 @@ export interface paths {
         put?: never;
         /**
          * Refresh
-         * @description Rotate: the refresh cookie is spent and a new pair is issued. Reuse revokes the session.
+         * @description Rotate: the refresh token is spent and a new pair is issued. Reuse revokes the session.
          *
          *     The new refresh token keeps the session's end (sign-in + 12 h); after it, sign in again.
+         *     The web SPA sends the cookie; an allow-listed native app sends ``refresh_token``.
          */
         post: operations["refresh_api_v1_auth_refresh_post"];
         delete?: never;
@@ -184,6 +185,106 @@ export interface paths {
         get: operations["me_api_v1_auth_me_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/devices/enrol": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Enrol
+         * @description Register this field device for the signed-in user and bind the session to it.
+         */
+        post: operations["enrol_api_v1_devices_enrol_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/devices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Devices
+         * @description The caller's own devices with their last-seen and last-sync times.
+         */
+        get: operations["my_devices_api_v1_devices_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/users/{user_id}/devices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * User Devices
+         * @description A user's devices (the user, a ``system_admin``, or a PER-09 of a shared project).
+         */
+        get: operations["user_devices_api_v1_users__user_id__devices_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/devices/{device_id}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Revoke
+         * @description Revoke a device: its sessions die now; on its next call it is told to wipe itself.
+         */
+        post: operations["revoke_api_v1_devices__device_id__revoke_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/devices/{device_id}/wipe-confirmed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Wipe Confirmed
+         * @description The revoked device confirms it wiped its local store (records, outbox, media, keys).
+         */
+        post: operations["wipe_confirmed_api_v1_devices__device_id__wipe_confirmed_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -677,6 +778,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/validation/rule-sets/{rule_set_id}/updates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tenant Rule Set Updates */
+        get: operations["tenant_rule_set_updates_api_v1_validation_rule_sets__rule_set_id__updates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/validation/rule-sets/{rule_set_id}/updates/{rule_key}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Accept Tenant Update */
+        post: operations["accept_tenant_update_api_v1_validation_rule_sets__rule_set_id__updates__rule_key__accept_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/validation/rule-sets/{rule_set_id}/rules/{rule_key}/try": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Try Tenant Rule */
+        post: operations["try_tenant_rule_api_v1_validation_rule_sets__rule_set_id__rules__rule_key__try_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/validation/drift-report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Drift Report */
+        get: operations["drift_report_api_v1_validation_drift_report_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/validation/rule-sets/{rule_set_id}/rules/{rule_key}/unlock-requests": {
         parameters: {
             query?: never;
@@ -848,6 +1017,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/validation/projects/{project_id}/rule-sets/{rule_set_id}/updates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Project Rule Set Updates */
+        get: operations["project_rule_set_updates_api_v1_validation_projects__project_id__rule_sets__rule_set_id__updates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/validation/projects/{project_id}/rule-sets/{rule_set_id}/updates/{rule_key}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Accept Project Update */
+        post: operations["accept_project_update_api_v1_validation_projects__project_id__rule_sets__rule_set_id__updates__rule_key__accept_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/validation/projects/{project_id}/rule-sets/{rule_set_id}/rules/{rule_key}/try": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Try Project Rule */
+        post: operations["try_project_rule_api_v1_validation_projects__project_id__rule_sets__rule_set_id__rules__rule_key__try_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -862,6 +1082,27 @@ export interface components {
              */
             fn: "sum" | "avg" | "min" | "max" | "count" | "count-distinct";
         };
+        /**
+         * CheckFinding
+         * @description A rule of the set that did not pass. ``message`` is the user-readable reason.
+         */
+        CheckFinding: {
+            /** Rule Key */
+            rule_key: string;
+            /** Rule Version */
+            rule_version: number;
+            /**
+             * Outcome
+             * @enum {string}
+             */
+            outcome: "fail" | "error";
+            /** Action */
+            action: string;
+            /** Severity */
+            severity: string;
+            /** Message */
+            message: string;
+        };
         /** DeliveryRead */
         DeliveryRead: {
             /** Channel */
@@ -870,6 +1111,183 @@ export interface components {
             ok: boolean;
             /** Detail */
             detail: string | null;
+        };
+        /**
+         * DeviceEnrolRequest
+         * @description A field client registers itself after sign-in (every sign-in; idempotent).
+         */
+        DeviceEnrolRequest: {
+            /**
+             * Device Id
+             * Format: uuid
+             * @description Generated by the client once per installation
+             */
+            device_id: string;
+            /**
+             * Platform
+             * @description Shown to admins; never decides the token transport
+             * @enum {string}
+             */
+            platform: "android" | "ios" | "web";
+            /**
+             * Os Version
+             * @default
+             */
+            os_version: string;
+            /**
+             * App Version
+             * @default
+             */
+            app_version: string;
+        };
+        /** DeviceRead */
+        DeviceRead: {
+            /**
+             * Device Id
+             * Format: uuid
+             */
+            device_id: string;
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+            /**
+             * Platform
+             * @enum {string}
+             */
+            platform: "android" | "ios" | "web";
+            /** Os Version */
+            os_version: string;
+            /** App Version */
+            app_version: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "active" | "revoked";
+            /**
+             * Enrolled At
+             * Format: date-time
+             */
+            enrolled_at: string;
+            /**
+             * Last Seen At
+             * Format: date-time
+             */
+            last_seen_at: string;
+            /**
+             * Last Sync At
+             * @description Last successful sync: work changed on the device after it is lost on revoke
+             */
+            last_sync_at: string | null;
+            /** Revoked At */
+            revoked_at: string | null;
+            /** Revoked By */
+            revoked_by: string | null;
+            /** Wipe Confirmed At */
+            wipe_confirmed_at: string | null;
+        };
+        /** DeviceRevokeRequest */
+        DeviceRevokeRequest: {
+            /**
+             * Confirm Cross Project Wipe
+             * @description Required (else 409) when a PER-09 revokes a device whose user also belongs to other projects: the wipe also deletes their unsynced work of those projects
+             * @default false
+             */
+            confirm_cross_project_wipe: boolean;
+        };
+        /** DeviceRevoked */
+        DeviceRevoked: {
+            /**
+             * Device Id
+             * Format: uuid
+             */
+            device_id: string;
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+            /**
+             * Platform
+             * @enum {string}
+             */
+            platform: "android" | "ios" | "web";
+            /** Os Version */
+            os_version: string;
+            /** App Version */
+            app_version: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "active" | "revoked";
+            /**
+             * Enrolled At
+             * Format: date-time
+             */
+            enrolled_at: string;
+            /**
+             * Last Seen At
+             * Format: date-time
+             */
+            last_seen_at: string;
+            /**
+             * Last Sync At
+             * @description Last successful sync: work changed on the device after it is lost on revoke
+             */
+            last_sync_at: string | null;
+            /** Revoked At */
+            revoked_at: string | null;
+            /** Revoked By */
+            revoked_by: string | null;
+            /** Wipe Confirmed At */
+            wipe_confirmed_at: string | null;
+            /**
+             * Role
+             * @description The authority the revoke used (audited)
+             * @enum {string}
+             */
+            role: "self" | "system_admin" | "per_09";
+            /**
+             * Cross Project Warning
+             * @description The device's user belongs to projects beyond the revoking PER-09's
+             */
+            cross_project_warning: boolean;
+        };
+        /**
+         * DriftEntryRead
+         * @description A project rule that differs from the tenant default (or a default the project lacks).
+         */
+        DriftEntryRead: {
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /**
+             * Rule Set Id
+             * Format: uuid
+             */
+            rule_set_id: string;
+            /** Rule Set Key */
+            rule_set_key: string;
+            /** Kind */
+            kind: string;
+            /** Rule Key */
+            rule_key: string;
+            /**
+             * Drift
+             * @enum {string}
+             */
+            drift: "added" | "modified" | "deleted" | "missing" | "default_removed";
+            /** Fields */
+            fields: string[];
+            /** Project Version */
+            project_version: number | null;
+            /** Default Version */
+            default_version: number | null;
         };
         /** FileRead */
         FileRead: {
@@ -1350,8 +1768,8 @@ export interface components {
         Persona: "PER-01" | "PER-02" | "PER-03" | "PER-04" | "PER-05" | "PER-06" | "PER-07" | "PER-08" | "PER-09" | "PER-10" | "PER-11" | "PER-12" | "PER-13" | "PER-14" | "PER-15" | "PER-16";
         /**
          * PinUnlockRequest
-         * @description The PIN. The device's refresh token comes from the refresh cookie: both are
-         *     required, a PIN alone is never a credential.
+         * @description The PIN. The device's refresh token comes from the refresh cookie (the native app:
+         *     ``refresh_token`` here): both are required, a PIN alone is never a credential.
          */
         PinUnlockRequest: {
             /**
@@ -1359,6 +1777,11 @@ export interface components {
              * @description 6-digit PIN of this device's session
              */
             pin: string;
+            /**
+             * Refresh Token
+             * @description The refresh token, for the native app only (its `Origin` is on `KERP_NATIVE_APP_ORIGINS`); ignored on every other request, which uses the cookie
+             */
+            refresh_token?: string | null;
         };
         /**
          * PolygonGeoJSON
@@ -1484,6 +1907,30 @@ export interface components {
             currency_code?: string | null;
             /** Locale */
             locale?: string | null;
+        };
+        /**
+         * RefreshRequest
+         * @description Optional body of ``/auth/refresh``: only the native app sends its refresh token here.
+         */
+        RefreshRequest: {
+            /**
+             * Refresh Token
+             * @description The refresh token, for the native app only (its `Origin` is on `KERP_NATIVE_APP_ORIGINS`); ignored on every other request, which uses the cookie
+             */
+            refresh_token?: string | null;
+        };
+        /** RegexMatch */
+        RegexMatch: {
+            /** Text */
+            text: string;
+            /** Start */
+            start: number;
+            /** End */
+            end: number;
+            /** Groups */
+            groups: {
+                [key: string]: string | null;
+            };
         };
         /**
          * ResolvedColumn
@@ -1617,6 +2064,59 @@ export interface components {
             project_id: string | null;
             /** Rules */
             rules: components["schemas"]["RuleRead"][];
+        };
+        /**
+         * RuleSetUpdatesRead
+         * @description ``GET .../rule-sets/{set}/updates``: the per-rule diff against the parent default.
+         */
+        RuleSetUpdatesRead: {
+            /**
+             * Rule Set Id
+             * Format: uuid
+             */
+            rule_set_id: string;
+            /** Key */
+            key: string;
+            /** Kind */
+            kind: string;
+            /** Layer */
+            layer: string;
+            /** Version */
+            version: number;
+            /**
+             * Default Rule Set Id
+             * Format: uuid
+             */
+            default_rule_set_id: string;
+            /** Default Layer */
+            default_layer: string;
+            /** Default Version */
+            default_version: number;
+            /** Default Seed Version */
+            default_seed_version: number | null;
+            /** Available */
+            available: number;
+            /** Updates */
+            updates: components["schemas"]["RuleUpdateRead"][];
+        };
+        /**
+         * RuleUpdateRead
+         * @description One rule of an upgrade offer: the set's rule (``current``) next to the new default.
+         */
+        RuleUpdateRead: {
+            /** Rule Key */
+            rule_key: string;
+            /**
+             * Change
+             * @enum {string}
+             */
+            change: "new" | "changed" | "removed" | "removed_by_project" | "removed_by_tenant" | "key_in_use";
+            /** Acceptable */
+            acceptable: boolean;
+            /** Fields */
+            fields: string[];
+            current: components["schemas"]["RuleRead"] | null;
+            default: components["schemas"]["RuleRead"] | null;
         };
         /**
          * SavedViewCreate
@@ -1769,8 +2269,9 @@ export interface components {
         };
         /**
          * TokenResponse
-         * @description The access token. The refresh token is never in a body: it is the ``httpOnly``
-         *     refresh cookie (diff §4.2, TD-203).
+         * @description The access token. The refresh token is the ``httpOnly`` refresh cookie (diff §4.2,
+         *     TD-203); only a request from an allow-listed native-app ``Origin`` gets it in the body
+         *     (``refresh_token``, T-0043) instead.
          */
         TokenResponse: {
             /** Access Token */
@@ -1791,6 +2292,61 @@ export interface components {
              * @description Seconds until the login session ends (sign-in + 12 h); then sign in again
              */
             refresh_expires_in: number;
+            /**
+             * Refresh Token
+             * @description Native app only (`Origin` on `KERP_NATIVE_APP_ORIGINS`): the refresh token, kept in the device keystore. Absent for every other caller (cookie transport)
+             */
+            refresh_token?: string | null;
+        };
+        /** TryError */
+        TryError: {
+            /** Code */
+            code: string;
+            /** Message */
+            message: string;
+        };
+        /**
+         * TryResult
+         * @description What a rule does with a sample context (ADR 0004 §6). Never persisted.
+         *
+         *     CEL rules: ``pass`` when the expression returns ``true``, ``fail`` on any other value,
+         *     ``error`` when it cannot be evaluated; ``value`` is the result (KERP CEL JSON). A ``check``
+         *     rule that does not pass also returns the ``finding`` ``run_checks`` would log. Regex rules
+         *     (sample ``{"text": ...}``): ``pass`` when the pattern matches (``autolink``: every match;
+         *     ``p6_grammar``: a full match), with the matches and their named groups.
+         */
+        TryResult: {
+            /** Rule Key */
+            rule_key: string;
+            /** Rule Version */
+            rule_version: number | null;
+            /** Kind */
+            kind: string;
+            /** Engine */
+            engine: string;
+            /**
+             * Outcome
+             * @enum {string}
+             */
+            outcome: "pass" | "fail" | "error";
+            /** Value */
+            value?: unknown;
+            error?: components["schemas"]["TryError"] | null;
+            finding?: components["schemas"]["CheckFinding"] | null;
+            /** Matches */
+            matches?: components["schemas"]["RegexMatch"][];
+        };
+        /**
+         * TryRuleInput
+         * @description Body of ``POST .../rules/{rule_key}/try``: a sample context and, optionally, a draft
+         *     rule to try instead of the stored one (nothing is saved either way).
+         */
+        TryRuleInput: {
+            /** Context */
+            context?: {
+                [key: string]: unknown;
+            };
+            rule?: components["schemas"]["RuleInput"] | null;
         };
         /**
          * UnlockRequestCreate
@@ -2026,6 +2582,13 @@ export interface operations {
                     "application/json": components["schemas"]["TokenResponse"];
                 };
             };
+            /** @description Not authenticated; with `code: DEVICE_REVOKED` when `X-KERP-Device-Id` (or the session's device) is revoked: wipe the device's local data */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -2106,6 +2669,13 @@ export interface operations {
                     "application/json": components["schemas"]["TokenResponse"];
                 };
             };
+            /** @description Not authenticated; with `code: DEVICE_REVOKED` when `X-KERP-Device-Id` (or the session's device) is revoked: wipe the device's local data */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -2142,7 +2712,14 @@ export interface operations {
                     "application/json": components["schemas"]["TokenResponse"];
                 };
             };
-            /** @description `Origin` is not the web app's origin */
+            /** @description Not authenticated; with `code: DEVICE_REVOKED` when `X-KERP-Device-Id` (or the session's device) is revoked: wipe the device's local data */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `Origin` is neither the web app's origin nor an allow-listed native app */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -2177,7 +2754,11 @@ export interface operations {
                 kerp_refresh?: string | null;
             };
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["RefreshRequest"] | null;
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -2188,7 +2769,14 @@ export interface operations {
                     "application/json": components["schemas"]["TokenResponse"];
                 };
             };
-            /** @description `Origin` is not the web app's origin */
+            /** @description Not authenticated; with `code: DEVICE_REVOKED` when `X-KERP-Device-Id` (or the session's device) is revoked: wipe the device's local data */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `Origin` is neither the web app's origin nor an allow-listed native app */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -2240,6 +2828,205 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MeResponse"];
+                };
+            };
+        };
+    };
+    enrol_api_v1_devices_enrol_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeviceEnrolRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceRead"];
+                };
+            };
+            /** @description Enrolled */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceRead"];
+                };
+            };
+            /** @description Another account's device, or session */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_devices_api_v1_devices_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceRead"][];
+                };
+            };
+        };
+    };
+    user_devices_api_v1_users__user_id__devices_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_api_v1_devices__device_id__revoke_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["DeviceRevokeRequest"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceRevoked"];
+                };
+            };
+            /** @description A shared project, but no PER-09 on it */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown device, or not the caller's to see */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description PER-09 revoke that also wipes other projects' unsynced work: repeat with `confirm_cross_project_wipe: true` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    wipe_confirmed_api_v1_devices__device_id__wipe_confirmed_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown device */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The device is not revoked */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -3396,6 +4183,125 @@ export interface operations {
             };
         };
     };
+    tenant_rule_set_updates_api_v1_validation_rule_sets__rule_set_id__updates_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rule_set_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuleSetUpdatesRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    accept_tenant_update_api_v1_validation_rule_sets__rule_set_id__updates__rule_key__accept_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rule_set_id: string;
+                rule_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuleSetRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    try_tenant_rule_api_v1_validation_rule_sets__rule_set_id__rules__rule_key__try_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rule_set_id: string;
+                rule_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TryRuleInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TryResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    drift_report_api_v1_validation_drift_report_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DriftEntryRead"][];
+                };
+            };
+        };
+    };
     request_unlock_api_v1_validation_rule_sets__rule_set_id__rules__rule_key__unlock_requests_post: {
         parameters: {
             query?: never;
@@ -3744,6 +4650,108 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RuleSetRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    project_rule_set_updates_api_v1_validation_projects__project_id__rule_sets__rule_set_id__updates_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                rule_set_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuleSetUpdatesRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    accept_project_update_api_v1_validation_projects__project_id__rule_sets__rule_set_id__updates__rule_key__accept_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                rule_set_id: string;
+                rule_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuleSetRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    try_project_rule_api_v1_validation_projects__project_id__rule_sets__rule_set_id__rules__rule_key__try_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                rule_set_id: string;
+                rule_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TryRuleInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TryResult"];
                 };
             };
             /** @description Validation Error */

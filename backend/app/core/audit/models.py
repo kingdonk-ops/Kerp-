@@ -6,9 +6,10 @@ import uuid
 from datetime import datetime
 from typing import Any, Final, NoReturn
 
-from sqlalchemy import BigInteger, CheckConstraint, String, UniqueConstraint, event
+from sqlalchemy import BigInteger, CheckConstraint, SmallInteger, String, UniqueConstraint, event
 from sqlalchemy.orm import Mapped, Session, UOWTransaction, mapped_column
 
+from app.core.audit.hashing import HASH_VERSION, HASH_VERSIONS
 from app.core.db import GUID, Base, BaseRecordMixin, JSONType
 
 TABLE: Final = "audit_ledger"
@@ -34,6 +35,11 @@ class AuditEntry(Base, BaseRecordMixin):
     distinct). ``(tenant_id, scope_id, chain_key, seq)`` is unique, so two writers can never
     both add entry ``n`` to a chain: a race fails instead of forking. The other CHECKs keep
     the mixin columns at their insert values, since rows never change.
+
+    ``device_id`` (T-0043, ADR 0010) is the enrolled field device the entry was written
+    through, else ``NULL``. ``hash_version`` is the content-hash format of the entry: rows
+    written before migration ``0016`` keep ``1`` (no ``device_id``), new rows get
+    ``HASH_VERSION`` (2), which hashes ``device_id`` too.
     """
 
     __tablename__ = TABLE
@@ -46,6 +52,11 @@ class AuditEntry(Base, BaseRecordMixin):
         CheckConstraint("deleted_at IS NULL", name="not_deleted"),
         CheckConstraint("revision = 1", name="first_revision"),
         CheckConstraint("custom_fields = '{}'", name="no_custom_fields"),
+        CheckConstraint(
+            "hash_version IN (" + ", ".join(str(v) for v in sorted(HASH_VERSIONS)) + ")",
+            name="hash_version",
+        ),
+        CheckConstraint("hash_version >= 2 OR device_id IS NULL", name="v1_no_device"),
     )
 
     scope_id: Mapped[uuid.UUID] = mapped_column(GUID(), nullable=False)
@@ -54,6 +65,10 @@ class AuditEntry(Base, BaseRecordMixin):
     prev_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     payload: Mapped[dict[str, Any]] = mapped_column(JSONType(), nullable=False)
+    device_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), nullable=True)
+    hash_version: Mapped[int] = mapped_column(
+        SmallInteger, nullable=False, default=HASH_VERSION, server_default="1"
+    )
 
     def soft_delete(self, *, at: datetime | None = None) -> NoReturn:
         raise AppendOnlyError("audit ledger entries cannot be deleted")

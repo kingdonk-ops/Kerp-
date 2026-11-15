@@ -1,11 +1,13 @@
 """Typed application settings, loaded from ``KERP_``-prefixed environment variables."""
 
+import re
 import uuid
 from functools import lru_cache
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as package_version
 from pathlib import Path
 from typing import Annotated, Literal
+from urllib.parse import urlsplit
 
 from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
@@ -105,6 +107,12 @@ class Settings(BaseSettings):
     # Origin of the web SPA allowed to use the refresh cookie (CSRF Origin check on
     # ``/auth/refresh`` and ``/auth/pin/unlock``). Unset: the API's own origin (one URL).
     web_origin: str | None = None
+    # Origins of the native field apps (the Capacitor Android build, T-0043, diff §4.2,
+    # TD-203), comma-separated: only requests whose ``Origin`` is listed get and send the
+    # refresh token in the JSON body; everyone else uses the refresh cookie. CORS for the API
+    # allows exactly these origins, without credentials. Must never contain the web origin:
+    # the app refuses to start if it does, and needs ``KERP_WEB_ORIGIN`` set to check it.
+    native_app_origins: Annotated[tuple[str, ...], NoDecode] = ()
     # E-mail domains whose accounts are internal staff (T-0049, diff §4.1 Internal staff):
     # comma-separated in the environment, lower-cased, exact match (no wildcards, a subdomain
     # is a different domain). Empty: no domain rule (only the Entra member link counts).
@@ -151,6 +159,48 @@ class Settings(BaseSettings):
             domains.add(entry)
         return tuple(sorted(domains))
 
+    @field_validator("web_origin", mode="before")
+    @classmethod
+    def _normalize_web_origin(cls, value: object) -> object:
+        if isinstance(value, str):
+            value = value.strip()
+            return normalize_origin(value) if value else None
+        return value
+
+    @field_validator("native_app_origins", mode="before")
+    @classmethod
+    def _parse_native_app_origins(cls, value: object) -> object:
+        """``"https://localhost, capacitor://localhost"`` → normalised origins; refused at
+        startup when an entry is not a bare ``scheme://host[:port]`` origin."""
+        if isinstance(value, str):
+            value = value.split(",")
+        if not isinstance(value, list | tuple | set | frozenset):
+            return value
+        origins: set[str] = set()
+        for raw in value:
+            if not isinstance(raw, str):
+                raise ValueError("native_app_origins entries must be strings")
+            entry = raw.strip()
+            if entry:
+                origins.add(normalize_origin(entry))
+        return tuple(sorted(origins))
+
+    @model_validator(mode="after")
+    def _native_origins_exclude_the_web_origin(self) -> "Settings":
+        # TD-203: script on the web origin must never get a refresh token in a body.
+        if not self.native_app_origins:
+            return self
+        if self.web_origin is None:
+            raise ValueError(
+                "KERP_NATIVE_APP_ORIGINS needs KERP_WEB_ORIGIN (the origin the SPA is served "
+                "from), so the native allow-list can be checked against it"
+            )
+        if self.web_origin in self.native_app_origins:
+            raise ValueError(
+                f"KERP_NATIVE_APP_ORIGINS must not contain the web origin {self.web_origin!r}"
+            )
+        return self
+
     @model_validator(mode="after")
     def _no_debug_in_production(self) -> "Settings":
         # Debug mode shows tracebacks to callers; refuse to start with it in production (T-0030).
@@ -171,6 +221,37 @@ class Settings(BaseSettings):
         if self.hsts_enabled is None:
             return self.environment == "production"
         return self.hsts_enabled
+
+
+_ORIGIN_SCHEME = re.compile(r"^[a-z][a-z0-9+.-]*$")
+_DEFAULT_PORTS = frozenset({("http", 80), ("https", 443)})
+
+
+def normalize_origin(value: str) -> str:
+    """An origin (RFC 6454) as browsers send it: ``scheme://host[:port]``, lower-case, no
+    path, query, fragment, user info or wildcard. ``ValueError`` for anything else."""
+    text = value.strip()
+    parts = urlsplit(text)
+    scheme, host = parts.scheme.lower(), (parts.hostname or "")
+    if (
+        not _ORIGIN_SCHEME.match(scheme)
+        or not host
+        or "*" in text
+        or parts.username is not None
+        or parts.password is not None
+        or parts.path not in ("", "/")
+        or parts.query
+        or parts.fragment
+        or any(ch.isspace() for ch in text)
+    ):
+        raise ValueError(f"{value!r} is not an origin (expected scheme://host[:port])")
+    try:
+        port = parts.port
+    except ValueError as exc:
+        raise ValueError(f"{value!r} has an invalid port") from exc
+    if (scheme, port) in _DEFAULT_PORTS:
+        port = None  # a browser leaves out the scheme's default port
+    return f"{scheme}://{host}" + (f":{port}" if port is not None else "")
 
 
 @lru_cache(maxsize=1)
