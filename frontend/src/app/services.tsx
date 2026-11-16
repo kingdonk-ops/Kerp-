@@ -1,5 +1,6 @@
 import { createContext, useContext, type ReactNode } from "react";
 
+import { browserCrossTab, type CrossTabAuth } from "../auth/crossTab";
 import { memoryStorage, TokenStore, type KeyValueStorage } from "../auth/tokenStore";
 import { createApiClient, type ApiClient } from "../lib/api/client";
 import { pendingProjectDirectory, type ProjectDirectory } from "../projects/directory";
@@ -11,6 +12,8 @@ export interface AppServices {
   projects: ProjectDirectory;
   /** Persists UI preferences such as the selected project scope. */
   preferences: KeyValueStorage;
+  /** Shares refresh and sign-out with the browser's other tabs (T-0072); optional in tests. */
+  crossTab?: CrossTabAuth;
 }
 
 function browserStorage(kind: "localStorage" | "sessionStorage"): KeyValueStorage {
@@ -23,11 +26,13 @@ function browserStorage(kind: "localStorage" | "sessionStorage"): KeyValueStorag
 
 export function createAppServices(): AppServices {
   const tokens = new TokenStore(browserStorage("sessionStorage"));
+  const crossTab = browserCrossTab(tokens);
   const env = import.meta.env as Record<string, string | undefined>;
   const baseUrl = env.VITE_API_BASE_URL ?? window.location.origin;
   return {
-    api: createApiClient({ baseUrl, tokens }),
+    api: createApiClient({ baseUrl, tokens, crossTab }),
     tokens,
+    crossTab,
     projects: pendingProjectDirectory,
     preferences: browserStorage("localStorage"),
   };

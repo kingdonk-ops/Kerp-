@@ -31,7 +31,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export const ME_QUERY_KEY = ["auth", "me"] as const;
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const { api, tokens } = useServices();
+  const { api, tokens, crossTab } = useServices();
   const queryClient = useQueryClient();
   const hasSession = useSyncExternalStore(
     (onChange) => tokens.subscribe(onChange),
@@ -71,8 +71,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Signing out locally must not depend on the server being reachable.
     }
     tokens.clear();
+    crossTab?.publishLogout(); // every other tab drops its access token too (T-0072)
     queryClient.clear();
-  }, [api, queryClient, tokens]);
+  }, [api, crossTab, queryClient, tokens]);
 
   const value = useMemo<AuthContextValue>(() => {
     let status: AuthStatus;
