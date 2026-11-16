@@ -134,6 +134,15 @@ class ProjectUpdate(BaseModel):
         return self
 
 
+class LobbyVisibility(BaseModel):
+    """``PUT /projects/{id}/lobby``: list the project in the lobby for internal users or not
+    (T-0040, diff §4.1). PER-09 of the project or a System admin only."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    visible_in_lobby: bool
+
+
 class ProjectRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -145,6 +154,7 @@ class ProjectRead(BaseModel):
     spatial_bounds: PolygonGeoJSON | None
     currency_code: str
     locale: str
+    visible_in_lobby: bool
     revision: int
     created_at: datetime
     updated_at: datetime

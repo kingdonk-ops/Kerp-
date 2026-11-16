@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Any, Final
 
-from sqlalchemy import CheckConstraint, String, UniqueConstraint
+from sqlalchemy import Boolean, CheckConstraint, String, UniqueConstraint, false
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.db import Base, BaseRecordMixin
@@ -35,6 +35,8 @@ class Project(Base, BaseRecordMixin):
       PostgreSQL (``app.core.geo``); a GeoJSON dict in Python.
     * ``currency_code`` (ISO 4217) / ``locale`` (BCP 47): presentation of the read-only
       money mirror and of numbers and dates. KERP never authors money.
+    * ``visible_in_lobby``: listed in the lobby for internal users (T-0040, diff §4.1); set
+      by the project's PER-09 holders or a System admin only. Default off.
     """
 
     __tablename__ = TABLE
@@ -54,3 +56,6 @@ class Project(Base, BaseRecordMixin):
     )
     currency_code: Mapped[str] = mapped_column(String(3), nullable=False, default=DEFAULT_CURRENCY)
     locale: Mapped[str] = mapped_column(String(35), nullable=False, default=DEFAULT_LOCALE)
+    visible_in_lobby: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )  # T-0040, migration 0021

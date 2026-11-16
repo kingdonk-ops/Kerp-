@@ -7,10 +7,10 @@ modules carries the project's `id` as its `project_id`.
 
 | File | What |
 |---|---|
-| `models.py` | `oe_projects_project` (`BaseRecordMixin`, tenant-level row; migration `0008`, membership-based RLS since `0015`) |
-| `schemas.py` | `ProjectCreate` / `ProjectUpdate` / `ProjectRead`, `PolygonGeoJSON`; timezone, ISO 4217, BCP 47 validation from `app.core.locale` (shared with the settings module) |
-| `service.py` | `create_project`, `get_project`, `list_projects`, `live_project_ids` (the jobs scheduler, T-0214), `update_project`, `delete_project`, `site_zone`, `bind_project` (project-scoped routers, T-0217) |
-| `router.py` | `GET/POST /api/v1/projects`, `GET/PATCH/DELETE /api/v1/projects/{id}` |
+| `models.py` | `oe_projects_project` (`BaseRecordMixin`, tenant-level row; migration `0008`, membership-based RLS since `0015`, `visible_in_lobby` since `0021`) |
+| `schemas.py` | `ProjectCreate` / `ProjectUpdate` / `ProjectRead`, `LobbyVisibility`, `PolygonGeoJSON`; timezone, ISO 4217, BCP 47 validation from `app.core.locale` (shared with the settings module) |
+| `service.py` | `create_project`, `get_project`, `list_projects`, `live_project_ids` (the jobs scheduler, T-0214), `update_project`, `delete_project`, `site_zone`, `bind_project` (project-scoped routers, T-0217), `set_lobby_visibility`, the narrow lobby read `lobby_projects` / `project_by_code` (T-0040) |
+| `router.py` | `GET/POST /api/v1/projects`, `GET/PATCH/DELETE /api/v1/projects/{id}`, `PUT /api/v1/projects/{id}/lobby` |
 
 ## Record
 
@@ -22,6 +22,7 @@ modules carries the project's `id` as its `project_id`.
 | `spatial_bounds` | GeoJSON `Polygon`, 2D `[lon, lat]`, closed rings, at most 10,000 positions across all rings, or `null` |
 | `currency_code` | active ISO 4217 code; default: the deployment setting |
 | `locale` | BCP 47 `ll[-Ssss][-RR|-nnn]`; default: the deployment setting |
+| `visible_in_lobby` | listed in the lobby for internal users (T-0040, diff §4.1); default `false`; changed only through `PUT /projects/{id}/lobby`, not `PATCH` (422) |
 
 **Defaults for new projects** (T-0044, diff §4.4). `POST /projects` may omit `status`,
 `site_timezone`, `currency_code` and `locale` (never send `null`, 422); `create_project` then
@@ -53,6 +54,9 @@ request's scope was resolved from, so they are read once per request, T-0071):
 
 - list and read: projects the caller is a member of; everything else is 404;
 - edit and delete: the `admin` capability (Project Administrator, PER-09) on that project, else 403;
+- lobby flag (`PUT /{id}/lobby`): PER-09 of that project or a System admin (diff §4.1); a
+  non-member who is not a System admin 404, a member without PER-09 403; audited as an
+  `update` with `fields: ["visible_in_lobby"]`;
 - create: the tenant-level `create_projects` grant ("Project Admin", appointed by a System
   admin through `/api/v1/admin/grants`; `access.CallerAdminGrants`), else 403 (diff §4.1,
   TD-184, T-0039). The creator is granted PER-09 on the new project in the same transaction
@@ -61,6 +65,20 @@ request's scope was resolved from, so they are read once per request, T-0071):
   without a creator.
 - delete: also revokes every membership on the project (`memberships.revoke_project`;
   audited as `revoked_memberships`), so memberships of a deleted project confer nothing.
+
+## Narrow lobby read (T-0040)
+
+The lobby module finds projects the caller is not a member of through `lobby_projects(session)`
+(live lobby-visible projects, only when the session user is an active internal user) and
+`project_by_code(session, code)` (the live project with exactly that code, for any active
+user). Both return `ProjectSummary(id, code, name)`, never the row, and need a session bound to
+the caller (`user_id`). On PostgreSQL they call the `SECURITY DEFINER` functions
+`kerp_lobby_projects()` / `kerp_lobby_project_by_code(text)` of migration `0021`, which check
+the caller (tenant, user, active, internal) against `auth_user` themselves; the membership
+policy is not widened (edge spec §6 amendments). Because the definer is the app role in CI and
+dev, which `FORCE` RLS also binds (TD-056), the function body raises `app.is_system_admin`
+transaction-locally for its own read and restores the caller's value before returning. On
+SQLite the service runs the same rule as a Core query past the ORM scope.
 
 ## Setting a new project up
 
@@ -92,4 +110,5 @@ access = projects.bind_project(session, principal, grants, project_id, require=C
 ## Tests
 
 `tests/test_projects.py` (SQLite and PostgreSQL; the PostGIS geometry check runs only on
-PostgreSQL, TD-052).
+PostgreSQL, TD-052). The lobby flag and narrow read: `tests/test_lobby.py`,
+`tests/test_rls_lobby.py`.

@@ -10,6 +10,9 @@ project is the one in the path:
 * create: the caller's tenant-level ``create_projects`` grant ("Project Admin", appointed by
   a System admin through ``/api/v1/admin/grants``), else 403 (diff §4.1, TD-184, T-0039). The
   creator is granted PER-09 on the new project in the same transaction.
+* ``PUT /{id}/lobby`` (``visible_in_lobby``): PER-09 of that project or a System admin
+  (T-0040, diff §4.1); a non-member who is not a System admin gets 404, a member without
+  PER-09 403. ``PATCH`` does not take the flag (422).
 """
 
 from __future__ import annotations
@@ -22,6 +25,7 @@ from app.core.auth.access import (
     CREATE_PROJECTS,
     CallerAdminGrants,
     CallerGrants,
+    CallerIsSystemAdmin,
     Capability,
     Grant,
     ProjectAccess,
@@ -30,7 +34,12 @@ from app.core.auth.access import (
 from app.core.auth.deps import CurrentPrincipal
 from app.core.db import DbSession
 from app.modules.projects import service
-from app.modules.projects.schemas import ProjectCreate, ProjectRead, ProjectUpdate
+from app.modules.projects.schemas import (
+    LobbyVisibility,
+    ProjectCreate,
+    ProjectRead,
+    ProjectUpdate,
+)
 
 router = APIRouter(tags=["projects"])
 
@@ -96,6 +105,24 @@ def update_project(
         project = service.update_project(session, project_id, body, actor_id=principal.user_id)
     except service.DuplicateProjectCodeError as exc:
         raise _conflict(exc) from exc
+    return ProjectRead.model_validate(project)
+
+
+@router.put("/{project_id}/lobby", response_model=ProjectRead)
+def set_lobby_visibility(
+    project_id: uuid.UUID,
+    body: LobbyVisibility,
+    principal: CurrentPrincipal,
+    grants: CallerGrants,
+    is_admin: CallerIsSystemAdmin,
+    session: DbSession,
+) -> ProjectRead:
+    """List the project in the lobby for internal users, or not (T-0040, diff §4.1)."""
+    if not is_admin:
+        _admin(grants, project_id)
+    project = service.set_lobby_visibility(
+        session, project_id, body.visible_in_lobby, actor_id=principal.user_id
+    )
     return ProjectRead.model_validate(project)
 
 
