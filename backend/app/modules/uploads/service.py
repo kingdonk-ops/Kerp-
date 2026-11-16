@@ -251,6 +251,9 @@ def verify_upload(
         storage.delete(staging)
     with db.unit_of_work(tenancy) as session:
         file = get_file(session, file_id)
+        # Re-read under a row lock (PostgreSQL): the orphan sweep may be rejecting this
+        # stuck file right now; whoever locks first decides, the other sees the new status.
+        session.refresh(file, with_for_update=True)
         if file.status == "verifying":
             file.scan_result = verdict
             if reason is not None:
@@ -304,8 +307,12 @@ def sweep_orphans(
                 )
             )
         )
+        # Locked (PostgreSQL), so a verify job finishing at the same moment cannot publish a
+        # file this sweep rejects, or the other way round (verify_upload locks the row too).
         verifying = session.scalars(
-            select(UploadedFile).where(project, UploadedFile.status == "verifying")
+            select(UploadedFile)
+            .where(project, UploadedFile.status == "verifying")
+            .with_for_update()
         ).all()
         stuck = [
             f

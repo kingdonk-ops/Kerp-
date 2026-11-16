@@ -25,6 +25,7 @@ from typing import TYPE_CHECKING, Any, Final
 
 from app.core.tenancy.context import TenancyContext
 from app.modules.jobs import service
+from app.modules.jobs.registry import UnknownJobKindError
 from app.modules.projects import service as projects
 
 if TYPE_CHECKING:
@@ -65,9 +66,10 @@ async def sweep_cron(ctx: Mapping[str, Any]) -> None:
         logger.warning("jobs sweep re-enqueued %d stuck job(s)", len(requeued))
 
 
-def _queue_hourly(db: Database, scope: TenancyContext, registry: JobRegistry) -> int:
+def _queue_hourly(
+    db: Database, scope: TenancyContext, registry: JobRegistry, kinds: tuple[str, ...]
+) -> int:
     """Add one job row per hourly kind in ``scope``; each is enqueued after the commit."""
-    kinds = registry.hourly_project_kinds()
     with db.unit_of_work(scope) as session:
         for kind in kinds:
             service.create_job(session, registry.get(kind), {}, source="system")
@@ -81,8 +83,28 @@ async def hourly_project_jobs(ctx: Mapping[str, Any]) -> None:
         logger.warning("hourly project jobs skipped: KERP_DEFAULT_TENANT_ID is not set")
         return
     registry: JobRegistry = ctx["registry"]
-    if not registry.hourly_project_kinds():
+    kinds = _known_kinds(registry)
+    if not kinds:
         return
     scopes = await asyncio.to_thread(deployment_scopes, ctx["db"], tenant_id)
     for scope in scopes[1:]:  # the projects; the first scope is tenant-level
-        await asyncio.to_thread(_queue_hourly, ctx["db"], scope, registry)
+        try:
+            await asyncio.to_thread(_queue_hourly, ctx["db"], scope, registry, kinds)
+        except Exception:  # one project's failure must not skip every project after it
+            logger.exception(
+                "hourly project jobs failed for a project",
+                extra={"project_id": str(scope.project_id)},
+            )
+
+
+def _known_kinds(registry: JobRegistry) -> tuple[str, ...]:
+    """The scheduled kinds that have a handler; an unknown one is logged and skipped."""
+    known: list[str] = []
+    for kind in registry.hourly_project_kinds():
+        try:
+            registry.get(kind)
+        except UnknownJobKindError:
+            logger.error("hourly project job %s has no registered handler", kind)
+            continue
+        known.append(kind)
+    return tuple(known)
