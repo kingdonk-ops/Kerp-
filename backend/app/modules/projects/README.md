@@ -9,7 +9,7 @@ modules carries the project's `id` as its `project_id`.
 |---|---|
 | `models.py` | `oe_projects_project` (`BaseRecordMixin`, tenant-level row; migration `0008`, membership-based RLS since `0015`) |
 | `schemas.py` | `ProjectCreate` / `ProjectUpdate` / `ProjectRead`, `PolygonGeoJSON`; timezone, ISO 4217, BCP 47 validation from `app.core.locale` (shared with the settings module) |
-| `service.py` | `create_project`, `get_project`, `list_projects`, `update_project`, `delete_project`, `site_zone` |
+| `service.py` | `create_project`, `get_project`, `list_projects`, `live_project_ids` (the jobs scheduler, T-0214), `update_project`, `delete_project`, `site_zone` |
 | `router.py` | `GET/POST /api/v1/projects`, `GET/PATCH/DELETE /api/v1/projects/{id}` |
 
 ## Record

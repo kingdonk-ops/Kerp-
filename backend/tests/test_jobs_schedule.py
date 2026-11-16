@@ -145,10 +145,12 @@ def test_the_batch_worker_runs_the_sweep_every_five_minutes(db: Database) -> Non
     settings = Settings(environment="test")
     broker = SaqBroker("redis://localhost:6379/0", prefix="t")
     workers = build_workers(settings, db=db, registry=REGISTRY, broker=broker)
-    crons = {w.queue.name: [(c.function, c.cron) for c in w.cron_jobs] for w in workers}
+    crons = {
+        w.queue.name: [(c.function, c.cron, c.timeout) for c in w.cron_jobs] for w in workers
+    }
     assert crons == {
         "t:interactive": [],
-        "t:batch": [(scheduler.sweep_cron, scheduler.SWEEP_CRON)],
+        "t:batch": [(scheduler.sweep_cron, scheduler.SWEEP_CRON, scheduler.CRON_TIMEOUT_S)],
     }
     assert scheduler.SWEEP_CRON == "*/5 * * * *"
     ctx: Any = {}
@@ -160,3 +162,9 @@ def test_the_batch_worker_runs_the_sweep_every_five_minutes(db: Database) -> Non
         broker,
         settings,
     )
+
+
+def test_the_jobs_module_declares_its_dependency_on_projects() -> None:
+    from app.core.module_loader.loader import discover_modules
+
+    assert "projects" in discover_modules().get("jobs").depends_on

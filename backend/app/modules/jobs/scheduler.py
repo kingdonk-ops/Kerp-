@@ -28,6 +28,9 @@ if TYPE_CHECKING:
     from app.core.db import Database
 
 SWEEP_CRON: Final = "*/5 * * * *"
+# Explicit SAQ job timeout for the cron run (SAQ's default is 10 s): one DB round-trip per
+# scope plus a Redis lookup per stale row. An interrupted run is resumed by the next tick.
+CRON_TIMEOUT_S: Final = 120
 
 logger = logging.getLogger("kerp.jobs")
 
