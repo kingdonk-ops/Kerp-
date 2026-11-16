@@ -1073,3 +1073,68 @@ def test_an_overlong_wipe_secret_is_422_whatever_the_device(api: Api) -> None:
     assert _confirm(api, uuid.uuid4(), long).status_code == 422
     assert _confirm(api, active, long).status_code == 422
     assert _confirm(api, uuid.uuid4(), "s" * 128).status_code == 404
+
+
+
+def test_replaying_a_valid_wipe_secret_does_not_reset_the_lock(api: Api) -> None:
+    """T-0212 review: refusals, then the same correct confirmation, again and again from one
+    client must still reach 429; the audit ledger stops growing once locked."""
+    _tokens, device = api.device_on(GREG)
+    assert api.revoke(api.login(ALICE), device).status_code == 200
+    secret = api.secrets[device]
+    assert _confirm(api, device, secret).status_code == 204  # recorded: clears the counter
+    statuses: list[int] = []
+    for _ in range(3):
+        for _ in range(WIPE_CONFIRM_POLICY.free_attempts):
+            statuses.append(_confirm(api, uuid.uuid4(), "w" * 43).status_code)
+        statuses.append(_confirm(api, device, secret).status_code)  # a replay: no reset
+    assert 429 in statuses
+    before = _wipe_rows(api)
+    assert _confirm(api, uuid.uuid4(), "w" * 43).status_code == 429
+    assert _wipe_rows(api) == before
+
+
+def test_the_first_confirmation_clears_the_clients_earlier_refusals(api: Api) -> None:
+    _tokens, device = api.device_on(GREG)
+    assert api.revoke(api.login(ALICE), device).status_code == 200
+    for _ in range(WIPE_CONFIRM_POLICY.free_attempts):
+        assert _confirm(api, uuid.uuid4(), "w" * 43).status_code == 404
+    assert _confirm(api, device, api.secrets[device]).status_code == 204
+    # The counter starts over: a whole new run of free attempts before any lock.
+    for _ in range(WIPE_CONFIRM_POLICY.free_attempts + 1):
+        assert _confirm(api, uuid.uuid4(), "w" * 43).status_code == 404
+
+
+def test_wipe_confirmation_answers_503_while_the_store_is_down(
+    api: Api, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _tokens, revoked = api.device_on(GREG)
+    assert api.revoke(api.login(ALICE), revoked).status_code == 200
+
+    def unavailable(*_args: Any, **_kwargs: Any) -> Any:
+        raise RevocationUnavailableError("synthetic outage")
+
+    before = _wipe_rows(api)
+    monkeypatch.setattr(api.runtime.store, "begin_attempt", unavailable)
+    unknown = _confirm(api, uuid.uuid4(), "w" * 43)
+    real = _confirm(api, revoked, api.secrets[revoked])
+    monkeypatch.undo()
+    assert (unknown.status_code, real.status_code) == (503, 503)
+    assert unknown.content == real.content  # the same answer whatever the device
+    assert _wipe_rows(api) == before
+    assert api.row(revoked).wipe_confirmed_at is None
+
+
+def test_a_store_outage_after_the_wipe_keeps_the_recorded_confirmation(
+    api: Api, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _tokens, revoked = api.device_on(GREG)
+    assert api.revoke(api.login(ALICE), revoked).status_code == 200
+
+    def unavailable(*_args: Any, **_kwargs: Any) -> None:
+        raise RevocationUnavailableError("synthetic outage")
+
+    monkeypatch.setattr(api.runtime.store, "clear_failures", unavailable)
+    assert _confirm(api, revoked, api.secrets[revoked]).status_code == 204
+    monkeypatch.undo()
+    assert api.row(revoked).wipe_confirmed_at is not None

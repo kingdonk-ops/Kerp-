@@ -34,6 +34,7 @@ Authorisation lives here; the registry itself is ``devices.py``. The caller's
 
 from __future__ import annotations
 
+import contextlib
 import uuid
 from dataclasses import dataclass
 from typing import Annotated, Final, Literal
@@ -454,5 +455,10 @@ def wipe_confirmed(
             source="api",
             device_id=device_id,
         )
-    lockout.succeeded(client)  # the right secret: this client's failures are forgotten
+        # The first confirmation of a device clears this client's failures. A repeat
+        # confirmation (already wiped) does not: otherwise one valid secret, replayed after
+        # every few refusals, would keep the counter from ever locking (T-0212 review). Best
+        # effort: a store outage here must not undo the recorded wipe.
+        with contextlib.suppress(RevocationUnavailableError):
+            lockout.succeeded(client)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
