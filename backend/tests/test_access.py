@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any, cast
 
 import pytest
-from fastapi import Depends, FastAPI
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import String, select
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -28,9 +28,8 @@ from app.core.auth.access import (
     ProjectAccess,
     Scope,
     Tier,
+    load_grants,
     project_access,
-    require_capability,
-    require_hold_release,
     resolve_request_scope,
     resolve_scope,
     sod_violations,
@@ -38,7 +37,7 @@ from app.core.auth.access import (
 from app.core.auth.models import PERSONA_CODES, ProjectMembership
 from app.core.auth.runtime import AuthRuntime
 from app.core.db import NAMING_CONVENTION, BaseRecordMixin, Database, DbSession
-from app.core.tenancy.context import TenancyContext, get_tenancy_context
+from app.core.tenancy.context import TenancyContext
 from app.core.tenancy.rls import apply_rls_policies, session_tenancy
 from app.core.tenancy.scope import OutOfScopeError, SiteScopedMixin, get_or_404
 from tests.audit_support import migrated_database
@@ -357,80 +356,50 @@ def test_request_binds_allowed_projects_from_memberships_only(
         assert bob.json() == {"allowed": []}
 
 
-def _guarded_client(
-    app_and_users: tuple[FastAPI, AuthRuntime, dict[str, uuid.UUID]], project: uuid.UUID
-) -> TestClient:
-    app = app_and_users[0]
-    app.dependency_overrides[get_tenancy_context] = lambda: TenancyContext(AUTH_T1, project)
-
-    @app.post("/_holds/quality", dependencies=[Depends(require_hold_release(HoldKind.QUALITY))])
-    def release_quality() -> dict[str, bool]:
-        return {"released": True}
-
-    @app.post("/_holds/safety", dependencies=[Depends(require_hold_release(HoldKind.SAFETY))])
-    def release_safety() -> dict[str, bool]:
-        return {"released": True}
-
-    @app.get("/_admin", dependencies=[Depends(require_capability(Capability.ADMINISTER))])
-    def admin() -> dict[str, bool]:
-        return {"ok": True}
-
-    for capability in Capability:
-        app.add_api_route(
-            f"/_cap/{capability.value}",
-            lambda: {"ok": True},
-            methods=["POST"],
-            dependencies=[Depends(require_capability(capability))],
-        )
-
-    return TestClient(app)
+def _loaded_access(db: Database, user: uuid.UUID, project: uuid.UUID) -> ProjectAccess:
+    """The user's access to ``project`` from the membership store (what a request loads)."""
+    with db.unit_of_work(TenancyContext(tenant_id=AUTH_T1, user_id=user)) as s:
+        return project_access(load_grants(s, AUTH_T1, user), project)
 
 
-def test_guards_answer_403_without_authority_and_404_without_membership(
+def test_capabilities_and_hold_release_follow_the_matrix_and_sod(
     app_and_users: tuple[FastAPI, AuthRuntime, dict[str, uuid.UUID]], auth_db: Database
 ) -> None:
+    """The decisions the routers make with ``ProjectAccess`` (T-0217 removed the unused
+    ``require_capability`` / ``require_hold_release`` guards; T-0010 matrix unchanged)."""
     users = app_and_users[2]
     _grant(auth_db, users["bob"], PB, Persona.PROJECT_ADMINISTRATOR)
     _grant(auth_db, users["alice"], PB, Persona.QAQC_LEAD)
-    with _guarded_client(app_and_users, PB) as client:
-        bob, alice = _bearer(client, BOB), _bearer(client, ALICE)
-        assert client.get("/_admin", headers=bob).status_code == 200
-        assert client.post("/_holds/quality", headers=bob).status_code == 403  # SoD
-        assert client.post("/_holds/quality", headers=alice).json() == {"released": True}
-        assert client.post("/_holds/safety", headers=alice).status_code == 200  # PER-11 on B
-        assert client.get("/_admin", headers=alice).status_code == 403
-        assert client.post("/_holds/quality").status_code == 401
+    bob = _loaded_access(auth_db, users["bob"], PB)
+    alice = _loaded_access(auth_db, users["alice"], PB)
+    assert bob.has(Capability.ADMINISTER)
+    assert not bob.can_release_hold(HoldKind.QUALITY)  # SoD
+    assert not bob.can_release_hold(HoldKind.SAFETY)
+    assert alice.can_release_hold(HoldKind.QUALITY)
+    assert alice.can_release_hold(HoldKind.SAFETY)  # PER-11 on B
+    assert not alice.has(Capability.ADMINISTER)
+    with pytest.raises(OutOfScopeError):  # no membership on C: 404
+        _loaded_access(auth_db, users["alice"], PC)
 
 
-def test_project_viewer_reads_but_every_write_guard_is_forbidden(
+def test_project_viewer_reads_but_holds_no_write_capability(
     app_and_users: tuple[FastAPI, AuthRuntime, dict[str, uuid.UUID]], auth_db: Database
 ) -> None:
-    """Capability guard matrix row for PER-16: ``V`` → 200, C/E/A/S/admin and holds → 403."""
+    """Capability matrix row for PER-16: ``V`` only, no hold release."""
     _grant(auth_db, app_and_users[2]["bob"], PB, Persona.PROJECT_VIEWER)
     try:
-        with _guarded_client(app_and_users, PB) as client:
-            bob = _bearer(client, BOB)
-            statuses = {
-                c.value: client.post(f"/_cap/{c.value}", headers=bob).status_code
-                for c in Capability
-            }
-            assert statuses == {"V": 200, "C": 403, "E": 403, "A": 403, "S": 403, "admin": 403}
-            assert client.get("/_admin", headers=bob).status_code == 403
-            assert client.post("/_holds/quality", headers=bob).status_code == 403
-            assert client.post("/_holds/safety", headers=bob).status_code == 403
-            # Not a portfolio persona: bob's allowed list stays empty.
-            assert client.get("/_scope", headers=bob).json() == {"allowed": []}
+        viewer = _loaded_access(auth_db, app_and_users[2]["bob"], PB)
+        assert {c.value: viewer.has(c) for c in Capability} == {
+            "V": True,
+            "C": False,
+            "E": False,
+            "A": False,
+            "S": False,
+            "admin": False,
+        }
+        assert not viewer.can_release_hold(HoldKind.QUALITY)
+        assert not viewer.can_release_hold(HoldKind.SAFETY)
     finally:
         revoke_project_viewers(auth_db)  # the 0012 downgrade refuses while PER-16 is active
 
 
-def test_guards_hide_a_project_the_caller_is_not_a_member_of(
-    app_and_users: tuple[FastAPI, AuthRuntime, dict[str, uuid.UUID]],
-) -> None:
-    with _guarded_client(app_and_users, PC) as client:
-        response = client.get("/_admin", headers=_bearer(client, ALICE))
-        assert response.status_code == 404
-        assert response.json() == {"detail": "Not Found"}
-    app_and_users[0].dependency_overrides[get_tenancy_context] = lambda: TenancyContext(AUTH_T1)
-    with TestClient(app_and_users[0]) as client:
-        assert client.get("/_admin", headers=_bearer(client, ALICE)).status_code == 404

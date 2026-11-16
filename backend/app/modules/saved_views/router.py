@@ -23,11 +23,9 @@ from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, Response, status
 
-from app.core.auth.access import CallerGrants, Capability, Grant, project_access, resolve_scope
+from app.core.auth.access import CallerGrants, Capability, Grant
 from app.core.auth.deps import CurrentPrincipal, Principal
 from app.core.db import DbSession
-from app.core.tenancy.context import TenancyContext
-from app.core.tenancy.rls import bind_tenancy, session_tenancy
 from app.modules.projects import service as projects
 from app.modules.saved_views import service
 from app.modules.saved_views.schemas import (
@@ -47,16 +45,9 @@ def _bind_project(
     principal: Principal, grants: list[Grant], session: DbSession, project_id: uuid.UUID
 ) -> service.Viewer:
     """Bind the session to ``project_id`` and return the caller as a ``Viewer``."""
-    access = project_access(grants, project_id)  # non-member: 404
-    if not access.has(Capability.VIEW):
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Forbidden")
-    base = session_tenancy(session) or TenancyContext(
-        tenant_id=principal.tenant_id, user_id=principal.user_id
+    access = projects.bind_project(
+        session, principal, grants, project_id, require=Capability.VIEW
     )
-    # A session holding objects cannot be rebound (``bind_tenancy``).
-    session.expunge_all()
-    bind_tenancy(session, resolve_scope(grants, base, project_id))
-    projects.get_project(session, project_id)  # a deleted project: 404
     return service.Viewer(
         user_id=principal.user_id,
         team_ids=frozenset(),  # teams module: T-0013 (TD-242)

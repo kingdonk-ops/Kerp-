@@ -13,7 +13,6 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 from sqlalchemy import select
@@ -662,13 +661,9 @@ def test_admin_grants_confer_no_approval_or_signature(api: Api) -> None:
         mine = access.project_access(access.load_grants(s, T1, api.users[ALICE]), project)
     assert mine.personas == {Persona.PROJECT_ADMINISTRATOR}
     for capability in (Capability.APPROVE, Capability.SIGN):
-        with pytest.raises(HTTPException) as refused:
-            access.require_capability(capability)(mine)
-        assert refused.value.status_code == 403
+        assert not mine.has(capability)
     for kind in HoldKind:
         assert not mine.can_release_hold(kind)
-        with pytest.raises(HTTPException):
-            access.require_hold_release(kind)(mine)
 
 
 def test_memberships_on_a_deleted_project_confer_nothing(api: Api) -> None:

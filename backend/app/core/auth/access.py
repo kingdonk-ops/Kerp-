@@ -24,7 +24,7 @@ from dataclasses import dataclass, replace
 from enum import StrEnum
 from typing import TYPE_CHECKING, Annotated, Final
 
-from fastapi import Depends, HTTPException, Request, status
+from fastapi import Depends, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -398,44 +398,3 @@ def get_caller_admin_grants(
 
 
 CallerAdminGrants = Annotated[frozenset[str], Depends(get_caller_admin_grants)]
-
-
-def get_project_access(grants: CallerGrants, session: DbSession) -> ProjectAccess:
-    """The caller's access to the session's bound project; 404 without one or a membership."""
-    context = session_tenancy(session)
-    if context is None or context.project_id is None:
-        raise OutOfScopeError("project not found")
-    return project_access(grants, context.project_id)
-
-
-CurrentAccess = Annotated[ProjectAccess, Depends(get_project_access)]
-
-
-def _forbidden() -> HTTPException:
-    return HTTPException(status.HTTP_403_FORBIDDEN, "Forbidden")
-
-
-def require_capability(capability: Capability) -> Callable[[ProjectAccess], ProjectAccess]:
-    """Dependency factory: 403 unless the caller holds ``capability`` in the bound project."""
-
-    def guard(access: CurrentAccess) -> ProjectAccess:
-        if not access.has(capability):
-            raise _forbidden()
-        return access
-
-    return guard
-
-
-def require_hold_release(kind: HoldKind) -> Callable[[ProjectAccess], ProjectAccess]:
-    """Dependency factory: 403 unless some persona may release ``kind`` holds at all.
-
-    Site-limited authority (PER-07) still needs ``access.can_release_hold(kind,
-    site_node_id=...)`` with the hold's site once the endpoint has loaded it.
-    """
-
-    def guard(access: CurrentAccess) -> ProjectAccess:
-        if not any(kind in PERSONAS[p].holds for p in access.personas - frozenset(SOD_BLOCKED)):
-            raise _forbidden()
-        return access
-
-    return guard

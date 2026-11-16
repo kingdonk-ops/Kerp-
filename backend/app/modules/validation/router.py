@@ -42,11 +42,9 @@ from fastapi import APIRouter, HTTPException, Path, Query, status
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
-from app.core.auth.access import CallerGrants, Grant, Persona, project_access, resolve_scope
+from app.core.auth.access import CallerGrants, Grant, Persona
 from app.core.auth.deps import CurrentPrincipal, Principal
 from app.core.db import DbSession
-from app.core.tenancy.context import TenancyContext
-from app.core.tenancy.rls import bind_tenancy, session_tenancy
 from app.modules.projects import service as projects
 from app.modules.validation import service, upgrades
 from app.modules.validation.models import RuleSet
@@ -144,14 +142,7 @@ def _bind_project(
     principal: Principal, grants: list[Grant], session: Session, project_id: uuid.UUID
 ) -> frozenset[Persona]:
     """Bind the request session to ``project_id`` (non-member: 404); the caller's personas."""
-    access = project_access(grants, project_id)
-    base = session_tenancy(session) or TenancyContext(
-        tenant_id=principal.tenant_id, user_id=principal.user_id
-    )
-    session.expunge_all()  # a session holding objects cannot be rebound
-    bind_tenancy(session, resolve_scope(grants, base, project_id))
-    projects.get_project(session, project_id)  # a deleted project: 404
-    return access.personas
+    return projects.bind_project(session, principal, grants, project_id).personas
 
 
 def _project_set(

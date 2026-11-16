@@ -17,12 +17,10 @@ from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, Request, status
 
-from app.core.auth.access import CallerGrants, Capability, Grant, project_access, resolve_scope
-from app.core.auth.deps import CurrentPrincipal, Principal
+from app.core.auth.access import CallerGrants, Capability
+from app.core.auth.deps import CurrentPrincipal
 from app.core.config import Settings
 from app.core.db import DbSession
-from app.core.tenancy.context import TenancyContext
-from app.core.tenancy.rls import bind_tenancy, session_tenancy
 from app.modules.notifications import service
 from app.modules.notifications.schemas import (
     DeliveryRead,
@@ -38,24 +36,6 @@ router = APIRouter(tags=["notifications"])
 NOTIFICATIONS = "/projects/{project_id}/notifications"
 
 
-def _bind_project(
-    principal: Principal,
-    grants: list[Grant],
-    session: DbSession,
-    project_id: uuid.UUID,
-    capability: Capability,
-) -> None:
-    if not project_access(grants, project_id).has(capability):  # non-member: 404
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Forbidden")
-    base = session_tenancy(session) or TenancyContext(
-        tenant_id=principal.tenant_id, user_id=principal.user_id
-    )
-    # A session holding objects cannot be rebound (``bind_tenancy``).
-    session.expunge_all()
-    bind_tenancy(session, resolve_scope(grants, base, project_id))
-    projects.get_project(session, project_id)  # a deleted project: 404
-
-
 @router.post(NOTIFICATIONS, response_model=NotificationSent, status_code=status.HTTP_201_CREATED)
 def send_notification(
     project_id: uuid.UUID,
@@ -65,7 +45,7 @@ def send_notification(
     session: DbSession,
     request: Request,
 ) -> NotificationSent:
-    _bind_project(principal, grants, session, project_id, Capability.ADMINISTER)
+    projects.bind_project(session, principal, grants, project_id, require=Capability.ADMINISTER)
     settings: Settings = request.app.state.settings
     try:
         delivery = service.notify(
@@ -92,7 +72,7 @@ def list_notifications(
     limit: Annotated[int, Query(ge=1, le=service.MAX_LIMIT)] = service.DEFAULT_LIMIT,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> list[NotificationRead]:
-    _bind_project(principal, grants, session, project_id, Capability.VIEW)
+    projects.bind_project(session, principal, grants, project_id, require=Capability.VIEW)
     notes = service.list_notifications(
         session, principal.user_id, unread_only=unread_only, limit=limit, offset=offset
     )
@@ -107,7 +87,7 @@ def mark_read(
     grants: CallerGrants,
     session: DbSession,
 ) -> NotificationRead:
-    _bind_project(principal, grants, session, project_id, Capability.VIEW)
+    projects.bind_project(session, principal, grants, project_id, require=Capability.VIEW)
     return NotificationRead.model_validate(
         service.mark_read(session, notification_id, principal.user_id)
     )
