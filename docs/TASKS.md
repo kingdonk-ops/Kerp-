@@ -3,11 +3,11 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 54/172 tasks done (31%) · **ready now:** 19 · **epics awaiting breakdown:** 47
+**Overall:** 55/172 tasks done (32%) · **ready now:** 19 · **epics awaiting breakdown:** 47
 
 | Phase | Tasks done | Progress |
 |---|---|---|
-| 0 · Platform foundations | 54/88 | `██████░░░░` 61% |
+| 0 · Platform foundations | 55/88 | `██████░░░░` 62% |
 | 1 · Asset & Quality backbone | 0/75 (+1 epics) | `░░░░░░░░░░` 0% |
 | 2 · Welding quality | 0/9 | `░░░░░░░░░░` 0% |
 | 3 · Logistics | 0/0 (+7 epics) | `░░░░░░░░░░` 0% |
@@ -82,7 +82,7 @@
 | ✅ | [T-0047](../tracker/tasks/T-0047.md) | Dynamic Form Renderer: localised template strings (plain string or per-locale map, fallback to the template default language) | frontend | S | T-0025 | #74 |
 | ▶ | [T-0026](../tracker/tasks/T-0026.md) | Admin UI: System admin grants (appoint Project Admins), user manager, project creation, persona + site scope assignment with SoD warning | frontend | M | T-0024, T-0014, T-0039 |  |
 | ⬜ | [T-0041](../tracker/tasks/T-0041.md) | Lobby screens: lobby list (internal users), project-code entry, Active requests panel with status chips, rejection reason and Request again after cooldown | frontend | M | T-0040, T-0050, T-0051, T-0042 |  |
-| 🟪 | [T-0042](../tracker/tasks/T-0042.md) | Top-bar project picker wired to memberships + post-login landing (one project -> in, several -> last used, none -> lobby) | frontend | S | T-0014, T-0024 | #108 |
+| ✅ | [T-0042](../tracker/tasks/T-0042.md) | Top-bar project picker wired to memberships + post-login landing (one project -> in, several -> last used, none -> lobby) | frontend | S | T-0014, T-0024 | #108 |
 | ▶ | [T-0048](../tracker/tasks/T-0048.md) | Devices screen: list enrolled devices, revoke with wipe warning (admin and own devices) | frontend | S | T-0043, T-0024 |  |
 | ⬜ | [T-0051](../tracker/tasks/T-0051.md) | Admin access-request inbox screen: pending requests for the user's PER-09 projects, approve with persona/site scope, reject with optional reason | frontend | S | T-0050, T-0042 |  |
 | ⬜ | [T-0053](../tracker/tasks/T-0053.md) | Invite link screens: one-click 'Join project' for signed-in users, invite token carried through sign-in, land in the project (lobby skipped) | frontend | S | T-0052, T-0042, T-0055, T-0026 |  |
