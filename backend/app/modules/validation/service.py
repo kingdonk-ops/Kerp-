@@ -31,7 +31,7 @@ from functools import cache
 from typing import TYPE_CHECKING, Any, Final
 
 from sqlalchemy import ColumnElement, select
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.audit import service as audit
@@ -48,6 +48,7 @@ from app.modules.validation.defaults import SeedRuleSet, load_defaults
 from app.modules.validation.models import (
     LAYERS,
     RULE_KINDS,
+    UNLOCK_PENDING_INDEX,
     Finding,
     Rule,
     RuleSet,
@@ -98,6 +99,9 @@ _EDIT_FIELDS: Final = tuple(name for name in _RULE_FIELDS if name not in _ORIGIN
 _COPY_FIELDS: Final = (*_EDIT_FIELDS, "unlock_adr_reference")
 # The layer each layer is copied from (and reset to).
 _PARENT_LAYER: Final = {"project": "tenant", "tenant": "system"}
+
+
+_SQLITE_PENDING_UNIQUE = "UNIQUE constraint failed: oe_validation_unlock_request.rule_id"
 
 
 class RuleStoreError(ValueError):
@@ -640,13 +644,9 @@ def request_unlock(
     rule = _live_rule(session, rule_set, rule_key)
     if not rule.locked:
         raise RuleStoreError(f"rule {rule_key!r} is not locked")
-    pending = session.scalars(
-        select(UnlockRequest.id).where(
-            UnlockRequest.rule_id == rule.id, UnlockRequest.status == "pending"
-        )
-    ).first()
-    if pending is not None:
-        raise RuleStoreError(f"rule {rule_key!r} already has a pending unlock request")
+    already = RuleStoreError(f"rule {rule_key!r} already has a pending unlock request")
+    if _pending_unlock_of(session, rule.id) is not None:
+        raise already
     request = UnlockRequest(
         tenant_id=context.tenant_id,
         project_id=None,
@@ -663,9 +663,28 @@ def request_unlock(
         source="api",
     )
     session.add(request)
-    session.flush()
+    try:
+        # A concurrent request that lands after the check above hits the one-pending-per-rule
+        # index (T-0216): 409. No SAVEPOINT: on SQLite one opened before any write would be the
+        # outermost transaction and commit early; the caller's unit of work rolls back instead.
+        session.flush()
+    except IntegrityError as exc:
+        # PostgreSQL names the index; SQLite names the column of the unique index.
+        detail = str(exc.orig)
+        if UNLOCK_PENDING_INDEX not in detail and _SQLITE_PENDING_UNIQUE not in detail:
+            raise  # another constraint (e.g. a foreign key): not the one-pending race
+        raise already from exc
     _audit_unlock(session, rule_set, request, "unlock_requested", actor, reason=reason)
     return request
+
+
+def _pending_unlock_of(session: Session, rule_id: uuid.UUID) -> uuid.UUID | None:
+    """The id of the rule's pending unlock request, if any."""
+    return session.scalars(
+        select(UnlockRequest.id).where(
+            UnlockRequest.rule_id == rule_id, UnlockRequest.status == "pending"
+        )
+    ).first()
 
 
 def approve_unlock(
