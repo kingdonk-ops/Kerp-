@@ -927,10 +927,12 @@ def test_a_racing_unlock_request_is_a_rule_store_error(
         first = request_unlock(s, tenant_set, "calibration", adr_reference="ADR 1").id
     # The other request's row lands between this one's check and its insert.
     monkeypatch.setattr(rule_store, "_pending_unlock_of", lambda *_args: None)
-    with db.unit_of_work(CTX_T1) as s:
-        with pytest.raises(RuleStoreError, match="already has a pending"):
-            request_unlock(s, tenant_set, "calibration", adr_reference="ADR 2")
-        # The refusal rolls back only its own insert: the session stays usable.
+    with (
+        pytest.raises(RuleStoreError, match="already has a pending"),
+        db.unit_of_work(CTX_T1) as s,
+    ):
+        request_unlock(s, tenant_set, "calibration", adr_reference="ADR 2")
+    with db.unit_of_work(CTX_T1) as s:  # the refused unit of work left nothing behind
         assert [r.id for r in rule_store.list_unlock_requests(s, "pending")] == [first]
 
 

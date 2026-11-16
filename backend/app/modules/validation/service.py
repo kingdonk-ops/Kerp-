@@ -662,11 +662,12 @@ def request_unlock(
         updated_by=actor,
         source="api",
     )
+    session.add(request)
     try:
-        # A SAVEPOINT: a concurrent request that lands after the check above hits the
-        # one-pending-per-rule index (T-0216); only the savepoint is rolled back (409).
-        with session.begin_nested():
-            session.add(request)
+        # A concurrent request that lands after the check above hits the one-pending-per-rule
+        # index (T-0216): 409. No SAVEPOINT: on SQLite one opened before any write would be the
+        # outermost transaction and commit early; the caller's unit of work rolls back instead.
+        session.flush()
     except IntegrityError as exc:
         # PostgreSQL names the index; SQLite names the column of the unique index.
         detail = str(exc.orig)
