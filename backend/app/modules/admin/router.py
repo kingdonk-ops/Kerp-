@@ -133,7 +133,10 @@ def create_user(
 def update_user(
     user_id: uuid.UUID, body: UserUpdate, principal: CurrentPrincipal, session: DbSession
 ) -> UserRead:
-    user = service.update_user(session, user_id, body, actor_id=principal.user_id)
+    try:
+        user = service.update_user(session, user_id, body, actor_id=principal.user_id)
+    except service.LastSystemAdminError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
     return UserRead.model_validate(user)
 
 

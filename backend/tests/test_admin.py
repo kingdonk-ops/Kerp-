@@ -737,3 +737,64 @@ def test_migration_0015_inlines_exactly_the_live_policy_sql() -> None:
 
 def test_the_grant_kinds_are_exactly_the_admin_grants() -> None:
     assert [k.value for k in AdminGrantKind] == list(ADMIN_GRANTS)
+
+
+# --- the last *active* System admin (T-0211, TD-274) -----------------------------------------
+
+
+def _deactivate(api: Api, user: str, caller: str = ALICE) -> Any:
+    url = f"{ADMIN}/users/{api.users[user]}"
+    return api.client.patch(url, json={"is_active": False}, headers=api.headers(caller))
+
+
+def test_the_last_active_system_admin_cannot_deactivate_themselves(api: Api) -> None:
+    refused = _deactivate(api, ALICE)
+    assert refused.status_code == 409
+    with api.db.unit_of_work(ROOT) as s:
+        assert service.users.get_user(s, api.users[ALICE]).is_active is True
+    assert api.chain(f"admin-user:{api.users[ALICE]}") == []
+
+
+def test_one_of_two_active_system_admins_can_be_deactivated(api: Api) -> None:
+    _make_admin(api.db, api.users[BOB])
+    assert _deactivate(api, BOB).status_code == 200
+    assert _deactivate(api, ALICE).status_code == 409  # BOB no longer counts
+
+
+def test_a_deactivated_admins_grant_does_not_keep_the_last_active_one_revocable(api: Api) -> None:
+    _make_admin(api.db, api.users[BOB])
+    assert _deactivate(api, BOB).status_code == 200
+    own = f"{GRANTS}/{api.users[ALICE]}/system_admin"
+    assert api.client.delete(own, headers=api.headers(ALICE)).status_code == 409
+    # The inactive admin's own grant can still be cleaned up.
+    inactive = f"{GRANTS}/{api.users[BOB]}/system_admin"
+    assert api.client.delete(inactive, headers=api.headers(ALICE)).status_code == 204
+
+
+def test_deactivating_a_user_without_system_admin_is_not_checked(api: Api) -> None:
+    assert _deactivate(api, CAROL).status_code == 200
+
+
+# --- check-then-insert races answer like the sequential case (T-0211) ------------------------
+
+
+def test_a_racing_duplicate_grant_answers_already_held(
+    api: Api, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    body = {"user_id": str(api.users[BOB]), "grant": "create_projects"}
+    root = api.headers(ALICE)
+    assert api.client.post(GRANTS, json=body, headers=root).status_code == 201
+    # The other request's row lands between this one's check and its insert.
+    monkeypatch.setattr(service, "own_admin_grants", lambda *_args: frozenset())
+    again = api.client.post(GRANTS, json=body, headers=root)
+    assert again.status_code == 200, again.text
+    assert [e["action"] for e in api.chain(f"admin-grant:{api.users[BOB]}")] == ["grant"]
+
+
+def test_a_racing_duplicate_user_answers_409(api: Api, monkeypatch: pytest.MonkeyPatch) -> None:
+    body = {"email": "erin@example.test", "display_name": "Erin"}
+    root = api.headers(ALICE)
+    assert api.client.post(f"{ADMIN}/users", json=body, headers=root).status_code == 201
+    monkeypatch.setattr(service.users, "find_user_by_email", lambda *_args: None)
+    again = api.client.post(f"{ADMIN}/users", json=body, headers=root)
+    assert again.status_code == 409, again.text
