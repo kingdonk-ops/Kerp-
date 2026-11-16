@@ -6,7 +6,6 @@ import { createQueryClient } from "../app/queryClient";
 import type { AppServices } from "../app/services";
 import { memoryStorage, type KeyValueStorage } from "../auth/tokenStore";
 import { i18n } from "../i18n";
-import { staticProjectDirectory } from "../projects/directory";
 import { FAKE_USER, json, makeServices, tokens } from "../test/fakeApi";
 import { DEVICE_THEME_KEY, THEME_ATTRIBUTE, applyTheme, decodeTheme, themeStorageKey } from "./theme";
 
@@ -25,7 +24,6 @@ function renderApp(
   const services: AppServices = {
     api: base.api,
     tokens: base.tokens,
-    projects: staticProjectDirectory([]),
     preferences,
   };
   const queryClient = createQueryClient();

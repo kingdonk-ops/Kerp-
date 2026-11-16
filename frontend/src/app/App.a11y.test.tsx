@@ -5,16 +5,20 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { memoryStorage } from "../auth/tokenStore";
 import { i18n } from "../i18n";
-import { staticProjectDirectory } from "../projects/directory";
 import { auditA11y, FIELD_VIEWPORTS, formatFindings, setViewport } from "../test/a11y";
-import { FAKE_USER, makeServices, tokens } from "../test/fakeApi";
+import { FAKE_USER, json, makeServices, tokens } from "../test/fakeApi";
 import { THEMES, applyTheme, themeStorageKey, DEVICE_THEME_KEY, type ThemeId } from "../theme/theme";
 import { AppRoot } from "./AppRoot";
 import { createQueryClient } from "./queryClient";
 import type { AppServices } from "./services";
 
-function renderApp(path: string, theme: ThemeId, signedIn: boolean) {
-  const base = makeServices();
+// A portfolio persona, so the All-Projects option is audited too (synthetic).
+const PROJECTS = [
+  { id: "p-alpha", code: "SYN-001", name: "Synthetic Refinery Unit", personas: ["PER-01"] },
+];
+
+function renderApp(path: string, theme: ThemeId, signedIn: boolean, projects: unknown[] = PROJECTS) {
+  const base = makeServices({ "GET /api/v1/me/projects": () => json(projects) });
   if (signedIn) base.tokens.set(tokens(0));
   const preferences = memoryStorage();
   // The theme comes from the stored preference, exercising the real switch-on path.
@@ -22,7 +26,6 @@ function renderApp(path: string, theme: ThemeId, signedIn: boolean) {
   const services: AppServices = {
     api: base.api,
     tokens: base.tokens,
-    projects: staticProjectDirectory([{ id: "p-alpha", code: "SYN-001", name: "Synthetic Refinery Unit" }]),
     preferences,
   };
   const queryClient = createQueryClient();
@@ -42,6 +45,15 @@ describe.each(THEMES)("app shell in the %s theme", (theme) => {
       await screen.findByText(i18n.t("auth.signedInAs", { name: FAKE_USER.display_name }));
       await screen.findByRole("option", { name: "SYN-001 — Synthetic Refinery Unit" });
       expect(document.documentElement.dataset.theme ?? "standard").toBe(theme);
+
+      const findings = await auditA11y(document.body, theme);
+      expect(findings, formatFindings(findings)).toEqual([]);
+    });
+
+    it("the lobby of a user with no project meets WCAG 2.1 AA and 48 px targets", async () => {
+      await setViewport(viewport);
+      renderApp("/", theme, true, []);
+      await screen.findByRole("heading", { level: 1, name: i18n.t("lobby.title") });
 
       const findings = await auditA11y(document.body, theme);
       expect(findings, formatFindings(findings)).toEqual([]);

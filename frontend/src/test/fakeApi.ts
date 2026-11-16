@@ -58,6 +58,8 @@ export function fakeBackend(handlers: Record<string, Handler> = {}) {
       req.auth?.startsWith("Bearer access-")
         ? json(FAKE_USER)
         : json({ detail: "Not authenticated" }, 401),
+    // A user with no project (lands in the lobby); tests pass their synthetic projects.
+    "GET /api/v1/me/projects": () => json([]),
   };
   const fetch = async (request: Request): Promise<Response> => {
     const url = new URL(request.url);

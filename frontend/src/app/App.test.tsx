@@ -3,29 +3,29 @@ import { describe, expect, it } from "vitest";
 
 import { memoryStorage, type KeyValueStorage } from "../auth/tokenStore";
 import { i18n } from "../i18n";
-import { staticProjectDirectory, type ProjectSummary } from "../projects/directory";
-import { scopeStorageKey } from "../projects/ProjectScopeProvider";
+import type { ProjectSummary } from "../projects/directory";
 import { FAKE_USER, json, makeServices, tokens } from "../test/fakeApi";
 import { AppRoot } from "./AppRoot";
 import { NAV_GROUPS } from "./nav";
 import { createQueryClient } from "./queryClient";
 import type { AppServices } from "./services";
 
-const PROJECTS: [ProjectSummary, ProjectSummary] = [
-  { id: "p-alpha", code: "SYN-001", name: "Synthetic Refinery Unit" },
-  { id: "p-beta", code: "SYN-002", name: "Synthetic Tank Farm" },
+const PROJECTS: ProjectSummary[] = [
+  { id: "p-alpha", code: "SYN-001", name: "Synthetic Refinery Unit", personas: ["PER-02"] },
 ];
 
 function setup(
   opts: { signedIn?: boolean; projects?: ProjectSummary[]; preferences?: KeyValueStorage } = {},
   handlers: Parameters<typeof makeServices>[0] = {},
 ) {
-  const base = makeServices(handlers);
+  const base = makeServices({
+    "GET /api/v1/me/projects": () => json(opts.projects ?? PROJECTS),
+    ...handlers,
+  });
   if (opts.signedIn ?? true) base.tokens.set(tokens(0));
   const services: AppServices = {
     api: base.api,
     tokens: base.tokens,
-    projects: staticProjectDirectory(opts.projects ?? PROJECTS),
     preferences: opts.preferences ?? memoryStorage(),
   };
   const queryClient = createQueryClient();
@@ -144,56 +144,6 @@ describe("app shell", () => {
         name: i18n.t("nav.groups.defenseClaims.title"),
       }),
     ).toBeInTheDocument();
-  });
-
-  it("switches between a project and the All-Projects portfolio scope and remembers it", async () => {
-    const preferences = memoryStorage();
-    renderApp("/", setup({ preferences }));
-
-    const switcher = await screen.findByRole("combobox", { name: i18n.t("scope.label") });
-    const project = (p: ProjectSummary) =>
-      i18n.t("scope.projectOption", { code: p.code, name: p.name });
-    const indicator = () => screen.getByTestId("scope-indicator");
-    await waitFor(() => {
-      expect(indicator()).toHaveTextContent(i18n.t("scope.current", { scope: project(PROJECTS[0]) }));
-    });
-    expect(within(switcher).getAllByRole("option").map((o) => o.textContent)).toEqual([
-      i18n.t("scope.allProjects"),
-      project(PROJECTS[0]),
-      project(PROJECTS[1]),
-    ]);
-
-    fireEvent.change(switcher, { target: { value: "p-beta" } });
-    expect(indicator()).toHaveTextContent(project(PROJECTS[1]));
-
-    fireEvent.change(switcher, { target: { value: "__all__" } });
-    expect(indicator()).toHaveTextContent(
-      i18n.t("scope.current", { scope: i18n.t("scope.allProjects") }),
-    );
-    expect(preferences.getItem(scopeStorageKey(FAKE_USER.id))).toBe("all");
-  });
-
-  it("restores the stored scope and ignores a project the user no longer has", async () => {
-    const preferences = memoryStorage();
-    preferences.setItem(scopeStorageKey(FAKE_USER.id), "project:p-beta");
-    const { unmount } = renderApp("/", setup({ preferences }));
-    expect(
-      await screen.findByText(new RegExp(PROJECTS[1].name), { selector: "[data-testid]" }),
-    ).toBeInTheDocument();
-    unmount();
-
-    preferences.setItem(scopeStorageKey(FAKE_USER.id), "project:p-gone");
-    renderApp("/", setup({ preferences }));
-    expect(
-      await screen.findByText(new RegExp(PROJECTS[0].name), { selector: "[data-testid]" }),
-    ).toBeInTheDocument();
-  });
-
-  it("falls back to the All-Projects scope while no projects are available", async () => {
-    renderApp("/", setup({ projects: [] }));
-
-    expect(await screen.findByText(i18n.t("scope.noProjects"))).toBeInTheDocument();
-    expect(screen.getByTestId("scope-indicator")).toHaveTextContent(i18n.t("scope.allProjects"));
   });
 
   it("signs out: revokes the session server-side and returns to login", async () => {
