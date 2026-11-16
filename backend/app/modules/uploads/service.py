@@ -20,7 +20,7 @@ from app.core.db import Database, utcnow
 from app.core.tenancy.context import TenancyContext
 from app.core.tenancy.rls import session_tenancy
 from app.core.tenancy.scope import OutOfScopeError, get_or_404
-from app.modules.jobs.service import JOB_REGISTRY, create_job
+from app.modules.jobs.service import JOB_REGISTRY, create_job, job_status
 from app.modules.uploads.models import UploadedFile, quarantine_prefix, staging_prefix
 from app.modules.uploads.scan import Scanner
 from app.modules.uploads.schemas import UploadCreate
@@ -60,7 +60,17 @@ SWEEP_KIND: Final = "uploads.sweep_orphans"
 DEFAULT_SWEEP_GRACE: Final = timedelta(hours=1)
 
 # Stored as ``rejection_reason``: codes, so the client translates them (i18n).
-Reason = Literal["size_mismatch", "type_mismatch", "sha256_mismatch", "missing_object", "infected"]
+Reason = Literal[
+    "size_mismatch",
+    "type_mismatch",
+    "sha256_mismatch",
+    "missing_object",
+    "infected",
+    "verify_failed",
+]
+# A file still ``verifying`` this long after ``complete`` (or whose verify job failed) is
+# rejected by the orphan sweep with ``verify_failed`` (T-0215, TD-209).
+VERIFY_STUCK_AFTER: Final = timedelta(hours=6)
 
 
 class FileTooLargeError(ValueError):
@@ -241,6 +251,9 @@ def verify_upload(
         storage.delete(staging)
     with db.unit_of_work(tenancy) as session:
         file = get_file(session, file_id)
+        # Re-read under a row lock (PostgreSQL): the orphan sweep may be rejecting this
+        # stuck file right now; whoever locks first decides, the other sees the new status.
+        session.refresh(file, with_for_update=True)
         if file.status == "verifying":
             file.scan_result = verdict
             if reason is not None:
@@ -262,15 +275,20 @@ def sweep_orphans(
     now: datetime | None = None,
     grace: timedelta = DEFAULT_SWEEP_GRACE,
 ) -> dict[str, int]:
-    """Expire ``pending`` files past their URL expiry + ``grace``; delete orphaned objects.
+    """Expire ``pending`` files past their URL expiry + ``grace``; reject stuck ``verifying``
+    files; delete orphaned objects.
 
-    A staging or quarantine object is an orphan when no ``pending``/``verifying`` file owns
-    it and it is older than ``grace`` (a re-``PUT`` after verification, a worker that died
-    mid-verify). Runs per project (``uploads.sweep_orphans``), so RLS stays on.
+    A ``verifying`` file whose verify job ``failed`` (read through the jobs service), or that
+    has been ``verifying`` for longer than ``VERIFY_STUCK_AFTER``, is rejected with
+    ``verify_failed`` (T-0215, TD-209). A staging or quarantine object is an orphan when no
+    ``pending``/``verifying`` file owns it and it is older than ``grace`` (a re-``PUT`` after
+    verification, a worker that died mid-verify). Runs per project (``uploads.sweep_orphans``,
+    queued hourly in every project by the jobs scheduler), so RLS stays on.
     """
     if tenancy.project_id is None:
         raise RuntimeError("the orphan sweep runs per project")
-    cutoff = (now or utcnow()) - grace
+    moment = now or utcnow()
+    cutoff = moment - grace
     project = UploadedFile.project_id == tenancy.project_id
     with db.unit_of_work(tenancy) as session:
         stale = session.scalars(
@@ -280,6 +298,30 @@ def sweep_orphans(
         ).all()
         for file in stale:
             file.status = "expired"
+        too_old = set(
+            session.scalars(
+                select(UploadedFile.id).where(
+                    project,
+                    UploadedFile.status == "verifying",
+                    UploadedFile.updated_at < moment - VERIFY_STUCK_AFTER,
+                )
+            )
+        )
+        # Locked (PostgreSQL), so a verify job finishing at the same moment cannot publish a
+        # file this sweep rejects, or the other way round (verify_upload locks the row too).
+        verifying = session.scalars(
+            select(UploadedFile)
+            .where(project, UploadedFile.status == "verifying")
+            .with_for_update()
+        ).all()
+        stuck = [
+            f
+            for f in verifying
+            if f.id in too_old
+            or (f.job_id is not None and job_status(session, f.job_id) == "failed")
+        ]
+        for file in stuck:
+            _reject(file, "verify_failed")
         session.flush()  # the sessions do not autoflush
         live = {
             str(i)
@@ -295,7 +337,7 @@ def sweep_orphans(
             if obj.key.rsplit("/", 1)[-1] not in live and obj.last_modified < cutoff:
                 storage.delete(obj.key)
                 deleted += 1
-    return {"expired": len(stale), "deleted": deleted}
+    return {"expired": len(stale), "deleted": deleted, "rejected": len(stuck)}
 
 
 def schedule_sweep(session: Session, *, actor_id: uuid.UUID | None = None) -> Job:

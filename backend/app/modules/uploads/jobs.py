@@ -9,7 +9,7 @@ import asyncio
 import uuid
 from typing import Any
 
-from app.modules.jobs.registry import JobContext
+from app.modules.jobs.registry import JobContext, schedule_hourly_per_project
 from app.modules.jobs.service import JobError, register_job
 from app.modules.uploads import service
 from app.modules.uploads.scan import get_scanner
@@ -36,6 +36,10 @@ async def verify(job: JobContext) -> dict[str, Any]:
         storage=get_storage(),
         scanner=get_scanner(),
     )
+
+
+# The worker's hourly cron queues one sweep in every live project (T-0215, TD-212).
+schedule_hourly_per_project(service.SWEEP_KIND)
 
 
 @register_job(service.SWEEP_KIND, queue="batch")

@@ -11,7 +11,7 @@ contract, `update(progress, message)` and the sanitised error (ADR 0007).
 | `registry.py` | `register_job(kind, queue=...)`, `JobKind`, `JobContext`, `JobRegistry`, `JOB_REGISTRY` |
 | `broker.py` | `JobBroker` seam, `SaqBroker` (two SAQ `RedisQueue`s), `LoopDispatcher` (post-commit enqueue) |
 | `service.py` | `create_job`, `get_job`, `start_job`/`report_progress`/`finish_job`, `sanitise_error`, `sweep` |
-| `scheduler.py` | `deployment_scopes`, `sweep_cron` (SAQ cron, every 5 min, batch worker; T-0214) |
+| `scheduler.py` | `deployment_scopes`, `sweep_cron` (SAQ cron, every 5 min, batch worker; T-0214), `hourly_project_jobs` (queues every `schedule_hourly_per_project` kind in every live project at :17; T-0215) |
 | `worker.py` | `run_job` (the one SAQ function), `build_workers`, `serve`; `python -m app.modules.jobs.worker` |
 | `router.py`, `schemas.py` | `POST /api/v1/jobs`, `GET /api/v1/jobs/{id}` |
 

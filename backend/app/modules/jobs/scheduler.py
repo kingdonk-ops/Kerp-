@@ -8,8 +8,11 @@ plus one per live project. The project list is read in a tenant-level unit of wo
 never a project-scoped record, so no BYPASSRLS is needed. The sweep's own sessions carry the
 bare scope only.
 
-Only the worker imports this module; the cron job runs on the batch worker every five
-minutes (SAQ ``CronJob(unique=True)``: one run per tick across worker replicas).
+``hourly_project_jobs`` (T-0215) queues, once an hour, every kind a module registered with
+``registry.schedule_hourly_per_project`` (e.g. the uploads orphan sweep) in every live project.
+
+Only the worker imports this module; both cron jobs run on the batch worker (SAQ
+``CronJob(unique=True)``: one run per tick across worker replicas).
 """
 
 from __future__ import annotations
@@ -22,15 +25,19 @@ from typing import TYPE_CHECKING, Any, Final
 
 from app.core.tenancy.context import TenancyContext
 from app.modules.jobs import service
+from app.modules.jobs.registry import UnknownJobKindError
 from app.modules.projects import service as projects
 
 if TYPE_CHECKING:
     from app.core.db import Database
+    from app.modules.jobs.registry import JobRegistry
 
 SWEEP_CRON: Final = "*/5 * * * *"
 # Explicit SAQ job timeout for the cron run (SAQ's default is 10 s): one DB round-trip per
 # scope plus a Redis lookup per stale row. An interrupted run is resumed by the next tick.
 CRON_TIMEOUT_S: Final = 120
+# Hourly per-project jobs (T-0215), off the full hour so they do not pile up with other crons.
+HOURLY_CRON: Final = "17 * * * *"
 
 logger = logging.getLogger("kerp.jobs")
 
@@ -57,3 +64,47 @@ async def sweep_cron(ctx: Mapping[str, Any]) -> None:
     requeued = await service.sweep(ctx["db"], ctx["broker"], scopes, registry=ctx["registry"])
     if requeued:
         logger.warning("jobs sweep re-enqueued %d stuck job(s)", len(requeued))
+
+
+def _queue_hourly(
+    db: Database, scope: TenancyContext, registry: JobRegistry, kinds: tuple[str, ...]
+) -> int:
+    """Add one job row per hourly kind in ``scope``; each is enqueued after the commit."""
+    with db.unit_of_work(scope) as session:
+        for kind in kinds:
+            service.create_job(session, registry.get(kind), {}, source="system")
+    return len(kinds)
+
+
+async def hourly_project_jobs(ctx: Mapping[str, Any]) -> None:
+    """SAQ cron: queue every hourly per-project kind in every live project."""
+    tenant_id = ctx["settings"].default_tenant_id
+    if tenant_id is None:
+        logger.warning("hourly project jobs skipped: KERP_DEFAULT_TENANT_ID is not set")
+        return
+    registry: JobRegistry = ctx["registry"]
+    kinds = _known_kinds(registry)
+    if not kinds:
+        return
+    scopes = await asyncio.to_thread(deployment_scopes, ctx["db"], tenant_id)
+    for scope in scopes[1:]:  # the projects; the first scope is tenant-level
+        try:
+            await asyncio.to_thread(_queue_hourly, ctx["db"], scope, registry, kinds)
+        except Exception:  # one project's failure must not skip every project after it
+            logger.exception(
+                "hourly project jobs failed for a project",
+                extra={"project_id": str(scope.project_id)},
+            )
+
+
+def _known_kinds(registry: JobRegistry) -> tuple[str, ...]:
+    """The scheduled kinds that have a handler; an unknown one is logged and skipped."""
+    known: list[str] = []
+    for kind in registry.hourly_project_kinds():
+        try:
+            registry.get(kind)
+        except UnknownJobKindError:
+            logger.error("hourly project job %s has no registered handler", kind)
+            continue
+        known.append(kind)
+    return tuple(known)
