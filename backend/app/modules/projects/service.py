@@ -46,6 +46,7 @@ __all__ = [
     "delete_project",
     "get_project",
     "list_projects",
+    "live_project_ids",
     "site_zone",
     "update_project",
 ]
@@ -142,6 +143,17 @@ def list_projects(session: Session, project_ids: Collection[uuid.UUID]) -> list[
     if not project_ids:
         return []
     query = select(Project).where(Project.id.in_(list(project_ids))).order_by(Project.code)
+    return list(session.scalars(query))
+
+
+def live_project_ids(session: Session) -> list[uuid.UUID]:
+    """Every live project of the session's tenant that the session can see, by id.
+
+    The jobs scheduler (T-0214) calls it on a tenant-level session bound with
+    ``is_system_admin=True``, which reads every project row (never a project-scoped record), so
+    it lists the deployment's projects under RLS without a bypass.
+    """
+    query = select(Project.id).where(Project.tenant_id == _tenant_id(session)).order_by(Project.id)
     return list(session.scalars(query))
 
 

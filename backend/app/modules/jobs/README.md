@@ -11,6 +11,7 @@ contract, `update(progress, message)` and the sanitised error (ADR 0007).
 | `registry.py` | `register_job(kind, queue=...)`, `JobKind`, `JobContext`, `JobRegistry`, `JOB_REGISTRY` |
 | `broker.py` | `JobBroker` seam, `SaqBroker` (two SAQ `RedisQueue`s), `LoopDispatcher` (post-commit enqueue) |
 | `service.py` | `create_job`, `get_job`, `start_job`/`report_progress`/`finish_job`, `sanitise_error`, `sweep` |
+| `scheduler.py` | `deployment_scopes`, `sweep_cron` (SAQ cron, every 5 min, batch worker; T-0214) |
 | `worker.py` | `run_job` (the one SAQ function), `build_workers`, `serve`; `python -m app.modules.jobs.worker` |
 | `router.py`, `schemas.py` | `POST /api/v1/jobs`, `GET /api/v1/jobs/{id}` |
 
@@ -62,8 +63,12 @@ runs it (`make worker`); liveness probe and re-queue on shutdown: TD-157.
 ## Sweep
 
 `sweep(db, broker, scopes)` re-enqueues rows still `queued` after `older_than` that SAQ does
-not know, one bound unit of work per scope. Scheduling it needs a list of tenant/project
-scopes, which no module provides yet (TD-155).
+not know, one bound unit of work per scope. `scheduler.py` (T-0214) runs it every five
+minutes as an SAQ cron job on the batch worker (`CronJob(unique=True)`: one run per tick across
+replicas). Its scopes (`deployment_scopes`) are the `KERP_DEFAULT_TENANT_ID` tenant-level scope
+plus one per live project, listed by `projects.live_project_ids` in a tenant-level unit of work
+bound with `is_system_admin=True` (reads project rows, never project-scoped records; no
+BYPASSRLS). Broker enqueue retry/backoff and a heal on `GET /jobs/{id}`: TD-304.
 
 ## Tests
 

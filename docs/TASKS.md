@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 45/172 tasks done (26%) · **ready now:** 28 · **epics awaiting breakdown:** 47
+**Overall:** 45/172 tasks done (26%) · **ready now:** 27 · **epics awaiting breakdown:** 47
 
 | Phase | Tasks done | Progress |
 |---|---|---|
@@ -30,7 +30,7 @@
 | ✅ | [T-0004](../tracker/tasks/T-0004.md) | Backend Dockerfile (multi-stage, --only-binary) + CI image build to GHCR | platform | S | T-0001 | #11 |
 | ▶ | [T-0213](../tracker/tasks/T-0213.md) | Production refuses to verify uploads with the always-clean StubScanner unless explicitly allowed | uploads | S | — |  |
 | ✅ | [T-0005](../tracker/tasks/T-0005.md) | Database layer + BaseRecordMixin + Alembic + metadata contract test | platform | M | T-0001 | #13 |
-| ▶ | [T-0214](../tracker/tasks/T-0214.md) | Schedule the jobs sweep: list tenant/project scopes under RLS and run service.sweep from an SAQ cron | jobs | M | — |  |
+| 🟪 | [T-0214](../tracker/tasks/T-0214.md) | Schedule the jobs sweep: list tenant/project scopes under RLS and run service.sweep from an SAQ cron | jobs | M | — | #101 |
 | ✅ | [T-0006](../tracker/tasks/T-0006.md) | Hash-chain audit ledger: append-only (seq, chain_key, prev_hash, content_hash, payload) + REVOKE UPDATE/DELETE | audit | M | T-0005 | #20 |
 | ⬜ | [T-0215](../tracker/tasks/T-0215.md) | Run the uploads orphan sweep hourly per project and recover files stuck in 'verifying' | uploads | S | T-0214 |  |
 | ✅ | [T-0007](../tracker/tasks/T-0007.md) | Project-scoped RLS: project_id context, policy helper, cross-project→404, 4 RLS-bypass contract tests | tenancy | M | T-0005 | #19 |
