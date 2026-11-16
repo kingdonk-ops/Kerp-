@@ -13,18 +13,19 @@ from typing import Any
 import pytest
 from alembic.autogenerate import compare_metadata
 from alembic.runtime.migration import MigrationContext
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 from sqlalchemy import Column, MetaData, Table, event, select, text
 
 from app.core.audit.service import chain_entries
-from app.core.auth.access import CREATE_PROJECTS, Persona
+from app.core.auth.access import CREATE_PROJECTS, Capability, Grant, Persona, load_grants
 from app.core.auth.models import MEMBERSHIP_TABLE, ProjectMembership
 from app.core.db import Base, Database, contract_violations
 from app.core.geo import GeoJSONGeometry
 from app.core.module_loader.loader import discover_modules
 from app.core.tenancy.context import TenancyContext
-from app.core.tenancy.rls import RLS_EXEMPT, bind_connection, rls_tables
+from app.core.tenancy.rls import RLS_EXEMPT, bind_connection, rls_tables, session_tenancy
 from app.core.tenancy.scope import OutOfScopeError
 from app.modules.admin import service as admin
 from app.modules.projects import service
@@ -627,3 +628,61 @@ def test_an_administrator_deletes_a_project(api: Api) -> None:
     assert api.client.delete(f"{PROJECTS}/{api.home}", headers=headers).status_code == 204
     assert api.client.get(f"{PROJECTS}/{api.home}", headers=headers).status_code == 404
     assert api.client.delete(f"{PROJECTS}/{api.home}", headers=headers).status_code == 404
+
+
+# --- bind_project: the one project-binding sequence of every project router (T-0217) ----------
+
+
+def _bind_case(db: Database) -> tuple[uuid.UUID, uuid.UUID, Any]:
+    """A project HOME with a PER-15 member (V + S, no C); returns (project, gone, principal)."""
+    from types import SimpleNamespace
+
+    user = seed_user(db, T1, ALICE)
+    root = TenancyContext(tenant_id=T1, is_system_admin=True)
+    with db.unit_of_work(root) as s:
+        home = service.create_project(s, _create(code="HOME")).id
+        gone = service.create_project(s, _create(code="GONE")).id
+        for project in (home, gone):
+            s.add(
+                ProjectMembership(
+                    tenant_id=T1,
+                    user_id=user,
+                    member_project_id=project,
+                    persona=Persona.CLIENT_REPRESENTATIVE.value,
+                )
+            )
+    with db.unit_of_work(root) as s:
+        service.delete_project(s, gone)
+    return home, gone, SimpleNamespace(tenant_id=T1, user_id=user)
+
+
+def _grants(db: Database, principal: Any) -> list[Grant]:
+    with db.unit_of_work(TenancyContext(tenant_id=T1, user_id=principal.user_id)) as s:
+        return load_grants(s, T1, principal.user_id)
+
+
+def test_bind_project_binds_a_member_and_checks_the_capability_first(db: Database) -> None:
+    home, _gone, principal = _bind_case(db)
+    grants = _grants(db, principal)
+    base = TenancyContext(tenant_id=T1, user_id=principal.user_id)
+    with db.unit_of_work(base) as s:
+        access = service.bind_project(s, principal, grants, home, require=Capability.VIEW)
+        assert access.personas == {Persona.CLIENT_REPRESENTATIVE}
+        bound = session_tenancy(s)
+        assert bound is not None
+        assert (bound.project_id, bound.user_id) == (home, principal.user_id)
+    with db.unit_of_work(base) as s, pytest.raises(HTTPException) as refused:
+        service.bind_project(s, principal, grants, home, require=Capability.CREATE)
+    assert refused.value.status_code == 403
+    with db.unit_of_work(base) as s:  # refused before the session was rebound
+        assert session_tenancy(s) == base
+
+
+def test_bind_project_hides_other_and_deleted_projects(db: Database) -> None:
+    _home, gone, principal = _bind_case(db)
+    grants = _grants(db, principal)
+    base = TenancyContext(tenant_id=T1, user_id=principal.user_id)
+    with db.unit_of_work(base) as s, pytest.raises(OutOfScopeError):
+        service.bind_project(s, principal, grants, uuid.uuid4())  # not a member
+    with db.unit_of_work(base) as s, pytest.raises(OutOfScopeError):
+        service.bind_project(s, principal, grants, gone)  # a deleted project

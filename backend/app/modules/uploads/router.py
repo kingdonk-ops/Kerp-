@@ -17,12 +17,10 @@ import uuid
 
 from fastapi import APIRouter, HTTPException, Request, status
 
-from app.core.auth.access import CallerGrants, Capability, Grant, project_access, resolve_scope
-from app.core.auth.deps import CurrentPrincipal, Principal
+from app.core.auth.access import CallerGrants, Capability
+from app.core.auth.deps import CurrentPrincipal
 from app.core.config import Settings
 from app.core.db import DbSession
-from app.core.tenancy.context import TenancyContext
-from app.core.tenancy.rls import bind_tenancy, session_tenancy
 from app.modules.projects import service as projects
 from app.modules.uploads import service
 from app.modules.uploads.schemas import FileRead, PresignedRead, UploadCreate, UploadTicket
@@ -31,25 +29,6 @@ from app.modules.uploads.storage import get_storage
 router = APIRouter(tags=["uploads"])
 
 FILES = "/projects/{project_id}/files"
-
-
-def _bind_project(
-    principal: Principal,
-    grants: list[Grant],
-    session: DbSession,
-    project_id: uuid.UUID,
-    capability: Capability,
-) -> None:
-    if not project_access(grants, project_id).has(capability):  # non-member: 404
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Forbidden")
-    base = session_tenancy(session) or TenancyContext(
-        tenant_id=principal.tenant_id, user_id=principal.user_id
-    )
-    # The tenant-level objects loaded so far (the principal's user) are detached first:
-    # a session holding objects cannot be rebound (``bind_tenancy``).
-    session.expunge_all()
-    bind_tenancy(session, resolve_scope(grants, base, project_id))
-    projects.get_project(session, project_id)  # a deleted project: 404
 
 
 def _settings(request: Request) -> Settings:
@@ -70,7 +49,7 @@ def create_upload(
     session: DbSession,
     request: Request,
 ) -> UploadTicket:
-    _bind_project(principal, grants, session, project_id, Capability.CREATE)
+    projects.bind_project(session, principal, grants, project_id, require=Capability.CREATE)
     settings = _settings(request)
     try:
         file, upload = service.presign_upload(
@@ -97,7 +76,7 @@ def complete_upload(
     session: DbSession,
 ) -> FileRead:
     """``verifying`` (poll the file or its job) or ``rejected`` with a reason code."""
-    _bind_project(principal, grants, session, project_id, Capability.CREATE)
+    projects.bind_project(session, principal, grants, project_id, require=Capability.CREATE)
     try:
         file = service.complete_upload(session, get_storage(), file_id, actor_id=principal.user_id)
     except service.NotUploaderError as exc:
@@ -115,7 +94,7 @@ def read_file(
     grants: CallerGrants,
     session: DbSession,
 ) -> FileRead:
-    _bind_project(principal, grants, session, project_id, Capability.VIEW)
+    projects.bind_project(session, principal, grants, project_id, require=Capability.VIEW)
     return FileRead.model_validate(service.get_file(session, file_id))
 
 
@@ -128,7 +107,7 @@ def download_file(
     session: DbSession,
     request: Request,
 ) -> PresignedRead:
-    _bind_project(principal, grants, session, project_id, Capability.VIEW)
+    projects.bind_project(session, principal, grants, project_id, require=Capability.VIEW)
     try:
         download = service.download_request(
             session, get_storage(), file_id, expires_in=_settings(request).download_url_seconds

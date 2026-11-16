@@ -22,7 +22,7 @@ rewritten (HS256 → RS256/EdDSA + JWKS + `jti` revocation in Redis).
 | `lockout.py` | `ProgressiveLockout` + policies, Redis-backed (T-0009); offline failures counted with `extra` (T-0038) |
 | `models.py` | `auth_user` table (tenant-level rows, RLS) — migration `0003`, internal staff flag + Entra link in `0013` (T-0049, ADR 0009); `auth_project_membership` (T-0010) — migration `0006`, persona CHECK widened for PER-16 in `0012` (T-0076), membership-based RLS in `0015` (T-0014); `oe_identity_device` (T-0043) — migration `0016`, `wipe_secret_hash` in `0018` (T-0080), `pin_hash` + `pin_set_at` in `0019` (T-0038) |
 | `memberships.py` | The membership store's write side (`project_grants`, `set_user_grants`, `revoke_project`; revoke = soft delete, re-grant revives), used by the admin module (T-0014) and the projects module (creator PER-09, revoke on delete; T-0039) |
-| `access.py` | Persona matrix, capability tiers, SoD, scope resolution, `require_capability` / `require_hold_release` guards (T-0010); admin-grant lookup seam, `is_system_admin` binding, `CallerIsSystemAdmin`, `sod_warning` (T-0014); `CallerAdminGrants` (the caller's own `system_admin` / `create_projects`, cached with the scope; T-0039) |
+| `access.py` | Persona matrix, capability tiers, SoD, scope resolution, `ProjectAccess` (`has`, `can_release_hold`) (T-0010); admin-grant lookup seam, `is_system_admin` binding, `CallerIsSystemAdmin`, `sod_warning` (T-0014); `CallerAdminGrants` (the caller's own `system_admin` / `create_projects`, cached with the scope; T-0039) |
 | `devices.py` | Device registry (`oe_identity_device`): enrol + session binding, `resolve_request_device` (last seen, revoked → `DEVICE_REVOKED`), revoke, wipe secret + uniform wipe confirmation (T-0080), `record_sync` for the sync endpoints (T-0043); the device PIN (`set_pin`, `pin_device`, T-0038) |
 | `device_api.py` | Device endpoints: enrol (with the PIN), PIN change, own / per-user lists, revoke (self, `system_admin`, PER-09 of a shared project; cross-project wipe warning), wipe-confirmed with the wipe secret (T-0043, T-0080, T-0038) |
 | `device_signal.py` | `X-KERP-Device-Id` header, `DeviceRevokedError` → `401` with `code: DEVICE_REVOKED` (no database) |
@@ -401,7 +401,7 @@ matrix:
   authority (PER-02, 06, 07, 11), `S` for the client representative (PER-15).
   Interpretation: TD-151.
 - **PER-16 Project Viewer** (T-0076, TD-251, ADR 0008): read-only across the project's
-  modules. Every `require_capability` other than `V` and every hold guard answer `403`; it has
+  modules. `ProjectAccess.has` is true for `V` only and `can_release_hold` is never true; it has
   no SoD implications and is not a portfolio persona. Migration `0012` widens the persona
   CHECK; its downgrade refuses while an active PER-16 membership exists and purges revoked
   (soft-deleted) PER-16 rows.
@@ -413,10 +413,12 @@ matrix:
   safety → PER-11. `SOD_BLOCKED` forbids any hold authority for PER-09 and `sod_violations()`
   checks the matrix against it.
 
-Guards: `Depends(require_capability(Capability.ADMINISTER))`,
-`Depends(require_hold_release(HoldKind.QUALITY))` (then
-`access.can_release_hold(kind, site_node_id=...)` for the hold's site). No membership in the
-session's bound project (or no bound project) → `404`; a member without the authority → `403`.
+Project-scoped endpoints bind the request session with
+`projects.service.bind_project(session, principal, grants, project_id, require=Capability.X)`
+(T-0217): no membership → `404`; a member without `require` → `403`; then the session is
+rebound to the project (scope from the memberships, never the request) and a deleted project is
+`404`. It returns the caller's `ProjectAccess`, for further decisions such as
+`access.can_release_hold(kind, site_node_id=...)` once the hold's site is known.
 
 ## Keys and configuration
 

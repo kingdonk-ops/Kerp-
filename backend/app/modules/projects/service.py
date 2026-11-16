@@ -23,18 +23,30 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Callable, Collection
-from typing import Any, Final
+from typing import TYPE_CHECKING, Any, Final
 from zoneinfo import ZoneInfo
 
+from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.audit import service as audit
 from app.core.auth import memberships
-from app.core.auth.access import Grant, Persona
-from app.core.tenancy.rls import session_tenancy
+from app.core.auth.access import (
+    Capability,
+    Grant,
+    Persona,
+    ProjectAccess,
+    project_access,
+    resolve_scope,
+)
+from app.core.tenancy.context import TenancyContext
+from app.core.tenancy.rls import bind_tenancy, session_tenancy
 from app.core.tenancy.scope import get_or_404
+
+if TYPE_CHECKING:
+    from app.core.auth.deps import Principal
 from app.modules.projects.models import Project
 from app.modules.projects.schemas import DEFAULTED_FIELDS, ProjectCreate, ProjectUpdate
 from app.modules.settings import service as deployment_settings
@@ -42,6 +54,7 @@ from app.modules.settings import service as deployment_settings
 __all__ = [
     "DuplicateProjectCodeError",
     "add_created_listener",
+    "bind_project",
     "create_project",
     "delete_project",
     "get_project",
@@ -131,6 +144,36 @@ def create_project(
     for listener in list(_CREATED_LISTENERS):
         listener(session, project)
     return project
+
+
+def bind_project(
+    session: Session,
+    principal: Principal,
+    grants: Collection[Grant],
+    project_id: uuid.UUID,
+    *,
+    require: Capability | None = None,
+) -> ProjectAccess:
+    """Bind a request session to ``project_id`` for a project-scoped endpoint (T-0217).
+
+    The one sequence every project-scoped router uses: a non-member gets ``OutOfScopeError``
+    (404); a member without ``require`` gets a 403 ``HTTPException``; then the session
+    is rebound to the project scope resolved from the caller's memberships (never the
+    request), and a deleted project is 404. Returns the caller's access to the project.
+
+    The tenant-level objects loaded so far (the principal's user) are detached first: a
+    session holding objects cannot be rebound (``bind_tenancy``).
+    """
+    access = project_access(grants, project_id)
+    if require is not None and not access.has(require):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Forbidden")
+    base = session_tenancy(session) or TenancyContext(
+        tenant_id=principal.tenant_id, user_id=principal.user_id
+    )
+    session.expunge_all()
+    bind_tenancy(session, resolve_scope(grants, base, project_id))
+    get_project(session, project_id)
+    return access
 
 
 def get_project(session: Session, project_id: uuid.UUID) -> Project:
