@@ -37,7 +37,7 @@
 | ▶ | [T-0216](../tracker/tasks/T-0216.md) | At most one pending unlock request per rule (partial unique index); a concurrent duplicate answers 409 | validation | S | — |  |
 | ✅ | [T-0008](../tracker/tasks/T-0008.md) | Auth: users, RS256/EdDSA JWT + JWKS endpoint, 15-min access + rotating refresh, jti revocation in Redis | identity | M | T-0007 | #31 |
 | ✅ | [T-0037](../tracker/tasks/T-0037.md) | Auth sessions: hidden deployment tenant at login, 12-hour refresh from sign-in (daily re-login) + same-second password-change token rejection | identity | M | T-0009 | #69 |
-| 🟦 | [T-0217](../tracker/tasks/T-0217.md) | One shared bind_project helper for project-scoped routers; remove the unused require_capability/require_hold_release guards | identity | S | — |  |
+| 🟪 | [T-0217](../tracker/tasks/T-0217.md) | One shared bind_project helper for project-scoped routers; remove the unused require_capability/require_hold_release guards | identity | S | — | #104 |
 | ✅ | [T-0009](../tracker/tasks/T-0009.md) | Field-worker auth: magic-link + 6-digit PIN local unlock + progressive lockout | identity | M | T-0008 | #35 |
 | ✅ | [T-0038](../tracker/tasks/T-0038.md) | Field PIN hybrid rework: PIN per enrolled device, server PIN only on renewal after idle, lockout counter per device | identity | M | T-0043 | #95 |
 | ✅ | [T-0043](../tracker/tasks/T-0043.md) | Device registry: enrolment, remote revoke with wipe signal, device_id on sessions and in the audit ledger (Pilot-0) | identity | M | T-0037, T-0014 | #89 |
