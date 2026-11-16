@@ -32,7 +32,7 @@ from app.core.auth.deps import CurrentPrincipal
 from app.core.auth.models import ProjectMembership
 from app.core.db import DbSession
 from app.core.tenancy.context import TenancyContext
-from app.core.tenancy.rls import session_tenancy
+from app.core.tenancy.rls import bind_tenancy, session_tenancy
 from app.core.tenancy.scope import OutOfScopeError
 
 if TYPE_CHECKING:
@@ -344,8 +344,13 @@ def user_has_projects_beyond(
     PER-09's device revoke wipes work of projects the PER-09 does not administer). Read in its
     own short unit of work bound to that user (the membership policy lets a session read its
     own rows), like ``resolve_request_scope``; read-only.
+
+    The caller is a request that already holds a connection of the request pool, so this read
+    runs on the ``Database``'s separate side-write pool: waiting on the request pool for a
+    second connection could deadlock it under load (T-0210).
     """
-    with database.unit_of_work(TenancyContext(tenant_id=tenant_id, user_id=user_id)) as session:
+    with database.side_write_sessionmaker() as session:
+        bind_tenancy(session, TenancyContext(tenant_id=tenant_id, user_id=user_id))
         grants = load_grants(session, tenant_id, user_id)
         return any(g.project_id not in project_ids for g in grants)
 

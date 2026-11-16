@@ -22,7 +22,7 @@
 | | ID | Title | Module | Size | Depends on | PR |
 |---|---|---|---|---|---|---|
 | ✅ | [T-0001](../tracker/tasks/T-0001.md) | Backend scaffold: FastAPI app factory, settings, /health | platform | S | — | #7 |
-| ▶ | [T-0210](../tracker/tasks/T-0210.md) | Request auth never holds two pooled DB connections: device lookup before the request session's first query | identity | S | — |  |
+| 🟦 | [T-0210](../tracker/tasks/T-0210.md) | Request auth never holds two pooled DB connections: device lookup before the request session's first query | identity | S | — |  |
 | ✅ | [T-0002](../tracker/tasks/T-0002.md) | Frontend scaffold: Vite + React 18 + TS strict, Tailwind, TanStack Query, Dexie, router, i18n, Vitest | platform | S | — | #8 |
 | ▶ | [T-0211](../tracker/tasks/T-0211.md) | Last active System admin is kept on deactivation and revoke; concurrent duplicate grant/user create answer 200/409, not 500 | admin | S | — |  |
 | ✅ | [T-0003](../tracker/tasks/T-0003.md) | Dev infra: docker-compose (PG16+PostGIS+ltree, Redis7, MinIO), Makefile, .env.example | platform | S | T-0001 | #33 |
