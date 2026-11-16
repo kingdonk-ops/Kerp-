@@ -48,6 +48,7 @@ from app.modules.validation.defaults import SeedRuleSet, load_defaults
 from app.modules.validation.models import (
     LAYERS,
     RULE_KINDS,
+    UNLOCK_PENDING_INDEX,
     Finding,
     Rule,
     RuleSet,
@@ -98,6 +99,9 @@ _EDIT_FIELDS: Final = tuple(name for name in _RULE_FIELDS if name not in _ORIGIN
 _COPY_FIELDS: Final = (*_EDIT_FIELDS, "unlock_adr_reference")
 # The layer each layer is copied from (and reset to).
 _PARENT_LAYER: Final = {"project": "tenant", "tenant": "system"}
+
+
+_SQLITE_PENDING_UNIQUE = "UNIQUE constraint failed: oe_validation_unlock_request.rule_id"
 
 
 class RuleStoreError(ValueError):
@@ -664,6 +668,10 @@ def request_unlock(
         with session.begin_nested():
             session.add(request)
     except IntegrityError as exc:
+        # PostgreSQL names the index; SQLite names the column of the unique index.
+        detail = str(exc.orig)
+        if UNLOCK_PENDING_INDEX not in detail and _SQLITE_PENDING_UNIQUE not in detail:
+            raise  # another constraint (e.g. a foreign key): not the one-pending race
         raise already from exc
     _audit_unlock(session, rule_set, request, "unlock_requested", actor, reason=reason)
     return request

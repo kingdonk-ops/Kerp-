@@ -37,7 +37,8 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
-from sqlalchemy.engine import Dialect, Engine
+from sqlalchemy.engine import Connection, Dialect, Engine
+from sqlalchemy.engine.interfaces import DBAPIConnection
 from sqlalchemy.orm import (
     DeclarativeBase,
     Mapped,
@@ -46,6 +47,7 @@ from sqlalchemy.orm import (
     mapped_column,
     sessionmaker,
 )
+from sqlalchemy.pool import ConnectionPoolEntry
 from sqlalchemy.types import TypeEngine
 
 from app.core.config import Settings, get_settings
@@ -294,7 +296,32 @@ def create_db_engine(
         options["max_overflow"] = max_overflow
     if pool_timeout is not None:
         options["pool_timeout"] = pool_timeout
-    return create_engine(url, **options)
+    engine = create_engine(url, **options)
+    if url.startswith("sqlite"):
+        _sqlite_real_transactions(engine)
+    return engine
+
+
+def _sqlite_real_transactions(engine: Engine) -> None:
+    """Let SQLite transactions behave like PostgreSQL's (SQLAlchemy's pysqlite recipe).
+
+    By default pysqlite opens a transaction only before the first INSERT/UPDATE/DELETE. A
+    ``SAVEPOINT`` issued before any write (``Session.begin_nested()``) then becomes the
+    outermost transaction, and its ``RELEASE`` commits immediately: a row inserted in the
+    savepoint survives a later rollback of the unit of work (T-0216 review). Here pysqlite's
+    own handling is switched off and every transaction starts with an explicit ``BEGIN``, so
+    savepoints nest inside the unit of work on SQLite too. Local and test databases only.
+    """
+
+    @event.listens_for(engine, "connect")
+    def _no_implicit_transactions(
+        dbapi_connection: DBAPIConnection, _record: ConnectionPoolEntry
+    ) -> None:
+        dbapi_connection.isolation_level = None
+
+    @event.listens_for(engine, "begin")
+    def _explicit_begin(connection: Connection) -> None:
+        connection.exec_driver_sql("BEGIN")
 
 
 class Database:

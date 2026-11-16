@@ -41,6 +41,7 @@ _DUPLICATES = (
 )
 _CANCEL = (
     f"UPDATE {TABLE} SET status = 'cancelled', decided_by = requested_by, "
+    "updated_by = requested_by, "
     "decided_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP, revision = revision + 1 "
     f"WHERE {PENDING} AND id IN ({_DUPLICATES})"
 )

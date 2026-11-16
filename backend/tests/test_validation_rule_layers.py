@@ -932,3 +932,22 @@ def test_a_racing_unlock_request_is_a_rule_store_error(
             request_unlock(s, tenant_set, "calibration", adr_reference="ADR 2")
         # The refusal rolls back only its own insert: the session stays usable.
         assert [r.id for r in rule_store.list_unlock_requests(s, "pending")] == [first]
+
+
+def test_an_unlock_request_rolls_back_with_its_unit_of_work(db: Database) -> None:
+    """T-0216 review: the request's insert must not be committed on its own (SAVEPOINT on
+    SQLite): a failure later in the same unit of work leaves no request and no ledger entry."""
+    seeded(db)
+    tenant_set = set_of(db, CTX_T1, "tenant")
+    before = len(events(db, CTX_T1, tenant_set))
+
+    def request_then_fail() -> None:
+        with db.unit_of_work(CTX_T1) as s:
+            request_unlock(s, tenant_set, "calibration", adr_reference="ADR 1")
+            raise RuntimeError("the caller fails after the request")
+
+    with pytest.raises(RuntimeError, match="caller fails"):
+        request_then_fail()
+    with db.unit_of_work(CTX_T1) as s:
+        assert rule_store.list_unlock_requests(s) == []
+    assert len(events(db, CTX_T1, tenant_set)) == before
