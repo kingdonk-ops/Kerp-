@@ -252,6 +252,26 @@ def load_grants(session: Session, tenant_id: uuid.UUID, user_id: uuid.UUID) -> l
     return [Grant(row[0], Persona(row[1]), row[2]) for row in rows]
 
 
+def persona_holders(
+    session: Session, tenant_id: uuid.UUID, project_id: uuid.UUID, persona: Persona
+) -> list[uuid.UUID]:
+    """The users holding ``persona`` on ``project_id`` (active memberships), by id.
+
+    Works on any session that can read the project's memberships, e.g. one bound to the
+    project (the membership read policy, T-0014). Used to route approvals (T-0035).
+    """
+    rows = session.scalars(
+        select(ProjectMembership.user_id)
+        .where(
+            ProjectMembership.tenant_id == tenant_id,
+            ProjectMembership.member_project_id == project_id,
+            ProjectMembership.persona == persona.value,
+        )
+        .distinct()
+    ).all()
+    return sorted(rows, key=str)
+
+
 # --- tenant-level admin grants (T-0014, diff §4.1) ---------------------------------------
 
 SYSTEM_ADMIN: Final = "system_admin"

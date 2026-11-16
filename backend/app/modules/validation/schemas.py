@@ -45,10 +45,26 @@ class CheckFinding(BaseModel):
     action: str
     severity: str
     message: str
+    # The logged finding's id, which an override request names (T-0035); None in "Try it".
+    finding_id: uuid.UUID | None = None
+
+
+class AppliedOverride(BaseModel):
+    """A blocking rule the record passed by an approved override (T-0035, Amendment A)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    override_id: uuid.UUID
+    rule_key: str
+    rule_version: int
 
 
 class CheckResult(BaseModel):
-    """Outcome of ``run_checks``. ``blocked`` is True when any ``block`` rule did not pass."""
+    """Outcome of ``run_checks``. ``blocked`` is True when any ``block`` rule did not pass.
+
+    ``overrides`` lists the blocking rules the record passed by an approved, still-bound
+    override (T-0035); they are not findings.
+    """
 
     model_config = ConfigDict(frozen=True)
 
@@ -57,6 +73,7 @@ class CheckResult(BaseModel):
     rule_set_version: int
     evaluated: int
     findings: tuple[CheckFinding, ...]
+    overrides: tuple[AppliedOverride, ...] = ()
 
     @property
     def blocked(self) -> bool:
@@ -158,6 +175,56 @@ class UnlockRequestRead(BaseModel):
     decided_by: uuid.UUID | None
     decided_at: datetime | None
     created_at: datetime
+
+
+# --- per-record override of a blocked check (T-0035, ADR 0004 Amendment A) -----------------
+
+OverrideDecision = Literal["pending", "approved", "rejected", "void"]
+
+
+class OverrideCreate(BaseModel):
+    """Body of an override request: the blocking finding and the mandatory typed reason."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    finding_id: uuid.UUID
+    reason: str = Field(min_length=1, max_length=2000, pattern=r"\S")
+    # Optional: route to this holder of the approver persona; else every holder is notified.
+    approver_user_id: uuid.UUID | None = None
+
+
+class OverrideDecisionInput(BaseModel):
+    """Body of an approval or rejection."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    comment: str | None = Field(default=None, max_length=2000)
+
+
+class OverrideRead(BaseModel):
+    """An override as stored (quality-and-inspection.md §Per-record override)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    project_id: uuid.UUID
+    record_type: str
+    record_id: uuid.UUID
+    rule_set_key: str
+    rule_key: str
+    rule_version: int
+    finding_id: uuid.UUID
+    requested_by: uuid.UUID
+    requested_at: datetime
+    reason: str
+    approver_persona: str
+    approver_user_id: uuid.UUID | None
+    decision: OverrideDecision
+    decided_by: uuid.UUID | None
+    decided_at: datetime | None
+    decision_comment: str | None
+    checked_values_hash: str
+    audit_chain_key: str
 
 
 # --- upgrade offers, drift report, "Try it" (T-0036, ADR 0004 §4, §6, Consequences) ---------

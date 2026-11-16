@@ -17,6 +17,9 @@ One API for the tenant default layer and the project set (the same Rules screen,
 * ``POST   .../rule-sets/{set}/rules/{key}/try``            "Try it" on a sample context
 * ``GET    /drift-report``                                  project rules that differ from
   the tenant defaults
+* ``POST   /projects/{project}/overrides``                   request a per-record override of
+  a blocking finding (T-0035, Amendment A); ``GET`` lists, ``GET .../{id}`` reads,
+  ``POST .../{id}/approve|reject`` decides
 
 **Who may (§7).** Tenant layer: ``check`` sets PER-13 Quality Director, other kinds PER-01
 Operations Management. Project set: ``check`` sets PER-06 QA/QC Lead, other kinds PER-09
@@ -29,6 +32,12 @@ binds no project yet (TD-122) and there is no tenant-level role store yet (T-001
 tenant persona is one the caller holds on any project of the tenant (the same interim as
 project creation, TD-184). A non-member of the project in the
 path, or a set outside the path's scope, is 404.
+
+**Overrides (Amendment A).** Every member with ``C`` (create) may request; every member reads.
+The service routes the approver from the requester's memberships (PER-06, or PER-02 when the
+requester holds PER-06) and refuses the requester as approver (403); a caller without the
+routed persona is 403. Blank reason or an ineligible named approver 422; a finding that is
+not blocking, not the latest, or already has an active override 409.
 """
 
 from __future__ import annotations
@@ -42,15 +51,19 @@ from fastapi import APIRouter, HTTPException, Path, Query, status
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
-from app.core.auth.access import CallerGrants, Grant, Persona
+from app.core.auth.access import CallerGrants, Capability, Grant, Persona
 from app.core.auth.deps import CurrentPrincipal, Principal
 from app.core.db import DbSession
 from app.modules.projects import service as projects
-from app.modules.validation import service, upgrades
+from app.modules.validation import overrides, service, upgrades
 from app.modules.validation.models import RuleSet
 from app.modules.validation.schemas import (
     KEY_PATTERN,
     DriftEntryRead,
+    OverrideCreate,
+    OverrideDecision,
+    OverrideDecisionInput,
+    OverrideRead,
     RuleInput,
     RuleRead,
     RuleSetRead,
@@ -95,6 +108,19 @@ def _errors() -> Iterator[None]:
     except service.RuleNotFoundError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
     except service.UnlockPermissionError as exc:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, str(exc)) from exc
+
+
+@contextmanager
+def _override_errors() -> Iterator[None]:
+    """The override service's refusals as HTTP answers (T-0035)."""
+    try:
+        yield
+    except overrides.OverrideInputError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
+    except overrides.OverrideError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+    except overrides.OverridePermissionError as exc:
         raise HTTPException(status.HTTP_403_FORBIDDEN, str(exc)) from exc
 
 
@@ -519,3 +545,91 @@ def try_project_rule(
 ) -> TryResult:
     rule_set = _project_set(principal, grants, session, project_id, rule_set_id)
     return _try(session, rule_set, rule_key, body)
+
+
+# --- per-record override of a blocked check (T-0035, ADR 0004 Amendment A) ------------------
+
+OVERRIDES = "/projects/{project_id}/overrides"
+
+
+@router.post(OVERRIDES, response_model=OverrideRead, status_code=status.HTTP_201_CREATED)
+def request_override(
+    project_id: uuid.UUID,
+    body: OverrideCreate,
+    principal: CurrentPrincipal,
+    grants: CallerGrants,
+    session: DbSession,
+) -> OverrideRead:
+    projects.bind_project(session, principal, grants, project_id, require=Capability.CREATE)
+    with _override_errors():
+        override = overrides.request_override(
+            session,
+            body.finding_id,
+            body.reason,
+            actor_id=principal.user_id,
+            approver_user_id=body.approver_user_id,
+        )
+    return OverrideRead.model_validate(override)
+
+
+@router.get(OVERRIDES, response_model=list[OverrideRead])
+def list_overrides(
+    project_id: uuid.UUID,
+    principal: CurrentPrincipal,
+    grants: CallerGrants,
+    session: DbSession,
+    decision: OverrideDecision | None = None,
+    record_type: Annotated[str | None, Query(max_length=60)] = None,
+    record_id: uuid.UUID | None = None,
+) -> list[OverrideRead]:
+    _bind_project(principal, grants, session, project_id)  # every member reads
+    rows = overrides.list_overrides(
+        session, decision=decision, record_type=record_type, record_id=record_id
+    )
+    return [OverrideRead.model_validate(row) for row in rows]
+
+
+@router.get(f"{OVERRIDES}/{{override_id}}", response_model=OverrideRead)
+def get_override(
+    project_id: uuid.UUID,
+    override_id: uuid.UUID,
+    principal: CurrentPrincipal,
+    grants: CallerGrants,
+    session: DbSession,
+) -> OverrideRead:
+    _bind_project(principal, grants, session, project_id)
+    return OverrideRead.model_validate(overrides.get_override(session, override_id))
+
+
+@router.post(f"{OVERRIDES}/{{override_id}}/approve", response_model=OverrideRead)
+def approve_override(
+    project_id: uuid.UUID,
+    override_id: uuid.UUID,
+    body: OverrideDecisionInput,
+    principal: CurrentPrincipal,
+    grants: CallerGrants,
+    session: DbSession,
+) -> OverrideRead:
+    _bind_project(principal, grants, session, project_id)  # the service checks the approver
+    with _override_errors():
+        override = overrides.approve_override(
+            session, override_id, comment=body.comment, actor_id=principal.user_id
+        )
+    return OverrideRead.model_validate(override)
+
+
+@router.post(f"{OVERRIDES}/{{override_id}}/reject", response_model=OverrideRead)
+def reject_override(
+    project_id: uuid.UUID,
+    override_id: uuid.UUID,
+    body: OverrideDecisionInput,
+    principal: CurrentPrincipal,
+    grants: CallerGrants,
+    session: DbSession,
+) -> OverrideRead:
+    _bind_project(principal, grants, session, project_id)
+    with _override_errors():
+        override = overrides.reject_override(
+            session, override_id, comment=body.comment, actor_id=principal.user_id
+        )
+    return OverrideRead.model_validate(override)

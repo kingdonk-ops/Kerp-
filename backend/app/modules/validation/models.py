@@ -7,8 +7,11 @@
   with the ``rule_key`` and rule version that produced it (ADR 0004 §3).
 * ``oe_validation_unlock_request``: the two-person unlock of a locked tenant-layer rule
   (ADR 0004 §5, Amendment B, TD-116; T-0034).
+* ``oe_validation_override``: the per-record override of a blocked check (ADR 0004
+  Amendment A; T-0035). Its shape is the table in ``docs/spec/modules/quality-and-inspection.md``
+  §Per-record override, frozen at M1 (T-0131).
 
-All use ``BaseRecordMixin`` and are under project RLS (migrations ``0005``, ``0014``).
+All use ``BaseRecordMixin`` and are under project RLS (migrations ``0005``, ``0014``, ``0022``).
 """
 
 from __future__ import annotations
@@ -38,6 +41,8 @@ RULE_TABLE: Final = "oe_validation_rule"
 FINDING_TABLE: Final = "oe_validation_finding"
 UNLOCK_TABLE: Final = "oe_validation_unlock_request"
 UNLOCK_PENDING_INDEX: Final = "uq_oe_validation_unlock_request_pending"
+OVERRIDE_TABLE: Final = "oe_validation_override"
+OVERRIDE_ACTIVE_INDEX: Final = "uq_oe_validation_override_active"
 
 # ADR 0004 §1 + Amendment E. Frozen at M1 (T-0131); adding a value needs the freeze process.
 RULE_KINDS: Final = ("check", "digest", "autolink", "notify", "p6_grammar", "p6_eligibility")
@@ -46,6 +51,13 @@ LAYERS: Final = ("system", "tenant", "project")
 SEVERITIES: Final = ("info", "warning", "error")
 OUTCOMES: Final = ("fail", "error")
 UNLOCK_STATUSES: Final = ("pending", "approved", "rejected", "cancelled")
+# ADR 0004 Amendment A: ``pending`` -> ``approved`` | ``rejected`` | ``void``. Frozen at M1.
+OVERRIDE_DECISIONS: Final = ("pending", "approved", "rejected", "void")
+# Requests that still count: at most one per record and rule (``OVERRIDE_ACTIVE_INDEX``).
+OVERRIDE_ACTIVE: Final = ("pending", "approved")
+# Amendment A.4: the QA/QC Lead (PER-06), or the Project Manager (PER-02) when the requester
+# holds PER-06.
+OVERRIDE_APPROVER_PERSONAS: Final = ("PER-06", "PER-02")
 
 
 def _in(column: str, values: tuple[str, ...]) -> str:
@@ -148,6 +160,9 @@ class Finding(Base, BaseRecordMixin):
     action: Mapped[str] = mapped_column(String(40), nullable=False)
     severity: Mapped[str] = mapped_column(String(10), nullable=False)
     message: Mapped[str] = mapped_column(Text, nullable=False)
+    # SHA-256 of the canonical JSON of the values the rule checked (T-0035, Amendment A.6):
+    # an override of this finding is bound to it. NULL on findings logged before 0022.
+    checked_values_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
 
 class UnlockRequest(Base, BaseRecordMixin):
@@ -191,3 +206,72 @@ class UnlockRequest(Base, BaseRecordMixin):
     requested_by: Mapped[uuid.UUID] = mapped_column(GUID(), nullable=False)
     decided_by: Mapped[uuid.UUID | None] = mapped_column(GUID(), nullable=True)
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class Override(Base, BaseRecordMixin):
+    """A reasoned request to let one record pass one blocking ``check`` rule (Amendment A).
+
+    Raised against the blocking finding of a ``run_checks`` run on the record
+    (``record_type:record_id`` is the run's ``subject``) and bound to that rule as evaluated
+    (``rule_set_key``, ``rule_key``, ``rule_version``) and to the hash of the values it
+    checked (``checked_values_hash``). Routed to ``approver_persona`` (PER-06, or PER-02 when
+    the requester holds PER-06); ``approver_user_id`` names the one approver when the
+    request was routed to a single user, else any other holder of the persona may decide.
+    The requester never decides their own request. A later evaluation of the record with a
+    different hash (or rule version) sets ``decision = void`` and the block returns.
+    Project-level row. Columns: quality-and-inspection.md §Per-record override (frozen at M1).
+    """
+
+    __tablename__ = OVERRIDE_TABLE
+    __table_args__ = (
+        CheckConstraint(_in("decision", OVERRIDE_DECISIONS), name="decision"),
+        CheckConstraint(_in("approver_persona", OVERRIDE_APPROVER_PERSONAS), name="approver"),
+        CheckConstraint("length(trim(reason)) > 0", name="reason_given"),
+        CheckConstraint("length(checked_values_hash) = 64", name="hash_length"),
+        CheckConstraint("(decision = 'pending') = (decided_at IS NULL)", name="decided"),
+        CheckConstraint(
+            "decision NOT IN ('approved', 'rejected') OR decided_by IS NOT NULL", name="decider"
+        ),
+        CheckConstraint(
+            "decided_by IS NULL OR decided_by <> requested_by", name="never_self_decided"
+        ),
+        CheckConstraint(
+            "approver_user_id IS NULL OR approver_user_id <> requested_by",
+            name="never_self_routed",
+        ),
+        # At most one pending or approved override per record and rule.
+        Index(
+            OVERRIDE_ACTIVE_INDEX,
+            "tenant_id",
+            "project_id",
+            "record_type",
+            "record_id",
+            "rule_set_key",
+            "rule_key",
+            unique=True,
+            postgresql_where=text("decision IN ('pending', 'approved')"),
+            sqlite_where=text("decision IN ('pending', 'approved')"),
+        ),
+    )
+
+    # Always a project-level row (the record belongs to a project).
+    project_id: Mapped[uuid.UUID] = mapped_column(GUID(), nullable=False, index=True)
+    record_type: Mapped[str] = mapped_column(String(60), nullable=False)
+    record_id: Mapped[uuid.UUID] = mapped_column(GUID(), nullable=False, index=True)
+    rule_set_key: Mapped[str] = mapped_column(String(120), nullable=False)
+    rule_key: Mapped[str] = mapped_column(String(120), nullable=False)
+    rule_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    finding_id: Mapped[uuid.UUID] = mapped_column(
+        GUID(), ForeignKey(f"{FINDING_TABLE}.id"), nullable=False, index=True
+    )
+    requested_by: Mapped[uuid.UUID] = mapped_column(GUID(), nullable=False)
+    requested_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    approver_persona: Mapped[str] = mapped_column(String(10), nullable=False)
+    approver_user_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), nullable=True)
+    decision: Mapped[str] = mapped_column(String(10), nullable=False, default="pending")
+    decided_by: Mapped[uuid.UUID | None] = mapped_column(GUID(), nullable=True)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    decision_comment: Mapped[str | None] = mapped_column(Text, nullable=True)
+    checked_values_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    audit_chain_key: Mapped[str] = mapped_column(String(200), nullable=False)
