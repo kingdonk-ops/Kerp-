@@ -988,3 +988,46 @@ def test_store_binds_sessions_to_a_device_and_revokes_them_together(make_store: 
     store.revoke_session(c, ttl)  # a plain revoke is not a device revoke
     assert store.is_revoked("jti", c)
     assert not store.revoked_by_device(c)
+
+
+# --- one request-pool connection per request (T-0210) -----------------------------------------
+# ``get_current_user`` used to load the user on the request session (which then keeps its
+# connection until the request ends) and only then open a second unit of work for the
+# ``X-KERP-Device-Id`` device: under load every request held one connection and waited for a
+# second, and all of them timed out. With a request pool of exactly one connection, any request
+# that needs two at once fails with a pool timeout.
+
+
+@pytest.fixture
+def one_connection(api: Api) -> Iterator[Api]:
+    """``api`` whose app runs on a request pool of exactly one connection."""
+    state = api.client.app.state  # type: ignore[attr-defined]
+    original: Database = state.db
+    small = Database(original.url, pool_size=1, max_overflow=0, pool_timeout=2)
+    state.db = small
+    try:
+        yield api
+    finally:
+        state.db = original
+        small.dispose()
+
+
+def test_a_request_through_an_enrolled_device_needs_one_connection(one_connection: Api) -> None:
+    tokens, device = one_connection.device_on(FIONA)
+    response = one_connection.client.get(ME, headers=one_connection.bearer(tokens, device))
+    assert response.status_code == 200
+
+
+def test_a_request_naming_an_unknown_device_needs_one_connection(one_connection: Api) -> None:
+    tokens = one_connection.login(FIONA)
+    headers = one_connection.bearer(tokens, uuid.uuid4())
+    assert one_connection.client.get(ME, headers=headers).status_code == 200
+
+
+def test_a_per09_revoke_with_the_cross_project_check_needs_one_connection(
+    one_connection: Api,
+) -> None:
+    _tokens, device = one_connection.device_on(FIONA)  # FIONA also works on AWAY
+    response = one_connection.revoke(one_connection.login(BOB), device, confirm=True)
+    assert response.status_code == 200
+    assert response.json()["cross_project_warning"] is True

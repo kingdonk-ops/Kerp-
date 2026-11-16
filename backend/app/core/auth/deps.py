@@ -75,25 +75,30 @@ def get_current_user(
     Also resolves the enrolled device the request comes through (T-0043): the session's
     bound device, or the ``X-KERP-Device-Id`` header naming one of the user's devices. A
     revoked device is ``401`` with ``code: DEVICE_REVOKED``.
+
+    The device is resolved first, in its own short unit of work, *before* the request session
+    runs its first query (T-0210): once that session has queried, it holds a pooled connection
+    until the request ends, and a second unit of work then waiting on the same pool deadlocks
+    the pool under load (every request holds one connection and waits for another).
     """
+    device_id: uuid.UUID | None = None
+    database: Database | None = getattr(request.app.state, "db", None)
+    if database is not None:  # None: a test app whose session dependency is overridden
+        try:
+            device_id = resolve_request_device(
+                database,
+                runtime.store,
+                tenant_id=claims.tenant_id,
+                user_id=claims.user_id,
+                session_id=claims.session_id,
+                header_device_id=request_device_id(request),
+                session_ttl=runtime.tokens.ttl["refresh"],
+            )
+        except DeviceConflictError as exc:
+            raise unauthorized(invalid_token=True) from exc
     try:
         user = load_active_user(session, claims)
     except AuthenticationError as exc:
-        raise unauthorized(invalid_token=True) from exc
-    database: Database | None = getattr(request.app.state, "db", None)
-    if database is None:  # a test app whose session dependency is overridden
-        return Principal(user=user, claims=claims)
-    try:
-        device_id = resolve_request_device(
-            database,
-            runtime.store,
-            tenant_id=claims.tenant_id,
-            user_id=claims.user_id,
-            session_id=claims.session_id,
-            header_device_id=request_device_id(request),
-            session_ttl=runtime.tokens.ttl["refresh"],
-        )
-    except DeviceConflictError as exc:
         raise unauthorized(invalid_token=True) from exc
     return Principal(user=user, claims=claims, device_id=device_id)
 
