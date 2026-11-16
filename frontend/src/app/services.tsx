@@ -3,13 +3,11 @@ import { createContext, useContext, type ReactNode } from "react";
 import { browserCrossTab, type CrossTabAuth } from "../auth/crossTab";
 import { memoryStorage, TokenStore, type KeyValueStorage } from "../auth/tokenStore";
 import { createApiClient, type ApiClient } from "../lib/api/client";
-import { pendingProjectDirectory, type ProjectDirectory } from "../projects/directory";
 
 /** App-wide service singletons, injectable so tests can supply fakes. */
 export interface AppServices {
   api: ApiClient;
   tokens: TokenStore;
-  projects: ProjectDirectory;
   /** Persists UI preferences such as the selected project scope. */
   preferences: KeyValueStorage;
   /** Shares refresh and sign-out with the browser's other tabs (T-0072); optional in tests. */
@@ -33,7 +31,6 @@ export function createAppServices(): AppServices {
     api: createApiClient({ baseUrl, tokens, crossTab }),
     tokens,
     crossTab,
-    projects: pendingProjectDirectory,
     preferences: browserStorage("localStorage"),
   };
 }

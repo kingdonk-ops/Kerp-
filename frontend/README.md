@@ -45,8 +45,8 @@ src/
   i18n/       i18next instance + message catalogues (locales/en.ts)
   lib/api/    API client (bearer token, single-flight refresh rotation + one retry on 401)
   lib/cel/    offline CEL rule evaluation (@marcbachmann/cel-js), parity with the server
-  pages/      route components
-  projects/   project scope: ProjectDirectory seam, ProjectScopeProvider, top-bar ProjectSwitcher
+  pages/      route components (incl. the placeholder lobby route `/lobby`)
+  projects/   project scope: `/me/projects` fetch + portfolio personas, ProjectScopeProvider, top-bar ProjectSwitcher
   shells/     RegisterPage, DetailPage (gate banner, tabs, audit), Dynamic Form Renderer (README.md)
   test/       Vitest setup, fake backend (`fakeApi.ts`), axe harness (`a11y.ts`)
   theme/      display themes: ThemeProvider (per-user preference), ThemeToggle
@@ -59,19 +59,29 @@ src/
   `sessionStorage` keeps only a "signed in" marker, so a reload resumes the session via
   `/api/v1/auth/refresh` (same origin). A session ends 12 hours after sign-in. Every other route sits behind `RequireAuth`. Sign-out calls
   `/api/v1/auth/logout` and clears the session even when the server is unreachable.
-- **Navigation (diff §6).** 8 groups in `src/app/nav.ts`: Overview, the 4 pillars
+- **Navigation (diff §6, §6.1).** 8 groups in `src/app/nav.ts`: Overview, the 4 pillars
   (Logistics, Execution, Defense & Claims, Controls & Insights), Backbone, Documents,
-  Admin. Module screens register under a group (mapping: TD-148).
-- **Project scope.** The top-bar switcher selects one project or the **All-Projects**
-  portfolio scope; the choice is stored per user in `localStorage`. Projects come from the
-  `ProjectDirectory` seam, empty until the projects API exists (TD-145); sending the scope
-  with requests is TD-146. The scope is a UI selection — the server binds the allowed
-  projects from memberships (TD-053).
+  Admin. `NAV_ITEMS` holds the item mapping of diff §6.1 (e.g. Execution: inspections / QMS,
+  ITPs, field time, progress, look-ahead); an item shows under its group only once its
+  screen exists — the module task that ships the screen gives the item its `path`. No item
+  has a screen yet (T-0042).
+- **Project picker and landing (T-0042, diff §4.1, §6.1).** The top-bar picker lists the
+  caller's projects from `GET /api/v1/me/projects` (memberships, T-0014) as "code — name",
+  ordered by name, then code. **All-Projects** is offered only to users holding a portfolio
+  persona (PER-01/10/11/12/13) on any project. The picked scope is remembered per user on this
+  client (`localStorage` key `kerp.scope.<user id>`) and removed once it is no longer allowed
+  (project gone from `/me/projects`, or All-Projects without a portfolio persona). Landing on
+  `/` after sign-in: one project → it opens; several → the remembered one, else the first by
+  name; none → the **lobby** (`/lobby`). Deep links are kept. The picker always shows
+  **"Browse / join another project"**, a link to the lobby. The lobby route is a placeholder
+  until the lobby screens (T-0041) replace it. Sending the scope with requests is TD-146; the
+  scope is a UI selection — the server binds the allowed projects from memberships (TD-053).
+  No tenant is shown anywhere in the shell.
 - **Design tokens.** `src/index.css` `@theme` defines semantic colours (`brand`, `surface`,
   `panel`, `ink`, `muted`, `line`, `pillar`, `focus`, `success`, `warning`, `danger`) and the touch
   spacing (`touch`, `touch-gap`; see *Field ergonomics*); components use
   those utilities, not raw palette colours.
-- **Services.** `AppServices` (`src/app/services.tsx`: api, tokens, projects, preferences)
+- **Services.** `AppServices` (`src/app/services.tsx`: api, tokens, preferences, crossTab)
   is injected through `AppRoot` so tests use the fake backend in `src/test/fakeApi.ts`.
 
 ## Field ergonomics (T-0046, diff §6.3)

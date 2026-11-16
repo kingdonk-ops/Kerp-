@@ -1,36 +1,55 @@
 import { useQuery } from "@tanstack/react-query";
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 
 import { useServices } from "../app/services";
 import { useAuth } from "../auth/AuthProvider";
-import type { ProjectSummary } from "./directory";
+import { fetchMyProjects, hasPortfolioPersona, type ProjectSummary } from "./directory";
 
 /**
- * The working scope picked in the top-bar switcher: one project, or the All-Projects
- * portfolio scope (diff §6). This is a UI selection only — the server binds the allowed
- * project list from the user's memberships, never from the client (TD-053).
+ * The working scope picked in the top-bar picker: one project, the All-Projects portfolio
+ * scope (portfolio personas only, diff §6.1), or none while the user has no project. This is
+ * a UI selection only — the server binds the allowed project list from the user's
+ * memberships, never from the client (TD-053).
  */
-export type ProjectScope = { kind: "all" } | { kind: "project"; projectId: string };
+export type ProjectScope =
+  | { kind: "all" }
+  | { kind: "project"; projectId: string }
+  | { kind: "none" };
 
 interface ProjectScopeValue {
   scope: ProjectScope;
-  /** The selected project, or `null` for the portfolio scope. */
+  /** The selected project, or `null` for the portfolio scope and while there is none. */
   project: ProjectSummary | null;
+  /** The user's projects from `GET /api/v1/me/projects`, by name. */
   projects: ProjectSummary[];
+  /** The user holds a portfolio persona, so All-Projects is offered. */
+  portfolio: boolean;
   isLoading: boolean;
+  isError: boolean;
   setScope: (scope: ProjectScope) => void;
 }
 
 const ProjectScopeContext = createContext<ProjectScopeValue | null>(null);
 
 const ALL: ProjectScope = { kind: "all" };
+const NONE: ProjectScope = { kind: "none" };
 
 export function scopeStorageKey(userId: string): string {
   return `kerp.scope.${userId}`;
 }
 
-function encode(scope: ProjectScope): string {
-  return scope.kind === "all" ? "all" : `project:${scope.projectId}`;
+function encode(scope: ProjectScope): string | null {
+  if (scope.kind === "all") return "all";
+  if (scope.kind === "project") return `project:${scope.projectId}`;
+  return null;
 }
 
 function decode(raw: string | null): ProjectScope | null {
@@ -39,16 +58,22 @@ function decode(raw: string | null): ProjectScope | null {
   return null;
 }
 
-/** Resolves the effective scope: a stored project the user still has, else the first one. */
-function resolve(stored: ProjectScope | null, projects: ProjectSummary[]): ProjectScope {
-  if (stored?.kind === "all") return ALL;
-  if (stored && projects.some((p) => p.id === stored.projectId)) return stored;
+/**
+ * Landing scope of diff §4.1: the remembered scope while the user still has it (All-Projects
+ * only with a portfolio persona), else the first project by name, else none.
+ */
+export function resolveScope(
+  stored: ProjectScope | null,
+  projects: readonly ProjectSummary[],
+): ProjectScope {
+  if (stored?.kind === "all" && hasPortfolioPersona(projects)) return ALL;
+  if (stored?.kind === "project" && projects.some((p) => p.id === stored.projectId)) return stored;
   const first = projects[0];
-  return first ? { kind: "project", projectId: first.id } : ALL;
+  return first ? { kind: "project", projectId: first.id } : NONE;
 }
 
 export function ProjectScopeProvider({ children }: { children: ReactNode }) {
-  const { projects: directory, preferences } = useServices();
+  const { api, preferences } = useServices();
   const { user } = useAuth();
   const userId = user?.id ?? "anonymous";
   const key = scopeStorageKey(userId);
@@ -64,24 +89,48 @@ export function ProjectScopeProvider({ children }: { children: ReactNode }) {
 
   const list = useQuery({
     queryKey: ["projects", "mine", userId],
-    queryFn: () => directory.listMyProjects(),
+    queryFn: () => fetchMyProjects(api),
   });
   const projects = useMemo(() => list.data ?? [], [list.data]);
+  const loaded = list.isSuccess;
 
   const setScope = useCallback(
     (scope: ProjectScope) => {
-      preferences.setItem(key, encode(scope));
-      setStored({ key, scope });
+      const raw = encode(scope);
+      if (raw === null) preferences.removeItem(key);
+      else preferences.setItem(key, raw);
+      setStored({ key, scope: raw === null ? null : scope });
     },
     [key, preferences],
   );
 
+  const scope = useMemo(
+    () => (loaded ? resolveScope(storedScope, projects) : NONE),
+    [loaded, storedScope, projects],
+  );
+
+  // The remembered scope is dropped from the client once it is no longer allowed (diff
+  // §4.1); `resolveScope` already ignores it for this render.
+  useEffect(() => {
+    if (!loaded || storedScope === null) return;
+    if (encode(resolveScope(storedScope, projects)) !== encode(storedScope)) {
+      preferences.removeItem(key);
+    }
+  }, [loaded, storedScope, projects, preferences, key]);
+
   const value = useMemo<ProjectScopeValue>(() => {
-    const scope = resolve(storedScope, projects);
     const project =
       scope.kind === "project" ? (projects.find((p) => p.id === scope.projectId) ?? null) : null;
-    return { scope, project, projects, isLoading: list.isPending, setScope };
-  }, [storedScope, projects, list.isPending, setScope]);
+    return {
+      scope,
+      project,
+      projects,
+      portfolio: hasPortfolioPersona(projects),
+      isLoading: list.isPending,
+      isError: list.isError,
+      setScope,
+    };
+  }, [scope, projects, list.isPending, list.isError, setScope]);
 
   return <ProjectScopeContext.Provider value={value}>{children}</ProjectScopeContext.Provider>;
 }

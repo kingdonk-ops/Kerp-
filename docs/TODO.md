@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 177 · **Closed:** 128
+**Open:** 178 · **Closed:** 128
 
 ## decision (3)
 
@@ -13,7 +13,7 @@
 | [TD-293](../tracker/todo/TD-293.md) | Do pilot crews share tablets? Confirm with the pilot team before go-live; if yes, add a shared-device task (device row per (device_id, user), whole-device wipe warning) | T-0143 | planner |
 | [TD-301](../tracker/todo/TD-301.md) | Field PIN API details not in the spec: PIN set via enrolment (409 PIN_ALREADY_SET), PUT /devices/{id}/pin from a bound session without the old PIN, 401 codes PIN_INVALID/PIN_EXHAUSTED, failed_offline only on unlock | T-0038 | implementer |
 
-## spec-gap (35)
+## spec-gap (36)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -52,6 +52,7 @@
 | [TD-221](../tracker/todo/TD-221.md) | Client wet signature (mode iii): outcome when the client rejects after the inspection is already approved (INSPECTED_PASSED/INSPECTED_FAILED) or LOCKED_FOR_TURNOVER | T-0174 | reviewer |
 | [TD-249](../tracker/todo/TD-249.md) | GET /auth/me (and the JWT tid claim) still expose the tenant id to the SPA: confirm diff 4.1 'never see the tenant' allows it or drop tenant_id from MeResponse | T-0037 | implementer |
 | [TD-270](../tracker/todo/TD-270.md) | Membership-based policy needs app.member_project_ids: spec says visible when the project is in app.allowed_project_ids or app.is_system_admin, but the allowed list holds only portfolio projects | T-0014 | implementer |
+| [TD-310](../tracker/todo/TD-310.md) | Default landing scope for portfolio personas: first project by name or All-Projects when nothing is remembered | T-0042 | implementer |
 
 ## missed (5)
 

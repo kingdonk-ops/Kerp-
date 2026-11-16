@@ -6,7 +6,38 @@ import { useAuth } from "../auth/AuthProvider";
 import { ProjectScopeProvider } from "../projects/ProjectScopeProvider";
 import { ProjectSwitcher } from "../projects/ProjectSwitcher";
 import { ThemeToggle } from "../theme/ThemeToggle";
-import { NAV_GROUPS } from "./nav";
+import { NAV_GROUPS, NAV_ITEMS, registeredNavItems, type NavGroupId, type NavItem } from "./nav";
+
+/** The group's items whose screens exist (diff §6.1); nothing while there are none. */
+export function NavItemList({
+  group,
+  items = NAV_ITEMS,
+}: {
+  group: NavGroupId;
+  items?: readonly NavItem[];
+}) {
+  const { t } = useTranslation();
+  const registered = registeredNavItems(group, items);
+  if (registered.length === 0) return null;
+  return (
+    <ul className="flex flex-wrap gap-touch-gap md:ml-3 md:flex-col">
+      {registered.map((entry) => (
+        <li key={entry.id}>
+          <NavLink
+            to={entry.path}
+            className={({ isActive }) =>
+              `flex min-h-touch items-center rounded px-3 text-sm whitespace-nowrap ${
+                isActive ? "bg-brand text-on-brand" : "hover:bg-line"
+              }`
+            }
+          >
+            {t(`nav.items.${entry.id}`)}
+          </NavLink>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 /**
  * Authenticated app shell: top bar (switcher, theme, user) + 8-group navigation. Field
@@ -69,6 +100,7 @@ export function Layout() {
                       </span>
                     )}
                   </NavLink>
+                  <NavItemList group={group.id} />
                 </li>
               ))}
             </ul>

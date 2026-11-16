@@ -2,11 +2,12 @@ import type { RouteObject } from "react-router";
 
 import { RequireAuth } from "../auth/RequireAuth";
 import { HomePage } from "../pages/HomePage";
+import { LobbyPage } from "../pages/LobbyPage";
 import { LoginPage } from "../pages/LoginPage";
 import { NavGroupPage } from "../pages/NavGroupPage";
 import { NotFoundPage } from "../pages/NotFoundPage";
 import { Layout } from "./Layout";
-import { NAV_GROUPS } from "./nav";
+import { LOBBY_PATH, NAV_GROUPS } from "./nav";
 
 export const routes: RouteObject[] = [
   { path: "/login", element: <LoginPage /> },
@@ -18,6 +19,7 @@ export const routes: RouteObject[] = [
         element: <Layout />,
         children: [
           { index: true, element: <HomePage /> },
+          { path: LOBBY_PATH.slice(1), element: <LobbyPage /> },
           ...NAV_GROUPS.filter((group) => group.path !== "/").map((group) => ({
             path: group.path.slice(1),
             element: <NavGroupPage group={group.id} />,
