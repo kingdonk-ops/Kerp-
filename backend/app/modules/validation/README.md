@@ -61,9 +61,16 @@ if result.blocked:
   findings' messages. A finding's message is the rule's `params.message` (rule data, written
   by the rule author), else `"<rule_key>: check failed"`. `warn` findings never block.
 
-- With a record subject (`"<record_type>:<uuid>"`), a blocking rule the record holds an
-  **approved override** for passes while it is still bound (below): no finding, listed in
-  `result.overrides` (`AppliedOverride`: `override_id`, `rule_key`, `rule_version`).
+- With a record subject (`"<record_type>:<uuid>"`), a failing blocking rule (outcome `fail`;
+  an `error` is never overridden) the record holds an **approved override** for passes while
+  it is still bound (below): no finding, listed in `result.overrides` (`AppliedOverride`:
+  `override_id`, `rule_key`, `rule_version`).
+- **Caller contract (T-0035):** call `run_checks` **before** appending to the record's own
+  audit chain (`<record_type>:<record_id>`) in the same transaction. Voiding a stale override
+  appends to that chain on the side pool; if the caller already holds the chain's lock, the
+  void waits out `lock_timeout`, is rolled back and logged, and is retried at the next
+  evaluation. The findings (committed first) and the block stand either way; the stale
+  override is never applied by the evaluation that found it stale (TD-316).
 
 The signature `run_checks(context, rule_set, *, session, subject=None)` and the result shape
 are frozen at M1 (T-0131).
@@ -102,12 +109,15 @@ exactly the columns of `docs/spec/modules/quality-and-inspection.md` §Per-recor
 5. **Binding** (A.6): `checked_values_hash` is the SHA-256 of the canonical JSON (sorted keys,
    no whitespace) of the values the rule checked: the context paths in the rule's
    `params.override_binding` (e.g. `["fields.equipment_id", "fields.spec_revision",
-   "fields.inspection_date"]`; 1–32 paths under `record`, `fields`, `actor` or `project`,
+   "fields.inspection_date"]`; 1–32 paths under `record`, `fields` or `project` (never `actor`),
    checked on save), or the whole `record` and `fields` when the rule names none. On every
    `run_checks` of the record, a pending or approved override whose rule version or hash
    differs from this evaluation is set to `void` (`decision_comment` `rule_changed` /
-   `checked_values_changed`, `decided_by` NULL) in the findings' own unit of work, so the block
-   returns; void is final, a new request answers the new finding.
+   `checked_values_changed`, `decided_by` NULL) in a side unit of work after the findings, so
+   the block returns; void is final, a new request answers the new finding. Decisions are
+   guarded in the database (`UPDATE ... WHERE decision = 'pending'`): a decision on a row
+   decided or voided meanwhile is 409, never an overwrite. Only `fail` findings can be
+   requested (an `error` is 409).
 
 `GET /projects/{p}/overrides?decision=&record_type=&record_id=` and `GET .../{id}`: every member.
 

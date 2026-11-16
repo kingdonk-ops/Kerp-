@@ -294,6 +294,8 @@ def request_override(
         raise OverrideError("the finding names no record (run_checks subject)")
     if finding.action != "block":
         raise OverrideError("only a blocking finding can be overridden")
+    if finding.outcome != "fail":
+        raise OverrideError("a rule that could not be evaluated cannot be overridden; fix it")
     if finding.checked_values_hash is None:
         raise OverrideError("the finding predates override binding; run the check again")
     if not _is_current(session, finding):
@@ -482,12 +484,25 @@ def _decide(
     if comment is not None and "\x00" in comment:
         raise OverrideInputError("the comment contains a NUL character")
     now = utcnow()
-    override.decision = decision
-    override.decided_by = actor
-    override.decided_at = now
-    override.decision_comment = comment or None
-    override.updated_by = actor
-    session.flush()
+    # Guarded in the database: a concurrent decision or a ``run_checks`` void committed since
+    # the row was loaded leaves no pending row to update, so nothing is overwritten.
+    result = session.execute(
+        update(Override)
+        .where(Override.id == override.id, Override.decision == "pending")
+        .values(
+            decision=decision,
+            decided_by=actor,
+            decided_at=now,
+            decision_comment=comment or None,
+            updated_at=now,
+            updated_by=actor,
+            revision=Override.revision + 1,
+        )
+        .execution_options(synchronize_session=False)
+    )
+    if not cast("CursorResult[Any]", result).rowcount:
+        raise OverrideError("the override was decided or voided meanwhile")
+    session.refresh(override)
     audit.append(
         session,
         override.audit_chain_key,

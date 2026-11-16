@@ -15,6 +15,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import inspect, select
 from sqlalchemy.exc import IntegrityError
 
+from app.core.audit.service import append as audit_append
 from app.core.audit.service import chain_entries, verify_chain
 from app.core.auth.access import Persona
 from app.core.auth.models import ProjectMembership
@@ -32,7 +33,7 @@ from app.modules.validation.schemas import CheckResult, RuleSpec
 from app.modules.validation.service import list_rule_sets, run_checks, save_rule, seed_tenant
 from tests.audit_support import migrated_database
 from tests.auth_support import PASSWORD, T1, T2, auth_app, make_settings, seed_user
-from tests.db_support import database_url
+from tests.db_support import ON_POSTGRES, database_url
 
 API = "/api/v1/validation"
 CTX = TenancyContext(tenant_id=T1)
@@ -599,7 +600,16 @@ def test_the_manifest_declares_the_notifications_dependency() -> None:
 
 @pytest.mark.parametrize(
     "binding",
-    [[], "fields.x", [1], ["now"], ["params.x"], ["fields..x"], ["fields.x", "fields.x"]],
+    [
+        [],
+        "fields.x",
+        [1],
+        ["now"],
+        ["params.x"],
+        ["actor.id"],
+        ["fields..x"],
+        ["fields.x", "fields.x"],
+    ],
 )
 def test_an_invalid_override_binding_does_not_compile(binding: object) -> None:
     with pytest.raises(RuleCompileError, match="override_binding"):
@@ -619,3 +629,79 @@ def test_the_hash_is_canonical_and_covers_only_the_bound_values() -> None:
     assert overrides.parse_subject("inspection:not-a-uuid") is None
     record = uuid.uuid4()
     assert overrides.parse_subject(f"inspection:{record}") == ("inspection", record)
+
+
+# --- review round 1: guarded decisions, errors, the record-chain lock ------------------------
+
+
+def _approver_ctx(api: Api, name: str) -> TenancyContext:
+    return TenancyContext(tenant_id=T1, project_id=api.project, user_id=api.ids[name])
+
+
+def test_a_decision_on_a_row_decided_meanwhile_is_409_not_an_overwrite(api: Api) -> None:
+    record = uuid.uuid4()
+    override = api.request("fw", api.finding(blocked(api, record))).json()
+    override_id = uuid.UUID(override["id"])
+    with api.db.unit_of_work(_approver_ctx(api, "qa")) as s:
+        stale = overrides.get_override(s, override_id)
+        assert stale.decision == "pending"  # loaded while still pending
+        assert api.decide("qa2", override["id"], "reject").status_code == 200
+        with pytest.raises(overrides.OverrideError, match="meanwhile"):
+            overrides.approve_override(s, override_id, actor_id=api.ids["qa"])
+    assert api.override(override["id"]).decision == "rejected"
+    with api.db.unit_of_work(api.ctx) as s:
+        events = [e.payload["event"] for e in chain_entries(s, f"inspection:{record}")]
+    assert events == ["validation_override_requested", "validation_override_rejected"]
+    assert [n[0] for n in api.notes("fw")] == ["validation.override_rejected"]
+
+
+def test_a_decision_on_a_row_voided_meanwhile_is_409_and_void_stays_final(api: Api) -> None:
+    record = uuid.uuid4()
+    override = api.request("fw", api.finding(blocked(api, record))).json()
+    override_id = uuid.UUID(override["id"])
+    with api.db.unit_of_work(_approver_ctx(api, "qa")) as s:
+        assert overrides.get_override(s, override_id).decision == "pending"
+        api.check(record, EXPIRED | {"signature": "x", "equipment_id": "TW-77"})  # voids it
+        with pytest.raises(overrides.OverrideError):
+            overrides.approve_override(s, override_id, actor_id=api.ids["qa"])
+    assert api.override(override["id"]).decision == "void"
+    assert api.decide("qa", override["id"], "approve").status_code == 409
+
+
+def test_an_error_finding_cannot_be_overridden_and_an_override_never_passes_an_error(
+    api: Api,
+) -> None:
+    record = uuid.uuid4()
+    no_due = {k: v for k, v in EXPIRED.items() if k != "cal_due"}
+    errored = api.check(record, no_due | {"signature": "x"})
+    assert [f.outcome for f in errored.findings if f.rule_key == "calibration"] == ["error"]
+    assert api.request("fw", api.finding(errored)).status_code == 409
+    # An approved override (of a fail) does not pass the same rule when it errors; cal_due
+    # is not a bound value, so the override stays bound.
+    _approved(api, record)
+    again = api.check(record, no_due | {"signature": "x"})
+    assert again.blocked
+    assert again.overrides == ()
+    assert api.check(record, EXPIRED | {"signature": "x"}).passed
+
+
+@pytest.mark.skipif(
+    not ON_POSTGRES, reason="needs PostgreSQL advisory locks; runs in CI's PostgreSQL step (TD-052)"
+)
+def test_a_caller_holding_the_record_chain_lock_keeps_its_findings_and_block(api: Api) -> None:
+    # TD-316: the caller appended to the record's chain before run_checks (e.g. a sign-off).
+    record = uuid.uuid4()
+    override_id = _approved(api, record)
+    changed = EXPIRED | {"signature": "x", "equipment_id": "TW-13"}
+    context = {"record": {"id": str(record)}, "fields": changed}
+    with api.db.unit_of_work(api.ctx) as s:
+        audit_append(s, f"inspection:{record}", {"event": "signed"})
+        result = run_checks(context, SET, session=s, subject=f"inspection:{record}")
+    assert result.blocked
+    assert result.overrides == ()
+    with api.db.unit_of_work(api.ctx) as s:
+        logged = s.scalars(select(Finding.rule_key).where(Finding.run_id == result.run_id)).all()
+    assert sorted(logged) == ["calibration", "photo"]
+    assert api.override(override_id).decision == "approved"  # the void was deferred
+    assert api.check(record, changed).blocked  # the next evaluation voids it
+    assert api.override(override_id).decision == "void"

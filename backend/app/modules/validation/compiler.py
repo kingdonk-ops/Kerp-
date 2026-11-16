@@ -59,7 +59,8 @@ MAX_PATTERN_LENGTH: Final = 1024  # characters; RE2 also caps program size and m
 # values. Without it the binding is the whole ``record`` and ``fields`` (any change voids).
 OVERRIDE_BINDING_PARAM: Final = "override_binding"
 DEFAULT_OVERRIDE_BINDING: Final = ("record", "fields")
-BINDING_ROOTS: Final = frozenset({"record", "fields", "actor", "project"})
+# Never ``actor`` (who submits is not what was checked), ``now`` or ``params``.
+BINDING_ROOTS: Final = frozenset({"record", "fields", "project"})
 MAX_BINDING_PATHS: Final = 32
 _BINDING_PATH: Final = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*){0,15}$")
 
@@ -104,7 +105,7 @@ def compile_rule(
 
 def check_override_binding(paths: object) -> None:
     """``params.override_binding`` must be 1-32 distinct dotted paths under a bindable root
-    (``record``, ``fields``, ``actor``, ``project``; never ``now`` or ``params``)."""
+    (``record``, ``fields``, ``project``; never ``actor``, ``now`` or ``params``)."""
     if not isinstance(paths, list) or not paths or len(paths) > MAX_BINDING_PATHS:
         raise RuleCompileError(
             f"params.{OVERRIDE_BINDING_PARAM} must be a list of 1-{MAX_BINDING_PATHS} paths"

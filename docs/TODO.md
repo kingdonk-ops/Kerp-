@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 183 · **Closed:** 128
+**Open:** 184 · **Closed:** 128
 
 ## decision (3)
 
@@ -199,7 +199,7 @@
 | [TD-252](../tracker/todo/TD-252.md) | tracker.py new-todo cannot see open PRs in cloud sessions: gh pr list uses GraphQL (blocked), so TODO ids collide | T-0029 | coordinator |
 | [TD-287](../tracker/todo/TD-287.md) | Upgrade offer: a soft-deleted own rule holding a new default's key shows key_in_use forever | T-0036 | reviewer |
 
-## risk (19)
+## risk (20)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -222,6 +222,7 @@
 | [TD-303](../tracker/todo/TD-303.md) | Field PIN gate can fail open if Redis evicts device:sid before the first rotation of a session bound by enrolment (its first refresh token has no did claim) | T-0038 | implementer |
 | [TD-305](../tracker/todo/TD-305.md) | Cross-tab broadcasts are not tied to a session: a sign-in in one tab hands that session's access token to other signed-in tabs (possibly another account); tag messages with the session id and ignore foreign ones | T-0072 | reviewer |
 | [TD-313](../tracker/todo/TD-313.md) | Override approver routing reads direct memberships only (persona_holders): follow load_grants when team-derived grants land (T-0073) | T-0035 | implementer |
+| [TD-316](../tracker/todo/TD-316.md) | Override void vs the record's audit-chain lock: T-0119 signing and inspection submit/approve must call run_checks before appending to the record chain | T-0035 | implementer |
 
 ## Closed
 

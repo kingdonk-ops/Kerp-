@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import logging
 import re
 import uuid
 from collections.abc import Callable, Collection, Iterable, Mapping
@@ -32,7 +33,7 @@ from functools import cache
 from typing import TYPE_CHECKING, Any, Final
 
 from sqlalchemy import ColumnElement, select
-from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from sqlalchemy.exc import IntegrityError, OperationalError, SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.audit import service as audit
@@ -96,6 +97,8 @@ __all__ = [
     "sync_system_defaults",
     "sync_system_layer",
 ]
+
+logger = logging.getLogger("kerp.validation")
 
 # Most specific first: a project's own set wins over the tenant's, which wins over system.
 _LAYER_PRIORITY: Final = {"project": 0, "tenant": 1, "system": 2}
@@ -322,16 +325,24 @@ def run_checks(
     The findings are committed in their **own** unit of work on a dedicated pool (same
     tenancy), so they survive when the caller then refuses the transition and rolls back: a
     blocked transition always leaves its findings (the record the T-0035 override builds on).
-
-    Overrides (T-0035, Amendment A): with a ``"<record_type>:<uuid>"`` subject, a blocking
-    rule the record has an **approved** override for passes (listed in ``result.overrides``,
-    no finding) while the rule version and the hash of the values it checked
-    (``overrides.checked_values_hash``) equal the override's. A pending or approved override
-    whose rule version or hash differs is voided in the same side unit of work (and the
-    block, if any, returns). Every finding records its ``checked_values_hash``.
     That pool is never the caller's request pool, so logging a finding never waits on a
     connection a request already holds. The rule set must be committed before it is run (the
     findings reference it).
+
+    Overrides (T-0035, Amendment A): with a ``"<record_type>:<uuid>"`` subject, a blocking
+    rule that **fails** (outcome ``fail``, not ``error``) passes when the record has an
+    **approved** override of it (listed in ``result.overrides``, no finding) while the rule
+    version and the hash of the values it checked (``overrides.checked_values_hash``) equal
+    the override's. Every finding records its ``checked_values_hash``. A pending or approved
+    override whose rule version or hash differs is never applied by this evaluation (the
+    block returns at once) and is voided after the findings are committed, in a second side
+    unit of work that also appends ``validation_override_voided`` to the record's audit
+    chain. **Caller contract:** call ``run_checks`` *before* appending to the record's own
+    audit chain (``<record_type>:<record_id>``) in the same transaction. A caller holding
+    that chain's lock makes the void wait out the side pool's ``lock_timeout``; the void is
+    then rolled back and retried at the next evaluation (logged; the findings and the block
+    stand, the gate never fails on it). Until a void lands, an evaluation with the original
+    values would apply the override again (TD-316).
     """
     tenancy = _context(session)
     if "params" in context:
@@ -359,7 +370,12 @@ def run_checks(
                 override = None
         if isinstance(result, CelOk) and result.value is True:
             continue
-        if override is not None and override.decision == "approved" and rule.action == "block":
+        if (
+            override is not None
+            and override.decision == "approved"
+            and rule.action == "block"
+            and not isinstance(result, CelError)  # an override answers a fail, never an error
+        ):
             applied.append(
                 AppliedOverride(
                     override_id=override.id, rule_key=rule.rule_key, rule_version=rule.version
@@ -1175,7 +1191,7 @@ def _persist_findings(
     rows: list[Finding],
     voids: list[overrides.Void] | None = None,
 ) -> None:
-    """Commit ``rows`` (and void stale overrides, T-0035) independently of the caller's
+    """Commit ``rows``, then void stale overrides (T-0035), independently of the caller's
     transaction (see ``run_checks``).
 
     The write runs on the ``Database``'s dedicated side-write pool, never on the request pool
@@ -1185,14 +1201,28 @@ def _persist_findings(
     cannot form that cycle. On SQLite (local tests only) a caller that has already written in
     its open transaction holds the database write lock, so call ``run_checks`` before writing.
     """
-    if not rows and not voids:
+    maker = _side_write_sessionmaker(session)
+    if rows:
+        with maker() as log:
+            bind_tenancy(log, tenancy)
+            log.add_all(rows)
+            log.commit()
+    if not voids:
         return
-    with _side_write_sessionmaker(session)() as log:
-        bind_tenancy(log, tenancy)
-        log.add_all(rows)
-        log.flush()
-        overrides.apply_voids(log, voids or ())
-        log.commit()
+    # Second unit of work: the void and its ledger entry land together or not at all. A caller
+    # holding the record's chain lock (it appended to it before ``run_checks``) makes the append
+    # wait out ``lock_timeout``; the findings are committed already and this evaluation did not
+    # apply the stale override, so the gate's answer stands and the void is retried next time.
+    try:
+        with maker() as log:
+            bind_tenancy(log, tenancy)
+            overrides.apply_voids(log, voids)
+            log.commit()
+    except OperationalError:
+        logger.warning(
+            "override void deferred: the record's audit chain is locked by the caller",
+            extra={"override_ids": [str(v.override_id) for v in voids]},
+        )
 
 
 def _side_write_sessionmaker(session: Session) -> sessionmaker[Session]:
