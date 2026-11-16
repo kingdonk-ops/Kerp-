@@ -30,7 +30,7 @@
 | ✅ | [T-0004](../tracker/tasks/T-0004.md) | Backend Dockerfile (multi-stage, --only-binary) + CI image build to GHCR | platform | S | T-0001 | #11 |
 | ▶ | [T-0213](../tracker/tasks/T-0213.md) | Production refuses to verify uploads with the always-clean StubScanner unless explicitly allowed | uploads | S | — |  |
 | ✅ | [T-0005](../tracker/tasks/T-0005.md) | Database layer + BaseRecordMixin + Alembic + metadata contract test | platform | M | T-0001 | #13 |
-| 🟦 | [T-0214](../tracker/tasks/T-0214.md) | Schedule the jobs sweep: list tenant/project scopes under RLS and run service.sweep from an SAQ cron | jobs | M | — |  |
+| 🟪 | [T-0214](../tracker/tasks/T-0214.md) | Schedule the jobs sweep: list tenant/project scopes under RLS and run service.sweep from an SAQ cron | jobs | M | — | #101 |
 | ✅ | [T-0006](../tracker/tasks/T-0006.md) | Hash-chain audit ledger: append-only (seq, chain_key, prev_hash, content_hash, payload) + REVOKE UPDATE/DELETE | audit | M | T-0005 | #20 |
 | ⬜ | [T-0215](../tracker/tasks/T-0215.md) | Run the uploads orphan sweep hourly per project and recover files stuck in 'verifying' | uploads | S | T-0214 |  |
 | ✅ | [T-0007](../tracker/tasks/T-0007.md) | Project-scoped RLS: project_id context, policy helper, cross-project→404, 4 RLS-bypass contract tests | tenancy | M | T-0005 | #19 |
