@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 178 · **Closed:** 128
+**Open:** 179 · **Closed:** 128
 
 ## decision (3)
 
@@ -102,7 +102,7 @@
 | [TD-278](../tracker/todo/TD-278.md) | Rule 'Try it' on a recent real context (ADR 0004 §6): pick a recent record/event of the set's kind and evaluate against it; T-0036 only evaluates supplied sample contexts | T-0036 | implementer |
 | [TD-288](../tracker/todo/TD-288.md) | pending_updates on a set with no parent default answers 409 instead of an empty offer | T-0036 | reviewer |
 
-## later (80)
+## later (81)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -186,6 +186,7 @@
 | [TD-307](../tracker/todo/TD-307.md) | PostgreSQL concurrency tests for the new row locks (uploads sweep vs verify_upload; admin deactivate \|\| deactivate and deactivate \|\| revoke), and lock only the stuck rows in the sweep | T-0215 | reviewer |
 | [TD-308](../tracker/todo/TD-308.md) | projects.service.bind_project raises a FastAPI HTTPException(403) from a service; replace with a small domain error the routers map (as OutOfScopeError is) | T-0217 | reviewer |
 | [TD-309](../tracker/todo/TD-309.md) | Document the one-pooled-connection-per-request rule (auth README request flow, Database.side_write_sessionmaker docstring covers read-only use) and pin the revoked-device + deactivated-user answer with a test | T-0210 | reviewer |
+| [TD-311](../tracker/todo/TD-311.md) | Deploy: when the migration owner and runtime role are split (TD-056), grant EXECUTE on kerp_lobby_projects() and kerp_lobby_project_by_code(text) to the runtime role | T-0040 | implementer |
 
 ## bug (3)
 

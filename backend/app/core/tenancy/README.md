@@ -67,7 +67,7 @@ Settings bound per transaction (all from the server, never from the request):
 | `app.allowed_project_ids` | projects of the caller's portfolio personas (T-0010) |
 | `app.member_project_ids` | every project of the caller's memberships, whatever the persona (T-0014); it widens only the `membership` tables |
 | `app.current_user_id` | token `sub` (T-0014) |
-| `app.is_system_admin` | `true` or unset: the caller's own `system_admin` grant, loaded at authentication through the admin module's lookup (`access.register_admin_grant_lookup`; on PostgreSQL the `SECURITY DEFINER` function `kerp_caller_admin_grants()`) in the same unit of work that reads the memberships (T-0014) |
+| `app.is_system_admin` | `true` or unset: the caller's own `system_admin` grant, loaded at authentication through the admin module's lookup (`access.register_admin_grant_lookup`; on PostgreSQL the `SECURITY DEFINER` function `kerp_caller_admin_grants()`) in the same unit of work that reads the memberships (T-0014). The only other writer: the narrow lobby read functions of migration `0021` (T-0040) raise it transaction-locally for their own three-column read and restore the caller's value before returning |
 
 The scope resolver runs bound to the caller (`TenancyContext(tid, user_id=sub)`), so the
 own-rows clauses let it read the caller's memberships and grants without depending on what it

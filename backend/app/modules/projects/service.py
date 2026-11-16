@@ -17,22 +17,29 @@ the same session and transaction, so a project never exists without its setup.
 Fields the creator leaves out (status, site timezone, currency, locale) take the deployment's
 defaults for new projects from the settings module (T-0044, diff §4.4); the service always
 passes all four explicitly, so the column defaults are only fallback literals.
+
+The lobby (T-0040, diff §4.1) reads projects the caller is not a member of only through the
+**narrow lobby read** (``lobby_projects``, ``project_by_code``): id, code and name, never the
+row, and the membership-based policy is not widened (edge spec §6 amendments). On PostgreSQL
+it calls the ``SECURITY DEFINER`` functions of migration ``0021``, which check the caller
+themselves; on SQLite the same rule runs here.
 """
 
 from __future__ import annotations
 
 import uuid
-from collections.abc import Callable, Collection
-from typing import TYPE_CHECKING, Any, Final
+from collections.abc import Callable, Collection, Iterable, Sequence
+from typing import TYPE_CHECKING, Any, Final, NamedTuple
 from zoneinfo import ZoneInfo
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import ColumnElement, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.audit import service as audit
 from app.core.auth import memberships
+from app.core.auth import service as users
 from app.core.auth.access import (
     Capability,
     Grant,
@@ -53,6 +60,7 @@ from app.modules.settings import service as deployment_settings
 
 __all__ = [
     "DuplicateProjectCodeError",
+    "ProjectSummary",
     "add_created_listener",
     "bind_project",
     "create_project",
@@ -60,11 +68,25 @@ __all__ = [
     "get_project",
     "list_projects",
     "live_project_ids",
+    "lobby_projects",
+    "project_by_code",
+    "set_lobby_visibility",
     "site_zone",
     "update_project",
 ]
 
 CHAIN_PREFIX: Final = "project:"
+# The narrow lobby read of migration 0021 (PostgreSQL).
+LOBBY_FUNCTION: Final = "kerp_lobby_projects"
+CODE_FUNCTION: Final = "kerp_lobby_project_by_code"
+
+
+class ProjectSummary(NamedTuple):
+    """What the narrow lobby read returns about a project: nothing but id, code and name."""
+
+    id: uuid.UUID
+    code: str
+    name: str
 
 # ``listener(session, project)``: called by ``create_project`` once the row is flushed.
 CreatedListener = Callable[[Session, Project], None]
@@ -242,3 +264,78 @@ def delete_project(
 def site_zone(project: Project) -> ZoneInfo:
     """The project's site timezone, for converting UTC timestamps for display (spec §1.2)."""
     return ZoneInfo(project.site_timezone)
+
+
+def set_lobby_visibility(
+    session: Session, project_id: uuid.UUID, visible: bool, *, actor_id: uuid.UUID | None = None
+) -> Project:
+    """List the project in the lobby (for internal users) or take it out (T-0040). Audited
+    like any update (``fields: ["visible_in_lobby"]``); no change writes nothing. Whether the
+    caller may (PER-09 of the project or a System admin) is the router's."""
+    project = get_project(session, project_id)
+    if project.visible_in_lobby is not visible:
+        project.visible_in_lobby = visible
+        project.updated_by = actor_id
+        session.flush()
+        _audit(session, project, "update", actor_id, fields=["visible_in_lobby"])
+    return project
+
+
+def _lobby_caller(session: Session, *, internal: bool) -> uuid.UUID | None:
+    """The tenant of a session bound to an active user (internal, if asked), else ``None``:
+    the SQLite counterpart of the caller check inside the 0021 functions."""
+    context = session_tenancy(session)
+    if context is None or context.user_id is None:
+        return None
+    user_id = context.user_id
+    if not users.active_user_ids(session, [user_id]):
+        return None
+    if internal and not users.is_internal_user(session, user_id):
+        return None
+    return context.tenant_id
+
+
+def _summaries(rows: Iterable[Sequence[object]]) -> list[ProjectSummary]:
+    return [ProjectSummary(uuid.UUID(str(r[0])), str(r[1]), str(r[2])) for r in rows]
+
+
+def _narrow_select(
+    session: Session, *, internal: bool, where: ColumnElement[Any]
+) -> list[ProjectSummary]:
+    """SQLite: id, code and name straight from the table, past the ORM scope (which mirrors
+    the membership policy), behind the same caller check as the PostgreSQL function."""
+    tenant_id = _lobby_caller(session, internal=internal)
+    if tenant_id is None:
+        return []
+    table = Project.__table__
+    query = (
+        select(table.c.id, table.c.code, table.c.name)
+        .where(table.c.tenant_id == tenant_id, table.c.deleted_at.is_(None), where)
+        .order_by(table.c.name, table.c.code)
+    )
+    # A Core execution on the connection, not an ORM one: the scope filters do not apply.
+    return _summaries(session.connection().execute(query))
+
+
+def _on_postgres(session: Session) -> bool:
+    return session.get_bind().dialect.name == "postgresql"
+
+
+def lobby_projects(session: Session) -> list[ProjectSummary]:
+    """The live lobby-visible projects of the tenant, by name then code. Empty unless the
+    session's user is an active internal user: the narrow read checks that itself (defence in
+    depth beside the endpoint). Needs a session bound to the caller (``user_id``)."""
+    if _on_postgres(session):
+        return _summaries(session.execute(text(f"SELECT id, code, name FROM {LOBBY_FUNCTION}()")))
+    return _narrow_select(session, internal=True, where=Project.__table__.c.visible_in_lobby)
+
+
+def project_by_code(session: Session, code: str) -> ProjectSummary | None:
+    """The live project with exactly this code (case-sensitive), lobby-visible or not, for any
+    active user of the tenant; ``None`` if there is none. It grants nothing (TD-202)."""
+    if _on_postgres(session):
+        query = text(f"SELECT id, code, name FROM {CODE_FUNCTION}(:code)")
+        found = _summaries(session.execute(query, {"code": code}))
+    else:
+        found = _narrow_select(session, internal=False, where=Project.__table__.c.code == code)
+    return found[0] if found else None
