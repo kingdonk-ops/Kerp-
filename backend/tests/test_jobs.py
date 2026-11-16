@@ -777,7 +777,11 @@ def test_worker_builds_one_saq_worker_per_queue_with_its_concurrency(db: Databas
         ("t:interactive", 3),
         ("t:batch", 1),
     ]
-    assert all(set(w.functions) == {"kerp_run_job"} for w in workers)
+    # Both run job rows; the batch worker also runs the stuck-job sweep cron (T-0214).
+    assert [set(w.functions) for w in workers] == [
+        {"kerp_run_job"},
+        {"kerp_run_job", "sweep_cron"},
+    ]
     ctx: WorkerContext = {"worker": workers[0]}
     assert workers[0].startup is not None
     asyncio.run(workers[0].startup[0](ctx))

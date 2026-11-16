@@ -17,7 +17,7 @@ import signal
 import uuid
 from typing import Any, Final
 
-from saq import Worker
+from saq import CronJob, Worker
 from saq.types import Context
 
 from app.core.config import Settings, get_settings
@@ -26,7 +26,7 @@ from app.core.logging import configure_logging
 from app.core.module_loader.loader import discover_modules, import_job_handlers
 from app.core.request_context import request_id_var
 from app.core.tenancy.context import TenancyContext, use_tenancy
-from app.modules.jobs import service
+from app.modules.jobs import scheduler, service
 from app.modules.jobs.broker import QUEUE_NAMES, RUN_JOB, LoopDispatcher, SaqBroker
 from app.modules.jobs.registry import JOB_REGISTRY, JobContext, JobRegistry
 
@@ -39,6 +39,8 @@ CANCELLED: Final = "Job timed out or was cancelled"
 class WorkerContext(Context, total=False):
     db: Database
     registry: JobRegistry
+    broker: SaqBroker
+    settings: Settings
 
 
 async def run_job(
@@ -175,12 +177,20 @@ def build_workers(
     async def startup(ctx: WorkerContext) -> None:
         ctx["db"] = db
         ctx["registry"] = registry
+        ctx["broker"] = broker
+        ctx["settings"] = settings
 
+    # The stuck-job sweep (T-0214) runs on the batch worker only.
+    cron_jobs: dict[str, list[CronJob[WorkerContext]]] = {
+        "interactive": [],
+        "batch": [CronJob(scheduler.sweep_cron, cron=scheduler.SWEEP_CRON)],
+    }
     return [
         Worker[WorkerContext](
             broker.queues[name],
             functions=[(RUN_JOB, run_job)],
             concurrency=concurrency[name],
+            cron_jobs=cron_jobs[name],
             startup=startup,
             id=f"kerp-{name}",
             shutdown_grace_period_s=SHUTDOWN_GRACE_S,
