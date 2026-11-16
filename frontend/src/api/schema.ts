@@ -312,6 +312,10 @@ export interface paths {
          * Wipe Confirmed
          * @description The revoked device confirms it wiped its local store (records, outbox, media, keys),
          *     with the wipe secret its enrolment returned.
+         *
+         *     Rate-limited per client address before anything else (T-0212, TD-298): every refusal is
+         *     audited, so an unlimited caller could grow the ledger at will. The lock-out never looks
+         *     at the device, so its ``429`` reveals nothing about it.
          */
         post: operations["wipe_confirmed_api_v1_devices__device_id__wipe_confirmed_post"];
         delete?: never;
@@ -3337,6 +3341,13 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many attempts from this client; retry after `Retry-After` seconds (decided before the device is looked up) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

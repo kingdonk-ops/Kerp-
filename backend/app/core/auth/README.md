@@ -45,7 +45,7 @@ rewritten (HS256 → RS256/EdDSA + JWKS + `jti` revocation in Redis).
 | `GET /api/v1/devices` | bearer | the caller's devices (last seen, last sync, status) |
 | `GET /api/v1/users/{user_id}/devices` | bearer | a user's devices: the user, a `system_admin`, or a PER-09 of a project the user belongs to; `403` a shared project without PER-09; `404` otherwise |
 | `POST /api/v1/devices/{device_id}/revoke` | bearer | `{confirm_cross_project_wipe?}` → revoked device + `role` + `cross_project_warning`; same callers as above; `409` until a PER-09 confirms the cross-project wipe |
-| `POST /api/v1/devices/{device_id}/wipe-confirmed` | none | `{wipe_secret}` → `204`: the revoked device reports its wipe; every refusal (unknown id, active device, wrong or missing secret) is the same `404 {"detail": "Not Found"}` (T-0080) |
+| `POST /api/v1/devices/{device_id}/wipe-confirmed` | none | `{wipe_secret}` → `204`: the revoked device reports its wipe; every refusal (unknown id, active device, wrong or missing secret) is the same `404 {"detail": "Not Found"}` (T-0080); `wipe_secret` at most 128 characters (`422`); per client address `WIPE_CONFIRM_POLICY` (11 attempts back to back, then the doubling lock, 1 h window; a right secret clears it) answers `429` + `Retry-After` before any lookup or audit entry (T-0212) |
 
 `TokenResponse` is `{access_token, token_type, expires_in, refresh_expires_in, session_expires_at}`
 (`session_expires_at`: the session's end, sign-in + 12 h, the same on every rotation and PIN

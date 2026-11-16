@@ -134,6 +134,18 @@ MAGIC_LINK_REQUEST_POLICY: Final = LockoutPolicy(
 )
 
 
+# Unauthenticated wipe confirmations per client address (T-0212, TD-298): every refused call
+# appends an audit entry (T-0080), so a client gets 11 attempts back to back (no lock after
+# failures 1-10), then the usual escalation. A right secret clears the client's counter. Keyed
+# by client, so one client's flood never blocks another device's confirmation.
+WIPE_CONFIRM_POLICY: Final = LockoutPolicy(
+    free_attempts=10,
+    base_delay=timedelta(seconds=30),
+    max_delay=timedelta(minutes=15),
+    window=timedelta(hours=1),
+)
+
+
 class ProgressiveLockout:
     """One policy applied to the subjects of one ``scope`` (``pin``, ``login``, ...)."""
 

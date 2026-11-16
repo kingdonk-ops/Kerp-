@@ -26,7 +26,7 @@
 | ✅ | [T-0002](../tracker/tasks/T-0002.md) | Frontend scaffold: Vite + React 18 + TS strict, Tailwind, TanStack Query, Dexie, router, i18n, Vitest | platform | S | — | #8 |
 | 🟪 | [T-0211](../tracker/tasks/T-0211.md) | Last active System admin is kept on deactivation and revoke; concurrent duplicate grant/user create answer 200/409, not 500 | admin | S | — | #98 |
 | ✅ | [T-0003](../tracker/tasks/T-0003.md) | Dev infra: docker-compose (PG16+PostGIS+ltree, Redis7, MinIO), Makefile, .env.example | platform | S | T-0001 | #33 |
-| ▶ | [T-0212](../tracker/tasks/T-0212.md) | Rate-limit the unauthenticated wipe-confirmed endpoint per client; cap wipe_secret length | identity | S | — |  |
+| 🟦 | [T-0212](../tracker/tasks/T-0212.md) | Rate-limit the unauthenticated wipe-confirmed endpoint per client; cap wipe_secret length | identity | S | — |  |
 | ✅ | [T-0004](../tracker/tasks/T-0004.md) | Backend Dockerfile (multi-stage, --only-binary) + CI image build to GHCR | platform | S | T-0001 | #11 |
 | ▶ | [T-0213](../tracker/tasks/T-0213.md) | Production refuses to verify uploads with the always-clean StubScanner unless explicitly allowed | uploads | S | — |  |
 | ✅ | [T-0005](../tracker/tasks/T-0005.md) | Database layer + BaseRecordMixin + Alembic + metadata contract test | platform | M | T-0001 | #13 |
