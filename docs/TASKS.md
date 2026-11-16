@@ -34,7 +34,7 @@
 | ✅ | [T-0006](../tracker/tasks/T-0006.md) | Hash-chain audit ledger: append-only (seq, chain_key, prev_hash, content_hash, payload) + REVOKE UPDATE/DELETE | audit | M | T-0005 | #20 |
 | 🟪 | [T-0215](../tracker/tasks/T-0215.md) | Run the uploads orphan sweep hourly per project and recover files stuck in 'verifying' | uploads | S | T-0214 | #102 |
 | ✅ | [T-0007](../tracker/tasks/T-0007.md) | Project-scoped RLS: project_id context, policy helper, cross-project→404, 4 RLS-bypass contract tests | tenancy | M | T-0005 | #19 |
-| ▶ | [T-0216](../tracker/tasks/T-0216.md) | At most one pending unlock request per rule (partial unique index); a concurrent duplicate answers 409 | validation | S | — |  |
+| 🟦 | [T-0216](../tracker/tasks/T-0216.md) | At most one pending unlock request per rule (partial unique index); a concurrent duplicate answers 409 | validation | S | — |  |
 | ✅ | [T-0008](../tracker/tasks/T-0008.md) | Auth: users, RS256/EdDSA JWT + JWKS endpoint, 15-min access + rotating refresh, jti revocation in Redis | identity | M | T-0007 | #31 |
 | ✅ | [T-0037](../tracker/tasks/T-0037.md) | Auth sessions: hidden deployment tenant at login, 12-hour refresh from sign-in (daily re-login) + same-second password-change token rejection | identity | M | T-0009 | #69 |
 | ▶ | [T-0217](../tracker/tasks/T-0217.md) | One shared bind_project helper for project-scoped routers; remove the unused require_capability/require_hold_release guards | identity | S | — |  |

@@ -31,7 +31,7 @@ from functools import cache
 from typing import TYPE_CHECKING, Any, Final
 
 from sqlalchemy import ColumnElement, select
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.audit import service as audit
@@ -640,13 +640,9 @@ def request_unlock(
     rule = _live_rule(session, rule_set, rule_key)
     if not rule.locked:
         raise RuleStoreError(f"rule {rule_key!r} is not locked")
-    pending = session.scalars(
-        select(UnlockRequest.id).where(
-            UnlockRequest.rule_id == rule.id, UnlockRequest.status == "pending"
-        )
-    ).first()
-    if pending is not None:
-        raise RuleStoreError(f"rule {rule_key!r} already has a pending unlock request")
+    already = RuleStoreError(f"rule {rule_key!r} already has a pending unlock request")
+    if _pending_unlock_of(session, rule.id) is not None:
+        raise already
     request = UnlockRequest(
         tenant_id=context.tenant_id,
         project_id=None,
@@ -662,10 +658,24 @@ def request_unlock(
         updated_by=actor,
         source="api",
     )
-    session.add(request)
-    session.flush()
+    try:
+        # A SAVEPOINT: a concurrent request that lands after the check above hits the
+        # one-pending-per-rule index (T-0216); only the savepoint is rolled back (409).
+        with session.begin_nested():
+            session.add(request)
+    except IntegrityError as exc:
+        raise already from exc
     _audit_unlock(session, rule_set, request, "unlock_requested", actor, reason=reason)
     return request
+
+
+def _pending_unlock_of(session: Session, rule_id: uuid.UUID) -> uuid.UUID | None:
+    """The id of the rule's pending unlock request, if any."""
+    return session.scalars(
+        select(UnlockRequest.id).where(
+            UnlockRequest.rule_id == rule_id, UnlockRequest.status == "pending"
+        )
+    ).first()
 
 
 def approve_unlock(

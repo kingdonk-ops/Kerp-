@@ -22,10 +22,12 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -35,6 +37,7 @@ RULE_SET_TABLE: Final = "oe_validation_rule_set"
 RULE_TABLE: Final = "oe_validation_rule"
 FINDING_TABLE: Final = "oe_validation_finding"
 UNLOCK_TABLE: Final = "oe_validation_unlock_request"
+UNLOCK_PENDING_INDEX: Final = "uq_oe_validation_unlock_request_pending"
 
 # ADR 0004 §1 + Amendment E. Frozen at M1 (T-0131); adding a value needs the freeze process.
 RULE_KINDS: Final = ("check", "digest", "autolink", "notify", "p6_grammar", "p6_eligibility")
@@ -164,6 +167,14 @@ class UnlockRequest(Base, BaseRecordMixin):
             "(status = 'pending') = (decided_by IS NULL AND decided_at IS NULL)", name="decision"
         ),
         CheckConstraint("status <> 'approved' OR decided_by <> requested_by", name="two_people"),
+        # At most one pending request per rule (T-0216, migration 0020).
+        Index(
+            UNLOCK_PENDING_INDEX,
+            "rule_id",
+            unique=True,
+            postgresql_where=text("status = 'pending'"),
+            sqlite_where=text("status = 'pending'"),
+        ),
     )
 
     rule_set_id: Mapped[uuid.UUID] = mapped_column(

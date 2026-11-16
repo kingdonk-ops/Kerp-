@@ -886,3 +886,49 @@ def test_after_an_unlock_a_project_picks_the_change_up_by_reset(
         reset = reset_rule(s, project_set, "calibration")
         assert (reset.locked, reset.unlock_adr_reference) == (False, "ADR 7")
         assert set_rule_enabled(s, project_set, "calibration", False).enabled is False
+
+
+# --- at most one pending unlock request per rule (T-0216) ----------------------------------------
+
+
+def _pending_row(set_id: uuid.UUID, rule: Rule, requested_by: uuid.UUID) -> UnlockRequest:
+    return UnlockRequest(
+        tenant_id=T1,
+        project_id=None,
+        rule_set_id=set_id,
+        rule_id=rule.id,
+        rule_key=rule.rule_key,
+        rule_version=rule.version,
+        adr_reference="ADR 1",
+        status="pending",
+        requested_by=requested_by,
+    )
+
+
+def test_the_database_refuses_a_second_pending_unlock_of_a_rule(db: Database) -> None:
+    seeded(db)
+    tenant_set = set_of(db, CTX_T1, "tenant")
+    calibration = rules_of(db, CTX_T1, tenant_set)["calibration"]
+    with db.unit_of_work(CTX_T1) as s:
+        s.add(_pending_row(tenant_set, calibration, QD))
+    with db.unit_of_work(CTX_T1) as s:
+        s.add(_pending_row(tenant_set, calibration, OPS))
+        with pytest.raises(IntegrityError):
+            s.flush()
+        s.rollback()
+
+
+def test_a_racing_unlock_request_is_a_rule_store_error(
+    db: Database, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    seeded(db)
+    tenant_set = set_of(db, CTX_T1, "tenant")
+    with db.unit_of_work(CTX_T1) as s:
+        first = request_unlock(s, tenant_set, "calibration", adr_reference="ADR 1").id
+    # The other request's row lands between this one's check and its insert.
+    monkeypatch.setattr(rule_store, "_pending_unlock_of", lambda *_args: None)
+    with db.unit_of_work(CTX_T1) as s:
+        with pytest.raises(RuleStoreError, match="already has a pending"):
+            request_unlock(s, tenant_set, "calibration", adr_reference="ADR 2")
+        # The refusal rolls back only its own insert: the session stays usable.
+        assert [r.id for r in rule_store.list_unlock_requests(s, "pending")] == [first]

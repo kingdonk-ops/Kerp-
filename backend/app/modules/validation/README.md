@@ -8,7 +8,7 @@ Built fresh; Inspection-ERP's `Finding(key, severity, message)` shape was a refe
 
 | File | What |
 |---|---|
-| `models.py` | `oe_validation_rule_set`, `oe_validation_rule`, `oe_validation_finding` (migration `0005`), `oe_validation_unlock_request` (migration `0014`); all `BaseRecordMixin` + RLS |
+| `models.py` | `oe_validation_rule_set`, `oe_validation_rule`, `oe_validation_finding` (migration `0005`), `oe_validation_unlock_request` (migration `0014`; one pending per rule: `0020`); all `BaseRecordMixin` + RLS |
 | `compiler.py` | compile-on-save: kind/engine rules, per-kind CEL context schema, RE2 regex compile |
 | `defaults.py` | system default seed files `app/modules/<m>/rules/defaults/*.yaml`: `load_defaults()` |
 | `service.py` | rule store (`create_rule_set`, `save_rule`, `set_rule_enabled`, `delete_rule`, `reset_rule`, `reset_rule_set`), layers (`sync_system_layer`, `sync_system_defaults`, `seed_tenant`, `seed_project`, `copy_module_defaults`), unlock (`request_unlock`, `approve_unlock`, `reject_unlock`), `resolve_rule_set`, `run_checks` |
@@ -160,7 +160,9 @@ version) and `approve_unlock` by a **second, different** user (PER-13 or PER-01 
 (`UnlockPermissionError`, and a CHECK constraint on `oe_validation_unlock_request`). The
 approval records the ADR reference on the rule (`unlock_adr_reference`). Request, approval,
 rejection or cancellation and the unlock itself are each a ledger entry. A rule changed after
-the request cannot be unlocked by it. Unlocking the tenant default does not touch project
+the request cannot be unlocked by it. A rule has at most one pending request: a partial unique
+index (`rule_id` where `status = 'pending'`, migration `0020`, T-0216) backs the service's
+check, so a concurrent duplicate is the same `RuleStoreError` (409), never a second row. Unlocking the tenant default does not touch project
 copies; a project picks the unlocked default up by resetting the rule. Resetting never
 loosens beyond the default, so it is allowed on locked rules, with one exception on the
 tenant layer: a reset (one rule or the whole set) that would **delete** a live locked rule
