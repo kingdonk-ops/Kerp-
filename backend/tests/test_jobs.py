@@ -780,7 +780,7 @@ def test_worker_builds_one_saq_worker_per_queue_with_its_concurrency(db: Databas
     # Both run job rows; the batch worker also runs the stuck-job sweep cron (T-0214).
     assert [set(w.functions) for w in workers] == [
         {"kerp_run_job"},
-        {"kerp_run_job", "sweep_cron"},
+        {"kerp_run_job", "sweep_cron", "hourly_project_jobs"},
     ]
     ctx: WorkerContext = {"worker": workers[0]}
     assert workers[0].startup is not None

@@ -180,7 +180,7 @@ def build_workers(
         ctx["broker"] = broker
         ctx["settings"] = settings
 
-    # The stuck-job sweep (T-0214) runs on the batch worker only.
+    # The stuck-job sweep (T-0214) and the hourly per-project jobs (T-0215): batch worker only.
     cron_jobs: dict[str, list[CronJob[WorkerContext]]] = {
         "interactive": [],
         "batch": [
@@ -188,7 +188,12 @@ def build_workers(
                 scheduler.sweep_cron,
                 cron=scheduler.SWEEP_CRON,
                 timeout=scheduler.CRON_TIMEOUT_S,
-            )
+            ),
+            CronJob(
+                scheduler.hourly_project_jobs,
+                cron=scheduler.HOURLY_CRON,
+                timeout=scheduler.CRON_TIMEOUT_S,
+            ),
         ],
     }
     return [

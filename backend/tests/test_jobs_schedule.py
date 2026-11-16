@@ -150,7 +150,10 @@ def test_the_batch_worker_runs_the_sweep_every_five_minutes(db: Database) -> Non
     }
     assert crons == {
         "t:interactive": [],
-        "t:batch": [(scheduler.sweep_cron, scheduler.SWEEP_CRON, scheduler.CRON_TIMEOUT_S)],
+        "t:batch": [
+            (scheduler.sweep_cron, scheduler.SWEEP_CRON, scheduler.CRON_TIMEOUT_S),
+            (scheduler.hourly_project_jobs, scheduler.HOURLY_CRON, scheduler.CRON_TIMEOUT_S),
+        ],
     }
     assert scheduler.SWEEP_CRON == "*/5 * * * *"
     ctx: Any = {}
@@ -168,3 +171,32 @@ def test_the_jobs_module_declares_its_dependency_on_projects() -> None:
     from app.core.module_loader.loader import discover_modules
 
     assert "projects" in discover_modules().get("jobs").depends_on
+
+
+def test_the_hourly_cron_queues_every_scheduled_kind_once_per_live_project(
+    db: Database,
+) -> None:
+    registry = JobRegistry()
+    hourly = registry.add(JobKind("demo.hourly", "batch", _noop))
+    registry.add_hourly_project_job(hourly.kind)
+    registry.add(JobKind("demo.unscheduled", "batch", _noop))
+    a, b = _project(db, TENANT, "HR1"), _project(db, TENANT, "HR2")
+    _delete(db, TENANT, _project(db, TENANT, "HR3"))
+    dispatched: list[JobRef] = []
+    service.set_dispatcher(dispatched.extend)
+    try:
+        ctx: Any = {
+            "db": db,
+            "registry": registry,
+            "settings": Settings(environment="test", default_tenant_id=TENANT),
+        }
+        asyncio.run(scheduler.hourly_project_jobs(ctx))
+    finally:
+        service.set_dispatcher(None)
+    assert sorted((r.project_id, r.queue) for r in dispatched) == sorted(
+        [(a, "batch"), (b, "batch")]
+    )
+    for project in (a, b):
+        with db.unit_of_work(TenancyContext(tenant_id=TENANT, project_id=project)) as s:
+            rows = s.query(Job).filter(Job.project_id == project).all()
+            assert [(r.kind, r.source) for r in rows] == [("demo.hourly", "system")]

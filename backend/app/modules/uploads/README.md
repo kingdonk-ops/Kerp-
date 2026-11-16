@@ -11,7 +11,7 @@ the bytes; it signs, checks and records. Helpers adapted from Inspection-ERP
 | `scan.py` | `Scanner` seam; `StubScanner` says every object is clean (real AV scanner: TD-211) |
 | `models.py` | `oe_uploads_file` (`BaseRecordMixin`, project RLS, migration `0009`) |
 | `service.py` | `presign_upload`, `complete_upload`, `get_file`, `download_request`, `verify_upload`, `sweep_orphans`, `schedule_sweep` |
-| `jobs.py` | `uploads.verify` (interactive), `uploads.verify_large` and `uploads.sweep_orphans` (batch) |
+| `jobs.py` | `uploads.verify` (interactive), `uploads.verify_large` and `uploads.sweep_orphans` (batch; queued hourly per project) |
 | `router.py`, `schemas.py` | `/api/v1/uploads/projects/{project_id}/files...` |
 
 ## Flow
@@ -48,9 +48,12 @@ the bytes; it signs, checks and records. Helpers adapted from Inspection-ERP
 
 `sweep_orphans(db, tenancy, storage=...)` runs per project (`uploads.sweep_orphans`): a
 `pending` file whose URL expired more than an hour ago becomes `expired`, and a staging or
-quarantine object no `pending`/`verifying` file owns is deleted once older than an hour.
-`schedule_sweep(session)` queues it; a periodic schedule needs the scope list TD-155 asks
-for (TD-212). A bucket lifecycle rule on `staging/` is the backstop (TD-208, with bucket
+quarantine object no `pending`/`verifying` file owns is deleted once older than an hour. A
+`verifying` file whose verify job `failed` (read with `jobs.service.job_status`) or that has been
+`verifying` for more than `VERIFY_STUCK_AFTER` (6 h) is `rejected` with `verify_failed` (T-0215),
+so its objects become orphans too. The worker's hourly cron queues the sweep in every live
+project (`schedule_hourly_per_project` in `jobs.py`, T-0215); `schedule_sweep(session)` queues
+one on demand. A bucket lifecycle rule on `staging/` is the backstop (TD-208, with bucket
 provisioning and CORS). No delete endpoint or content-object GC yet (TD-209).
 
 ## Configuration (`KERP_` env)

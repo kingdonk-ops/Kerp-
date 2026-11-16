@@ -44,6 +44,7 @@ __all__ = [
     "create_job",
     "finish_job",
     "get_job",
+    "job_status",
     "register_job",
     "report_progress",
     "sanitise_error",
@@ -166,6 +167,12 @@ def _forget_after_rollback(session: Session, previous_transaction: SessionTransa
     )
     if pending:
         pending[:] = [(t, r) for t, r in pending if not _within(t, previous_transaction)]
+
+
+def job_status(session: Session, job_id: uuid.UUID) -> str | None:
+    """The job's status if it is in the session's scope, else ``None`` (other modules, T-0215)."""
+    job = session.get(Job, job_id)
+    return job.status if job is not None and is_visible(session, job) else None
 
 
 def get_job(session: Session, job_id: uuid.UUID) -> Job:

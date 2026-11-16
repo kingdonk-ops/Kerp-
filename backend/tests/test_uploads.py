@@ -474,12 +474,17 @@ def test_the_sweep_expires_abandoned_uploads_and_deletes_orphans(
     storage.write(elsewhere, b"x")
 
     # Within the grace period nothing happens.
-    assert service.sweep_orphans(db, home, storage=storage) == {"expired": 0, "deleted": 0}
+    assert service.sweep_orphans(db, home, storage=storage) == {
+        "expired": 0,
+        "deleted": 0,
+        "rejected": 0,
+    }
 
     later = utcnow() + timedelta(hours=2)
     assert service.sweep_orphans(db, home, storage=storage, now=later) == {
         "expired": 1,
         "deleted": 3,
+        "rejected": 0,
     }
     assert _load(db, home, abandoned).status == "expired"
     assert _load(db, home, verifying).status == "verifying"
@@ -532,7 +537,7 @@ def test_the_job_handlers_run_the_service(
     result = asyncio.run(upload_jobs.verify(_context(db, home, {"file_id": str(file_id)})))
     assert result["status"] == "available"
     swept = asyncio.run(upload_jobs.sweep_orphans(_context(db, home, {})))
-    assert swept == {"expired": 0, "deleted": 0}
+    assert swept == {"expired": 0, "deleted": 0, "rejected": 0}
 
 
 @pytest.mark.parametrize("payload", [{}, {"file_id": "not-a-uuid"}])
@@ -679,3 +684,53 @@ def test_the_body_limit_does_not_cap_presigned_uploads(
     assert completed.status_code == 200, completed.text
     oversized = {**_body(data), "filename": "x" * 2048}  # the request itself is still bounded
     assert api.client.post(api.files(), json=oversized, headers=alice).status_code == 413
+
+
+
+# --- stuck 'verifying' files and the hourly schedule (T-0215, TD-212, TD-209) ----------------
+
+
+def _verifying(db: Database, home: TenancyContext, storage: LocalStorage) -> UploadedFile:
+    file_id = _presign(db, home, storage)
+    storage.write(_load(db, home, file_id).staging_key, PNG)
+    file = _complete(db, home, storage, file_id)
+    assert file.status == "verifying"
+    assert file.job_id is not None
+    return file
+
+
+def test_the_sweep_rejects_a_file_whose_verify_job_failed(
+    db: Database, home: TenancyContext, storage: LocalStorage, dispatched: list[JobRef]
+) -> None:
+    file = _verifying(db, home, storage)
+    with db.unit_of_work(home) as s:
+        jobs.finish_job(s, file.job_id, error="Internal error (ConnectionError)")  # type: ignore[arg-type]
+    later = utcnow() + timedelta(hours=2)
+    swept = service.sweep_orphans(db, home, storage=storage, now=later)
+    assert swept == {"expired": 0, "deleted": 1, "rejected": 1}
+    after = _load(db, home, file.id)
+    assert (after.status, after.rejection_reason) == ("rejected", "verify_failed")
+    assert storage.head(after.staging_key) is None
+
+
+def test_the_sweep_rejects_a_file_verifying_for_too_long(
+    db: Database, home: TenancyContext, storage: LocalStorage, dispatched: list[JobRef]
+) -> None:
+    file = _verifying(db, home, storage)  # its job never ran (still queued)
+    much_later = utcnow() + service.VERIFY_STUCK_AFTER + timedelta(minutes=1)
+    swept = service.sweep_orphans(db, home, storage=storage, now=much_later)
+    assert swept["rejected"] == 1
+    assert _load(db, home, file.id).rejection_reason == "verify_failed"
+
+
+def test_the_sweep_leaves_a_healthy_verifying_file_alone(
+    db: Database, home: TenancyContext, storage: LocalStorage, dispatched: list[JobRef]
+) -> None:
+    file = _verifying(db, home, storage)
+    later = utcnow() + service.VERIFY_STUCK_AFTER - timedelta(minutes=1)
+    assert service.sweep_orphans(db, home, storage=storage, now=later)["rejected"] == 0
+    assert _load(db, home, file.id).status == "verifying"
+
+
+def test_the_orphan_sweep_is_scheduled_hourly_for_every_project() -> None:
+    assert service.SWEEP_KIND in JOB_REGISTRY.hourly_project_kinds()

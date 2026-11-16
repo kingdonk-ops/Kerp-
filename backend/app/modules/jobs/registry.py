@@ -70,6 +70,7 @@ class JobRegistry:
 
     def __init__(self) -> None:
         self._kinds: dict[str, JobKind] = {}
+        self._hourly_project_kinds: list[str] = []
 
     def add(self, job_kind: JobKind) -> JobKind:
         if not KIND_PATTERN.match(job_kind.kind):
@@ -92,6 +93,15 @@ class JobRegistry:
     def kinds(self) -> tuple[str, ...]:
         return tuple(sorted(self._kinds))
 
+    def add_hourly_project_job(self, kind: str) -> str:
+        """Queue ``kind`` (payload ``{}``) once an hour in every live project (T-0215)."""
+        if kind not in self._hourly_project_kinds:
+            self._hourly_project_kinds.append(kind)
+        return kind
+
+    def hourly_project_kinds(self) -> tuple[str, ...]:
+        return tuple(self._hourly_project_kinds)
+
 
 JOB_REGISTRY = JobRegistry()
 
@@ -110,3 +120,8 @@ def register_job(
         return handler
 
     return decorate
+
+
+def schedule_hourly_per_project(kind: str) -> str:
+    """Have the worker's hourly cron queue ``kind`` in every live project (T-0215)."""
+    return JOB_REGISTRY.add_hourly_project_job(kind)
