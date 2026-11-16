@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 45/172 tasks done (26%) · **ready now:** 23 · **epics awaiting breakdown:** 47
+**Overall:** 45/172 tasks done (26%) · **ready now:** 21 · **epics awaiting breakdown:** 47
 
 | Phase | Tasks done | Progress |
 |---|---|---|
