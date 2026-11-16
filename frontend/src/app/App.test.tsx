@@ -209,6 +209,25 @@ describe("app shell", () => {
     expect(ctx.services.tokens.hasSession).toBe(false);
   });
 
+  it("tells the browser's other tabs about the sign-out (T-0072)", async () => {
+    const ctx = setup();
+    const published: string[] = [];
+    ctx.services.crossTab = {
+      withRefreshLock: (refresh) => refresh(),
+      publishToken: () => published.push("token"),
+      publishLogout: () => published.push("logout"),
+      close: () => undefined,
+    };
+    renderApp("/admin", ctx);
+
+    fireEvent.click(await screen.findByRole("button", { name: i18n.t("auth.logout") }));
+
+    expect(
+      await screen.findByRole("heading", { level: 1, name: i18n.t("auth.login.title") }),
+    ).toBeInTheDocument();
+    expect(published).toEqual(["logout"]);
+  });
+
   it("offers a retry when the session cannot be loaded", async () => {
     let fail = true;
     renderApp(
