@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 181 · **Closed:** 118
+**Open:** 182 · **Closed:** 118
 
 ## decision (4)
 
@@ -108,7 +108,7 @@
 | [TD-288](../tracker/todo/TD-288.md) | pending_updates on a set with no parent default answers 409 instead of an empty offer | T-0036 | reviewer |
 | [TD-298](../tracker/todo/TD-298.md) | Rate-limit the unauthenticated wipe-confirmed endpoint (every refusal appends an audit entry) | T-0080, T-0212 | implementer |
 
-## later (76)
+## later (77)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -188,6 +188,7 @@
 | [TD-294](../tracker/todo/TD-294.md) | Project delete revokes its memberships (T-0039, TD-184): a future project restore must re-grant them, and memberships on projects soft-deleted before T-0039 (dev databases only) stay live until revoked | T-0039 | implementer |
 | [TD-296](../tracker/todo/TD-296.md) | System-admin-only write RLS policy for oe_settings_deployment (defence in depth) | T-0044 | implementer |
 | [TD-302](../tracker/todo/TD-302.md) | Use the did token claim in CurrentPrincipal device resolution so DEVICE_REVOKED and last_seen survive an evicted device:sid binding | T-0038 | implementer |
+| [TD-304](../tracker/todo/TD-304.md) | Jobs: short in-process retry/backoff on a Redis ConnectionError in broker enqueue, and optional heal on GET /jobs/{id} of an old queued row SAQ does not know (split from TD-155) | T-0214 | reviewer |
 
 ## bug (3)
 
