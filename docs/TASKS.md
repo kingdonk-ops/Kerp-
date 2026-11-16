@@ -3,11 +3,11 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 55/172 tasks done (32%) · **ready now:** 18 · **epics awaiting breakdown:** 47
+**Overall:** 56/172 tasks done (33%) · **ready now:** 19 · **epics awaiting breakdown:** 47
 
 | Phase | Tasks done | Progress |
 |---|---|---|
-| 0 · Platform foundations | 55/88 | `██████░░░░` 62% |
+| 0 · Platform foundations | 56/88 | `██████░░░░` 64% |
 | 1 · Asset & Quality backbone | 0/75 (+1 epics) | `░░░░░░░░░░` 0% |
 | 2 · Welding quality | 0/9 | `░░░░░░░░░░` 0% |
 | 3 · Logistics | 0/0 (+7 epics) | `░░░░░░░░░░` 0% |
@@ -63,8 +63,8 @@
 | ✅ | [T-0036](../tracker/tasks/T-0036.md) | Rule store: default-upgrade offers with per-rule diff, tenant drift report, 'Try it' evaluation | validation | S | T-0034 | #88 |
 | ✅ | [T-0019](../tracker/tasks/T-0019.md) | notifications module (in-app) behind a pluggable channel interface | notifications | S | T-0012 | #64 |
 | ▶ | [T-0035](../tracker/tasks/T-0035.md) | Per-record override of a blocked check: reasoned request, routed approver (never self), notifications, audit, bound to the checked values | validation | M | T-0018, T-0010, T-0019 |  |
-| 🟪 | [T-0040](../tracker/tasks/T-0040.md) | Lobby discovery API: visible-in-lobby flag, lobby listing for internal users, project-code lookup | admin | S | T-0014, T-0049 | #109 |
-| ⬜ | [T-0050](../tracker/tasks/T-0050.md) | Access-request lifecycle API: pending/approved/rejected/withdrawn, rejection reason, re-request cooldown, requester's active-requests list | admin | M | T-0040, T-0019 |  |
+| ✅ | [T-0040](../tracker/tasks/T-0040.md) | Lobby discovery API: visible-in-lobby flag, lobby listing for internal users, project-code lookup | admin | S | T-0014, T-0049 | #109 |
+| ▶ | [T-0050](../tracker/tasks/T-0050.md) | Access-request lifecycle API: pending/approved/rejected/withdrawn, rejection reason, re-request cooldown, requester's active-requests list | admin | M | T-0040, T-0019 |  |
 | ▶ | [T-0058](../tracker/tasks/T-0058.md) | Outbound e-mail core service: AWS SES transport, i18n templates, async send via SAQ, send log, bounce/complaint suppression (Pilot-0) | platform | M | T-0015, T-0037 |  |
 | ✅ | [T-0020](../tracker/tasks/T-0020.md) | saved_views module | saved_views | S | T-0012 | #65 |
 | ⬜ | [T-0052](../tracker/tasks/T-0052.md) | Project invites API: single-use expiring invite_token bound to the invited e-mail, one-click join, membership granted right after first sign-in (password, SSO; magic link for PER-14 invites) | admin | M | T-0014, T-0054, T-0057 |  |
