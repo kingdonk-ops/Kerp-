@@ -211,14 +211,19 @@ def build_workers(
 
 
 async def serve(settings: Settings) -> None:
-    """Run both workers until SIGTERM/SIGINT (or cancellation), then stop both."""
+    """Run both workers until SIGTERM/SIGINT (or cancellation), then stop both.
+
+    Every module's startup check (``register_startup_check``) runs first, before any
+    connection is made: a check that raises refuses to start the worker (T-0213)."""
+    registry = load_registry()
+    registry.run_startup_checks(settings)
     if not settings.redis_url:
         raise RuntimeError("KERP_REDIS_URL is not set")
     db = Database.from_settings(settings)
     broker = SaqBroker(settings.redis_url)
     loop = asyncio.get_running_loop()
     service.set_dispatcher(LoopDispatcher(broker, loop))
-    workers = build_workers(settings, db=db, registry=load_registry(), broker=broker)
+    workers = build_workers(settings, db=db, registry=registry, broker=broker)
     stopping = asyncio.Event()
     # Each SAQ worker would install its own SIGTERM/SIGINT handler (the last one wins and only
     # that worker would stop), so the signals are handled here and stop both at once.

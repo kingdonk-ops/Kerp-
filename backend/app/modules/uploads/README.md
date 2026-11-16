@@ -8,7 +8,7 @@ the bytes; it signs, checks and records. Helpers adapted from Inspection-ERP
 | File | What |
 |---|---|
 | `storage.py` | `clean_filename`, `content_disposition`, served-type (H-10) and magic-byte allowlists, `Storage` Protocol, `LocalStorage` (traversal guard; tests), `S3Storage` (boto3, lazy), `get_storage`/`set_storage` |
-| `scan.py` | `Scanner` seam; `StubScanner` says every object is clean (real AV scanner: TD-211) |
+| `scan.py` | `Scanner` seam; `StubScanner` says every object is clean (real AV scanner: TD-211); `require_real_scanner`, the worker startup check that refuses the stub in production (T-0213) |
 | `models.py` | `oe_uploads_file` (`BaseRecordMixin`, project RLS, migration `0009`) |
 | `service.py` | `presign_upload`, `complete_upload`, `get_file`, `download_request`, `verify_upload`, `sweep_orphans`, `schedule_sweep` |
 | `jobs.py` | `uploads.verify` (interactive), `uploads.verify_large` and `uploads.sweep_orphans` (batch; queued hourly per project) |
@@ -64,6 +64,10 @@ never hard-coded: default `ap-southeast-2` for Australian deployments, TD-171 / 
 MinIO ignores it),
 `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` (unset: the AWS credential chain),
 `UPLOAD_MAX_BYTES` (100 MiB), `UPLOAD_URL_SECONDS` (900), `DOWNLOAD_URL_SECONDS` (300).
+`UPLOAD_SCANNER_ALLOW_STUB` (false): with `KERP_ENVIRONMENT=production` the SAQ worker refuses
+to start while the scanner is the always-clean `StubScanner` (worker startup check
+`scan.require_real_scanner`, T-0213); install a real scanner with `set_scanner` (TD-211) or set
+this to `true` to accept unscanned uploads explicitly.
 
 ## Tests
 

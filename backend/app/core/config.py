@@ -85,6 +85,9 @@ class Settings(BaseSettings):
     upload_max_bytes: int = Field(default=100 * 1024 * 1024, ge=1, le=5 * 1024**3)
     upload_url_seconds: int = Field(default=900, ge=60, le=3600)
     download_url_seconds: int = Field(default=300, ge=30, le=3600)
+    # Malware scan (T-0213, TD-211): in production the worker refuses to start while uploads
+    # would be verified by the always-clean stub scanner, unless this is set explicitly.
+    upload_scanner_allow_stub: bool = False
 
     # Auth tokens (T-0008, diff §4). Asymmetric JWTs, public keys served as JWKS.
     # ``jwt_private_key`` is a PEM (RSA for RS256, Ed25519 for EdDSA); ``jwt_private_key_file``

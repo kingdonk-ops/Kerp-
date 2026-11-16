@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Any, Final, Literal, Protocol
 from app.core.tenancy.context import TenancyContext
 
 if TYPE_CHECKING:
+    from app.core.config import Settings
     from app.core.db import Database
 
 QueueName = Literal["interactive", "batch"]
@@ -61,6 +62,10 @@ class JobKind:
     timeout_s: int = DEFAULT_TIMEOUT_S
 
 
+# A module's start-up precondition for the worker, e.g. "production needs a real scanner".
+StartupCheck = Callable[["Settings"], None]
+
+
 class UnknownJobKindError(LookupError):
     """No handler is registered for the kind."""
 
@@ -71,6 +76,7 @@ class JobRegistry:
     def __init__(self) -> None:
         self._kinds: dict[str, JobKind] = {}
         self._hourly_project_kinds: list[str] = []
+        self._startup_checks: list[StartupCheck] = []
 
     def add(self, job_kind: JobKind) -> JobKind:
         if not KIND_PATTERN.match(job_kind.kind):
@@ -102,6 +108,20 @@ class JobRegistry:
     def hourly_project_kinds(self) -> tuple[str, ...]:
         return tuple(self._hourly_project_kinds)
 
+    def add_startup_check(self, check: StartupCheck) -> StartupCheck:
+        """A module's check the worker runs before it starts (T-0213); it raises to refuse."""
+        if check not in self._startup_checks:
+            self._startup_checks.append(check)
+        return check
+
+    def startup_checks(self) -> tuple[StartupCheck, ...]:
+        return tuple(self._startup_checks)
+
+    def run_startup_checks(self, settings: Settings) -> None:
+        """Run every registered check in order; the first one that raises stops the worker."""
+        for check in self._startup_checks:
+            check(settings)
+
 
 JOB_REGISTRY = JobRegistry()
 
@@ -125,3 +145,8 @@ def register_job(
 def schedule_hourly_per_project(kind: str) -> str:
     """Have the worker's hourly cron queue ``kind`` in every live project (T-0215)."""
     return JOB_REGISTRY.add_hourly_project_job(kind)
+
+
+def register_startup_check(check: StartupCheck) -> StartupCheck:
+    """Register ``check`` (decorator) to run when the worker starts, before it connects."""
+    return JOB_REGISTRY.add_startup_check(check)
