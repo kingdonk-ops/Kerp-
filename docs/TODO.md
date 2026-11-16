@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 182 · **Closed:** 118
+**Open:** 183 · **Closed:** 122
 
 ## decision (4)
 
@@ -67,7 +67,7 @@
 | [TD-208](../tracker/todo/TD-208.md) | Uploads infra: provision the kerp-vault bucket (CORS for browser PUT/GET, lifecycle on staging/), wire KERP_S3_* in compose, add MinIO to CI for the gated round-trip test | T-0016 | implementer |
 | [TD-297](../tracker/todo/TD-297.md) | Admin UI screen for deployment settings (Admin > System) is not planned in any task | T-0044 | implementer |
 
-## deferred (36)
+## deferred (33)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -84,7 +84,6 @@
 | [TD-147](../tracker/todo/TD-147.md) | Field-worker sign-in screens: magic-link request/redeem and 6-digit PIN unlock in the SPA | T-0024 | implementer |
 | [TD-149](../tracker/todo/TD-149.md) | Area/discipline scoping (PER-04) and granted-subtree scoping (PER-15) are not enforced yet | T-0010 | implementer |
 | [TD-150](../tracker/todo/TD-150.md) | Asset-Site scoping is ORM-only and matches site_node_id exactly (no RLS, no subtree) | T-0010 | implementer |
-| [TD-155](../tracker/todo/TD-155.md) | Schedule the jobs sweep: enumerate tenant/project scopes under RLS (no BYPASSRLS) and run service.sweep from an SAQ cron | T-0015, T-0214 | implementer |
 | [TD-156](../tracker/todo/TD-156.md) | Jobs API: per-kind capability check on POST /jobs and GET /jobs/{id} once RBAC lands (T-0010) | T-0015 | implementer |
 | [TD-178](../tracker/todo/TD-178.md) | Form renderer: calculated fields (dynamic math) and dynamic ranges | T-0025 | implementer |
 | [TD-179](../tracker/todo/TD-179.md) | RegisterPage: server-side saved views (per user, shareable) | T-0025 | implementer |
@@ -92,7 +91,6 @@
 | [TD-181](../tracker/todo/TD-181.md) | DetailPage: audit log and gate-status endpoints | T-0025 | implementer |
 | [TD-182](../tracker/todo/TD-182.md) | RegisterPage: server-side filtering, sorting and paging | T-0025 | implementer |
 | [TD-209](../tracker/todo/TD-209.md) | Uploads: file deletion and content-object GC; recover files stuck in 'verifying' after a failed verify job | T-0016, T-0215 | implementer |
-| [TD-212](../tracker/todo/TD-212.md) | Uploads: run the orphan sweep on a schedule for every project (needs the scope list of TD-155) | T-0016, T-0215 | implementer |
 | [TD-217](../tracker/todo/TD-217.md) | Inspection scheduling after Pilot-0: calendar view, general recurrence (beyond scaffolds), light work-order grouping (TD-165 remainder) | T-0152 | planner |
 | [TD-231](../tracker/todo/TD-231.md) | Teams admin screen (system_admin): list, create, rename, delete, add/remove members, link teams to projects with a role; read-only linked-teams view per project | T-0013 | planner |
 | [TD-238](../tracker/todo/TD-238.md) | Notifications: run non-in-app channels (FCM T-0144, e-mail TD-084) as an SAQ job after commit, with a persisted per-channel delivery log and retry; T-0019 calls them synchronously inside the caller's transaction | T-0019 | implementer |
@@ -106,9 +104,8 @@
 | [TD-273](../tracker/todo/TD-273.md) | Membership assignment does not validate site_node_id (PER-07 Asset-Site scope) against the asset hierarchy; no asset module exists yet | T-0014 | implementer |
 | [TD-278](../tracker/todo/TD-278.md) | Rule 'Try it' on a recent real context (ADR 0004 §6): pick a recent record/event of the set's kind and evaluate against it; T-0036 only evaluates supplied sample contexts | T-0036 | implementer |
 | [TD-288](../tracker/todo/TD-288.md) | pending_updates on a set with no parent default answers 409 instead of an empty offer | T-0036 | reviewer |
-| [TD-298](../tracker/todo/TD-298.md) | Rate-limit the unauthenticated wipe-confirmed endpoint (every refusal appends an audit entry) | T-0080, T-0212 | implementer |
 
-## later (77)
+## later (80)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -176,7 +173,6 @@
 | [TD-263](../tracker/todo/TD-263.md) | Harden .claude/settings.json and scripts/gemini_review.sh against agent edits via Bash (CODEOWNERS, CI check or PreToolUse hook) | — | planner |
 | [TD-267](../tracker/todo/TD-267.md) | Frontend Project Settings -> Rules screen (ADR 0004 §7) on the T-0034 Rules API: tabs by kind/module, same component for the tenant default layer, unlock request/approve | T-0034 | implementer |
 | [TD-272](../tracker/todo/TD-272.md) | Projects API: GET /api/v1/projects should list every project for a system_admin (diff §4.1 'System admins can list every project row'); it lists the caller's memberships only | T-0014 | implementer |
-| [TD-274](../tracker/todo/TD-274.md) | Deactivating a user (PATCH /api/v1/admin/users/{id}) can lock out the last active system_admin, including the caller | T-0014, T-0211 | implementer |
 | [TD-275](../tracker/todo/TD-275.md) | Deploy: when the migration owner and runtime role are split (TD-056), grant EXECUTE on kerp_caller_admin_grants() to the runtime role | T-0014 | implementer |
 | [TD-277](../tracker/todo/TD-277.md) | setup_github.sh: set fork PR workflow approval to 'all external contributors' (TD-223 mitigation) instead of relying on a manual Settings step | T-0067 | planner |
 | [TD-279](../tracker/todo/TD-279.md) | Offer whole rule sets a running project lacks (a set first shipped, or first added to the tenant layer, after the project was created): today such a gate falls back to the tenant set via resolve_rule_set and no per-project copy is offered | T-0036 | implementer |
@@ -189,6 +185,10 @@
 | [TD-296](../tracker/todo/TD-296.md) | System-admin-only write RLS policy for oe_settings_deployment (defence in depth) | T-0044 | implementer |
 | [TD-302](../tracker/todo/TD-302.md) | Use the did token claim in CurrentPrincipal device resolution so DEVICE_REVOKED and last_seen survive an evicted device:sid binding | T-0038 | implementer |
 | [TD-304](../tracker/todo/TD-304.md) | Jobs: short in-process retry/backoff on a Redis ConnectionError in broker enqueue, and optional heal on GET /jobs/{id} of an old queued row SAQ does not know (split from TD-155) | T-0214 | reviewer |
+| [TD-306](../tracker/todo/TD-306.md) | Cross-tab refresh: add a timeout to the /auth/refresh request (a hung refresh holds the kerp-refresh lock in every tab) and clear the query cache on a remote sign-out | T-0072 | reviewer |
+| [TD-307](../tracker/todo/TD-307.md) | PostgreSQL concurrency tests for the new row locks (uploads sweep vs verify_upload; admin deactivate \|\| deactivate and deactivate \|\| revoke), and lock only the stuck rows in the sweep | T-0215 | reviewer |
+| [TD-308](../tracker/todo/TD-308.md) | projects.service.bind_project raises a FastAPI HTTPException(403) from a service; replace with a small domain error the routers map (as OutOfScopeError is) | T-0217 | reviewer |
+| [TD-309](../tracker/todo/TD-309.md) | Document the one-pooled-connection-per-request rule (auth README request flow, Database.side_write_sessionmaker docstring covers read-only use) and pin the revoked-device + deactivated-user answer with a test | T-0210 | reviewer |
 
 ## bug (3)
 
@@ -198,7 +198,7 @@
 | [TD-252](../tracker/todo/TD-252.md) | tracker.py new-todo cannot see open PRs in cloud sessions: gh pr list uses GraphQL (blocked), so TODO ids collide | T-0029 | coordinator |
 | [TD-287](../tracker/todo/TD-287.md) | Upgrade offer: a soft-deleted own rule holding a new default's key shows key_in_use forever | T-0036 | reviewer |
 
-## risk (19)
+## risk (20)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -221,6 +221,7 @@
 | [TD-292](../tracker/todo/TD-292.md) | Remove stale scripts/gemini_review.sh allow/deny rules from .claude/settings.json (human-only edit) | — | implementer |
 | [TD-299](../tracker/todo/TD-299.md) | Sign-in with valid credentials answers DEVICE_REVOKED for a revoked device of another account | T-0080 | implementer |
 | [TD-303](../tracker/todo/TD-303.md) | Field PIN gate can fail open if Redis evicts device:sid before the first rotation of a session bound by enrolment (its first refresh token has no did claim) | T-0038 | implementer |
+| [TD-305](../tracker/todo/TD-305.md) | Cross-tab broadcasts are not tied to a session: a sign-in in one tab hands that session's access token to other signed-in tabs (possibly another account); tag messages with the session id and ignore foreign ones | T-0072 | reviewer |
 
 ## Closed
 
@@ -297,6 +298,7 @@
 | ✅ | [TD-148](../tracker/todo/TD-148.md) | Module-to-navigation-group mapping for the 8-group IA is unspecified | 6a: module -> nav group mapping written into diff §6.1 (items may move later) (user, 2026-11-13) |
 | ✅ | [TD-151](../tracker/todo/TD-151.md) | Persona matrix interpretation: default-tier labels vs V/C/E/A/S, PER-03 progress sign-off, PER-09 combined with a hold-authority persona | 2a: T-0010 tier mapping confirmed (edge §5.2 amendment); PER-09 + hold-authority persona allowed with a warning at assignment and an audit-ledger entry; no admin role confers hold release or sign-off without a qualified persona and credentials (TD-099/TD-100). Spec diff §4.1, edge §5; tasks T-0014, T-0026, T-0039 (user, 2026-11-13) |
 | ✅ | [TD-152](../tracker/todo/TD-152.md) | T-0014 membership-based policy must keep the caller's own memberships readable by the scope resolver | T-0014 / PR #86: auth_project_membership read policy (migration 0015) admits user_id = app.current_user_id, and resolve_request_scope binds the token sub as app.current_user_id in its tenant-level unit of work, so the resolver reads the caller's own memberships (tests/test_rls_admin.py, test_a_plain_tenant_session_sees_no_project_or_foreign_membership; tests/test_admin.py scope resolver tests on PostgreSQL as kerp_app). |
+| ✅ | [TD-155](../tracker/todo/TD-155.md) | Schedule the jobs sweep: enumerate tenant/project scopes under RLS (no BYPASSRLS) and run service.sweep from an SAQ cron |  |
 | ✅ | [TD-161](../tracker/todo/TD-161.md) | Field client local store: Dexie/IndexedDB (edge spec, T-0127) vs embedded SQLite (master §1); clean-room needs 500 inspections + 10 GB media, SQLCipher-grade encryption at rest, Android 11+ minimum and managed-Play/MDM distribution | 16a + d: Capacitor Android build uses SQLCipher SQLite + file-system media behind one client storage contract; web-only PWA apps keep Dexie; Android 11+, managed Play/MDM; storage and sync contract client-agnostic. Spec diff §6.2, master §1.3, edge §1; tasks T-0127, T-0141, T-0142 (user, 2026-11-13) |
 | ✅ | [TD-162](../tracker/todo/TD-162.md) | Sync pull scope: per-device/per-project pull-deltas scope, has-more paging, download-for-offline selection with size, local purge, client-generated record ids, stale-base flag on answers, submit blocked until attachments complete | Cut into T-0147, T-0148, T-0149 and the attachments check in T-0150; spec in diff §6.4 with planner defaults (user, 2026-11-13, Q5a) |
 | ✅ | [TD-163](../tracker/todo/TD-163.md) | Barcode/QR/NFC identifiers on Items + scan-to-locate lookup (master user story exists; no columns, endpoint, or NFC path for PWA vs Capacitor) | Cut into T-0154 (Item scan identifiers + lookup) and T-0155 (scan-to-locate, Android NFC, offline lookup); spec in asset-and-tagging.md (user, 2026-11-13, Q5a) |
@@ -319,6 +321,7 @@
 | ✅ | [TD-202](../tracker/todo/TD-202.md) | Lobby details: a project code only finds the project and files an access request (never grants access); the lobby is also reachable from the project picker for users who already have projects | Q1a: a project code only finds that one project and lets the user file an access request decided by the project's PER-09 holders; it never grants access by itself. Users who already have projects open the lobby from the picker. Spec diff §4.1; T-0040, T-0041 (user, 2026-11-13) |
 | ✅ | [TD-203](../tracker/todo/TD-203.md) | SPA refresh-token transport: keep the JSON body (sessionStorage) or move to an httpOnly SameSite cookie | Q6a: the web SPA gets the refresh token as an httpOnly Secure SameSite cookie (CSRF-protected /auth/refresh); the Capacitor Android build keeps the JSON-body transport. Spec diff §4.2; T-0037 (user, 2026-11-13) |
 | ✅ | [TD-206](../tracker/todo/TD-206.md) | Confirm planner default: once the offline window expires without server contact, queued data is kept but new edits are blocked until an online sign-in | Accepted for the Capacitor/PWA field client until the native Android app launches with a normal login system; revisit then (TD-210). (user, 2026-11-13) |
+| ✅ | [TD-212](../tracker/todo/TD-212.md) | Uploads: run the orphan sweep on a schedule for every project (needs the scope list of TD-155) |  |
 | ✅ | [TD-213](../tracker/todo/TD-213.md) | Object key layout: confirm {tenant}/{project}/{module}/{sha256} (no extension) instead of the master spec's {hash}.ext, plus transient staging/ and quarantine/ prefixes | Product owner, 2026-11-15: keep {tenant}/{project}/{module}/{sha256} with no extension (content-addressed dedup; filename and content type on the row, applied on download; no extension-driven serving). Master spec §1.1 Storage Isolation amended, including the transient staging/ and quarantine/ prefixes |
 | ✅ | [TD-214](../tracker/todo/TD-214.md) | Pilot-0 checklist gaps: no inspector capture screen in the subset (T-0130 not listed; needs T-0124/T-0112/T-0128), no ad-hoc inspection UI, and T-0133 depends on the deferred P6 import T-0104 | R2a: T-0130 joins Pilot-0, T-0165 cut for capture and ad-hoc start, T-0133's P6 tests split to T-0166 outside the pilot so T-0104 leaves the gate (user, 2026-11-13) |
 | ✅ | [TD-218](../tracker/todo/TD-218.md) | Field palette after Pilot-0: video and audio notes, barcode/QR answer fields, reference images on questions (TD-166 remainder) | R4b: in Pilot-0; cut into T-0167 (video/audio/barcode field types), T-0168 (reference images), T-0169 (SAQ media probe), T-0170 (video/audio capture), T-0171 (barcode field + reference image display) (user, 2026-11-13) |
@@ -339,8 +342,10 @@
 | ✅ | [TD-264](../tracker/todo/TD-264.md) | Invites: add a short human-typeable invite code as an alternative to the invite link, or keep link-only? | Product owner, 2026-11-14: no invite code; invites are links only (e-mailed link with setup_token, copyable invite_token link as fallback, re-send rotates both). Spec diff §4.1 Re-send; tasks T-0052, T-0053, T-0059 |
 | ✅ | [TD-265](../tracker/todo/TD-265.md) | T-0014 user create/update schemas must reject is_internal, entra_oid and entra_tid with 422 and the admin user list must show is_internal read-only (T-0049 criterion; those schemas do not exist yet) | T-0014: admin UserCreate/UserUpdate use extra=forbid (is_internal, entra_oid, entra_tid, tenant_id are 422; tested), GET /api/v1/admin/users lists is_internal read-only via app.core.auth.service, and POST /api/v1/admin/users creates accounts through app.core.auth.service.create_user, which derives the flag. |
 | ✅ | [TD-271](../tracker/todo/TD-271.md) | Split TD-032 (tenant_id FK) out of T-0014: needs a tenants directory table, an FK on every table and an ADR (core-table change) | Product owner, 2026-11-15: split out as its own task T-0079 (tenants directory table + tenant_id FK on every table, ADR; phase 0, order 14, depends on T-0014). TD-032 now points at T-0079 |
+| ✅ | [TD-274](../tracker/todo/TD-274.md) | Deactivating a user (PATCH /api/v1/admin/users/{id}) can lock out the last active system_admin, including the caller |  |
 | ✅ | [TD-281](../tracker/todo/TD-281.md) | ADR 0004 §4/§6/§7: confirm who reads/accepts upgrade offers, who may 'Try it', who reads the drift report, and that brand-new system sets reach the tenant layer automatically | Product owner, 2026-11-15: implementer reading confirmed. Offers are read by whoever reads the set (any project member; PER-13/PER-01 on the tenant layer); accept and Try it only by the set's editor per ADR 0004 §7 (check: PER-06 project / PER-13 tenant; other kinds PER-09 / PER-01), so PER-09 never accepts a check update; drift report PER-13 or PER-01, limited by RLS to their portfolio projects; removed_by_<layer> = the set deleted its copy and the default changed since the copy, stays on offer until reset; a brand-new system set is copied into the tenant layer automatically by sync_system_defaults, changed sets are only offered; routes keyed by set id. Recorded in ADR 0004 Amendment G |
 | ✅ | [TD-283](../tracker/todo/TD-283.md) | Shared field tablets: one device_id per account, or several accounts per device? | Product owner, 2026-11-15: keep one account per device_id for Pilot-0 (T-0043 behaviour; another account enrolling the same id gets 409). The client keys its local store per account, so a revoke wipes only that account's data on the device (T-0143). Whether pilot crews share tablets is to be confirmed with the pilot team: TD-293 (if they do, a shared-device task is added before the pilot) |
 | ✅ | [TD-285](../tracker/todo/TD-285.md) | Native-origin allow-list: KERP_WEB_ORIGIN made mandatory when KERP_NATIVE_APP_ORIGINS is set; body transport also on magic-link redeem and PIN unlock | Product owner, 2026-11-15: both readings confirmed. (a) KERP_NATIVE_APP_ORIGINS requires KERP_WEB_ORIGIN (settings refuse otherwise) and the API's own origin never gets body transport; (b) body transport (out and in) also applies to magic-link redeem and PIN unlock by the same Origin rule; on the web origin /pin/unlock refuses a body token (422) and /refresh ignores it. Recorded in diff §4.2 |
 | ✅ | [TD-286](../tracker/todo/TD-286.md) | wipe-confirmed is unauthenticated: anyone who knows a revoked device_id can set its wipe time | Fixed by T-0080 (PR #94): per-device wipe secret issued once at enrolment, stored as SHA-256; wipe-confirmed requires it, uniform 404 for every refusal |
 | ✅ | [TD-291](../tracker/todo/TD-291.md) | Revoked-device oracle: refuse_revoked_device on login and wipe-confirmed answer for any device id | Fixed by T-0080 (PR #94): sign-in checks credentials before the device; wipe-confirmed answers uniformly |
+| ✅ | [TD-298](../tracker/todo/TD-298.md) | Rate-limit the unauthenticated wipe-confirmed endpoint (every refusal appends an audit entry) |  |
