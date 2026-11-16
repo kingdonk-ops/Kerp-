@@ -28,7 +28,7 @@
 | ✅ | [T-0003](../tracker/tasks/T-0003.md) | Dev infra: docker-compose (PG16+PostGIS+ltree, Redis7, MinIO), Makefile, .env.example | platform | S | T-0001 | #33 |
 | 🟪 | [T-0212](../tracker/tasks/T-0212.md) | Rate-limit the unauthenticated wipe-confirmed endpoint per client; cap wipe_secret length | identity | S | — | #99 |
 | ✅ | [T-0004](../tracker/tasks/T-0004.md) | Backend Dockerfile (multi-stage, --only-binary) + CI image build to GHCR | platform | S | T-0001 | #11 |
-| ▶ | [T-0213](../tracker/tasks/T-0213.md) | Production refuses to verify uploads with the always-clean StubScanner unless explicitly allowed | uploads | S | — |  |
+| 🟦 | [T-0213](../tracker/tasks/T-0213.md) | Production refuses to verify uploads with the always-clean StubScanner unless explicitly allowed | uploads | S | — |  |
 | ✅ | [T-0005](../tracker/tasks/T-0005.md) | Database layer + BaseRecordMixin + Alembic + metadata contract test | platform | M | T-0001 | #13 |
 | 🟪 | [T-0214](../tracker/tasks/T-0214.md) | Schedule the jobs sweep: list tenant/project scopes under RLS and run service.sweep from an SAQ cron | jobs | M | — | #101 |
 | ✅ | [T-0006](../tracker/tasks/T-0006.md) | Hash-chain audit ledger: append-only (seq, chain_key, prev_hash, content_hash, payload) + REVOKE UPDATE/DELETE | audit | M | T-0005 | #20 |

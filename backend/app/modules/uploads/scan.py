@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
+from app.core.config import Settings
 from app.modules.uploads.storage import Storage
 
 
@@ -37,3 +38,20 @@ def set_scanner(scanner: Scanner | None) -> None:
 
 def get_scanner() -> Scanner:
     return _scanner if _scanner is not None else StubScanner()
+
+
+def require_real_scanner(settings: Settings) -> None:
+    """Refuse a production worker whose uploads would be marked clean unscanned (T-0213).
+
+    Registered as a worker startup check by ``uploads/jobs.py``. The stub stays usable in
+    development and tests; production needs a real scanner installed with ``set_scanner``
+    before the worker starts (TD-211), or ``KERP_UPLOAD_SCANNER_ALLOW_STUB=true``.
+    """
+    if settings.environment != "production" or settings.upload_scanner_allow_stub:
+        return
+    if isinstance(get_scanner(), StubScanner):
+        raise RuntimeError(
+            "uploads would be verified by the always-clean stub scanner: install a real "
+            "scanner (TD-211) or set KERP_UPLOAD_SCANNER_ALLOW_STUB=true to accept unscanned "
+            "uploads in production"
+        )

@@ -734,3 +734,41 @@ def test_the_sweep_leaves_a_healthy_verifying_file_alone(
 
 def test_the_orphan_sweep_is_scheduled_hourly_for_every_project() -> None:
     assert service.SWEEP_KIND in JOB_REGISTRY.hourly_project_kinds()
+
+
+# --- production refuses the always-clean stub scanner (T-0213) ---------------------------------
+
+
+def test_production_refuses_the_stub_scanner_unless_allowed() -> None:
+    from app.core.config import Settings
+    from app.modules.uploads.scan import require_real_scanner, set_scanner
+
+    set_scanner(None)  # the stub
+    with pytest.raises(RuntimeError, match="KERP_UPLOAD_SCANNER_ALLOW_STUB"):
+        require_real_scanner(Settings(environment="production"))
+    require_real_scanner(Settings(environment="production", upload_scanner_allow_stub=True))
+    require_real_scanner(Settings(environment="development"))
+    require_real_scanner(Settings(environment="test"))
+
+
+def test_production_accepts_a_real_scanner() -> None:
+    from app.core.config import Settings
+    from app.modules.uploads.scan import require_real_scanner, set_scanner
+
+    class Clean:
+        def scan(self, storage: object, key: str) -> str:
+            return "clean"
+
+    set_scanner(Clean())  # type: ignore[arg-type]
+    try:
+        require_real_scanner(Settings(environment="production"))
+    finally:
+        set_scanner(None)
+
+
+def test_the_uploads_module_registers_the_scanner_check_for_the_worker() -> None:
+    import app.modules.uploads.jobs  # noqa: F401 - registers the handlers and the check
+    from app.modules.jobs.registry import JOB_REGISTRY
+    from app.modules.uploads.scan import require_real_scanner
+
+    assert require_real_scanner in JOB_REGISTRY.startup_checks()

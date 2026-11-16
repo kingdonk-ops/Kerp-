@@ -9,11 +9,18 @@ import asyncio
 import uuid
 from typing import Any
 
-from app.modules.jobs.registry import JobContext, schedule_hourly_per_project
+from app.modules.jobs.registry import (
+    JobContext,
+    register_startup_check,
+    schedule_hourly_per_project,
+)
 from app.modules.jobs.service import JobError, register_job
 from app.modules.uploads import service
-from app.modules.uploads.scan import get_scanner
+from app.modules.uploads.scan import get_scanner, require_real_scanner
 from app.modules.uploads.storage import get_storage
+
+# Production never verifies uploads with the always-clean stub (T-0213).
+register_startup_check(require_real_scanner)
 
 
 @register_job(service.VERIFY_LARGE_KIND, queue="batch")

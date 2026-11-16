@@ -799,3 +799,30 @@ def test_the_api_process_does_not_import_saq_workers_or_heavy_libs_eagerly() -> 
         " assert 'app.modules.jobs.worker' not in sys.modules, 'worker imported by the API'"
     )
     subprocess.run([sys.executable, "-c", code], cwd=BACKEND, check=True)
+
+
+# --- startup checks (T-0213) -------------------------------------------------------------------
+
+
+def test_startup_checks_run_in_registration_order_with_the_settings() -> None:
+    registry = JobRegistry()
+    seen: list[tuple[str, str]] = []
+    registry.add_startup_check(lambda s: seen.append(("first", s.environment)))
+    registry.add_startup_check(lambda s: seen.append(("second", s.environment)))
+    registry.run_startup_checks(Settings(environment="test"))
+    assert seen == [("first", "test"), ("second", "test")]
+
+
+def test_a_failing_startup_check_stops_serve_before_it_connects_anywhere(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def refuse(_settings: Settings) -> None:
+        raise RuntimeError("refused by a module's startup check")
+
+    registry = JobRegistry()
+    registry.add_startup_check(refuse)
+    monkeypatch.setattr(worker_module, "load_registry", lambda: registry)
+    # No database and an unreachable Redis: the check must fail first.
+    settings = Settings(environment="test", redis_url="redis://127.0.0.1:1/0")
+    with pytest.raises(RuntimeError, match="refused by a module's startup check"):
+        asyncio.run(serve(settings))
