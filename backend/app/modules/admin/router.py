@@ -133,7 +133,10 @@ def create_user(
 def update_user(
     user_id: uuid.UUID, body: UserUpdate, principal: CurrentPrincipal, session: DbSession
 ) -> UserRead:
-    user = service.update_user(session, user_id, body, actor_id=principal.user_id)
+    try:
+        user = service.update_user(session, user_id, body, actor_id=principal.user_id)
+    except service.LastSystemAdminError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
     return UserRead.model_validate(user)
 
 
@@ -252,7 +255,14 @@ def grant(
     body: AdminGrantIn, principal: CurrentPrincipal, session: DbSession, response: Response
 ) -> AdminGrantRead:
     user = auth_service.get_user(session, body.user_id)
-    if not service.grant(session, user.id, body.grant.value, actor_id=principal.user_id):
+    try:
+        created = service.grant(session, user.id, body.grant.value, actor_id=principal.user_id)
+    except service.GrantRaceError:
+        # Another request granted it first. This request wrote nothing else, so its unit of
+        # work is rolled back here and the answer is the sequential one: already held.
+        session.rollback()
+        created = False
+    if not created:
         response.status_code = status.HTTP_200_OK
     return _admin_grant(user, body.grant.value)
 

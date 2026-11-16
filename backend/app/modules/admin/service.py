@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from typing import Any, Final
 
 from sqlalchemy import select, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.audit import service as audit
@@ -48,6 +49,11 @@ class DuplicateUserError(ValueError):
 
 class SodConfirmationError(ValueError):
     """PER-09 + hold-authority persona without ``confirm_sod`` (409, TD-151)."""
+
+
+class GrantRaceError(RuntimeError):
+    """A concurrent request granted the same kind first (unique index). The unit of work must
+    roll back; the API answers like the sequential case: 200, already held."""
 
 
 class LastSystemAdminError(ValueError):
@@ -121,17 +127,22 @@ def grant(session: Session, user_id: uuid.UUID, kind: str, *, actor_id: uuid.UUI
     users.get_user(session, user_id)
     if kind in own_admin_grants(session, tenant_id, user_id):
         return False
-    session.add(
-        AdminGrant(
-            tenant_id=tenant_id,
-            project_id=None,
-            user_id=user_id,
-            kind=kind,
-            created_by=actor_id,
-            updated_by=actor_id,
-        )
+    row = AdminGrant(
+        tenant_id=tenant_id,
+        project_id=None,
+        user_id=user_id,
+        kind=kind,
+        created_by=actor_id,
+        updated_by=actor_id,
     )
-    session.flush()
+    session.add(row)
+    try:
+        session.flush()
+    except IntegrityError as exc:
+        # A concurrent grant of the same kind landed between the check above and this
+        # insert (live unique index). No SAVEPOINT: on SQLite one opened before any write
+        # commits early. The caller's unit of work is now unusable and must roll back.
+        raise GrantRaceError(f"{kind} was granted concurrently") from exc
     _append(session, f"admin-grant:{user_id}", {"action": "grant", "grant": kind}, actor_id)
     return True
 
@@ -145,22 +156,40 @@ def revoke(session: Session, user_id: uuid.UUID, kind: str, *, actor_id: uuid.UU
         # As the write policy would; checked first because PostgreSQL silently drops rows a
         # ``FOR UPDATE`` may not update instead of refusing them.
         raise OutOfScopeError("AdminGrant not found")
-    query = select(AdminGrant).where(
-        AdminGrant.tenant_id == _tenant_id(session), AdminGrant.kind == kind
-    )
-    # Lock every live row of the kind so two System admins revoking each other at the same
-    # time cannot both pass the last-admin check (PostgreSQL; SQLite refuses the 2nd writer).
-    rows = session.scalars(query.with_for_update()).all()
+    rows = _locked_grants(session, kind)
     row = next((r for r in rows if r.user_id == user_id), None)
     if row is None:
         return False
-    if kind == SYSTEM_ADMIN and len(rows) == 1:
-        raise LastSystemAdminError("the last System admin cannot be removed")
+    if kind == SYSTEM_ADMIN and not _other_active_admins(session, rows, user_id):
+        raise LastSystemAdminError("the last active System admin cannot be removed")
     row.soft_delete()
     row.updated_by = actor_id
     session.flush()
     _append(session, f"admin-grant:{user_id}", {"action": "revoke", "grant": kind}, actor_id)
     return True
+
+
+def _locked_grants(session: Session, kind: str) -> list[AdminGrant]:
+    """Every live grant of ``kind`` in the tenant, locked until the transaction ends.
+
+    Revoking a ``system_admin`` grant and deactivating a user both lock the live
+    ``system_admin`` rows first (same query, same order), so two System admins acting at the
+    same time cannot both pass the last-admin check (PostgreSQL; SQLite refuses the second
+    writer).
+    """
+    query = select(AdminGrant).where(
+        AdminGrant.tenant_id == _tenant_id(session), AdminGrant.kind == kind
+    )
+    return list(session.scalars(query.order_by(AdminGrant.id).with_for_update()))
+
+
+def _other_active_admins(
+    session: Session, rows: Collection[AdminGrant], user_id: uuid.UUID
+) -> bool:
+    """Whether a ``system_admin`` grant in ``rows`` is held by an *active* user other than
+    ``user_id`` (TD-274: a deactivated user's grant runs nothing)."""
+    others = {r.user_id for r in rows if r.user_id != user_id}
+    return bool(users.active_user_ids(session, others))  # fresh, not the identity map
 
 
 def list_grants(session: Session, user_id: uuid.UUID | None = None) -> list[tuple[User, str]]:
@@ -189,14 +218,20 @@ def create_user(
     ``internal_domains`` (default: ``KERP_INTERNAL_EMAIL_DOMAINS``)."""
     if users.find_user_by_email(session, data.email) is not None:
         raise DuplicateUserError("an account with this e-mail exists already")
-    user = users.create_user(
-        session,
-        tenant_id=_tenant_id(session),
-        email=data.email,
-        password=None,
-        display_name=data.display_name,
-        internal_domains=internal_domains,
-    )
+    try:
+        # A concurrent create of the same e-mail that lands after the check above hits the
+        # unique constraint: 409 and the caller's unit of work rolls back. No SAVEPOINT: on
+        # SQLite one opened before any write would commit the user early (T-0211 review).
+        user = users.create_user(
+            session,
+            tenant_id=_tenant_id(session),
+            email=data.email,
+            password=None,
+            display_name=data.display_name,
+            internal_domains=internal_domains,
+        )
+    except IntegrityError as exc:
+        raise DuplicateUserError("an account with this e-mail exists already") from exc
     user.created_by = user.updated_by = actor_id
     _append(session, f"admin-user:{user.id}", {"action": "create"}, actor_id)
     return user
@@ -205,8 +240,17 @@ def create_user(
 def update_user(
     session: Session, user_id: uuid.UUID, data: UserUpdate, *, actor_id: uuid.UUID
 ) -> User:
-    """Rename, deactivate or reactivate. A deactivated user's tokens stop working at once."""
+    """Rename, deactivate or reactivate. A deactivated user's tokens stop working at once.
+
+    Deactivating the last active System admin (the caller included) raises
+    ``LastSystemAdminError``: the deployment would have nobody left to run it (TD-274).
+    """
     user = users.get_user(session, user_id)
+    if user.is_active and data.is_active is False:
+        admins = _locked_grants(session, SYSTEM_ADMIN)
+        holds = any(r.user_id == user_id for r in admins)
+        if holds and not _other_active_admins(session, admins, user_id):
+            raise LastSystemAdminError("the last active System admin cannot be deactivated")
     changed = sorted(n for n in data.model_fields_set if getattr(user, n) != getattr(data, n))
     for name in changed:
         setattr(user, name, getattr(data, name))
@@ -303,6 +347,7 @@ def remove_member(
 
 __all__ = [
     "DuplicateUserError",
+    "GrantRaceError",
     "LastSystemAdminError",
     "Member",
     "NotAMemberError",

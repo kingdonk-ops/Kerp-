@@ -19,9 +19,15 @@ release; TD-151). Revoking soft-deletes (partial unique index on live rows). Pol
 `app.is_system_admin` session reads and writes all of them; nobody else writes. The ORM
 guard refuses the same writes on SQLite. `service.grant` / `service.revoke` (audited) are
 what the appointment API (`/grants`, below) and provisioning scripts call, from a session
-bound with `is_system_admin=True`. `revoke` refuses the last live `system_admin` of the
-tenant (`LastSystemAdminError`, 409); it locks the live rows of the kind first, so two System
-admins removing each other at once cannot both succeed.
+bound with `is_system_admin=True`. `revoke` refuses the last `system_admin` held by an
+*active* user, and `update_user` refuses to deactivate that user (`LastSystemAdminError`, 409;
+T-0211, TD-274): a deactivated user's grant runs nothing. Both lock the live `system_admin`
+rows first (same query, same order), so two System admins removing or deactivating each other
+at once cannot both succeed; the active flag is read fresh (`auth.service.active_user_ids`),
+never from a `User` already loaded in the session. A user create racing a duplicate hits the
+unique constraint: 409, and the unit of work rolls back. A grant racing a duplicate raises
+`GrantRaceError`; the router rolls back its write-free unit of work and answers 200 already
+held. No SAVEPOINT is used (on SQLite one opened before any write commits early).
 
 **What the grants allow** (diff §4.1, T-0039). `system_admin`: this module's System-admin
 endpoints. `create_projects` ("Project Admin"): `POST /api/v1/projects`, nothing else; the
@@ -50,14 +56,14 @@ never from a claim, parameter or header.
 |---|---|---|
 | `GET /users` | `system_admin` | every account, with the read-only `is_internal` flag |
 | `POST /users` | `system_admin` | create an account without credentials (`email`, `display_name`); 409 if the e-mail exists |
-| `PATCH /users/{id}` | `system_admin` | `display_name`, `is_active` (deactivate / reactivate; a deactivated user's tokens stop at once) |
+| `PATCH /users/{id}` | `system_admin` | `display_name`, `is_active` (deactivate / reactivate; a deactivated user's tokens stop at once); 409 for the last active `system_admin` |
 | `POST /users/lookup` | PER-09 of any project, `system_admin` | exact e-mail → `{id, email, display_name}` of an active account, else 404 |
 | `GET /projects/{p}/members` | PER-09 of `p`, `system_admin` | members of `p` with their personas and sites |
 | `PUT /projects/{p}/members/{user}` | PER-09 of `p`, `system_admin` | set the user's complete persona set on `p` |
 | `DELETE /projects/{p}/members/{user}` | PER-09 of `p`, `system_admin` | revoke all of the user's personas on `p` |
 | `GET /grants[?user_id=]` | `system_admin` | live tenant-level grants `{user_id, email, display_name, grant}`, by e-mail |
 | `POST /grants` | `system_admin` | `{user_id, grant}` with `grant` `system_admin` or `create_projects`: 201, 200 if already held, 404 unknown user |
-| `DELETE /grants/{user}/{grant}` | `system_admin` | revoke: 204, 404 if not held, 409 for the last `system_admin` |
+| `DELETE /grants/{user}/{grant}` | `system_admin` | revoke: 204, 404 if not held, 409 for the last active `system_admin` |
 
 Everyone else gets 403; a project the caller is not a member of (or a deleted one) is 404 for
 everyone but a `system_admin` (deleted: 404 for all). Request bodies forbid unknown fields

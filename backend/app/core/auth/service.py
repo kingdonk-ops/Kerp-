@@ -162,6 +162,19 @@ def users_by_id(session: Session, user_ids: Collection[uuid.UUID]) -> dict[uuid.
     return {user.id: user for user in rows}
 
 
+def active_user_ids(session: Session, user_ids: Collection[uuid.UUID]) -> set[uuid.UUID]:
+    """The live, *active* accounts among ``user_ids``, read from the database every time.
+
+    A column query, so the answer never comes from a ``User`` already in the session's
+    identity map: after waiting on a row lock, a concurrently committed deactivation is seen
+    (the last-active-admin check, T-0211).
+    """
+    if not user_ids:
+        return set()
+    query = select(User.id).where(User.id.in_(list(user_ids)), User.is_active.is_(True))
+    return set(session.scalars(query))
+
+
 def find_user_by_email(session: Session, email: str) -> User | None:
     """The live account with exactly this e-mail (case-insensitive, trimmed), if any."""
     query = select(User).where(User.email == normalize_email(email))
