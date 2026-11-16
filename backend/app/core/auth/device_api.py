@@ -34,6 +34,7 @@ Authorisation lives here; the registry itself is ``devices.py``. The caller's
 
 from __future__ import annotations
 
+import contextlib
 import uuid
 from dataclasses import dataclass
 from typing import Annotated, Final, Literal
@@ -53,9 +54,13 @@ from app.core.auth.access import (
     load_grants,
     user_has_projects_beyond,
 )
+from app.core.auth.bearer import AUTH_UNAVAILABLE
 from app.core.auth.deps import CurrentPrincipal, get_auth_service
+from app.core.auth.lockout import WIPE_CONFIRM_POLICY, LockedOutError, ProgressiveLockout
 from app.core.auth.models import DEVICE_ACTIVE, DEVICE_REVOKED, Device
 from app.core.auth.passwords import hash_password
+from app.core.auth.revocation import RevocationUnavailableError
+from app.core.auth.router import TOO_MANY_ATTEMPTS
 from app.core.auth.runtime import AuthRuntime, get_auth_runtime
 from app.core.auth.schemas import (
     DeviceEnrolled,
@@ -387,16 +392,39 @@ def revoke(
                 "and a wrong or missing wipe secret"
             )
         },
+        status.HTTP_429_TOO_MANY_REQUESTS: {
+            "description": (
+                "Too many attempts from this client; retry after `Retry-After` seconds "
+                "(decided before the device is looked up)"
+            )
+        },
     },
 )
 def wipe_confirmed(
     device_id: uuid.UUID,
     session: DbSession,
     runtime: RuntimeDep,
+    request: Request,
     body: Annotated[WipeConfirmRequest | None, Body()] = None,
 ) -> Response:
     """The revoked device confirms it wiped its local store (records, outbox, media, keys),
-    with the wipe secret its enrolment returned."""
+    with the wipe secret its enrolment returned.
+
+    Rate-limited per client address before anything else (T-0212, TD-298): every refusal is
+    audited, so an unlimited caller could grow the ledger at will. The lock-out never looks
+    at the device, so its ``429`` reveals nothing about it."""
+    lockout = ProgressiveLockout(runtime.store, WIPE_CONFIRM_POLICY, "wipe-confirm")
+    client = request.client.host if request.client else users.UNKNOWN_CLIENT
+    try:
+        lockout.begin(client)
+    except LockedOutError as exc:
+        return JSONResponse(
+            {"detail": TOO_MANY_ATTEMPTS},
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            headers={"Retry-After": str(exc.retry_after)},
+        )
+    except RevocationUnavailableError as exc:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, AUTH_UNAVAILABLE) from exc
     tenant = runtime.settings.default_tenant_id
     if tenant is None:
         return JSONResponse(WIPE_REFUSED_BODY, status_code=WIPE_REFUSED_STATUS)
@@ -427,4 +455,10 @@ def wipe_confirmed(
             source="api",
             device_id=device_id,
         )
+        # The first confirmation of a device clears this client's failures. A repeat
+        # confirmation (already wiped) does not: otherwise one valid secret, replayed after
+        # every few refusals, would keep the counter from ever locking (T-0212 review). Best
+        # effort: a store outage here must not undo the recorded wipe.
+        with contextlib.suppress(RevocationUnavailableError):
+            lockout.succeeded(client)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

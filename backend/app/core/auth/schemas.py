@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
-from typing import Annotated, Literal
+from typing import Annotated, Final, Literal
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, field_validator
 
@@ -227,11 +227,16 @@ class DeviceEnrolled(DeviceRead):
     )
 
 
+# An issued secret is 43 characters; anything longer is refused before any work (T-0212).
+WIPE_SECRET_MAX_LENGTH: Final = 128
+
+
 class WipeConfirmRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     wipe_secret: str | None = Field(
         default=None,
+        max_length=WIPE_SECRET_MAX_LENGTH,
         description=(
             "The secret enrolment returned. Required: without it, or with a wrong one, the "
             "answer is the uniform refusal"
