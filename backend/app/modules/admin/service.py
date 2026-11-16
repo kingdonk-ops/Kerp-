@@ -51,6 +51,11 @@ class SodConfirmationError(ValueError):
     """PER-09 + hold-authority persona without ``confirm_sod`` (409, TD-151)."""
 
 
+class GrantRaceError(RuntimeError):
+    """A concurrent request granted the same kind first (unique index). The unit of work must
+    roll back; the API answers like the sequential case: 200, already held."""
+
+
 class LastSystemAdminError(ValueError):
     """Revoking this ``system_admin`` grant would leave the deployment without one (409)."""
 
@@ -130,14 +135,14 @@ def grant(session: Session, user_id: uuid.UUID, kind: str, *, actor_id: uuid.UUI
         created_by=actor_id,
         updated_by=actor_id,
     )
+    session.add(row)
     try:
-        # A SAVEPOINT: a concurrent grant of the same kind that lands between the check above
-        # and this insert hits the live unique index; only the savepoint is rolled back, so
-        # the request answers "already held" instead of a 500 (T-0211).
-        with session.begin_nested():
-            session.add(row)
-    except IntegrityError:
-        return False
+        session.flush()
+    except IntegrityError as exc:
+        # A concurrent grant of the same kind landed between the check above and this
+        # insert (live unique index). No SAVEPOINT: on SQLite one opened before any write
+        # commits early. The caller's unit of work is now unusable and must roll back.
+        raise GrantRaceError(f"{kind} was granted concurrently") from exc
     _append(session, f"admin-grant:{user_id}", {"action": "grant", "grant": kind}, actor_id)
     return True
 
@@ -184,7 +189,7 @@ def _other_active_admins(
     """Whether a ``system_admin`` grant in ``rows`` is held by an *active* user other than
     ``user_id`` (TD-274: a deactivated user's grant runs nothing)."""
     others = {r.user_id for r in rows if r.user_id != user_id}
-    return any(u.is_active for u in users.users_by_id(session, others).values())
+    return bool(users.active_user_ids(session, others))  # fresh, not the identity map
 
 
 def list_grants(session: Session, user_id: uuid.UUID | None = None) -> list[tuple[User, str]]:
@@ -214,17 +219,17 @@ def create_user(
     if users.find_user_by_email(session, data.email) is not None:
         raise DuplicateUserError("an account with this e-mail exists already")
     try:
-        # A SAVEPOINT: a concurrent create of the same e-mail that lands after the check above
-        # hits the unique constraint; the request answers 409, not 500 (T-0211).
-        with session.begin_nested():
-            user = users.create_user(
-                session,
-                tenant_id=_tenant_id(session),
-                email=data.email,
-                password=None,
-                display_name=data.display_name,
-                internal_domains=internal_domains,
-            )
+        # A concurrent create of the same e-mail that lands after the check above hits the
+        # unique constraint: 409 and the caller's unit of work rolls back. No SAVEPOINT: on
+        # SQLite one opened before any write would commit the user early (T-0211 review).
+        user = users.create_user(
+            session,
+            tenant_id=_tenant_id(session),
+            email=data.email,
+            password=None,
+            display_name=data.display_name,
+            internal_domains=internal_domains,
+        )
     except IntegrityError as exc:
         raise DuplicateUserError("an account with this e-mail exists already") from exc
     user.created_by = user.updated_by = actor_id
@@ -342,6 +347,7 @@ def remove_member(
 
 __all__ = [
     "DuplicateUserError",
+    "GrantRaceError",
     "LastSystemAdminError",
     "Member",
     "NotAMemberError",

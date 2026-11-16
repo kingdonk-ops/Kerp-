@@ -798,3 +798,34 @@ def test_a_racing_duplicate_user_answers_409(api: Api, monkeypatch: pytest.Monke
     monkeypatch.setattr(service.users, "find_user_by_email", lambda *_args: None)
     again = api.client.post(f"{ADMIN}/users", json=body, headers=root)
     assert again.status_code == 409, again.text
+
+
+def test_another_admin_deactivates_the_other_and_then_cannot_deactivate_themselves(
+    api: Api,
+) -> None:
+    _make_admin(api.db, api.users[BOB])
+    assert _deactivate(api, ALICE, caller=BOB).status_code == 200
+    assert _deactivate(api, BOB, caller=BOB).status_code == 409
+
+
+@pytest.mark.parametrize("action", ["deactivate", "revoke"])
+def test_the_last_admin_check_sees_a_deactivation_committed_meanwhile(
+    api: Api, action: str
+) -> None:
+    """T-0211 review: the other admin is already loaded in the session (as auth loads the
+    caller); a deactivation committed by another unit of work meanwhile must still count."""
+    alice, bob = api.users[ALICE], api.users[BOB]
+    _make_admin(api.db, bob)
+    mine = TenancyContext(tenant_id=T1, user_id=alice, is_system_admin=True)
+    with api.db.unit_of_work(mine) as s:
+        assert service.users.get_user(s, bob).is_active  # in this session's identity map
+        with api.db.unit_of_work(ROOT) as other:  # meanwhile: B is deactivated
+            service.update_user(other, bob, UserUpdate(is_active=False), actor_id=alice)
+        def remove_alice() -> object:
+            if action == "deactivate":
+                return service.update_user(s, alice, UserUpdate(is_active=False), actor_id=alice)
+            return service.revoke(s, alice, SYSTEM_ADMIN, actor_id=alice)
+
+        with pytest.raises(service.LastSystemAdminError):
+            remove_alice()
+        s.rollback()
