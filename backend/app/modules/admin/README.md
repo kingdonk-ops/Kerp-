@@ -23,9 +23,11 @@ bound with `is_system_admin=True`. `revoke` refuses the last `system_admin` held
 *active* user, and `update_user` refuses to deactivate that user (`LastSystemAdminError`, 409;
 T-0211, TD-274): a deactivated user's grant runs nothing. Both lock the live `system_admin`
 rows first (same query, same order), so two System admins removing or deactivating each other
-at once cannot both succeed. A grant or user create racing a duplicate hits the unique index
-inside a SAVEPOINT and answers like the sequential case (200 already held, 409 duplicate
-e-mail), never 500.
+at once cannot both succeed; the active flag is read fresh (`auth.service.active_user_ids`),
+never from a `User` already loaded in the session. A user create racing a duplicate hits the
+unique constraint: 409, and the unit of work rolls back. A grant racing a duplicate raises
+`GrantRaceError`; the router rolls back its write-free unit of work and answers 200 already
+held. No SAVEPOINT is used (on SQLite one opened before any write commits early).
 
 **What the grants allow** (diff §4.1, T-0039). `system_admin`: this module's System-admin
 endpoints. `create_projects` ("Project Admin"): `POST /api/v1/projects`, nothing else; the

@@ -818,7 +818,8 @@ def test_the_last_admin_check_sees_a_deactivation_committed_meanwhile(
     _make_admin(api.db, bob)
     mine = TenancyContext(tenant_id=T1, user_id=alice, is_system_admin=True)
     with api.db.unit_of_work(mine) as s:
-        assert service.users.get_user(s, bob).is_active  # in this session's identity map
+        held = service.users.get_user(s, bob)  # held, as Principal holds the caller
+        assert held.is_active  # in this session's identity map, strongly referenced
         with api.db.unit_of_work(ROOT) as other:  # meanwhile: B is deactivated
             service.update_user(other, bob, UserUpdate(is_active=False), actor_id=alice)
         def remove_alice() -> object:
@@ -829,3 +830,4 @@ def test_the_last_admin_check_sees_a_deactivation_committed_meanwhile(
         with pytest.raises(service.LastSystemAdminError):
             remove_alice()
         s.rollback()
+        del held
