@@ -22,8 +22,9 @@ rewritten (HS256 → RS256/EdDSA + JWKS + `jti` revocation in Redis).
 | `service.py` | `AuthService` login / refresh / logout / magic link / PIN unlock; `start_session` (the one way any provider's sign-in becomes a KERP session); `create_user`, `set_password`; user reads for the admin module (`list_users`, `get_user`, `users_by_id`, `find_user_by_email`, T-0014); internal staff rule (`is_internal_user`, T-0049) |
 | `field.py` | Magic-link tokens + delivery seam, PIN rules and the `PIN_REQUIRED` / `PIN_INVALID` / `PIN_EXHAUSTED` answers (T-0009, T-0038) |
 | `lockout.py` | `ProgressiveLockout` + policies, Redis-backed (T-0009); offline failures counted with `extra` (T-0038) |
-| `models.py` | `auth_user` table (tenant-level rows, RLS) — migration `0003`, internal staff flag + Entra link in `0013` (T-0049, ADR 0009); `auth_project_membership` (T-0010) — migration `0006`, persona CHECK widened for PER-16 in `0012` (T-0076), membership-based RLS in `0015` (T-0014); `oe_identity_device` (T-0043) — migration `0016`, `wipe_secret_hash` in `0018` (T-0080), `pin_hash` + `pin_set_at` in `0019` (T-0038) |
-| `memberships.py` | The membership store's write side (`project_grants`, `set_user_grants`, `revoke_project`; revoke = soft delete, re-grant revives), used by the admin module (T-0014) and the projects module (creator PER-09, revoke on delete; T-0039) |
+| `models.py` | `auth_user` table (tenant-level rows, RLS) — migration `0003`, internal staff flag + Entra link in `0013` (T-0049, ADR 0009); `auth_project_membership` (T-0010) — migration `0006`, persona CHECK widened for PER-16 in `0012` (T-0076), membership-based RLS in `0015` (T-0014), grant sources (`source_type`, `source_id`) in `0025` (T-0073, ADR 0008); `oe_identity_device` (T-0043) — migration `0016`, `wipe_secret_hash` in `0018` (T-0080), `pin_hash` + `pin_set_at` in `0019` (T-0038) |
+| `memberships.py` | The membership store's write side for **individual** (`direct`) rows (`project_grants`, `set_user_grants`, `revoke_project`; revoke = soft delete, re-grant revives) and the member list with sources (`project_member_grants`), used by the admin module (T-0014) and the projects module (creator PER-09, revoke on delete; T-0039) |
+| `team_grants.py` | Team-derived grants (T-0073, ADR 0008): `sync_team_link_grants`, `revoke_team_link_grants`, `team_link_grants` for the teams module, and the startup check (below) |
 | `access.py` | Persona matrix, capability tiers, SoD, scope resolution, `ProjectAccess` (`has`, `can_release_hold`) (T-0010); admin-grant lookup seam, `is_system_admin` binding, `CallerIsSystemAdmin`, `sod_warning` (T-0014); `CallerAdminGrants` (the caller's own `system_admin` / `create_projects`, cached with the scope; T-0039) |
 | `devices.py` | Device registry (`oe_identity_device`): enrol + session binding, `resolve_request_device` (last seen, revoked → `DEVICE_REVOKED`), revoke, wipe secret + uniform wipe confirmation (T-0080), `record_sync` for the sync endpoints (T-0043); the device PIN (`set_pin`, `pin_device`, T-0038) |
 | `device_api.py` | Device endpoints: enrol (with the PIN), PIN change, own / per-user lists, revoke (self, `system_admin`, PER-09 of a shared project; cross-project wipe warning), wipe-confirmed with the wipe secret (T-0043, T-0080, T-0038) |
@@ -499,7 +500,7 @@ unit of work that reads the memberships, `resolve_request_scope` (bound to the c
 own-rows policies apply, TD-152) asks the registered admin-grant lookup for the caller's own
 grants and binds `system_admin` as `TenancyContext.is_system_admin` → `app.is_system_admin`;
 the token's `sub` is bound as `app.current_user_id`, and every project of the caller's
-memberships as `app.member_project_ids`. None of these is ever read from a token claim, request
+memberships (individual and team-derived, T-0073) as `app.member_project_ids`. None of these is ever read from a token claim, request
 parameter or header. Core imports no module: the admin module registers its lookup with
 `register_admin_grant_lookup` at import (no lookup → nobody is a System admin). Neither admin
 grant is a persona or adds a capability (no `A`/`S`, TD-151). `sod_warning(personas)` flags
@@ -554,6 +555,73 @@ Project-scoped endpoints bind the request session with
 rebound to the project (scope from the memberships, never the request) and a deleted project is
 `404`. It returns the caller's `ProjectAccess`, for further decisions such as
 `access.can_release_hold(kind, site_node_id=...)` once the hold's site is known.
+
+## Team-derived grants (T-0073, ADR 0008)
+
+Diff §4.1 *Teams*: **effective access to a project = the user's individual memberships ∪ the
+grants from the teams linked to it.** Core never imports the teams module, so the derived
+grants live in `auth_project_membership` itself, keyed by source:
+
+- `source_type` `direct` (an individual assignment, `source_id` NULL) or `team_link`
+  (`source_id` = the team-project link id, no FK). CHECKs: the value set, and
+  `(source_type = 'direct') = (source_id IS NULL)`.
+- Unique `(tenant_id, member_project_id, user_id, source_type, source_id, persona,
+  site_node_id)` `NULLS NOT DISTINCT`, soft-deleted rows included (a re-grant revives its
+  row), and a partial unique index on live team rows `(tenant_id, member_project_id, user_id,
+  source_id)`: one live persona per user and link. SQLite treats NULLs as distinct, so the
+  write paths look a row up (deleted ones included) before inserting.
+- `load_grants` reads every live row whatever its source; the same grant from both sources
+  collapses into one `Grant`. `resolve_scope`, `project_access`, the allowed project list,
+  `/api/v1/me/projects` and the membership-based RLS count derived grants with no change.
+  Direct and derived rows never overwrite each other: removing one source leaves the other.
+
+**The API the teams module calls** (`team_grants.py`; a tenant-level `system_admin` session
+only, else `NotSystemAdminError`, mapped to 403 by the caller; RLS and the ORM write guard
+refuse other sessions' writes to derived rows as well):
+
+| Function | What |
+|---|---|
+| `sync_team_link_grants(session, *, link_id, project_id, persona, site_node_id, user_ids, confirm_sod=False) -> None` | The live rows of `link_id` become exactly one per user in `user_ids` with that project, persona and site. Rows that are gone or carry an old project, persona or site are soft-deleted first (flushed), then new ones inserted or matching soft-deleted ones restored; unchanged rows are not rewritten. `user_ids` is stored as given, never filtered by account status (pass every non-deleted team member) |
+| `revoke_team_link_grants(session, *, link_id) -> None` | Soft-deletes every live row of the link |
+| `team_link_grants(session) -> Mapping[UUID, frozenset[(user_id, project_id, persona, site_node_id)]]` | Every link id with live derived rows in the tenant, including ids the teams tables no longer know (orphans, for reconcile, T-0075) |
+
+- **Link roles** (TD-251): PER-01 to PER-14 except PER-09, and PER-16 (`LINK_PERSONAS`). PER-09
+  and PER-15 are individual only; they, an unknown persona, a PER-07 without a site, a site on
+  any other persona, or an unknown user raise `ValueError`.
+- **Separation of duties across sources.** A sync that would give a hold-authority persona
+  (PER-02, PER-06, PER-07, PER-11) on the project to a user holding **individual** PER-09 there
+  raises `SodConfirmationRequired` (`project_id`, `user_ids`) unless `confirm_sod=True`; only
+  users who get a new or changed row count, so re-syncing confirmed rows asks for nothing. The
+  other direction is the admin module's: assigning individual PER-09 to a user with a
+  team-derived hold persona needs `confirm_sod` there (`sod_warning` over all of the user's
+  grants on the project).
+- **Audit.** Each call that changes rows appends one entry per affected project on chain
+  `membership:<project_id>`: `action` (`team_link_sync` | `team_link_revoke`), `link_id`,
+  `added` / `removed` user ids (a re-role lists the user in both), the persona and site, and
+  `sod_warning` (with `sod_user_ids` when confirmed); the actor is the session user. A no-op
+  writes nothing.
+- **Deactivated users** keep their derived rows: a deactivated account cannot authenticate, so
+  the rows grant nothing, and reactivation restores team access with no re-sync.
+- **PER-09 member admin** (admin module): lists derived rows (`source: team`, the link id,
+  `team_name` null until T-0013 fills it in); PUT and DELETE change individual rows only;
+  DELETE of a user whose access is only team-derived is 409 `managed_through_team`.
+  `memberships.revoke_project` (project delete) refuses while derived rows remain on the
+  project (`TeamGrantsPresentError`, 409 `team_links_present`): unlink its teams first.
+
+**Startup check, fail closed.** When the module loader has not loaded `teams` and live
+`team_link` rows exist, the app refuses to start (`OrphanedTeamGrantsError`), because nothing
+would maintain them. The check runs before any tenant is bound, so on PostgreSQL it calls the
+`SECURITY DEFINER` function `kerp_live_team_link_grant_count()` (migration `0025`, pinned
+`search_path`, `EXECUTE` revoked from `PUBLIC`, granted to the migration role and `kerp_app`),
+which returns only the count across **all tenants**, never row data; on SQLite it is a plain
+count. **To disable teams**: unlink every team while the module is still loaded (which revokes
+the rows), or call `revoke_team_link_grants` for every link id from `team_link_grants()` in a
+`system_admin` session of each tenant; then remove the module.
+
+**Migration `0025`** is additive (every existing row becomes `direct`). Its downgrade is
+destructive: it deletes every `team_link` row first (a user may hold the same persona directly
+and through a team, which the old key rejects), then restores the old constraint, policies and
+columns and drops the function.
 
 ## Keys and configuration
 

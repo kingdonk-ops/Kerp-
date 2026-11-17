@@ -245,7 +245,12 @@ def resolve_scope(
 
 
 def load_grants(session: Session, tenant_id: uuid.UUID, user_id: uuid.UUID) -> list[Grant]:
-    """The user's active memberships (tenant-level rows, soft-deleted ones excluded)."""
+    """The user's active memberships (tenant-level rows, soft-deleted ones excluded).
+
+    Every source counts (ADR 0008, T-0073): individual (``direct``) and team-derived
+    (``team_link``) rows alike, nothing filters on the source. The same grant from two
+    sources collapses into one ``Grant``.
+    """
     rows = session.execute(
         select(
             ProjectMembership.member_project_id,
@@ -253,7 +258,7 @@ def load_grants(session: Session, tenant_id: uuid.UUID, user_id: uuid.UUID) -> l
             ProjectMembership.site_node_id,
         ).where(ProjectMembership.tenant_id == tenant_id, ProjectMembership.user_id == user_id)
     ).all()
-    return [Grant(row[0], Persona(row[1]), row[2]) for row in rows]
+    return list(dict.fromkeys(Grant(row[0], Persona(row[1]), row[2]) for row in rows))
 
 
 def persona_holders(
@@ -318,7 +323,7 @@ def sod_warning(personas: Iterable[Persona]) -> bool:
     """Whether a user's *full* persona set on one project combines PER-09 with a
     hold-authority persona (TD-151, edge spec §5 Admins): allowed, but the assignment must
     be confirmed and is audited with ``sod_warning: true``. Callers pass every grant of the
-    user on the project, whatever its source (T-0073 adds team-derived ones)."""
+    user on the project, whatever its source (individual or team-derived, T-0073)."""
     held = frozenset(personas)
     return Persona.PROJECT_ADMINISTRATOR in held and bool(held & HOLD_AUTHORITY)
 

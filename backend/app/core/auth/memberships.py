@@ -8,20 +8,45 @@ session (no bound project) that can see the project's rows under the membership-
 
 Revoking soft-deletes a row; granting the same persona (and site) again revives it, because
 the grant's unique key covers soft-deleted rows too.
+
+These functions write **individual** (``direct``) rows only. Team-derived (``team_link``)
+rows belong to ``team_grants`` (T-0073, ADR 0008): ``set_user_grants`` never touches them,
+``project_member_grants`` lists them with their source, and ``revoke_project`` refuses while
+live ones exist (``TeamGrantsPresentError``), because only the teams module may end them.
 """
 
 from __future__ import annotations
 
 import uuid
 from collections.abc import Collection
+from dataclasses import dataclass
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.auth.access import Grant, Persona
-from app.core.auth.models import ProjectMembership
+from app.core.auth.models import SOURCE_DIRECT, SOURCE_TEAM_LINK, ProjectMembership
 from app.core.tenancy.rls import session_tenancy
 from app.core.tenancy.scope import INCLUDE_DELETED
+
+
+class TeamGrantsPresentError(ValueError):
+    """The project still has live team-derived grants: a System admin unlinks its teams first
+    (409). Only the teams module ends derived rows (ADR 0008)."""
+
+
+@dataclass(frozen=True, slots=True)
+class MemberGrant:
+    """One live membership row with its source: ``direct`` (``source_id`` ``None``) or
+    ``team_link`` (``source_id`` = the team link id)."""
+
+    grant: Grant
+    source_type: str
+    source_id: uuid.UUID | None
+
+    @property
+    def is_direct(self) -> bool:
+        return self.source_type == SOURCE_DIRECT
 
 
 def _tenant_id(session: Session) -> uuid.UUID:
@@ -35,17 +60,30 @@ def _grant(row: ProjectMembership) -> Grant:
     return Grant(row.member_project_id, Persona(row.persona), row.site_node_id)
 
 
-def project_grants(session: Session, project_id: uuid.UUID) -> dict[uuid.UUID, set[Grant]]:
-    """The live grants on ``project_id``, per user."""
+def project_member_grants(
+    session: Session, project_id: uuid.UUID
+) -> dict[uuid.UUID, set[MemberGrant]]:
+    """Every live row on ``project_id`` with its source, per user (the member list)."""
     rows = session.scalars(
         select(ProjectMembership).where(
             ProjectMembership.tenant_id == _tenant_id(session),
             ProjectMembership.member_project_id == project_id,
         )
     )
-    members: dict[uuid.UUID, set[Grant]] = {}
+    members: dict[uuid.UUID, set[MemberGrant]] = {}
     for row in rows:
-        members.setdefault(row.user_id, set()).add(_grant(row))
+        member = MemberGrant(_grant(row), row.source_type, row.source_id)
+        members.setdefault(row.user_id, set()).add(member)
+    return members
+
+
+def project_grants(session: Session, project_id: uuid.UUID) -> dict[uuid.UUID, set[Grant]]:
+    """The live **individual** (``direct``) grants on ``project_id``, per user."""
+    members: dict[uuid.UUID, set[Grant]] = {}
+    for user_id, rows in project_member_grants(session, project_id).items():
+        direct = {r.grant for r in rows if r.is_direct}
+        if direct:
+            members[user_id] = direct
     return members
 
 
@@ -57,9 +95,11 @@ def set_user_grants(
     *,
     actor_id: uuid.UUID | None = None,
 ) -> tuple[set[Grant], set[Grant]]:
-    """Make ``grants`` the user's complete set on the project; returns ``(added, removed)``.
+    """Make ``grants`` the user's complete **individual** set on the project; returns
+    ``(added, removed)``. Team-derived rows are never touched: a grant the user also holds
+    through a team gets its own ``direct`` row, which outlives the team link.
 
-    Every grant must name ``project_id``. An empty set revokes everything.
+    Every grant must name ``project_id``. An empty set revokes every individual grant.
     """
     tenant_id = _tenant_id(session)
     if any(g.project_id != project_id for g in grants):
@@ -68,6 +108,7 @@ def set_user_grants(
         ProjectMembership.tenant_id == tenant_id,
         ProjectMembership.member_project_id == project_id,
         ProjectMembership.user_id == user_id,
+        ProjectMembership.source_type == SOURCE_DIRECT,
     )
     rows = {
         _grant(r): r for r in session.scalars(query.execution_options(**{INCLUDE_DELETED: True}))
@@ -92,6 +133,7 @@ def set_user_grants(
                 member_project_id=project_id,
                 persona=grant.persona.value,
                 site_node_id=grant.site_node_id,
+                source_type=SOURCE_DIRECT,
                 created_by=actor_id,
                 updated_by=actor_id,
             )
@@ -104,13 +146,22 @@ def revoke_project(
     session: Session, project_id: uuid.UUID, *, actor_id: uuid.UUID | None = None
 ) -> list[tuple[uuid.UUID, Grant]]:
     """Revoke every live grant on ``project_id`` (the project is being deleted: memberships of
-    a deleted project confer nothing, diff §4.1, TD-184); returns ``(user, grant)`` pairs."""
+    a deleted project confer nothing, diff §4.1, TD-184); returns ``(user, grant)`` pairs.
+
+    ``TeamGrantsPresentError`` while team-derived grants remain on the project: they are
+    ended by unlinking the teams (T-0013), never here, so they cannot outlive their link
+    unnoticed nor be re-created by the teams reconcile for a deleted project.
+    """
     rows = session.scalars(
         select(ProjectMembership).where(
             ProjectMembership.tenant_id == _tenant_id(session),
             ProjectMembership.member_project_id == project_id,
         )
     ).all()
+    if any(row.source_type == SOURCE_TEAM_LINK for row in rows):
+        raise TeamGrantsPresentError(
+            "the project has team-derived members: a system admin unlinks its teams first"
+        )
     for row in rows:
         row.soft_delete()
         row.updated_by = actor_id

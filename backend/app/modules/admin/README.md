@@ -58,9 +58,9 @@ never from a claim, parameter or header.
 | `POST /users` | `system_admin` | create an account without credentials (`email`, `display_name`); 409 if the e-mail exists |
 | `PATCH /users/{id}` | `system_admin` | `display_name`, `is_active` (deactivate / reactivate; a deactivated user's tokens stop at once); 409 for the last active `system_admin` |
 | `POST /users/lookup` | PER-09 of any project, `system_admin` | exact e-mail → `{id, email, display_name}` of an active account, else 404 |
-| `GET /projects/{p}/members` | PER-09 of `p`, `system_admin` | members of `p` with their personas and sites |
-| `PUT /projects/{p}/members/{user}` | PER-09 of `p`, `system_admin` | set the user's complete persona set on `p` |
-| `DELETE /projects/{p}/members/{user}` | PER-09 of `p`, `system_admin` | revoke all of the user's personas on `p` |
+| `GET /projects/{p}/members` | PER-09 of `p`, `system_admin` | members of `p` with their personas and sites, each grant with `source` (`direct` \| `team`), `source_id` (the team link) and `team_name` (null until T-0013) |
+| `PUT /projects/{p}/members/{user}` | PER-09 of `p`, `system_admin` | set the user's complete **individual** persona set on `p`; team-derived grants are untouched, and a persona also held through a team gets its own individual row (it outlives the team) |
+| `DELETE /projects/{p}/members/{user}` | PER-09 of `p`, `system_admin` | revoke all of the user's individual personas on `p`; 409 `managed_through_team` (with the link ids) when the user's access is only team-derived |
 | `GET /grants[?user_id=]` | `system_admin` | live tenant-level grants `{user_id, email, display_name, grant}`, by e-mail |
 | `POST /grants` | `system_admin` | `{user_id, grant}` with `grant` `system_admin` or `create_projects`: 201, 200 if already held, 404 unknown user |
 | `DELETE /grants/{user}/{grant}` | `system_admin` | revoke: 204, 404 if not held, 409 for the last active `system_admin` |
@@ -94,8 +94,9 @@ user's *full* persona set on the project and is true for PER-09 together with a 
 has `A` (PER-02, PER-06, PER-07, PER-11; derived from `PERSONAS`, so PER-16 never warns).
 Without `confirm_sod: true` such a PUT answers 409
 `{"code": "sod_confirmation_required", "sod_warning": true}`; with it the assignment is saved,
-the response carries `sod_warning: true` and the audit entry `sod_warning: true`. T-0073 feeds
-team-derived grants into the same function. Assigning PER-09 never adds hold or signing
+the response carries `sod_warning: true` and the audit entry `sod_warning: true`. The set
+counts the user's team-derived grants on the project too (T-0073, ADR 0008): individual PER-09
+for a user with a team-derived PER-02/06/07/11 needs the same confirmation. Assigning PER-09 never adds hold or signing
 capability: capabilities stay those of each persona (`access.PERSONAS`).
 
 ## Audit

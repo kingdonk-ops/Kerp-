@@ -2218,6 +2218,12 @@ export interface components {
             site_node_id: string | null;
         };
         /**
+         * GrantSource
+         * @description Where a member's grant comes from (T-0073, ADR 0008).
+         * @enum {string}
+         */
+        GrantSource: "direct" | "team";
+        /**
          * GroupBy
          * @description Group rows by ``columns`` (outermost first), with aggregates and a totals row.
          */
@@ -2535,12 +2541,33 @@ export interface components {
             /** Display Name */
             display_name: string;
             /** Grants */
-            grants: components["schemas"]["GrantRead"][];
+            grants: components["schemas"]["MemberGrantRead"][];
             /**
              * Sod Warning
              * @description PER-09 together with a hold-authority persona (confirmed with confirm_sod)
              */
             sod_warning: boolean;
+        };
+        /**
+         * MemberGrantRead
+         * @description One live grant of a project member, with its source (T-0073, ADR 0008).
+         */
+        MemberGrantRead: {
+            persona: components["schemas"]["Persona"];
+            /** Site Node Id */
+            site_node_id: string | null;
+            /** @description direct: individual assignment; team: derived from a team link, read-only */
+            source: components["schemas"]["GrantSource"];
+            /**
+             * Source Id
+             * @description The team link id of a team-derived grant
+             */
+            source_id: string | null;
+            /**
+             * Team Name
+             * @description The team's name (null until the teams module fills it in, T-0013)
+             */
+            team_name: string | null;
         };
         /** MemberRead */
         MemberRead: {
@@ -2554,7 +2581,7 @@ export interface components {
             /** Display Name */
             display_name: string;
             /** Grants */
-            grants: components["schemas"]["GrantRead"][];
+            grants: components["schemas"]["MemberGrantRead"][];
         };
         /**
          * ModuleState

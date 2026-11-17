@@ -8,7 +8,9 @@ bound with, loaded from the grants table at authentication, never from the reque
   e-mail only, rate-limited per caller (429), every lookup audited.
 * ``GET /projects/{p}/members``, ``PUT/DELETE /projects/{p}/members/{user}``: a PER-09 of
   ``p`` or a ``system_admin``. A non-member of ``p`` (or a deleted project) gets 404, a
-  member without PER-09 403.
+  member without PER-09 403. The list shows team-derived grants (``source: team``, the link
+  id) next to individual ones; PUT and DELETE change individual grants only, and DELETE of a
+  user whose access is only team-derived answers 409 ``managed_through_team`` (T-0073).
 
 * ``GET/POST /grants``, ``DELETE /grants/{user}/{grant}``: ``system_admin`` only (else 403):
   appoint and remove System admins and Project Admins (``create_projects``); the last System
@@ -37,6 +39,7 @@ from app.core.auth.access import (
 )
 from app.core.auth.deps import CurrentPrincipal
 from app.core.auth.lockout import LockedOutError, LockoutPolicy, ProgressiveLockout
+from app.core.auth.memberships import MemberGrant
 from app.core.auth.models import User
 from app.core.auth.runtime import AuthRuntime, get_auth_runtime
 from app.core.db import DbSession
@@ -45,9 +48,10 @@ from app.modules.admin.schemas import (
     AdminGrantIn,
     AdminGrantKind,
     AdminGrantRead,
-    GrantRead,
+    GrantSource,
     MemberAssign,
     MemberAssigned,
+    MemberGrantRead,
     MemberRead,
     UserCreate,
     UserLookupRequest,
@@ -89,13 +93,42 @@ def _require_project_admin(grants: list[Grant], is_admin: bool, project_id: uuid
         raise _forbidden()
 
 
+def _grant(row: MemberGrant) -> MemberGrantRead:
+    return MemberGrantRead(
+        persona=row.grant.persona,
+        site_node_id=row.grant.site_node_id,
+        source=GrantSource.DIRECT if row.is_direct else GrantSource.TEAM,
+        source_id=row.source_id,
+        team_name=None,  # filled in by the teams module (T-0013); core imports no module
+    )
+
+
+def _managed_through_team(exc: service.ManagedThroughTeamError) -> HTTPException:
+    return HTTPException(
+        status.HTTP_409_CONFLICT,
+        {
+            "code": "managed_through_team",
+            "message": str(exc),
+            "link_ids": [str(link) for link in exc.link_ids],
+        },
+    )
+
+
 def _member(member: service.Member) -> dict[str, Any]:
-    grants = sorted(member.grants, key=lambda g: (g.persona.value, str(g.site_node_id or "")))
+    grants = sorted(
+        member.grants,
+        key=lambda g: (
+            not g.is_direct,
+            g.grant.persona.value,
+            str(g.grant.site_node_id or ""),
+            str(g.source_id or ""),
+        ),
+    )
     return {
         "user_id": member.user.id,
         "email": member.user.email,
         "display_name": member.user.display_name,
-        "grants": [GrantRead(persona=g.persona, site_node_id=g.site_node_id) for g in grants],
+        "grants": [_grant(g) for g in grants],
     }
 
 
@@ -224,6 +257,8 @@ def remove_member(
         service.remove_member(session, project_id, user_id, actor_id=principal.user_id)
     except service.NotAMemberError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Not Found") from exc
+    except service.ManagedThroughTeamError as exc:
+        raise _managed_through_team(exc) from exc
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

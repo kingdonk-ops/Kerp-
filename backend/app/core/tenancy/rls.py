@@ -29,6 +29,11 @@ instead (T-0014, TD-053, edge spec §6 amendments), declared on the model's tabl
   ``app.is_system_admin``; with an owner column, the caller also reads their own rows
   (``app.current_user_id``), which is how the scope resolver reads the caller's memberships.
   Inserts need the exact scope; updates and deletes need the exact scope *and* visibility.
+  With a ``source_column`` (the memberships, ADR 0008, T-0073), rows whose source is not
+  ``'direct'`` (team-derived grants) are inserted, updated and deleted only by
+  ``app.is_system_admin`` sessions, and one extra read policy lets the census function
+  ``kerp_live_team_link_grant_count()`` (migration ``0025``, the startup check) count the live
+  derived rows of every tenant while it raises ``app.team_link_census`` for its own read.
 * ``admin_grant``: the caller reads their own rows; an ``app.is_system_admin`` session reads
   and writes all of them; nobody else inserts, updates or deletes.
 * ``access_request`` (T-0050, edge spec §6 amendments): a row is readable by its owner (the
@@ -90,6 +95,11 @@ MEMBERSHIP_POLICY_NAMES: Final = (
     "membership_update_policy",
     "membership_delete_policy",
 )
+# The extra read policy of a membership table with a source column (T-0073): only while the
+# census function of migration 0025 raises ``app.team_link_census`` for its own count.
+MEMBERSHIP_CENSUS_POLICY_NAME: Final = "membership_team_link_census_policy"
+CENSUS_SETTING: Final = "app.team_link_census"
+DIRECT_SOURCE: Final = "direct"
 ADMIN_GRANT_POLICY_NAMES: Final = ("admin_grant_read_policy", "admin_grant_write_policy")
 ACCESS_REQUEST_POLICY_NAMES: Final = (
     "access_request_read_policy",
@@ -140,11 +150,15 @@ class RlsPolicy:
     * ``kind="access_request"`` (T-0050): readable by the owner (``owner_column``), by the
       administrators (PER-09) of the project in ``project_column`` and by ``system_admin``
       sessions; only the owner inserts; updates need visibility; nobody deletes.
+
+    ``source_column`` (membership only, T-0073): rows whose value there is not ``'direct'``
+    are written by ``system_admin`` sessions only.
     """
 
     kind: Literal["membership", "admin_grant", "access_request"]
     owner_column: str | None = None
     project_column: str | None = None
+    source_column: str | None = None
 
 
 def rls_table_info(policy: RlsPolicy) -> dict[str, Any]:
@@ -169,6 +183,13 @@ def membership_visible_sql(project_column: str, owner_column: str | None = None)
     if owner_column is not None:
         clauses.append(f"{owner_column} = {_USER_EXPR}")
     return f"tenant_id = {_TENANT_EXPR} AND ({' OR '.join(clauses)})"
+
+
+def membership_census_sql(source_column: str) -> str:
+    """Read rule of the census policy: live derived rows of any tenant, only while
+    ``app.team_link_census`` is raised (by the census function of migration ``0025``)."""
+    census = f"COALESCE(NULLIF(current_setting('{CENSUS_SETTING}', true), '')::boolean, false)"
+    return f"{census} AND {source_column} <> '{DIRECT_SOURCE}' AND deleted_at IS NULL"
 
 
 def access_request_visible_sql(project_column: str, owner_column: str) -> str:
@@ -209,13 +230,23 @@ def _special_policy_sql(table: str, policy: RlsPolicy) -> list[str]:
         read, insert, update, delete = names
         visible = membership_visible_sql(policy.project_column, policy.owner_column)
         guarded = f"{SCOPE_ROW_SQL} AND {visible}"
+        insertable = SCOPE_ROW_SQL
+        if policy.source_column is not None:
+            writable = f"({policy.source_column} = '{DIRECT_SOURCE}' OR {SYSTEM_ADMIN_SQL})"
+            guarded, insertable = f"{guarded} AND {writable}", f"{insertable} AND {writable}"
         creates = [
             f"CREATE POLICY {read} ON {table} FOR SELECT USING ({visible})",
-            f"CREATE POLICY {insert} ON {table} FOR INSERT WITH CHECK ({SCOPE_ROW_SQL})",
+            f"CREATE POLICY {insert} ON {table} FOR INSERT WITH CHECK ({insertable})",
             f"CREATE POLICY {update} ON {table} FOR UPDATE USING ({guarded})"
             f" WITH CHECK ({guarded})",
             f"CREATE POLICY {delete} ON {table} FOR DELETE USING ({guarded})",
         ]
+        if policy.source_column is not None:
+            names = (*names, MEMBERSHIP_CENSUS_POLICY_NAME)
+            creates.append(
+                f"CREATE POLICY {MEMBERSHIP_CENSUS_POLICY_NAME} ON {table} FOR SELECT"
+                f" USING ({membership_census_sql(policy.source_column)})"
+            )
     else:
         if policy.owner_column is None:
             raise ValueError(f"{table}: an admin_grant policy needs owner_column")
@@ -244,7 +275,11 @@ def expected_policy_names(table: Table) -> tuple[str, ...]:
         return POLICY_NAMES
     if policy.kind == "access_request":
         return ACCESS_REQUEST_POLICY_NAMES
-    return MEMBERSHIP_POLICY_NAMES if policy.kind == "membership" else ADMIN_GRANT_POLICY_NAMES
+    if policy.kind == "membership":
+        if policy.source_column is not None:
+            return (*MEMBERSHIP_POLICY_NAMES, MEMBERSHIP_CENSUS_POLICY_NAME)
+        return MEMBERSHIP_POLICY_NAMES
+    return ADMIN_GRANT_POLICY_NAMES
 
 
 def rls_tables(metadata: MetaData, *, exempt: frozenset[str] = RLS_EXEMPT) -> list[str]:

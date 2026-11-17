@@ -3,9 +3,9 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 213 · **Closed:** 129
+**Open:** 216 · **Closed:** 129
 
-## decision (7)
+## decision (8)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -16,8 +16,9 @@
 | [TD-329](../tracker/todo/TD-329.md) | Module map: access requests live in the new access_requests module (router mount /api/v1/<module>), not admin/lobby as T-0050 and lobby README assumed; planner to align the module map and T-0050 front-matter | T-0050 | reviewer |
 | [TD-335](../tracker/todo/TD-335.md) | Planner sizing: SSO-sized security flows landed at ~3.8k changed lines (M guideline < ~800); split such tasks further in future phases | T-0054 | reviewer |
 | [TD-340](../tracker/todo/TD-340.md) | Mail planner defaults to confirm: only permanent bounces and complaints suppress; recipient locale falls back to KERP_MAIL_DEFAULT_LOCALE (users have no locale yet); send_mail takes the caller's session | T-0058 | implementer |
+| [TD-348](../tracker/todo/TD-348.md) | T-0073: deleting a project with team-derived members answers 409 (unlink teams first); T-0013 to confirm or cascade | T-0073 | implementer |
 
-## spec-gap (38)
+## spec-gap (39)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -59,6 +60,7 @@
 | [TD-310](../tracker/todo/TD-310.md) | Default landing scope for portfolio personas: first project by name or All-Projects when nothing is remembered | T-0042 | implementer |
 | [TD-312](../tracker/todo/TD-312.md) | Override binding and routing defaults (T-0035): which values are 'checked', who the approver user is | T-0035 | implementer |
 | [TD-319](../tracker/todo/TD-319.md) | Active-requests panel: a pending request hides the older decided request of the same project (diff §4.1 reads 'every pending plus the latest decided per project') | T-0050 | implementer |
+| [TD-347](../tracker/todo/TD-347.md) | T-0073: 'PUT/DELETE on a derived row returns 409' read for the per-user member API | T-0073 | implementer |
 
 ## missed (7)
 
@@ -223,7 +225,7 @@
 | [TD-330](../tracker/todo/TD-330.md) | scripts/pr_suggestions.py rebuild fails in cloud sessions: gh api --paginate follows numeric-ID repository Link URLs that the agent proxy rejects (HTTP 403); paginate with explicit repos/{owner}/{repo} page params | — | coordinator |
 | [TD-339](../tracker/todo/TD-339.md) | jobs LoopDispatcher.drain can spin forever when the commit ran on the loop's own thread (finished tasks stay in the set until their done callbacks run) | T-0058 | implementer |
 
-## risk (25)
+## risk (26)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -252,6 +254,7 @@
 | [TD-333](../tracker/todo/TD-333.md) | Reverse proxy / ingress / load balancer in front of the API must not log query strings on /api/v1/auth/sso/* (Entra code and state) | T-0054 | reviewer |
 | [TD-342](../tracker/todo/TD-342.md) | SNS endpoint /api/v1/mail/ses-events fetches an uncached certificate per new SigningCertURL path before the signature check (outbound-GET amplification for anyone knowing the topic ARN) | T-0058 | reviewer |
 | [TD-346](../tracker/todo/TD-346.md) | NFR perf job timings on shared GitHub runners are noisy (form open median ~0.3 s locally at 4x throttle); before T-0146 makes it a hard gate, decide on retries/headroom or a dedicated runner and keep a trend of perf-results.json | T-0045, T-0146 | implementer |
+| [TD-349](../tracker/todo/TD-349.md) | T-0073: census read policy on auth_project_membership is opened by the app.team_link_census setting | T-0073 | implementer |
 
 ## Closed
 

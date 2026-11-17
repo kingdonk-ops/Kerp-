@@ -14,8 +14,8 @@
   ``typ``, so it is never accepted as an access or refresh token, nor they as a ticket.
 
 ``member`` on each result: the caller already has effective access to the project (the grants
-the request scope was resolved from: direct memberships, and team-derived ones once T-0073
-lands, ADR 0008), so the UI opens it instead of offering a request.
+the request scope was resolved from: direct memberships and team-derived ones, T-0073,
+ADR 0008), so the UI opens it instead of offering a request.
 """
 
 from __future__ import annotations

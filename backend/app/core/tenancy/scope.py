@@ -39,7 +39,7 @@ from __future__ import annotations
 import uuid
 from typing import Any, Final
 
-from sqlalchemy import ColumnElement, and_, event, false, or_
+from sqlalchemy import ColumnElement, and_, event, false, inspect, or_
 from sqlalchemy.orm import (
     Mapped,
     ORMExecuteState,
@@ -51,7 +51,7 @@ from sqlalchemy.orm import (
 
 from app.core.db import GUID, Base, BaseRecordMixin
 from app.core.tenancy.context import TenancyContext
-from app.core.tenancy.rls import RlsPolicy, session_tenancy, table_policy
+from app.core.tenancy.rls import DIRECT_SOURCE, RlsPolicy, session_tenancy, table_policy
 
 INCLUDE_DELETED: Final = "include_deleted"
 
@@ -238,6 +238,12 @@ def _guard_writes(session: Session, flush_context: UOWTransaction, instances: ob
             continue
         if policy.kind == "admin_grant" and not context.is_system_admin:
             raise OutOfScopeError(f"{type(obj).__name__} not found")
+        if policy.source_column is not None and not context.is_system_admin:
+            # Derived (non-direct) membership rows: system admins only (mirrors RLS, T-0073).
+            history = inspect(obj).attrs[policy.source_column].history
+            sources = {getattr(obj, policy.source_column), *history.deleted}
+            if sources - {DIRECT_SOURCE, None}:
+                raise OutOfScopeError(f"{type(obj).__name__} not found")
         if policy.kind == "access_request" and policy.owner_column is not None:
             # Only the requester files a request; nobody deletes one (mirrors RLS, T-0050).
             own = context.user_id is not None and getattr(obj, policy.owner_column) == (

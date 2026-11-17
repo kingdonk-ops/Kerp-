@@ -6924,6 +6924,15 @@
         ],
         "title": "GrantRead"
       },
+      "GrantSource": {
+        "type": "string",
+        "enum": [
+          "direct",
+          "team"
+        ],
+        "title": "GrantSource",
+        "description": "Where a member's grant comes from (T-0073, ADR 0008)."
+      },
       "GroupBy": {
         "properties": {
           "columns": {
@@ -7638,7 +7647,7 @@
           },
           "grants": {
             "items": {
-              "$ref": "#/components/schemas/GrantRead"
+              "$ref": "#/components/schemas/MemberGrantRead"
             },
             "type": "array",
             "title": "Grants"
@@ -7659,6 +7668,64 @@
         ],
         "title": "MemberAssigned"
       },
+      "MemberGrantRead": {
+        "properties": {
+          "persona": {
+            "$ref": "#/components/schemas/Persona"
+          },
+          "site_node_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Site Node Id"
+          },
+          "source": {
+            "$ref": "#/components/schemas/GrantSource",
+            "description": "direct: individual assignment; team: derived from a team link, read-only"
+          },
+          "source_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Id",
+            "description": "The team link id of a team-derived grant"
+          },
+          "team_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Team Name",
+            "description": "The team's name (null until the teams module fills it in, T-0013)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "persona",
+          "site_node_id",
+          "source",
+          "source_id",
+          "team_name"
+        ],
+        "title": "MemberGrantRead",
+        "description": "One live grant of a project member, with its source (T-0073, ADR 0008)."
+      },
       "MemberRead": {
         "properties": {
           "user_id": {
@@ -7676,7 +7743,7 @@
           },
           "grants": {
             "items": {
-              "$ref": "#/components/schemas/GrantRead"
+              "$ref": "#/components/schemas/MemberGrantRead"
             },
             "type": "array",
             "title": "Grants"

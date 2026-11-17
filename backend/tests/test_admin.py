@@ -9,6 +9,7 @@ All data is synthetic.
 import importlib.util
 import uuid
 from collections.abc import Iterator
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -474,9 +475,10 @@ def test_a_project_administrator_manages_members_of_their_project(api: Api) -> N
     assigned = api.put(api.home, DAVE, BOB, body)
     assert assigned.status_code == 200, assigned.text
     assert assigned.json()["sod_warning"] is False
+    direct = {"source": "direct", "source_id": None, "team_name": None}
     assert assigned.json()["grants"] == [
-        {"persona": "PER-07", "site_node_id": str(SITE)},
-        {"persona": "PER-16", "site_node_id": None},
+        {"persona": "PER-07", "site_node_id": str(SITE), **direct},
+        {"persona": "PER-16", "site_node_id": None, **direct},
     ]
     co_admin = api.put(api.home, DAVE, BOB, {"grants": [{"persona": "PER-09"}]})
     assert co_admin.status_code == 200  # PER-09 for a co-admin; replaces the set
@@ -722,6 +724,9 @@ def test_migration_0015_inlines_exactly_the_live_policy_sql() -> None:
     tables = Base.metadata.tables
     for table, column, owner in migration.MEMBERSHIP_TABLES:
         policy = table_policy(tables[table])
+        assert policy is not None
+        # The memberships' source column arrived in 0025 (T-0073, test_team_grants.py).
+        policy = replace(policy, source_column=None)
         assert policy == RlsPolicy("membership", owner_column=owner, project_column=column)
         frozen = migration._membership_sql(table, column, owner)
         assert creates(rls_policy_sql(table, policy)) == creates(frozen)

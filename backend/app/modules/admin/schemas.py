@@ -118,16 +118,35 @@ class MemberAssign(BaseModel):
         return self
 
 
+class GrantSource(StrEnum):
+    """Where a member's grant comes from (T-0073, ADR 0008)."""
+
+    DIRECT = "direct"  # an individual assignment: this API changes it
+    TEAM = "team"  # derived from a team link (``source_id``): read-only here
+
+
 class GrantRead(BaseModel):
     persona: Persona
     site_node_id: uuid.UUID | None
+
+
+class MemberGrantRead(GrantRead):
+    """One live grant of a project member, with its source (T-0073, ADR 0008)."""
+
+    source: GrantSource = Field(
+        description="direct: individual assignment; team: derived from a team link, read-only"
+    )
+    source_id: uuid.UUID | None = Field(description="The team link id of a team-derived grant")
+    team_name: str | None = Field(
+        description="The team's name (null until the teams module fills it in, T-0013)"
+    )
 
 
 class MemberRead(BaseModel):
     user_id: uuid.UUID
     email: str
     display_name: str
-    grants: list[GrantRead]
+    grants: list[MemberGrantRead]
 
 
 class MemberAssigned(MemberRead):
