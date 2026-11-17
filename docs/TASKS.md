@@ -64,7 +64,7 @@
 | ✅ | [T-0019](../tracker/tasks/T-0019.md) | notifications module (in-app) behind a pluggable channel interface | notifications | S | T-0012 | #64 |
 | ✅ | [T-0035](../tracker/tasks/T-0035.md) | Per-record override of a blocked check: reasoned request, routed approver (never self), notifications, audit, bound to the checked values | validation | M | T-0018, T-0010, T-0019 | #110 |
 | ✅ | [T-0040](../tracker/tasks/T-0040.md) | Lobby discovery API: visible-in-lobby flag, lobby listing for internal users, project-code lookup | admin | S | T-0014, T-0049 | #109 |
-| 🟦 | [T-0050](../tracker/tasks/T-0050.md) | Access-request lifecycle API: pending/approved/rejected/withdrawn, rejection reason, re-request cooldown, requester's active-requests list | admin | M | T-0040, T-0019 |  |
+| 🟪 | [T-0050](../tracker/tasks/T-0050.md) | Access-request lifecycle API: pending/approved/rejected/withdrawn, rejection reason, re-request cooldown, requester's active-requests list | admin | M | T-0040, T-0019 | #112 |
 | ▶ | [T-0058](../tracker/tasks/T-0058.md) | Outbound e-mail core service: AWS SES transport, i18n templates, async send via SAQ, send log, bounce/complaint suppression (Pilot-0) | platform | M | T-0015, T-0037 |  |
 | ✅ | [T-0020](../tracker/tasks/T-0020.md) | saved_views module | saved_views | S | T-0012 | #65 |
 | ⬜ | [T-0052](../tracker/tasks/T-0052.md) | Project invites API: single-use expiring invite_token bound to the invited e-mail, one-click join, membership granted right after first sign-in (password, SSO; magic link for PER-14 invites) | admin | M | T-0014, T-0054, T-0057 |  |
