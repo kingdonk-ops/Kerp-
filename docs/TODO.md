@@ -3,15 +3,16 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 184 · **Closed:** 128
+**Open:** 185 · **Closed:** 129
 
-## decision (3)
+## decision (4)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
 | [TD-096](../tracker/todo/TD-096.md) | Approved coating ITR dropped the residual-dust rating row the ITP requires; Grating and Gridmesh ITR has no approved version: confirm with the client before shipping default templates | T-0113 | planner |
 | [TD-293](../tracker/todo/TD-293.md) | Do pilot crews share tablets? Confirm with the pilot team before go-live; if yes, add a shared-device task (device row per (device_id, user), whole-device wipe warning) | T-0143 | planner |
 | [TD-301](../tracker/todo/TD-301.md) | Field PIN API details not in the spec: PIN set via enrolment (409 PIN_ALREADY_SET), PUT /devices/{id}/pin from a bound session without the old PIN, 401 codes PIN_INVALID/PIN_EXHAUSTED, failed_offline only on unlock | T-0038 | implementer |
+| [TD-317](../tracker/todo/TD-317.md) | Confirm lobby project-code lookup rate limits (30/h per user, 1000/h deployment, 1-15 min escalating lockout) | T-0040 | coordinator |
 
 ## spec-gap (37)
 
@@ -65,7 +66,7 @@
 | [TD-208](../tracker/todo/TD-208.md) | Uploads infra: provision the kerp-vault bucket (CORS for browser PUT/GET, lifecycle on staging/), wire KERP_S3_* in compose, add MinIO to CI for the gated round-trip test | T-0016 | implementer |
 | [TD-297](../tracker/todo/TD-297.md) | Admin UI screen for deployment settings (Admin > System) is not planned in any task | T-0044 | implementer |
 
-## deferred (34)
+## deferred (33)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -77,7 +78,6 @@
 | [TD-122](../tracker/todo/TD-122.md) | Bind the request's project scope from the authorised project (tenancy context is tenant-level after T-0008) | T-0008 | implementer |
 | [TD-129](../tracker/todo/TD-129.md) | Guard the module toggle API (PUT /api/v1/modules/{name}) with the admin capability tier once RBAC lands (T-0010/T-0014) | T-0011 | implementer |
 | [TD-140](../tracker/todo/TD-140.md) | Compile-on-save checks CEL rules only at top-level variables; field-level type checking against kind context schemas | T-0018 | implementer |
-| [TD-145](../tracker/todo/TD-145.md) | Wire the project switcher to the projects/membership API and gate All-Projects on the allowed project list | T-0024 | implementer |
 | [TD-146](../tracker/todo/TD-146.md) | Send the selected project scope with API requests and key cached queries by scope | T-0024 | implementer |
 | [TD-147](../tracker/todo/TD-147.md) | Field-worker sign-in screens: magic-link request/redeem and 6-digit PIN unlock in the SPA | T-0024 | implementer |
 | [TD-149](../tracker/todo/TD-149.md) | Area/discipline scoping (PER-04) and granted-subtree scoping (PER-15) are not enforced yet | T-0010 | implementer |
@@ -104,7 +104,7 @@
 | [TD-288](../tracker/todo/TD-288.md) | pending_updates on a set with no parent default answers 409 instead of an empty offer | T-0036 | reviewer |
 | [TD-315](../tracker/todo/TD-315.md) | Override request currency: a later fully passing run of the record is not visible (no run log) | T-0035 | implementer |
 
-## later (82)
+## later (83)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -190,6 +190,7 @@
 | [TD-309](../tracker/todo/TD-309.md) | Document the one-pooled-connection-per-request rule (auth README request flow, Database.side_write_sessionmaker docstring covers read-only use) and pin the revoked-device + deactivated-user answer with a test | T-0210 | reviewer |
 | [TD-311](../tracker/todo/TD-311.md) | Deploy: when the migration owner and runtime role are split (TD-056), grant EXECUTE on kerp_lobby_projects() and kerp_lobby_project_by_code(text) to the runtime role | T-0040 | implementer |
 | [TD-314](../tracker/todo/TD-314.md) | Override UI: Request override on a blocked gate, approver inbox, i18n for validation.override_* notification kinds | T-0035 | implementer |
+| [TD-318](../tracker/todo/TD-318.md) | Narrow the void-path except OperationalError in validation _persist_findings to LockNotAvailable (55P03) | T-0035 | coordinator |
 
 ## bug (3)
 
@@ -297,6 +298,7 @@
 | ✅ | [TD-139](../tracker/todo/TD-139.md) | Confirm per-kind rule context schemas and action vocabularies (validation compiler) | 9a: rule context schemas, p6_grammar groups and action vocabularies confirmed as built and recorded in ADR 0004 Addendum F; frozen by T-0131 (user, 2026-11-13) |
 | ✅ | [TD-141](../tracker/todo/TD-141.md) | Rule store: explicit per-rule version column, findings log only non-passing rules | per-rule version column; findings log only failed/errored rules. (user, 2026-11-13) |
 | ✅ | [TD-142](../tracker/todo/TD-142.md) | PIN gating fails open if Redis evicts the pin:<sid> key: add an amr=["pin"] token claim or require maxmemory-policy noeviction | T-0038: PIN hash on the device row; the session device travels as the did token claim, so an evicted store binding no longer opens the gate (residual: first refresh token of a session bound by enrolment) |
+| ✅ | [TD-145](../tracker/todo/TD-145.md) | Wire the project switcher to the projects/membership API and gate All-Projects on the allowed project list | Done by T-0042 (PR #108): picker reads GET /api/v1/me/projects; All-Projects only for portfolio personas. |
 | ✅ | [TD-148](../tracker/todo/TD-148.md) | Module-to-navigation-group mapping for the 8-group IA is unspecified | 6a: module -> nav group mapping written into diff §6.1 (items may move later) (user, 2026-11-13) |
 | ✅ | [TD-151](../tracker/todo/TD-151.md) | Persona matrix interpretation: default-tier labels vs V/C/E/A/S, PER-03 progress sign-off, PER-09 combined with a hold-authority persona | 2a: T-0010 tier mapping confirmed (edge §5.2 amendment); PER-09 + hold-authority persona allowed with a warning at assignment and an audit-ledger entry; no admin role confers hold release or sign-off without a qualified persona and credentials (TD-099/TD-100). Spec diff §4.1, edge §5; tasks T-0014, T-0026, T-0039 (user, 2026-11-13) |
 | ✅ | [TD-152](../tracker/todo/TD-152.md) | T-0014 membership-based policy must keep the caller's own memberships readable by the scope resolver | T-0014 / PR #86: auth_project_membership read policy (migration 0015) admits user_id = app.current_user_id, and resolve_request_scope binds the token sub as app.current_user_id in its tenant-level unit of work, so the resolver reads the caller's own memberships (tests/test_rls_admin.py, test_a_plain_tenant_session_sees_no_project_or_foreign_membership; tests/test_admin.py scope resolver tests on PostgreSQL as kerp_app). |
