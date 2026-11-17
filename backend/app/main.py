@@ -23,6 +23,7 @@ from app.core.auth.device_signal import (
 from app.core.auth.field import PinGateError, pin_gate_handler
 from app.core.auth.router import router as auth_router
 from app.core.auth.runtime import check_startup_config, close_auth_runtime
+from app.core.auth.sso_router import router as sso_router
 from app.core.body_limit import BodyLimitMiddleware
 from app.core.config import Settings, get_settings
 from app.core.db import Database
@@ -122,6 +123,7 @@ def create_app(
 
     app.include_router(health_router)
     app.include_router(auth_router)  # core auth + JWKS (T-0008)
+    app.include_router(sso_router)  # Entra ID SSO, auth config, assetlinks (T-0054)
     app.include_router(device_router)  # device registry (T-0043)
     # Domain modules (app/modules/<name>/) and the per-project toggle API (T-0011).
     install_modules(app, modules_package)

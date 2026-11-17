@@ -67,6 +67,7 @@ def auth_app(
     store: Any = None,
     keys: KeySet | None = None,
     magic_links: MagicLinkSender | None = None,
+    entra_transport: Any = None,
 ) -> tuple[FastAPI, AuthRuntime]:
     """``create_app`` with a runtime on a fake Redis (or the given store)."""
     app = create_app(settings)
@@ -75,6 +76,7 @@ def auth_app(
         keys=keys or KeySet(generate_signing_key(settings.jwt_algorithm)),
         store=store if store is not None else fake_store(),
         magic_links=magic_links,
+        entra_transport=entra_transport,
     )
     install_auth_runtime(app, runtime)
     return app, runtime

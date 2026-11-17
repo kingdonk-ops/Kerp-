@@ -9,10 +9,12 @@ from pathlib import Path
 from typing import Annotated, Literal
 from urllib.parse import urlsplit
 
-from pydantic import Field, SecretStr, field_validator, model_validator
+from pydantic import Field, SecretStr, ValidationInfo, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 PACKAGE_NAME = "kerp-backend"
+# The Entra ID SSO callback (T-0054): the one web redirect URI of the app registration.
+ENTRA_CALLBACK_PATH = "/api/v1/auth/sso/entra/callback"
 
 Environment = Literal["development", "test", "production"]
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
@@ -128,6 +130,21 @@ class Settings(BaseSettings):
     # rejection before the user may ask for the same project again. 0 disables it.
     access_request_cooldown_hours: int = Field(default=24, ge=0, le=24 * 365)
 
+    # Entra ID SSO, identity only (T-0054, diff §4.5). Enabled only when both the tenant id
+    # and the client id are set; both are GUIDs, so the authority can only ever be the
+    # company tenant (never ``common`` / ``organizations``). The client secret comes from
+    # the secret store / environment, never the repo. The redirect URI is the public
+    # ``https://<deployment>/api/v1/auth/sso/entra/callback`` registered on the app
+    # registration (required in production; elsewhere derived from the request).
+    entra_tenant_id: str | None = None
+    entra_client_id: str | None = None
+    entra_client_secret: SecretStr | None = Field(default=None, repr=False)
+    entra_redirect_uri: str | None = None
+    # Android App Link verification (``/.well-known/assetlinks.json``, diff §4.5 Native
+    # handoff): the app's package name and its signing-certificate SHA-256 fingerprints.
+    android_app_package: str | None = None
+    android_app_cert_fingerprints: Annotated[tuple[str, ...], NoDecode] = ()
+
     # Notification channels (T-0019, TD-168): the registered channel names every notification
     # goes to (JSON list in the environment). ``in_app`` is the inbox record and always on;
     # FCM push (T-0144) and e-mail (TD-084) are added here once they exist.
@@ -168,6 +185,62 @@ class Settings(BaseSettings):
                 )
             domains.add(entry)
         return tuple(sorted(domains))
+
+    @field_validator("entra_tenant_id", "entra_client_id", mode="before")
+    @classmethod
+    def _entra_guid(cls, value: object, info: ValidationInfo) -> object:
+        """A GUID, lower-cased; empty means unset. ``common``, ``organizations``, a domain
+        name or anything else that is not one tenant's / app's GUID is refused at startup."""
+        if not isinstance(value, str):
+            return value
+        text = value.strip().lower()
+        if not text:
+            return None
+        if not _GUID.match(text):
+            raise ValueError(
+                f"{info.field_name} must be a GUID (the company tenant / app registration id; "
+                "never 'common' or 'organizations')"
+            )
+        return text
+
+    @field_validator("entra_redirect_uri", mode="before")
+    @classmethod
+    def _entra_redirect_uri(cls, value: object) -> object:
+        if not isinstance(value, str):
+            return value
+        text = value.strip()
+        if not text:
+            return None
+        parts = urlsplit(text)
+        if parts.scheme not in ("https", "http") or not parts.hostname or parts.query:
+            raise ValueError("entra_redirect_uri must be an absolute http(s) URL without query")
+        if parts.path != ENTRA_CALLBACK_PATH:
+            raise ValueError(f"entra_redirect_uri must end in {ENTRA_CALLBACK_PATH}")
+        return text
+
+    @field_validator("android_app_cert_fingerprints", mode="before")
+    @classmethod
+    def _parse_fingerprints(cls, value: object) -> object:
+        """``"AA:BB:…"`` (32 colon-separated hex bytes), comma-separated; upper-cased."""
+        if isinstance(value, str):
+            value = value.split(",")
+        if not isinstance(value, list | tuple | set | frozenset):
+            return value
+        prints: list[str] = []
+        for raw in value:
+            if not isinstance(raw, str):
+                raise ValueError("android_app_cert_fingerprints entries must be strings")
+            entry = raw.strip().upper()
+            if not entry:
+                continue
+            if not _FINGERPRINT.match(entry):
+                raise ValueError(
+                    f"android_app_cert_fingerprints entry {entry!r} is not a SHA-256 "
+                    "fingerprint (32 colon-separated hex bytes)"
+                )
+            if entry not in prints:
+                prints.append(entry)
+        return tuple(prints)
 
     @field_validator("web_origin", mode="before")
     @classmethod
@@ -230,6 +303,11 @@ class Settings(BaseSettings):
         return self
 
     @property
+    def entra_enabled(self) -> bool:
+        """Entra ID SSO is offered only with both the tenant and the client id (diff §4.5)."""
+        return self.entra_tenant_id is not None and self.entra_client_id is not None
+
+    @property
     def api_docs_active(self) -> bool:
         """Whether the API docs and OpenAPI schema are served (explicit setting, else non-prod)."""
         if self.api_docs_enabled is None:
@@ -244,6 +322,8 @@ class Settings(BaseSettings):
         return self.hsts_enabled
 
 
+_GUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
+_FINGERPRINT = re.compile(r"^[0-9A-F]{2}(:[0-9A-F]{2}){31}$")
 _ORIGIN_SCHEME = re.compile(r"^[a-z][a-z0-9+.-]*$")
 _DEFAULT_PORTS = frozenset({("http", 80), ("https", 443)})
 

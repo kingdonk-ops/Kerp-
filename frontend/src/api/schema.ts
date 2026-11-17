@@ -13,7 +13,8 @@ export interface paths {
         };
         /**
          * Health
-         * @description Process is up and serving requests. Does not probe external dependencies.
+         * @description Process is up and serving requests. Does not probe external dependencies; with Entra
+         *     ID SSO enabled it reads one marker from the auth store (``warnings``).
          */
         get: operations["health_health_get"];
         put?: never;
@@ -186,6 +187,111 @@ export interface paths {
         };
         /** Me */
         get: operations["me_api_v1_auth_me_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Auth Config
+         * @description The sign-in methods: Entra ID SSO as the preferred one when the deployment offers it,
+         *     password always (SSO is promoted, never enforced, diff §4.5). Needs no key or Redis.
+         */
+        get: operations["auth_config_api_v1_auth_config_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/sso/entra/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Sso Start
+         * @description Start an Entra ID sign-in: a redirect to the company tenant's authority.
+         */
+        get: operations["sso_start_api_v1_auth_sso_entra_start_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/sso/entra/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Sso Callback
+         * @description Entra's redirect back: verify everything, then sign in (web) or hand off (native).
+         *
+         *     Always a redirect that clears the pre-auth cookie; a refusal carries ``error=<code>``.
+         */
+        get: operations["sso_callback_api_v1_auth_sso_entra_callback_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/sso/entra/exchange": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sso Exchange
+         * @description The native app redeems its App Link code with its verifier and device id: a new KERP
+         *     session in the native body transport (the refresh token in the body).
+         */
+        post: operations["sso_exchange_api_v1_auth_sso_entra_exchange_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/.well-known/assetlinks.json": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Assetlinks
+         * @description Digital Asset Links for the verified Android App Link ``/app/sso-return`` (from
+         *     ``KERP_ANDROID_APP_PACKAGE`` + ``KERP_ANDROID_APP_CERT_FINGERPRINTS``).
+         */
+        get: operations["assetlinks__well_known_assetlinks_json_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1567,6 +1673,15 @@ export interface components {
             fn: "sum" | "avg" | "min" | "max" | "count" | "count-distinct";
         };
         /**
+         * AuthConfigResponse
+         * @description What the sign-in screen offers. No secret, no tenant id.
+         */
+        AuthConfigResponse: {
+            password?: components["schemas"]["PasswordOption"];
+            /** @description Present when the deployment offers Entra ID SSO */
+            sso?: components["schemas"]["SsoOption"] | null;
+        };
+        /**
          * CheckFinding
          * @description A rule of the set that did not pass. ``message`` is the user-readable reason.
          */
@@ -2080,6 +2195,11 @@ export interface components {
             status: "ok";
             /** Version */
             version: string;
+            /**
+             * Warnings
+             * @description Configuration warnings, absent when there are none. `sso_acct_claim_missing`: an Entra ID SSO sign-in was refused in the last 24 h because the ID token had no `acct` claim (enable the optional claims `email`, `acct`, `xms_edov`)
+             */
+            warnings?: string[] | null;
         };
         /**
          * JobCreate
@@ -2540,6 +2660,15 @@ export interface components {
             checked_values_hash: string;
             /** Audit Chain Key */
             audit_chain_key: string;
+        };
+        /** PasswordOption */
+        PasswordOption: {
+            /**
+             * Available
+             * @default true
+             * @constant
+             */
+            available: true;
         };
         /**
          * PendingAccessRequest
@@ -3085,6 +3214,47 @@ export interface components {
              * @enum {string}
              */
             direction: "asc" | "desc";
+        };
+        /**
+         * SsoExchangeRequest
+         * @description The native app redeems the single-use exchange code of its App Link (diff §4.5).
+         */
+        SsoExchangeRequest: {
+            /** Code */
+            code: string;
+            /**
+             * Verifier
+             * @description The app-generated verifier whose S256 hash `/start` received
+             */
+            verifier: string;
+            /**
+             * Device Id
+             * Format: uuid
+             */
+            device_id: string;
+        };
+        /**
+         * SsoOption
+         * @description Entra ID SSO is offered: the promoted, default sign-in for company staff (diff §4.5
+         *     *SSO promoted, password kept*). Password sign-in stays available for everyone.
+         */
+        SsoOption: {
+            /**
+             * Provider
+             * @default entra
+             * @constant
+             */
+            provider: "entra";
+            /**
+             * Preferred
+             * @default true
+             */
+            preferred: boolean;
+            /**
+             * Start Url
+             * @description Open by top-level navigation (web) or in the system browser (Android, with `device_id` and `app_challenge`)
+             */
+            start_url: string;
         };
         /**
          * TokenResponse
@@ -3662,6 +3832,187 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["MeResponse"];
                 };
+            };
+        };
+    };
+    auth_config_api_v1_auth_config_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthConfigResponse"];
+                };
+            };
+        };
+    };
+    sso_start_api_v1_auth_sso_entra_start_get: {
+        parameters: {
+            query?: {
+                invite_token?: string | null;
+                /** @description The enrolling field client's device id */
+                device_id?: string | null;
+                /** @description Native app only: S256 hash of its own verifier (with `device_id`); the callback then hands off through the App Link with a single-use code */
+                app_challenge?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            302: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description SSO is not offered by this deployment */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sso_callback_api_v1_auth_sso_entra_callback_get: {
+        parameters: {
+            query?: {
+                state?: string | null;
+                code?: string | null;
+                error?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                kerp_sso_preauth?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            303: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description SSO is not offered by this deployment */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sso_exchange_api_v1_auth_sso_entra_exchange_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SsoExchangeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TokenResponse"];
+                };
+            };
+            /** @description Bad, expired, reused or foreign code or verifier (the same answer for any device); with valid credentials `code: DEVICE_REVOKED` for a revoked device */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `Origin` is not an allow-listed native app */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description SSO is not offered by this deployment */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    assetlinks__well_known_assetlinks_json_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description No Android app is configured */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

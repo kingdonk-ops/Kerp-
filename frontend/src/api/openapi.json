@@ -11,7 +11,7 @@
           "platform"
         ],
         "summary": "Health",
-        "description": "Process is up and serving requests. Does not probe external dependencies.",
+        "description": "Process is up and serving requests. Does not probe external dependencies; with Entra\nID SSO enabled it reads one marker from the auth store (``warnings``).",
         "operationId": "health_health_get",
         "responses": {
           "200": {
@@ -400,6 +400,291 @@
             "HTTPBearer": []
           }
         ]
+      }
+    },
+    "/api/v1/auth/config": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Auth Config",
+        "description": "The sign-in methods: Entra ID SSO as the preferred one when the deployment offers it,\npassword always (SSO is promoted, never enforced, diff §4.5). Needs no key or Redis.",
+        "operationId": "auth_config_api_v1_auth_config_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthConfigResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/sso/entra/start": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Sso Start",
+        "description": "Start an Entra ID sign-in: a redirect to the company tenant's authority.",
+        "operationId": "sso_start_api_v1_auth_sso_entra_start_get",
+        "parameters": [
+          {
+            "name": "invite_token",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 512
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Invite Token"
+            }
+          },
+          {
+            "name": "device_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The enrolling field client's device id",
+              "title": "Device Id"
+            },
+            "description": "The enrolling field client's device id"
+          },
+          {
+            "name": "app_challenge",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]{43}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Native app only: S256 hash of its own verifier (with `device_id`); the callback then hands off through the App Link with a single-use code",
+              "title": "App Challenge"
+            },
+            "description": "Native app only: S256 hash of its own verifier (with `device_id`); the callback then hands off through the App Link with a single-use code"
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "SSO is not offered by this deployment"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/sso/entra/callback": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Sso Callback",
+        "description": "Entra's redirect back: verify everything, then sign in (web) or hand off (native).\n\nAlways a redirect that clears the pre-auth cookie; a refusal carries ``error=<code>``.",
+        "operationId": "sso_callback_api_v1_auth_sso_entra_callback_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "State"
+            }
+          },
+          {
+            "name": "code",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Code"
+            }
+          },
+          {
+            "name": "error",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Error"
+            }
+          },
+          {
+            "name": "kerp_sso_preauth",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Kerp Sso Preauth"
+            }
+          }
+        ],
+        "responses": {
+          "303": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "SSO is not offered by this deployment"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/sso/entra/exchange": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Sso Exchange",
+        "description": "The native app redeems its App Link code with its verifier and device id: a new KERP\nsession in the native body transport (the refresh token in the body).",
+        "operationId": "sso_exchange_api_v1_auth_sso_entra_exchange_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SsoExchangeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Bad, expired, reused or foreign code or verifier (the same answer for any device); with valid credentials `code: DEVICE_REVOKED` for a revoked device"
+          },
+          "403": {
+            "description": "`Origin` is not an allow-listed native app"
+          },
+          "404": {
+            "description": "SSO is not offered by this deployment"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/.well-known/assetlinks.json": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Assetlinks",
+        "description": "Digital Asset Links for the verified Android App Link ``/app/sso-return`` (from\n``KERP_ANDROID_APP_PACKAGE`` + ``KERP_ANDROID_APP_CERT_FINGERPRINTS``).",
+        "operationId": "assetlinks__well_known_assetlinks_json_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "404": {
+            "description": "No Android app is configured"
+          }
+        }
       }
     },
     "/api/v1/devices/enrol": {
@@ -5285,6 +5570,27 @@
         ],
         "title": "Aggregate"
       },
+      "AuthConfigResponse": {
+        "properties": {
+          "password": {
+            "$ref": "#/components/schemas/PasswordOption"
+          },
+          "sso": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SsoOption"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Present when the deployment offers Entra ID SSO"
+          }
+        },
+        "type": "object",
+        "title": "AuthConfigResponse",
+        "description": "What the sign-in screen offers. No secret, no tenant id."
+      },
       "CheckFinding": {
         "properties": {
           "rule_key": {
@@ -6480,6 +6786,21 @@
           "version": {
             "type": "string",
             "title": "Version"
+          },
+          "warnings": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Warnings",
+            "description": "Configuration warnings, absent when there are none. `sso_acct_claim_missing`: an Entra ID SSO sign-in was refused in the last 24 h because the ID token had no `acct` claim (enable the optional claims `email`, `acct`, `xms_edov`)"
           }
         },
         "type": "object",
@@ -7536,6 +7857,18 @@
         ],
         "title": "OverrideRead",
         "description": "An override as stored (quality-and-inspection.md §Per-record override)."
+      },
+      "PasswordOption": {
+        "properties": {
+          "available": {
+            "type": "boolean",
+            "const": true,
+            "title": "Available",
+            "default": true
+          }
+        },
+        "type": "object",
+        "title": "PasswordOption"
       },
       "PendingAccessRequest": {
         "properties": {
@@ -8997,6 +9330,62 @@
           "column"
         ],
         "title": "SortKey"
+      },
+      "SsoExchangeRequest": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 16,
+            "title": "Code"
+          },
+          "verifier": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._~-]{43,128}$",
+            "title": "Verifier",
+            "description": "The app-generated verifier whose S256 hash `/start` received"
+          },
+          "device_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Device Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "code",
+          "verifier",
+          "device_id"
+        ],
+        "title": "SsoExchangeRequest",
+        "description": "The native app redeems the single-use exchange code of its App Link (diff §4.5)."
+      },
+      "SsoOption": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "const": "entra",
+            "title": "Provider",
+            "default": "entra"
+          },
+          "preferred": {
+            "type": "boolean",
+            "title": "Preferred",
+            "default": true
+          },
+          "start_url": {
+            "type": "string",
+            "title": "Start Url",
+            "description": "Open by top-level navigation (web) or in the system browser (Android, with `device_id` and `app_challenge`)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start_url"
+        ],
+        "title": "SsoOption",
+        "description": "Entra ID SSO is offered: the promoted, default sign-in for company staff (diff §4.5\n*SSO promoted, password kept*). Password sign-in stays available for everyone."
       },
       "TokenResponse": {
         "properties": {

@@ -231,9 +231,11 @@ UNKNOWN_CLIENT = "unknown"
 
 
 class AuthService:
-    def __init__(self, runtime: AuthRuntime, provider: AuthProvider | None = None) -> None:
+    def __init__(
+        self, runtime: AuthRuntime, provider: AuthProvider[PasswordCredentials] | None = None
+    ) -> None:
         self.runtime = runtime
-        self.provider: AuthProvider = provider or LocalPasswordProvider()
+        self.provider: AuthProvider[PasswordCredentials] = provider or LocalPasswordProvider()
         store = runtime.store
         self.login_lockout = ProgressiveLockout(store, LOGIN_POLICY, "login")
         self.login_account_lockout = ProgressiveLockout(
@@ -280,10 +282,7 @@ class AuthService:
         # Credentials first (T-0080, TD-291): only a caller who proved the account learns
         # that the device it names is revoked (and is told to wipe).
         refuse_revoked_device(session, device_id)
-        self._signed_in(user)
-        session_id = uuid.uuid4()
-        bound = self._bind_sign_in_device(session, user.id, tenant, session_id, device_id)
-        return self._issue_pair(user.id, tenant, session_id, device_id=bound)
+        return self.start_session(session, user, device_id=device_id)
 
     def refresh(
         self, session: Session, refresh_token: str, *, device_id: uuid.UUID | None = None
@@ -353,10 +352,20 @@ class AuthService:
         ).one_or_none()
         if user is None or not user.is_active:
             raise AuthenticationError("user not active")
+        return self.start_session(session, user, device_id=device_id)
+
+    def start_session(
+        self, session: Session, user: User, *, device_id: uuid.UUID | None = None
+    ) -> TokenPair:
+        """A new KERP session for ``user``, whose identity a provider has just proved
+        (password, magic link, Entra ID SSO: T-0054): the internal flag is recomputed, the
+        session is bound to ``device_id`` when that is an active device the user enrolled,
+        and the same 15-minute access + 12-hour refresh pair is issued. The caller has
+        already refused a revoked device (credentials first, T-0080)."""
         self._signed_in(user)
         session_id = uuid.uuid4()
-        bound = self._bind_sign_in_device(session, user_id, tenant_id, session_id, device_id)
-        return self._issue_pair(user_id, tenant_id, session_id, device_id=bound)
+        bound = self._bind_sign_in_device(session, user.id, user.tenant_id, session_id, device_id)
+        return self._issue_pair(user.id, user.tenant_id, session_id, device_id=bound)
 
     def unlock(
         self,
@@ -431,7 +440,7 @@ class AuthService:
         return self.runtime.tokens.now() - claims.issued_at >= limit
 
     def _signed_in(self, user: User) -> None:
-        """Every successful sign-in (password, magic link; SSO with T-0054) recomputes the
+        """Every successful sign-in (password, magic link, Entra ID SSO) recomputes the
         internal flag, so a domain removed from the list takes effect at the next one. A
         refresh or PIN unlock continues a session and is not a sign-in."""
         refresh_internal_flag(user, self.runtime.settings.internal_email_domains)

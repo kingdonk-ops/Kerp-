@@ -42,7 +42,7 @@ hardcoded config, no `.env` file is read).
 | `KERP_MIGRATION_DATABASE_URL` | unset (= `KERP_DATABASE_URL`) | Schema-owner URL Alembic runs as |
 | `KERP_MAX_BODY_BYTES` | `1048576` (1 MiB) | Largest request body any endpoint accepts (413 above it; min 1024). File bytes go to object storage by presigned URL and are not capped by it (`app/core/body_limit.py`) |
 | `KERP_REDIS_URL` | unset | Redis URL (auth token revocation; job queue later). Required in production |
-| `KERP_JWT_*`, `KERP_ACCESS_TOKEN_MINUTES`, `KERP_REFRESH_TOKEN_HOURS`, `KERP_DEFAULT_TENANT_ID`, `KERP_WEB_ORIGIN`, `KERP_NATIVE_APP_ORIGINS`, `KERP_INTERNAL_EMAIL_DOMAINS` | see `app/core/auth/README.md` | Token signing keys and lifetimes, the deployment tenant (required in production: the app does not start without it), refresh-cookie origin (optional; set it behind a proxy, see Container image), the native field app's origins (optional; body refresh-token transport and the API's CORS list; must not contain the web origin, which must then be set, or the app does not start), the e-mail domains of internal staff (optional; comma-separated, exact match; a malformed entry refuses startup) |
+| `KERP_JWT_*`, `KERP_ACCESS_TOKEN_MINUTES`, `KERP_REFRESH_TOKEN_HOURS`, `KERP_DEFAULT_TENANT_ID`, `KERP_WEB_ORIGIN`, `KERP_NATIVE_APP_ORIGINS`, `KERP_INTERNAL_EMAIL_DOMAINS`, `KERP_ENTRA_*`, `KERP_ANDROID_APP_*` | see `app/core/auth/README.md` | Token signing keys and lifetimes, the deployment tenant (required in production: the app does not start without it), refresh-cookie origin (optional; set it behind a proxy, see Container image), the native field app's origins (optional; body refresh-token transport and the API's CORS list; must not contain the web origin, which must then be set, or the app does not start), the e-mail domains of internal staff (optional; comma-separated, exact match; a malformed entry refuses startup) |
 | `KERP_STORAGE_BUCKET`, `KERP_S3_ENDPOINT_URL`, `KERP_S3_PUBLIC_ENDPOINT_URL`, `KERP_S3_ACCESS_KEY_ID`, `KERP_S3_SECRET_ACCESS_KEY`, `KERP_UPLOAD_*`, `KERP_DOWNLOAD_URL_SECONDS` | see `app/modules/uploads/README.md` | Object storage (S3 / MinIO) and upload limits |
 | `KERP_ACCESS_REQUEST_COOLDOWN_HOURS` | `24` | Hours after a rejected access request before the same user may ask for the same project again (409 `ACCESS_REQUEST_COOLDOWN` before that); `0` disables the cooldown (`app/modules/access_requests/README.md`, diff §4.1) |
 | `KERP_S3_REGION` | `ap-southeast-2` | S3 region, set per deployment (TD-171 decision 13a, diff §4.4); MinIO ignores it |
@@ -180,6 +180,19 @@ A production container (the image default) needs:
   the lobby list; others are external until linked to a company Entra member account (T-0049,
   ADR 0009). Exact match, no wildcards; an entry with `@`, a space or `*` stops startup. Run
   migration `0013` before deploying this version.
+- Entra ID SSO (optional, T-0054; `app/core/auth/README.md`, *Entra ID SSO*):
+  `KERP_ENTRA_TENANT_ID` and `KERP_ENTRA_CLIENT_ID` (GUIDs; both set = SSO offered),
+  `KERP_ENTRA_REDIRECT_URI` (`https://<deployment>/api/v1/auth/sso/entra/callback`) and the
+  **secret** `KERP_ENTRA_CLIENT_SECRET`, injected from the secret store (never in the repo, an
+  image or compose file). Production refuses to start with SSO enabled but no secret or redirect
+  URI. **The app registration must emit the optional ID-token claims `email`, `acct` and
+  `xms_edov`: without `acct` every SSO sign-in is refused** (logged as `acct_claim_missing`;
+  the server logs a start-up warning naming the claims, and `/health` reports
+  `warnings: ["sso_acct_claim_missing"]` for 24 h after such a refusal). After deploying, do one
+  test sign-in with a member account and check it lands signed in.
+- Android App Link (optional, with the Capacitor build, T-0143): `KERP_ANDROID_APP_PACKAGE` and
+  `KERP_ANDROID_APP_CERT_FINGERPRINTS` (SHA-256 of the signing certificate, `AA:BB:…`) serve
+  `/.well-known/assetlinks.json`.
 
 ```bash
 docker run --rm -p 8000:8000 -e KERP_DEFAULT_TENANT_ID=<tenant uuid> \
@@ -219,8 +232,8 @@ pinned to a version outside its specifier, if a pin has no hash, or if the Docke
 
 ## Endpoints
 
-- `GET /health` → `200 {"status": "ok", "version": "<version>"}`
-- `GET /.well-known/jwks.json`, `POST /api/v1/auth/{login,refresh,logout}`, `GET /api/v1/auth/me` — see `app/core/auth/README.md`
+- `GET /health` → `200 {"status": "ok", "version": "<version>"}` (plus `warnings` when there are any, e.g. `sso_acct_claim_missing`, T-0054)
+- `GET /.well-known/jwks.json`, `POST /api/v1/auth/{login,refresh,logout}`, `GET /api/v1/auth/me`, `GET /api/v1/auth/config`, `/api/v1/auth/sso/entra/*`, `GET /.well-known/assetlinks.json` — see `app/core/auth/README.md`
 
 ## Database (T-0005)
 
