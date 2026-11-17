@@ -3,11 +3,11 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 61/172 tasks done (35%) · **ready now:** 17 · **epics awaiting breakdown:** 47
+**Overall:** 62/172 tasks done (36%) · **ready now:** 19 · **epics awaiting breakdown:** 47
 
 | Phase | Tasks done | Progress |
 |---|---|---|
-| 0 · Platform foundations | 61/88 | `██████░░░░` 69% |
+| 0 · Platform foundations | 62/88 | `███████░░░` 70% |
 | 1 · Asset & Quality backbone | 0/75 (+1 epics) | `░░░░░░░░░░` 0% |
 | 2 · Welding quality | 0/9 | `░░░░░░░░░░` 0% |
 | 3 · Logistics | 0/0 (+7 epics) | `░░░░░░░░░░` 0% |
@@ -50,10 +50,10 @@
 | ✅ | [T-0014](../tracker/tasks/T-0014.md) | admin module: user + project-membership administration API (PER-09 on its projects), admin grants table, membership-based RLS on projects and tenant-level tables | admin | M | T-0010, T-0011, T-0012 | #86 |
 | ✅ | [T-0039](../tracker/tasks/T-0039.md) | System admin appoints Project Admins: system_admin/create_projects grant API, project creation gated on create_projects, creator gets PER-09 | admin | S | T-0014 | #92 |
 | ✅ | [T-0044](../tracker/tasks/T-0044.md) | Deployment (tenant) settings: offline window (default 7, max 14 days) and new-project defaults (status, timezone, currency, locale) | admin | S | T-0039 | #93 |
-| 🟪 | [T-0073](../tracker/tasks/T-0073.md) | Team-derived project grants in core auth: membership rows keyed by source (direct \| team_link), sync/revoke API, load_grants union, PER-09 sees but cannot edit team rows | identity | M | T-0010, T-0014, T-0076 | #119 |
+| ✅ | [T-0073](../tracker/tasks/T-0073.md) | Team-derived project grants in core auth: membership rows keyed by source (direct \| team_link), sync/revoke API, load_grants union, PER-09 sees but cannot edit team rows | identity | M | T-0010, T-0014, T-0076 | #119 |
 | ✅ | [T-0076](../tracker/tasks/T-0076.md) | PER-16 Project Viewer persona: Viewer tier (V only), single-project scope, in the core persona/capability model and membership CHECK | identity | S | T-0010 | #76 |
 | ▶ | [T-0079](../tracker/tasks/T-0079.md) | Tenants directory table + tenant_id FK on every table (ADR) | platform | M | T-0014 |  |
-| ⬜ | [T-0013](../tracker/tasks/T-0013.md) | teams module: tenant-level teams, team membership, team-project links with a role, team service contract | teams | M | T-0010, T-0011, T-0012, T-0014, T-0073 |  |
+| ▶ | [T-0013](../tracker/tasks/T-0013.md) | teams module: tenant-level teams, team membership, team-project links with a role, team service contract | teams | M | T-0010, T-0011, T-0012, T-0014, T-0073 |  |
 | ✅ | [T-0015](../tracker/tasks/T-0015.md) | SAQ worker + Redis + jobs module (enqueue/status/poll), interactive+batch priority queues | jobs | M | T-0003, T-0011 | #40 |
 | ⬜ | [T-0075](../tracker/tasks/T-0075.md) | teams reconcile: full-tuple comparison of team-derived grants against the teams tables, orphan link ids, --fix | teams | S | T-0013, T-0073 |  |
 | ✅ | [T-0016](../tracker/tasks/T-0016.md) | Storage service + presigned uploads (presign/complete, sha256 verify, scan stub, orphan sweep) | uploads | M | T-0015 | #49 |
@@ -68,7 +68,7 @@
 | ✅ | [T-0058](../tracker/tasks/T-0058.md) | Outbound e-mail core service: AWS SES transport, i18n templates, async send via SAQ, send log, bounce/complaint suppression (Pilot-0) | platform | M | T-0015, T-0037 | #116 |
 | ✅ | [T-0020](../tracker/tasks/T-0020.md) | saved_views module | saved_views | S | T-0012 | #65 |
 | ⬜ | [T-0052](../tracker/tasks/T-0052.md) | Project invites API: single-use expiring invite_token bound to the invited e-mail, one-click join, membership granted right after first sign-in (password, SSO; magic link for PER-14 invites) | admin | M | T-0014, T-0054, T-0057 |  |
-| ⬜ | [T-0057](../tracker/tasks/T-0057.md) | Magic-link sign-in limited to Field Workers (PER-14): neutral 202 and no link for anyone else, eligibility re-checked on redeem | identity | S | T-0014, T-0073 |  |
+| ▶ | [T-0057](../tracker/tasks/T-0057.md) | Magic-link sign-in limited to Field Workers (PER-14): neutral 202 and no link for anyone else, eligibility re-checked on redeem | identity | S | T-0014, T-0073 |  |
 | ⬜ | [T-0074](../tracker/tasks/T-0074.md) | saved_views: share a team view with several teams linked to the project (view-team link table, migrate team_id, wire teams contract) | saved_views | S | T-0013, T-0020 |  |
 | ▶ | [T-0077](../tracker/tasks/T-0077.md) | Local password policy (NIST 800-63B style, minimum 8) and self-service password reset by e-mail: neutral 202, single-use expiring link, sessions revoked | identity | M | T-0037, T-0058, T-0068 |  |
 | ✅ | [T-0021](../tracker/tasks/T-0021.md) | Observability + security headers (request id, structured logs, CSP/HSTS) | platform | S | T-0001 | #9 |
