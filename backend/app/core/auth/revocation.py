@@ -32,6 +32,11 @@ Device binding (T-0043, diff §4.3; the device registry itself is ``oe_identity_
   the API then answers ``401`` with ``code: DEVICE_REVOKED`` (the client wipes itself)
   instead of a plain ``401``. TTL = the refresh lifetime.
 
+Entra ID SSO (T-0054, diff §4.5) keeps short-lived values under ``sso:`` (``put_value``,
+``take_value`` atomic ``GETDEL``, ``peek_value``, ``claim`` = ``SET NX``): the sign-in
+``state`` entries (10 min, single use), native exchange codes (60 s, single use), the
+deployment-wide JWKS refetch limit (1 min) and the ``acct_claim_missing`` health marker (24 h).
+
 Any store failure raises ``RevocationUnavailableError``; callers fail closed (503), they
 never treat an unreachable store as "not revoked" or "not locked".
 """
@@ -98,6 +103,14 @@ class RevocationStore(Protocol):
 
     def revoked_by_device(self, session_id: uuid.UUID) -> bool: ...
 
+    def put_value(self, key: str, value: bytes, ttl: timedelta) -> None: ...
+
+    def peek_value(self, key: str) -> bytes | None: ...
+
+    def take_value(self, key: str) -> bytes | None: ...
+
+    def claim(self, key: str, ttl: timedelta) -> bool: ...
+
     def close(self) -> None: ...
 
 
@@ -140,6 +153,10 @@ def _uuid_or_none(value: bytes | None) -> uuid.UUID | None:
         return uuid.UUID(value.decode())
     except ValueError:
         return None
+
+
+def _value_key(key: str) -> str:
+    return f"{KEY_PREFIX}{key}"
 
 
 def _failures_key(key: str) -> str:
@@ -304,6 +321,22 @@ class RedisRevocationStore:
     def revoked_by_device(self, session_id: uuid.UUID) -> bool:
         return bool(self._call(lambda: self._client.exists(_device_revoked_key(session_id))))
 
+    def put_value(self, key: str, value: bytes, ttl: timedelta) -> None:
+        self._call(lambda: self._client.set(_value_key(key), value, ex=_seconds(ttl)))
+
+    def peek_value(self, key: str) -> bytes | None:
+        return _as_bytes(self._call(lambda: self._client.get(_value_key(key))))
+
+    def take_value(self, key: str) -> bytes | None:
+        # GETDEL is atomic: a single-use value is handed out exactly once.
+        return _as_bytes(self._call(lambda: self._client.getdel(_value_key(key))))
+
+    def claim(self, key: str, ttl: timedelta) -> bool:
+        """Set ``key`` unless it exists (``SET NX``): ``True`` for the one caller that set it."""
+        return bool(
+            self._call(lambda: self._client.set(_value_key(key), b"1", ex=_seconds(ttl), nx=True))
+        )
+
     def close(self) -> None:
         self._client.close()
 
@@ -437,6 +470,26 @@ class InMemoryRevocationStore:
     def revoked_by_device(self, session_id: uuid.UUID) -> bool:
         with self._lock:
             return self._live(_device_revoked_key(session_id))
+
+    def put_value(self, key: str, value: bytes, ttl: timedelta) -> None:
+        self._set(_value_key(key), ttl, value)
+
+    def peek_value(self, key: str) -> bytes | None:
+        with self._lock:
+            return self._get(_value_key(key))
+
+    def take_value(self, key: str) -> bytes | None:
+        with self._lock:
+            value = self._get(_value_key(key))
+            self._entries.pop(_value_key(key), None)
+            return value
+
+    def claim(self, key: str, ttl: timedelta) -> bool:
+        with self._lock:
+            if self._get(_value_key(key)) is not None:
+                return False
+            self._entries[_value_key(key)] = (self._clock() + _seconds(ttl), b"1")
+            return True
 
     def close(self) -> None:
         with self._lock:

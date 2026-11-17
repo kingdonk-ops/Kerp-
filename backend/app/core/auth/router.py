@@ -63,7 +63,8 @@ AuthServiceDep = Annotated[AuthService, Depends(get_auth_service)]
 RuntimeDep = Annotated[AuthRuntime, Depends(get_auth_runtime)]
 
 
-def _own_origin(request: Request) -> str:
+def own_origin(request: Request) -> str:
+    """The API's own origin as this request sees it."""
     return f"{request.url.scheme}://{request.url.netloc}".lower()
 
 
@@ -75,10 +76,25 @@ def native_app_origin(request: Request, settings: Settings) -> bool:
     origin = request.headers.get("origin")
     if not origin or origin not in settings.native_app_origins:
         return False
-    return origin not in (settings.web_origin, _own_origin(request))
+    return origin not in (settings.web_origin, own_origin(request))
 
 
-def _token_response(pair: TokenPair, response: Response, *, native: bool) -> TokenResponse:
+def set_refresh_cookie(response: Response, pair: TokenPair) -> None:
+    """The web SPA's refresh cookie (``httpOnly``, ``Secure``, ``SameSite=Strict``, auth
+    paths only), ``Max-Age`` = what is left of the session."""
+    refresh = pair.refresh.claims
+    response.set_cookie(
+        REFRESH_COOKIE,
+        pair.refresh.token,
+        max_age=int((refresh.expires_at - refresh.issued_at).total_seconds()),
+        path=REFRESH_COOKIE_PATH,
+        secure=True,
+        httponly=True,
+        samesite="strict",
+    )
+
+
+def token_response(pair: TokenPair, response: Response, *, native: bool) -> TokenResponse:
     """The token response: refresh token in the cookie, or in the body for a native app."""
     # RFC 6749 §5.1: token responses must not be cached.
     response.headers["Cache-Control"] = "no-store"
@@ -86,15 +102,7 @@ def _token_response(pair: TokenPair, response: Response, *, native: bool) -> Tok
     access, refresh = pair.access.claims, pair.refresh.claims
     refresh_seconds = int((refresh.expires_at - refresh.issued_at).total_seconds())
     if not native:
-        response.set_cookie(
-            REFRESH_COOKIE,
-            pair.refresh.token,
-            max_age=refresh_seconds,
-            path=REFRESH_COOKIE_PATH,
-            secure=True,
-            httponly=True,
-            samesite="strict",
-        )
+        set_refresh_cookie(response, pair)
     return TokenResponse(
         access_token=pair.access.token,
         expires_in=int((access.expires_at - access.issued_at).total_seconds()),
@@ -132,7 +140,7 @@ def _refresh_credential(
         if not body_token:
             raise unauthorized(invalid_token=True)
         return RefreshCredential(body_token, native=True)
-    allowed = runtime.settings.web_origin or _own_origin(request)
+    allowed = runtime.settings.web_origin or own_origin(request)
     if request.headers.get("origin") != allowed:
         raise HTTPException(status.HTTP_403_FORBIDDEN, CROSS_ORIGIN)
     if not cookie or len(cookie) > REFRESH_COOKIE_MAX_LENGTH:
@@ -232,7 +240,7 @@ def login(
         raise _locked(exc) from exc
     except RevocationUnavailableError as exc:
         raise _unavailable() from exc
-    return _token_response(pair, response, native=native_app_origin(request, runtime.settings))
+    return token_response(pair, response, native=native_app_origin(request, runtime.settings))
 
 
 @router.post(
@@ -274,7 +282,7 @@ def redeem_magic_link(
         raise unauthorized(invalid_token=True) from exc
     except RevocationUnavailableError as exc:
         raise _unavailable() from exc
-    return _token_response(pair, response, native=native_app_origin(request, runtime.settings))
+    return token_response(pair, response, native=native_app_origin(request, runtime.settings))
 
 
 @router.post(
@@ -318,7 +326,7 @@ def pin_unlock(
         raise _locked(exc) from exc
     except RevocationUnavailableError as exc:
         raise _unavailable() from exc
-    return _token_response(pair, response, native=credential.native)
+    return token_response(pair, response, native=credential.native)
 
 
 @router.post(
@@ -350,7 +358,7 @@ def refresh(
         raise unauthorized(invalid_token=True) from exc
     except RevocationUnavailableError as exc:
         raise _unavailable() from exc
-    return _token_response(pair, response, native=credential.native)
+    return token_response(pair, response, native=credential.native)
 
 
 @router.post(f"{PREFIX}/logout", status_code=status.HTTP_204_NO_CONTENT)

@@ -18,6 +18,20 @@ export const en = {
       locked: "Too many attempts. Please wait and try again.",
       failed: "Sign-in failed. Please try again.",
     },
+    /** Entra ID SSO refusals (T-0054): the server's `error` code → message (shown by T-0055). */
+    sso: {
+      errors: {
+        SSO_GUEST: "Sign in with the method from your invitation.",
+        SSO_NO_ACCOUNT: "No KERP account for this e-mail, ask your administrator.",
+        SSO_ACCOUNT_DEACTIVATED: "Your KERP account is deactivated, ask your administrator.",
+        SSO_EMAIL_UNVERIFIED:
+          "Your Microsoft account has no verified e-mail address, ask your administrator.",
+        SSO_ACCOUNT_LINKED_ELSEWHERE:
+          "This KERP account is linked to another Microsoft account, ask your administrator.",
+        SSO_FAILED: "Sign-in with Microsoft failed. Please try again.",
+        DEVICE_REVOKED: "This device was revoked. Its local data is being removed.",
+      },
+    },
     signedInAs: "Signed in as {{name}}",
     logout: "Sign out",
   },

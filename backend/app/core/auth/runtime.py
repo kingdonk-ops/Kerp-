@@ -11,7 +11,7 @@ import logging
 import threading
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Final
+from typing import TYPE_CHECKING, Final
 
 from fastapi import FastAPI, Request
 
@@ -25,9 +25,22 @@ from app.core.auth.revocation import (
 from app.core.auth.tokens import TokenService
 from app.core.config import Settings
 
+if TYPE_CHECKING:
+    # Imported where used: ``entra`` needs the ORM models, which import the DB layer, which
+    # imports this module (bearer → runtime).
+    from app.core.auth.entra import EntraOidcProvider, EntraTransport
+
 STATE_ATTR: Final = "auth"
 _logger = logging.getLogger("kerp.auth")
 _build_lock = threading.Lock()
+
+
+@dataclass(frozen=True, slots=True)
+class EntraSso:
+    """The SSO provider and the transport it talks to Microsoft through (a fake in tests)."""
+
+    provider: EntraOidcProvider
+    transport: EntraTransport
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,6 +50,8 @@ class AuthRuntime:
     tokens: TokenService
     store: RevocationStore
     magic_links: MagicLinkSender
+    # Entra ID SSO (T-0054): ``None`` when the deployment does not offer it.
+    entra: EntraSso | None = None
 
     def close(self) -> None:
         self.store.close()
@@ -48,6 +63,7 @@ def build_auth_runtime(
     keys: KeySet | None = None,
     store: RevocationStore | None = None,
     magic_links: MagicLinkSender | None = None,
+    entra_transport: EntraTransport | None = None,
 ) -> AuthRuntime:
     """Assemble the runtime. Raises ``AuthConfigError`` on unusable production config."""
     if keys is None:
@@ -72,13 +88,38 @@ def build_auth_runtime(
         tokens=tokens,
         store=store,
         magic_links=magic_links or sender_from_settings(settings),
+        entra=_entra_from_settings(settings, store, entra_transport),
     )
+
+
+def _entra_from_settings(
+    settings: Settings, store: RevocationStore, transport: EntraTransport | None
+) -> EntraSso | None:
+    from app.core.auth.entra import EntraJwks, EntraOidcProvider, HttpEntraTransport, entra_config
+
+    config = entra_config(settings)
+    if config is None:
+        return None
+    transport = transport or HttpEntraTransport()
+    bound = transport
+    jwks = EntraJwks(lambda: bound.fetch_jwks(config), store)
+    provider = EntraOidcProvider(config, jwks, internal_domains=settings.internal_email_domains)
+    return EntraSso(provider=provider, transport=transport)
 
 
 def check_startup_config(settings: Settings) -> None:
     """Fail fast at startup on auth configuration production cannot run without."""
     if settings.environment == "production" and settings.default_tenant_id is None:
         raise AuthConfigError("KERP_DEFAULT_TENANT_ID must be set in production (diff §4.1)")
+    if settings.entra_enabled and settings.environment == "production":
+        # T-0054: the secret comes from the secret store / environment, never the repo.
+        if settings.entra_client_secret is None:
+            raise AuthConfigError("Entra ID SSO needs KERP_ENTRA_CLIENT_SECRET in production")
+        if settings.entra_redirect_uri is None:
+            raise AuthConfigError("Entra ID SSO needs KERP_ENTRA_REDIRECT_URI in production")
+    from app.core.auth.entra import startup_warning
+
+    startup_warning(settings)
 
 
 def _store_from_settings(settings: Settings) -> RevocationStore:

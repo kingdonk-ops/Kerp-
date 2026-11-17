@@ -1,4 +1,4 @@
-# app/core/auth — users, asymmetric JWTs, JWKS, revocation (T-0008), field-worker auth (T-0009, T-0038), device registry (T-0043)
+# app/core/auth — users, asymmetric JWTs, JWKS, revocation (T-0008), field-worker auth (T-0009, T-0038), device registry (T-0043), Entra ID SSO (T-0054)
 
 This is the identity module (`module: identity` in the tracker): it lives in `app/core/` because
 every request's authentication depends on it (T-0008, T-0010 notes).
@@ -16,8 +16,10 @@ rewritten (HS256 → RS256/EdDSA + JWKS + `jti` revocation in Redis).
 | `runtime.py` | `AuthRuntime` (keys + tokens + store) built lazily from settings, cached on `app.state.auth` |
 | `bearer.py` | `get_bearer`: verifies the `Authorization: Bearer` token once per request (no DB) |
 | `deps.py` | `CurrentPrincipal` (401 unless a valid token of an active user), `require_claims` |
-| `providers.py` | `AuthProvider` seam + `LocalPasswordProvider` (Entra ID SSO later: TD-043) |
-| `service.py` | `AuthService` login / refresh / logout / magic link / PIN unlock; `create_user`, `set_password`; user reads for the admin module (`list_users`, `get_user`, `users_by_id`, `find_user_by_email`, T-0014); internal staff rule (`is_internal_user`, T-0049) |
+| `providers.py` | `AuthProvider` seam (generic over the credentials) + `LocalPasswordProvider` |
+| `entra.py` | `EntraOidcProvider` (the second provider, T-0054): tenant-pinned config, ID-token verification, `EntraJwks` (cached, rate-limited refetch), member rule, verified-e-mail matching + `oid` link, `HttpEntraTransport` (stdlib HTTPS), refusal reasons → client codes |
+| `sso.py`, `sso_router.py` | SSO flow state in the store (`state` entries, native exchange codes, `acct_claim_missing` marker), the `auth:sso:entra` audit chain; endpoints `/auth/config`, `/auth/sso/entra/{start,callback,exchange}`, `/.well-known/assetlinks.json` (T-0054) |
+| `service.py` | `AuthService` login / refresh / logout / magic link / PIN unlock; `start_session` (the one way any provider's sign-in becomes a KERP session); `create_user`, `set_password`; user reads for the admin module (`list_users`, `get_user`, `users_by_id`, `find_user_by_email`, T-0014); internal staff rule (`is_internal_user`, T-0049) |
 | `field.py` | Magic-link tokens + delivery seam, PIN rules and the `PIN_REQUIRED` / `PIN_INVALID` / `PIN_EXHAUSTED` answers (T-0009, T-0038) |
 | `lockout.py` | `ProgressiveLockout` + policies, Redis-backed (T-0009); offline failures counted with `extra` (T-0038) |
 | `models.py` | `auth_user` table (tenant-level rows, RLS) — migration `0003`, internal staff flag + Entra link in `0013` (T-0049, ADR 0009); `auth_project_membership` (T-0010) — migration `0006`, persona CHECK widened for PER-16 in `0012` (T-0076), membership-based RLS in `0015` (T-0014); `oe_identity_device` (T-0043) — migration `0016`, `wipe_secret_hash` in `0018` (T-0080), `pin_hash` + `pin_set_at` in `0019` (T-0038) |
@@ -37,6 +39,11 @@ rewritten (HS256 → RS256/EdDSA + JWKS + `jti` revocation in Redis).
 | `POST /api/v1/auth/refresh` | refresh cookie + Origin (native app: `{refresh_token}` body) | new `TokenResponse` + cookie (rotation); `401 {code: PIN_REQUIRED}` for a session of a device with a PIN idle `KERP_PIN_IDLE_MINUTES` or longer (token not spent); `401` for ended sessions; `403` cross-origin |
 | `POST /api/v1/auth/logout` | bearer | `204`; revokes the token and its whole login session; clears the refresh cookie |
 | `GET /api/v1/auth/me` | bearer | `{id, tenant_id, email, display_name, is_internal}` (`is_internal` read-only, below) |
+| `GET /api/v1/auth/config` | none | `{password: {available: true}, sso: {provider: "entra", preferred: true, start_url} \| null}` (*Entra ID SSO*) |
+| `GET /api/v1/auth/sso/entra/start` | none | `?invite_token&device_id&app_challenge` → `302` to the tenant's authorize endpoint + pre-auth cookie; `404` without SSO |
+| `GET /api/v1/auth/sso/entra/callback` | pre-auth cookie | `303` to the web landing (refresh cookie set) or the App Link (exchange code); refusals `?error=<code>` |
+| `POST /api/v1/auth/sso/entra/exchange` | native origin | `{code, verifier, device_id}` → `TokenResponse` with `refresh_token` (native body); `401` uniform; `401 {code: DEVICE_REVOKED}`; `403` other origins |
+| `GET /.well-known/assetlinks.json` | none | Digital Asset Links of the Android app (from configuration); `404` unconfigured |
 | `POST /api/v1/auth/magic-link` | none | `{email}` → always `202`; sends a 15-min one-time link to an active user; `429` when throttled |
 | `POST /api/v1/auth/magic-link/redeem` | none | `{token}` → `TokenResponse` + cookie of a new session (on an enrolled device: bound to it, PIN kept) |
 | `POST /api/v1/auth/pin/unlock` | refresh cookie + Origin (native app: `refresh_token` in the body) | `{pin, failed_offline?}` → rotated `TokenResponse` + cookie; `401 {code: PIN_INVALID \| PIN_EXHAUSTED}`; `429` when locked; `403` cross-origin |
@@ -91,6 +98,130 @@ list (T-0040).
 `company.example,company-group.example`. Entries are trimmed, lower-cased and de-duplicated;
 an entry with `@`, whitespace or `*` stops the app at startup (settings validation). Empty or
 unset: no domain rule, only the Entra link makes an account internal.
+
+## Entra ID SSO, identity only (T-0054, diff §4.5, TD-043)
+
+`entra.py`, `sso.py`, `sso_router.py`. A second `AuthProvider` (`EntraOidcProvider`) for
+**company staff**: it proves who a member of the company Entra tenant is, and nothing else.
+Success issues the **same KERP session** as a password sign-in (`AuthService.start_session`:
+15-minute access token, refresh ending 12 h after sign-in, `session_expires_at`, device
+binding). External users never use it.
+
+### App registration (one per deployment)
+
+- **Single-tenant** (accounts in this organisational directory only).
+- **One web redirect URI**: `https://<deployment>/api/v1/auth/sso/entra/callback` (the Android
+  build uses it too, *Native handoff*). Set the same value as `KERP_ENTRA_REDIRECT_URI`.
+- **Scopes** `openid profile email` only. **No API permissions**, no group or app-role claims.
+- **Optional ID-token claims `email`, `acct`, `xms_edov`** (Token configuration → Add optional
+  claim → ID). **Without `acct` every SSO sign-in is refused** (`acct_claim_missing`, below).
+- A client secret (a certificate credential later: TD-322) stored in the secret store
+  and injected as `KERP_ENTRA_CLIENT_SECRET`. Never in the repo.
+
+SSO is offered when `KERP_ENTRA_TENANT_ID` and `KERP_ENTRA_CLIENT_ID` are both set (and the
+deployment tenant is). The authority and issuer are pinned to
+`https://login.microsoftonline.com/<KERP_ENTRA_TENANT_ID>/v2.0`; the settings accept only a
+GUID, so `common` / `organizations` can never be configured. With SSO enabled the server logs a
+start-up warning naming the required optional claims.
+
+### Flow
+
+1. `GET /api/v1/auth/config` tells the sign-in screen what to offer: with SSO,
+   `sso: {provider: "entra", preferred: true, start_url}`; `password: {available: true}`
+   always. **SSO is promoted, never enforced**: there is no SSO-only mode, and password login
+   works for every active account with a password, internal and Entra-linked ones included.
+2. `GET /api/v1/auth/sso/entra/start` (top-level navigation) creates `state`, `nonce` and a
+   PKCE S256 verifier (256 random bits each) and stores them in Redis under
+   `sha256(state)` for 10 minutes, single use, with the optional `invite_token` (accepted by
+   T-0052), the enrolling `device_id` and, for the native app, its `app_challenge` (the S256
+   hash of the app's own verifier). It sets the random pre-auth cookie `kerp_sso_preauth`
+   (`HttpOnly; Secure; SameSite=Lax; Path=/api/v1/auth/sso; Max-Age=600`), whose SHA-256 is
+   in the state entry, and redirects (`302`) to the tenant's authorize endpoint
+   (`response_type=code`, `response_mode=query`, `code_challenge_method=S256`).
+3. `GET /api/v1/auth/sso/entra/callback` takes the state entry (`GETDEL`: unknown, reused or
+   expired → refused), then compares the pre-auth cookie's hash (missing or foreign → refused,
+   the state already consumed: login-CSRF binding), and clears the cookie on every answer. It
+   redeems the code with the verifier and the client secret, then verifies the ID token:
+   RS256 against the tenant JWKS, `iss` = the pinned issuer, `tid` = the configured tenant,
+   `aud` = the client id (one string), `exp` / `nbf` / `iat` with at most 2 minutes of leeway,
+   `nonce` = the stored one. Then the member rule and the matching below.
+4. **Web**: a revoked `device_id` from the state is refused only now (credentials first,
+   T-0080); otherwise a new session, the refresh cookie (`kerp_refresh`, as for password
+   login) and `303` to `<KERP_WEB_ORIGIN or deployment>/login/sso-return?status=signed_in`.
+   The SPA then calls `/auth/refresh` (cookie transport) for its access token; no token is ever
+   in a URL. Landing page: T-0055.
+5. **Native** (the state has an `app_challenge`; `device_id` is then required): never a token
+   in a redirect. A single-use **exchange code** (256 bits, stored as SHA-256, 60 s, bound to
+   the user, the `device_id` and the app challenge) and `303` to the verified App Link
+   `https://<deployment>/app/sso-return?code=…`. The app redeems it with
+   `POST /api/v1/auth/sso/entra/exchange` `{code, verifier, device_id}` from an origin on
+   `KERP_NATIVE_APP_ORIGINS` (else `403`, the code untouched) and gets the native body
+   transport (`refresh_token` in the body). The code is spent on the first attempt
+   (`GETDEL`): a second redemption, one after 60 s, a wrong verifier or another `device_id`
+   all get the same `401 {"detail": "Not authenticated"}`; a reuse is audited
+   (`exchange_code_reused`). **Device check after credentials** (T-0080, TD-291): only with
+   the right code and verifier is the device looked at, so with bad credentials an unknown, an
+   active and a revoked `device_id` get the same answer; with valid credentials a revoked device
+   is `401 {code: DEVICE_REVOKED}`. The callback never checks the device of a native flow.
+
+Refusals redirect to the same landing (web or App Link) with `?error=<code>`, a key the client
+translates (`auth.sso.errors.<code>` in the SPA catalogue):
+
+| `code` | Reasons (logged; never shown) | Message |
+|---|---|---|
+| `SSO_GUEST` | `guest` (`acct` ≠ 0), `acct_claim_missing`, `foreign_idp` (`idp` ≠ pinned issuer) | Sign in with the method from your invitation |
+| `SSO_NO_ACCOUNT` | `no_account` | No KERP account for this e-mail, ask your administrator |
+| `SSO_ACCOUNT_DEACTIVATED` | `account_deactivated` | Account deactivated |
+| `SSO_EMAIL_UNVERIFIED` | `email_missing`, `email_unverified` | No verified e-mail on the Microsoft account |
+| `SSO_ACCOUNT_LINKED_ELSEWHERE` | `oid_mismatch` | Linked to another Microsoft account |
+| `DEVICE_REVOKED` | `device_revoked` (web flow with a revoked device) | The client wipes (*Devices*) |
+| `SSO_FAILED` | everything else: `state_invalid`, `preauth_cookie_mismatch`, `provider_error`, `token_exchange_failed` (incl. a PKCE mismatch), `jwks_unavailable`, `id_token_*`, `nonce_mismatch` | Sign-in with Microsoft failed, try again |
+
+### Members only, matching, no roles
+
+- **Members only.** `acct` must be `0` (a missing `acct` is not proof: refused as
+  `acct_claim_missing`); an `idp` claim different from the pinned issuer is a guest. Guests
+  are never linked and never become internal; they use password (or a magic link as Field
+  Workers).
+- **Matching.** An account linked to the token's `oid` (`entra_oid`) signs in by `oid` only;
+  the e-mail claim is then ignored. Otherwise the first sign-in matches an existing **active**
+  account by the `email` claim (case-insensitive) **only when it is verified**: `xms_edov` is
+  `true`, or its domain is on `KERP_INTERNAL_EMAIL_DOMAINS`. No `preferred_username` fallback;
+  a missing or unverified `email` is refused. A match stores `entra_oid` / `entra_tid` (the
+  link, audited `sso_linked`). An account linked to a different `oid` is refused; no account is
+  refused (KERP never creates accounts from SSO); a deactivated account is refused.
+- **No group-to-role mapping.** Group, app-role and directory-role claims are ignored. A
+  successful sign-in recomputes `is_internal` (true: the account is linked) and nothing else
+  about access: personas, PER-09, admin grants and teams stay in KERP.
+
+### JWKS, logging, audit, health
+
+- **JWKS.** Fetched from `…/<tenant>/discovery/v2.0/keys`, cached in the process for 24 h (a
+  failed reload keeps the known keys). A token with an unknown `kid` triggers a refetch only
+  when the deployment-wide limit allows (`SET NX` on `sso:entra:jwks-refetch`, 60 s, shared by
+  every worker), so forged `kid`s cost Microsoft at most one request a minute.
+- **No token contents** are logged or audited: the security log (`kerp.auth.sso`) gets
+  `entra sso sign-in refused: <reason>` with `sso_reason` / `sso_flow`. Transport errors carry
+  the HTTP status only.
+- **Audit ledger**, tenant-level chain `auth:sso:entra`: `sso_linked`, `sso_signed_in`,
+  `sso_verified` (native callback, before the exchange) and `sso_refused` with `reason` for
+  every refusal of a verified identity (guest, unverified e-mail, no account, deactivated,
+  `oid` mismatch, revoked device, exchange verifier / device mismatch, code reuse). Refusals
+  before an identity is proven (bad state, cookie or token) go to the security log only, so
+  unauthenticated requests cannot grow the ledger (as for wipe confirmations, T-0212).
+- **`acct` prerequisite.** A refusal for a missing `acct` sets a 24-hour marker; `/health` then
+  answers `warnings: ["sso_acct_claim_missing"]`. The deploy docs (`backend/README.md`) say that
+  without the `acct` optional claim every SSO sign-in is refused.
+
+### Android App Link (native handoff)
+
+`GET /.well-known/assetlinks.json` serves, from `KERP_ANDROID_APP_PACKAGE` and
+`KERP_ANDROID_APP_CERT_FINGERPRINTS`, the statement
+`delegate_permission/common.handle_all_urls` for that package and certificate(s), so Android
+verifies the App Link `https://<deployment>/app/sso-return` (host = the redirect URI's host).
+Never a custom URL scheme. The app (T-0143) opens `start_url?device_id=…&app_challenge=…` in
+Custom Tabs, keeps its verifier in the keystore-backed store, and redeems the code from the App
+Link with `/exchange`.
 
 ## Refresh cookie (web SPA, T-0037)
 
@@ -230,7 +361,7 @@ or revoke which device is decided in
   `401 {code: DEVICE_REVOKED}` so the client wipes; a valid magic link is then left unspent
   (the same link redeems later from an active device) and is spent only once the device check
   passes. Refresh, PIN unlock, authenticated requests and enrolment are unchanged (their
-  caller already holds a session). The SSO exchange gets the same rule with T-0054.
+  caller already holds a session). The SSO exchange follows the same rule (T-0054, *Entra ID SSO*).
 - **Client contract (T-0143).** On `201` from enrolment the client stores `wipe_secret` in the
   keystore-backed secure store **per account** (with that account's local store, keyed by the
   `device_id`); it never logs it or sends it anywhere else. On `DEVICE_REVOKED` it wipes the
@@ -437,6 +568,12 @@ rebound to the project (scope from the memberships, never the request) and a del
 | `KERP_WEB_ORIGIN` | unset | Web SPA origin allowed on the cookie endpoints; unset = the API's own origin as the request sees it (behind a TLS-terminating proxy set this, or trust the proxy with `FORWARDED_ALLOW_IPS`); required with `KERP_NATIVE_APP_ORIGINS` |
 | `KERP_NATIVE_APP_ORIGINS` | empty | Native-app origins that get the refresh token in the body, and the API's CORS allow-list (*API CORS and the native-origin allow-list*) |
 | `KERP_REDIS_URL` | unset | Revocation store |
+| `KERP_ENTRA_TENANT_ID` | unset | The company Entra tenant (a GUID; `common` / `organizations` / domain names refused at startup). With the client id: SSO offered |
+| `KERP_ENTRA_CLIENT_ID` | unset | The app registration's client id (a GUID) |
+| `KERP_ENTRA_CLIENT_SECRET` | unset | **Secret** (secret store / environment only): the client secret for the code redemption. Required in production with SSO |
+| `KERP_ENTRA_REDIRECT_URI` | unset | `https://<deployment>/api/v1/auth/sso/entra/callback` exactly as registered; required in production with SSO (elsewhere: the request's own origin). Its origin is also the App Link host |
+| `KERP_ANDROID_APP_PACKAGE` | unset | Android package name for `assetlinks.json` |
+| `KERP_ANDROID_APP_CERT_FINGERPRINTS` | empty | Comma-separated SHA-256 signing-certificate fingerprints (`AA:BB:…`, 32 bytes) |
 
 Outside production, a missing key means an **ephemeral** key per process and a missing
 Redis URL an in-memory store (both logged as warnings). In production both are required;

@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 195 · **Closed:** 129
+**Open:** 197 · **Closed:** 129
 
 ## decision (5)
 
@@ -69,7 +69,7 @@
 | [TD-297](../tracker/todo/TD-297.md) | Admin UI screen for deployment settings (Admin > System) is not planned in any task | T-0044 | implementer |
 | [TD-327](../tracker/todo/TD-327.md) | Frontend i18n key notifications.kind.access_requests.requested for the inbox (needed when the access-request UI lands) | T-0050 | reviewer |
 
-## deferred (33)
+## deferred (34)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -106,8 +106,9 @@
 | [TD-278](../tracker/todo/TD-278.md) | Rule 'Try it' on a recent real context (ADR 0004 §6): pick a recent record/event of the set's kind and evaluate against it; T-0036 only evaluates supplied sample contexts | T-0036 | implementer |
 | [TD-288](../tracker/todo/TD-288.md) | pending_updates on a set with no parent default answers 409 instead of an empty offer | T-0036 | reviewer |
 | [TD-315](../tracker/todo/TD-315.md) | Override request currency: a later fully passing run of the record is not visible (no run log) | T-0035 | implementer |
+| [TD-322](../tracker/todo/TD-322.md) | Entra ID SSO: certificate (client assertion) credentials for the code redemption instead of the client secret | T-0054 | implementer |
 
-## later (87)
+## later (88)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -195,6 +196,7 @@
 | [TD-314](../tracker/todo/TD-314.md) | Override UI: Request override on a blocked gate, approver inbox, i18n for validation.override_* notification kinds | T-0035 | implementer |
 | [TD-318](../tracker/todo/TD-318.md) | Narrow the void-path except OperationalError in validation _persist_findings to LockNotAvailable (55P03) | T-0035 | coordinator |
 | [TD-321](../tracker/todo/TD-321.md) | Access-request notification to PER-09 holders is not pinned or cleared on decision, and System admins without a membership get none | T-0050 | implementer |
+| [TD-323](../tracker/todo/TD-323.md) | Rate-limit GET /auth/sso/entra/start per client (each call stores a 10-minute state entry in Redis) | T-0054 | implementer |
 | [TD-325](../tracker/todo/TD-325.md) | Access-request RLS: add WITH CHECK so the requester can only set status pending/withdrawn on their own row | T-0050 | reviewer |
 | [TD-326](../tracker/todo/TD-326.md) | Notifications service helper to notify project members from a tenant-level session, replacing the access_requests _ProjectBinding re-bind | T-0050 | reviewer |
 | [TD-328](../tracker/todo/TD-328.md) | persona_holders does not filter deactivated users, so deactivated PER-09 holders still get access-request inbox rows | T-0050 | reviewer |

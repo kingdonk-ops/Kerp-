@@ -1,9 +1,9 @@
 """The ``AuthProvider`` seam: who proves a user's identity at login (TD-003).
 
-KERP issues its own tokens whatever proved the identity. Today the only provider is the
-local email + scrypt password one. Entra ID SSO for staff (TD-043) becomes a second
-provider that verifies an Entra ID token and returns the matching ``User``; token issue,
-rotation and revocation stay as they are.
+KERP issues its own tokens whatever proved the identity. Two providers exist: the local
+email + scrypt password one below, and Entra ID SSO for staff (``entra.EntraOidcProvider``,
+T-0054, TD-043), which verifies an Entra ID token and returns the matching ``User``. Token
+issue, rotation and revocation are the same for both (``AuthService.start_session``).
 """
 
 from __future__ import annotations
@@ -25,18 +25,20 @@ class PasswordCredentials:
     password: str
 
 
-class AuthProvider(Protocol):
-    """Resolves login credentials to an active user of ``tenant_id``, or ``None``.
+class AuthProvider[C](Protocol):
+    """Resolves login credentials (of type ``C``) to an active user of ``tenant_id``.
 
     ``session`` is already bound to ``tenant_id`` (tenant level), so RLS and the ORM scope
     confine every lookup to that tenant. Implementations must not reveal *why* a login
-    failed (unknown user, wrong secret, inactive account all return ``None``).
+    failed to the client: the password provider returns ``None`` for every failure; the
+    Entra provider raises ``SsoRefusedError`` whose reason goes only to the logs and audit
+    ledger and whose client ``code`` is one of a few translated messages (diff §4.5).
     """
 
     name: str
 
     def authenticate(
-        self, session: Session, tenant_id: uuid.UUID, credentials: PasswordCredentials
+        self, session: Session, tenant_id: uuid.UUID, credentials: C
     ) -> User | None: ...
 
 

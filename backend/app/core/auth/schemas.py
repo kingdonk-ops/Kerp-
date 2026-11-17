@@ -263,3 +263,50 @@ class DeviceRevoked(DeviceRead):
     cross_project_warning: bool = Field(
         description="The device's user belongs to projects beyond the revoking PER-09's"
     )
+
+
+# --- Entra ID SSO (T-0054, diff §4.5) -----------------------------------------------------
+
+# RFC 7636: a verifier is 43-128 unreserved characters; its S256 challenge is 43 base64url.
+PKCE_VERIFIER_PATTERN: Final = r"^[A-Za-z0-9._~-]{43,128}$"
+PKCE_CHALLENGE_PATTERN: Final = r"^[A-Za-z0-9_-]{43}$"
+
+
+class PasswordOption(BaseModel):
+    available: Literal[True] = True
+
+
+class SsoOption(BaseModel):
+    """Entra ID SSO is offered: the promoted, default sign-in for company staff (diff §4.5
+    *SSO promoted, password kept*). Password sign-in stays available for everyone."""
+
+    provider: Literal["entra"] = "entra"
+    preferred: bool = True
+    start_url: str = Field(
+        description=(
+            "Open by top-level navigation (web) or in the system browser (Android, with "
+            "`device_id` and `app_challenge`)"
+        )
+    )
+
+
+class AuthConfigResponse(BaseModel):
+    """What the sign-in screen offers. No secret, no tenant id."""
+
+    password: PasswordOption = Field(default_factory=PasswordOption)
+    sso: SsoOption | None = Field(
+        default=None, description="Present when the deployment offers Entra ID SSO"
+    )
+
+
+class SsoExchangeRequest(BaseModel):
+    """The native app redeems the single-use exchange code of its App Link (diff §4.5)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    code: str = Field(min_length=16, max_length=128)
+    verifier: str = Field(
+        pattern=PKCE_VERIFIER_PATTERN,
+        description="The app-generated verifier whose S256 hash `/start` received",
+    )
+    device_id: uuid.UUID
