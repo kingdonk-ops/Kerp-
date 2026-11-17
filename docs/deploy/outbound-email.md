@@ -30,7 +30,11 @@ log).
 
 ## 3. Bounce and complaint wiring
 
-1. Create an SNS **standard topic** in the deployment region, e.g. `kerp-mail-events`.
+1. Create an SNS **standard topic** in the deployment region, e.g. `kerp-mail-events`, and set
+   its **signature version to 2** (SHA256). SNS signs with version 1 (SHA1) by default, which
+   KERP refuses:
+   `aws sns set-topic-attributes --topic-arn <arn> --attribute-name SignatureVersion --attribute-value 2`
+   (console: topic → *Edit* → *Signature version: SHA256*).
 2. Create an SES **configuration set** (e.g. `kerp-mail`) with an **event destination** of
    type SNS → that topic, for the event types *Bounce* and *Complaint* (*Delivery* is optional
    and ignored). Set `KERP_MAIL_SES_CONFIGURATION_SET=kerp-mail`.
@@ -45,6 +49,9 @@ log).
 5. The endpoint must be reachable from SNS (public HTTPS, valid certificate). It has no JWT;
    it verifies the SNS signature (SignatureVersion 2), the exact topic and the certificate
    host. Set the topic's *delivery policy* to retry for a few hours.
+   If the subscription never becomes *Confirmed* and the API logs the refusal reason
+   `sns_signature_version`, the topic still signs with version 1: set `SignatureVersion=2`
+   (step 1) and request confirmation again.
 6. Test with the **SES mailbox simulator** from the deployment: send to
    `bounce@simulator.amazonses.com` and `complaint@simulator.amazonses.com` (e.g. a magic-link
    request for a synthetic test user with that address). Both addresses must appear on the

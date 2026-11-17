@@ -91,7 +91,9 @@ fetched or written (`sns.py`):
    is fetched, so a foreign `SubscriptionConfirmation` is never confirmed.
 3. `SignatureVersion` `2`; `SigningCertURL` exactly `https://sns.<KERP_AWS_REGION>.amazonaws.com/…pem`
    (no other host, scheme, port or user info). The certificate is fetched only from there
-   (5 s timeout, 64 KiB cap) and cached per URL for 24 h.
+   (5 s timeout, 64 KiB cap) and cached per URL for 24 h. SNS topics sign with version 1 by
+   default: the topic's `SignatureVersion` attribute must be set to `2`, or every message is
+   refused with `sns_signature_version` (see `docs/deploy/outbound-email.md` §3).
 4. The SHA256withRSA signature verifies over the SNS canonical string.
 
 Our topic's `SubscriptionConfirmation` is confirmed by a GET of its `SubscribeURL` (same host
