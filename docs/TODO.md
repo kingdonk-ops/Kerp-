@@ -109,7 +109,7 @@
 | [TD-315](../tracker/todo/TD-315.md) | Override request currency: a later fully passing run of the record is not visible (no run log) | T-0035 | implementer |
 | [TD-322](../tracker/todo/TD-322.md) | Entra ID SSO: certificate (client assertion) credentials for the code redemption instead of the client secret | T-0054 | implementer |
 
-## later (90)
+## later (91)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -202,9 +202,10 @@
 | [TD-326](../tracker/todo/TD-326.md) | Notifications service helper to notify project members from a tenant-level session, replacing the access_requests _ProjectBinding re-bind | T-0050 | reviewer |
 | [TD-328](../tracker/todo/TD-328.md) | persona_holders does not filter deactivated users, so deactivated PER-09 holders still get access-request inbox rows | T-0050 | reviewer |
 | [TD-331](../tracker/todo/TD-331.md) | EntraJwks.key_for holds its lock across the JWKS HTTP fetch, and with no keys cached a failed first load refetches on every callback outside the once-a-minute limit; add a short negative cache / apply the limit | T-0054 | reviewer |
-| [TD-334](../tracker/todo/TD-334.md) | SSO return landings (/login/sso-return, /app/sso-return) must send Referrer-Policy: no-referrer (T-0055 / T-0143) | T-0055 | reviewer |
+| [TD-332](../tracker/todo/TD-332.md) | SSO callback: a 503 when Redis is unreachable does not clear the pre-auth cookie | T-0054 | reviewer |
+| [TD-334](../tracker/todo/TD-334.md) | SSO return landings (/login/sso-return, /app/sso-return) must send Referrer-Policy: no-referrer (T-0055 / T-0143) | T-0055, T-0143 | reviewer |
 
-## bug (5)
+## bug (4)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -212,7 +213,6 @@
 | [TD-252](../tracker/todo/TD-252.md) | tracker.py new-todo cannot see open PRs in cloud sessions: gh pr list uses GraphQL (blocked), so TODO ids collide | T-0029 | coordinator |
 | [TD-287](../tracker/todo/TD-287.md) | Upgrade offer: a soft-deleted own rule holding a new default's key shows key_in_use forever | T-0036 | reviewer |
 | [TD-330](../tracker/todo/TD-330.md) | scripts/pr_suggestions.py rebuild fails in cloud sessions: gh api --paginate follows numeric-ID repository Link URLs that the agent proxy rejects (HTTP 403); paginate with explicit repos/{owner}/{repo} page params | — | coordinator |
-| [TD-332](../tracker/todo/TD-332.md) | SSO callback: a 503 when Redis is unreachable does not clear the pre-auth cookie | T-0054 | reviewer |
 
 ## risk (23)
 
@@ -240,7 +240,7 @@
 | [TD-316](../tracker/todo/TD-316.md) | Override void vs the record's audit-chain lock: T-0119 signing and inspection submit/approve must call run_checks before appending to the record chain | T-0035 | implementer |
 | [TD-320](../tracker/todo/TD-320.md) | Access-request filing has no rate limit: withdraw and re-request (no cooldown) can flood a project's PER-09 holders with notifications | T-0050 | implementer |
 | [TD-324](../tracker/todo/TD-324.md) | kerp_lobby_projects_by_id returns code and name for any live project id regardless of lobby visibility; restrict to lobby-visible / requested projects or check the ticket first, and record the third narrow read path in edge §6 | T-0050 | reviewer |
-| [TD-333](../tracker/todo/TD-333.md) | Entra authorization code and state from /api/v1/auth/sso/* callback query strings land in uvicorn access logs; redact query strings on those paths | T-0054 | reviewer |
+| [TD-333](../tracker/todo/TD-333.md) | Reverse proxy / ingress / load balancer in front of the API must not log query strings on /api/v1/auth/sso/* (Entra code and state) | T-0054 | reviewer |
 
 ## Closed
 
