@@ -22,6 +22,7 @@ from sqlalchemy import (
     String,
     UniqueConstraint,
     false,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -76,11 +77,23 @@ class User(Base, BaseRecordMixin):
     entra_tid: Mapped[str | None] = mapped_column(String(ENTRA_ID_LENGTH), nullable=True)
 
 
+def _in(column: str, values: tuple[str, ...]) -> str:
+    return f"{column} IN (" + ", ".join(f"'{v}'" for v in values) + ")"
+
+
 MEMBERSHIP_TABLE: Final = "auth_project_membership"
 # PER-01 ... PER-16 (edge spec §5.2; PER-16 Project Viewer since migration 0012, T-0076).
 # The capability matrix lives in ``access.py``.
 PERSONA_CODES: Final = tuple(f"PER-{n:02d}" for n in range(1, 17))
 SITE_INSPECTOR: Final = "PER-07"
+# Where a membership row comes from (ADR 0008, T-0073): ``direct`` = an individual assignment
+# (T-0014), ``team_link`` = derived from a team-project link (``source_id`` = the link id).
+SOURCE_DIRECT: Final = "direct"
+SOURCE_TEAM_LINK: Final = "team_link"
+SOURCE_TYPES: Final = (SOURCE_DIRECT, SOURCE_TEAM_LINK)
+MEMBERSHIP_GRANT_KEY: Final = "uq_auth_project_membership_source_grant"
+TEAM_LINK_LIVE_INDEX: Final = "uq_auth_project_membership_team_link_live"
+_TEAM_LINK_LIVE: Final = f"source_type = '{SOURCE_TEAM_LINK}' AND deleted_at IS NULL"
 
 
 class ProjectMembership(Base, BaseRecordMixin):
@@ -92,18 +105,42 @@ class ProjectMembership(Base, BaseRecordMixin):
     projects), to sessions that see its project, and to ``system_admin`` sessions.
     A Site Inspector (PER-07) membership names its site (Asset-Site scoping). Revoking a
     membership soft-deletes it.
+
+    Rows are keyed by source (ADR 0008, T-0073): ``direct`` rows are individual assignments,
+    ``team_link`` rows are derived from a team-project link (``source_id`` = the link id, no
+    FK: the link belongs to the teams module) and are written only through
+    ``app.core.auth.team_grants`` by ``system_admin`` sessions (RLS and the ORM guard refuse
+    everyone else). Access is the union of the live rows, whatever their source.
     """
 
     __tablename__ = MEMBERSHIP_TABLE
     __table_args__ = (
+        # Soft-deleted rows included, so a re-grant revives its row (migration 0025).
         UniqueConstraint(
             "tenant_id",
-            "user_id",
             "member_project_id",
+            "user_id",
+            "source_type",
+            "source_id",
             "persona",
             "site_node_id",
-            name="uq_auth_project_membership_grant",
+            name=MEMBERSHIP_GRANT_KEY,
             postgresql_nulls_not_distinct=True,
+        ),
+        # One live persona per user and team link (the product owner's key, ADR 0008).
+        Index(
+            TEAM_LINK_LIVE_INDEX,
+            "tenant_id",
+            "member_project_id",
+            "user_id",
+            "source_id",
+            unique=True,
+            postgresql_where=text(_TEAM_LINK_LIVE),
+            sqlite_where=text(_TEAM_LINK_LIVE),
+        ),
+        CheckConstraint(_in("source_type", SOURCE_TYPES), name="source_type"),
+        CheckConstraint(
+            f"(source_type = '{SOURCE_DIRECT}') = (source_id IS NULL)", name="source_id"
         ),
         CheckConstraint("project_id IS NULL", name="tenant_level"),
         CheckConstraint(
@@ -116,7 +153,12 @@ class ProjectMembership(Base, BaseRecordMixin):
         # Membership-based policy (T-0014, TD-053): visible for the described project or the
         # caller's own rows (the scope resolver reads those, TD-152); migration 0015.
         rls_table_info(
-            RlsPolicy("membership", owner_column="user_id", project_column="member_project_id")
+            RlsPolicy(
+                "membership",
+                owner_column="user_id",
+                project_column="member_project_id",
+                source_column="source_type",
+            )
         ),
     )
 
@@ -126,6 +168,10 @@ class ProjectMembership(Base, BaseRecordMixin):
     member_project_id: Mapped[uuid.UUID] = mapped_column(GUID(), nullable=False, index=True)
     persona: Mapped[str] = mapped_column(String(6), nullable=False)
     site_node_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), nullable=True)
+    source_type: Mapped[str] = mapped_column(
+        String(16), nullable=False, default=SOURCE_DIRECT, server_default=SOURCE_DIRECT
+    )
+    source_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), nullable=True, index=True)
 
 
 DEVICE_TABLE: Final = "oe_identity_device"
@@ -136,10 +182,6 @@ DEVICE_STATUSES: Final = (DEVICE_ACTIVE, DEVICE_REVOKED)
 VERSION_LENGTH: Final = 64
 WIPE_SECRET_HASH_LENGTH: Final = 64  # SHA-256, hex
 PIN_HASH_LENGTH: Final = 255  # scrypt, as ``passwords.hash_password`` writes it
-
-
-def _in(column: str, values: tuple[str, ...]) -> str:
-    return f"{column} IN (" + ", ".join(f"'{v}'" for v in values) + ")"
 
 
 class Device(Base, BaseRecordMixin):

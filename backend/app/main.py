@@ -24,13 +24,14 @@ from app.core.auth.field import PinGateError, pin_gate_handler
 from app.core.auth.router import router as auth_router
 from app.core.auth.runtime import check_startup_config, close_auth_runtime
 from app.core.auth.sso_router import router as sso_router
+from app.core.auth.team_grants import check_team_grants_at_startup
 from app.core.body_limit import BodyLimitMiddleware
 from app.core.config import Settings, get_settings
 from app.core.db import Database
 from app.core.logging import configure_logging
 from app.core.mail.router import router as mail_router
 from app.core.mail.transport import check_mail_config
-from app.core.module_loader.loader import DEFAULT_PACKAGE, install_modules
+from app.core.module_loader.loader import DEFAULT_PACKAGE, install_modules, registry_of
 from app.core.request_context import RequestContextMiddleware
 from app.core.security_headers import SecurityHeadersMiddleware
 from app.core.tenancy.scope import OutOfScopeError
@@ -61,6 +62,8 @@ def create_app(
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         check_startup_config(settings)
         check_mail_config(settings)  # production refuses to start without SES (T-0058)
+        # Team-derived grants without the teams module: refuse to start (T-0073, ADR 0008).
+        check_team_grants_at_startup(database, registry_of(_app).names())
         # Jobs (T-0015): rows committed by requests are enqueued on SAQ after the commit.
         # Mail (T-0058): the jobs module installs core mail's post-commit enqueuer.
         broker = SaqBroker(settings.redis_url) if settings.redis_url else None

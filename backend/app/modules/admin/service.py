@@ -8,6 +8,9 @@ memberships only through ``app.core.auth.memberships``; this module owns ``oe_ad
 Audit chains (tenant-level scope): ``admin-user:<user>`` (create, update),
 ``admin-user-lookup:<caller>`` (every e-mail lookup), ``project-members:<project>`` (assign,
 remove; ``sod_warning`` flagged), ``admin-grant:<user>`` (grant, revoke).
+
+Members are listed with every live row, individual (``direct``) and team-derived
+(``team_link``, T-0073, ADR 0008); a PER-09 changes only the individual rows.
 """
 
 from __future__ import annotations
@@ -32,7 +35,7 @@ from app.core.auth.access import (
     register_admin_grant_lookup,
     sod_warning,
 )
-from app.core.auth.models import User, normalize_email
+from app.core.auth.models import SOURCE_DIRECT, User, normalize_email
 from app.core.tenancy.rls import session_tenancy
 from app.core.tenancy.scope import OutOfScopeError
 from app.modules.admin.models import AdminGrant
@@ -64,10 +67,21 @@ class NotAMemberError(LookupError):
     """The user holds no membership on the project (404)."""
 
 
+class ManagedThroughTeamError(ValueError):
+    """The user's access to the project comes only through teams (409): a PER-09 cannot edit
+    or remove team-derived rows (ADR 0008, T-0073). ``link_ids``: the team links."""
+
+    def __init__(self, link_ids: Iterable[uuid.UUID]) -> None:
+        self.link_ids = sorted(link_ids, key=str)
+        super().__init__("managed through a team: a system admin changes the team instead")
+
+
 @dataclass(frozen=True, slots=True)
 class Member:
+    """A project member with every live row: individual and team-derived (T-0073)."""
+
     user: User
-    grants: frozenset[Grant]
+    grants: frozenset[memberships.MemberGrant]
 
 
 def _tenant_id(session: Session) -> uuid.UUID:
@@ -286,10 +300,17 @@ def lookup_user(session: Session, email: str, *, actor_id: uuid.UUID) -> User | 
 def project_members(session: Session, project_id: uuid.UUID) -> list[Member]:
     """The project's members with their grants, by e-mail (a deleted project: 404)."""
     projects.get_project(session, project_id)
-    grants = memberships.project_grants(session, project_id)
+    grants = memberships.project_member_grants(session, project_id)
     accounts = users.users_by_id(session, grants)
     found = [Member(accounts[u], frozenset(g)) for u, g in grants.items() if u in accounts]
     return sorted(found, key=lambda m: m.user.email)
+
+
+def _team_rows(
+    session: Session, project_id: uuid.UUID, user_id: uuid.UUID
+) -> frozenset[memberships.MemberGrant]:
+    held = memberships.project_member_grants(session, project_id).get(user_id, set())
+    return frozenset(g for g in held if not g.is_direct)
 
 
 def assign_member(
@@ -301,16 +322,21 @@ def assign_member(
     confirm_sod: bool,
     actor_id: uuid.UUID,
 ) -> tuple[Member, bool]:
-    """Set the user's complete persona set on the project; returns it and ``sod_warning``.
+    """Set the user's complete **individual** persona set on the project; returns the member
+    (individual and team-derived rows) and ``sod_warning``.
 
-    PER-09 with a hold-authority persona needs ``confirm_sod`` (else
-    ``SodConfirmationError``) and is audited with ``sod_warning: true``. Assigning PER-09
-    adds no hold or signing capability: capabilities come only from each persona (TD-151).
+    Team-derived rows are left alone; a persona the user also holds through a team gets its
+    own individual row (it outlives the team link). PER-09 with a hold-authority persona,
+    counted over the user's effective grants (individual and team-derived, ADR 0008), needs
+    ``confirm_sod`` (else ``SodConfirmationError``) and is audited with ``sod_warning: true``.
+    Assigning PER-09 adds no hold or signing capability: capabilities come only from each
+    persona (TD-151).
     """
     projects.get_project(session, project_id)
     user = users.get_user(session, user_id)
     wanted = frozenset(personas)
-    warn = sod_warning(g.persona for g in wanted)
+    team = _team_rows(session, project_id, user_id)
+    warn = sod_warning([*(g.persona for g in wanted), *(t.grant.persona for t in team)])
     if warn and not confirm_sod:
         raise SodConfirmationError(
             "PER-09 together with a hold-authority persona: confirm with confirm_sod"
@@ -328,18 +354,24 @@ def assign_member(
             "sod_warning": warn,
         }
         _append(session, f"project-members:{project_id}", payload, actor_id)
-    return Member(user, wanted), warn
+    direct = (memberships.MemberGrant(g, SOURCE_DIRECT, None) for g in wanted)
+    return Member(user, frozenset((*direct, *team))), warn
 
 
 def remove_member(
     session: Session, project_id: uuid.UUID, user_id: uuid.UUID, *, actor_id: uuid.UUID
 ) -> None:
-    """Revoke every persona of the user on the project (``NotAMemberError`` if none)."""
+    """Revoke every individual persona of the user on the project. Team-derived rows stay:
+    a user with only those gets ``ManagedThroughTeamError``, a non-member ``NotAMemberError``.
+    """
     projects.get_project(session, project_id)
     _added, removed = memberships.set_user_grants(
         session, project_id, user_id, (), actor_id=actor_id
     )
     if not removed:
+        team = _team_rows(session, project_id, user_id)
+        if team:
+            raise ManagedThroughTeamError(t.source_id for t in team if t.source_id is not None)
         raise NotAMemberError("not a member of this project")
     payload = {"action": "remove", "user_id": str(user_id), "removed": _grant_payload(removed)}
     _append(session, f"project-members:{project_id}", payload, actor_id)
@@ -349,6 +381,7 @@ __all__ = [
     "DuplicateUserError",
     "GrantRaceError",
     "LastSystemAdminError",
+    "ManagedThroughTeamError",
     "Member",
     "NotAMemberError",
     "SodConfirmationError",

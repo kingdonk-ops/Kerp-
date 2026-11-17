@@ -59,6 +59,19 @@ not B's (404); a plain tenant-level session (no user, no flag) reads no project 
 System admin reads every project row and membership but, because the project-scoped tables keep
 the standard policies, **no project-scoped record** of a project without a membership.
 
+**Membership sources (T-0073, ADR 0008).** `auth_project_membership` rows carry a source:
+`direct` (an individual assignment) or `team_link` (derived from a team-project link,
+`source_id` = the link id). Access is the union of the live rows, whatever their source, so a
+team-derived grant opens the project row and the project's memberships exactly like an
+individual one (`app.member_project_ids`, `app.allowed_project_ids` and the site filter are
+built from both). The memberships' policy declares `source_column="source_type"`: inserts,
+updates and deletes of a row whose source is not `direct` (old or new row) additionally need
+`app.is_system_admin`, and the ORM write guard refuses the same on SQLite. The extra read
+policy `membership_team_link_census_policy` shows live derived rows of **any** tenant, but only
+while `app.team_link_census` is raised, which only the `SECURITY DEFINER` census function
+`kerp_live_team_link_grant_count()` of migration `0025` does, for its own count, before
+restoring the caller's value (the startup check, `app/core/auth/README.md`).
+
 Settings bound per transaction (all from the server, never from the request):
 
 | Setting | From |
@@ -131,5 +144,6 @@ Migration `0006` (T-0010) inlines its RLS DDL so it stays frozen at that revisio
 call, raw-SQL aggregation, DB migration. It needs PostgreSQL and runs in CI's PostgreSQL step
 as the `NOSUPERUSER NOBYPASSRLS` role `kerp_app` (skipped elsewhere, TD-052).
 `tests/test_rls_multi_project.py` covers the allowed list under RLS the same way, and
-`tests/test_rls_admin.py` the membership-based and admin-grant policies (T-0014).
+`tests/test_rls_admin.py` the membership-based and admin-grant policies (T-0014),
+`tests/test_rls_team_grants.py` the derived-row write rule and the census function (T-0073).
 `tests/test_tenancy.py` and `tests/test_access.py` run on both dialects.

@@ -7,6 +7,7 @@ project is the one in the path:
 * list / read: projects the caller is a member of; any other project (another tenant's,
   a non-member's, a deleted one) is 404.
 * edit / delete: the ``admin`` capability on that project (Project Administrator), else 403.
+  Delete answers 409 while team-derived members remain (unlink the teams first, T-0073).
 * create: the caller's tenant-level ``create_projects`` grant ("Project Admin", appointed by
   a System admin through ``/api/v1/admin/grants``), else 403 (diff §4.1, TD-184, T-0039). The
   creator is granted PER-09 on the new project in the same transaction.
@@ -21,6 +22,7 @@ import uuid
 
 from fastapi import APIRouter, HTTPException, Response, status
 
+from app.core.auth import memberships
 from app.core.auth.access import (
     CREATE_PROJECTS,
     CallerAdminGrants,
@@ -131,5 +133,11 @@ def delete_project(
     project_id: uuid.UUID, principal: CurrentPrincipal, grants: CallerGrants, session: DbSession
 ) -> Response:
     _admin(grants, project_id)
-    service.delete_project(session, project_id, actor_id=principal.user_id)
+    try:
+        service.delete_project(session, project_id, actor_id=principal.user_id)
+    except memberships.TeamGrantsPresentError as exc:
+        # Team-derived members are ended by unlinking the teams (T-0073, ADR 0008).
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, {"code": "team_links_present", "message": str(exc)}
+        ) from exc
     return Response(status_code=status.HTTP_204_NO_CONTENT)

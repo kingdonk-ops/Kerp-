@@ -65,6 +65,8 @@ request's scope was resolved from, so they are read once per request, T-0071):
   without a creator.
 - delete: also revokes every membership on the project (`memberships.revoke_project`;
   audited as `revoked_memberships`), so memberships of a deleted project confer nothing.
+  While team-derived members remain (T-0073, ADR 0008) it answers 409 `team_links_present`:
+  a System admin unlinks the project's teams first, so derived grants never outlive their link.
 
 ## Narrow lobby read (T-0040)
 
