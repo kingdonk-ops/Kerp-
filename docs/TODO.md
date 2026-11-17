@@ -208,7 +208,7 @@
 | [TD-332](../tracker/todo/TD-332.md) | SSO callback: a 503 when Redis is unreachable does not clear the pre-auth cookie | T-0054 | reviewer |
 | [TD-334](../tracker/todo/TD-334.md) | SSO return landings (/login/sso-return, /app/sso-return) must send Referrer-Policy: no-referrer (T-0055 / T-0143) | T-0055, T-0143 | reviewer |
 | [TD-338](../tracker/todo/TD-338.md) | One deployment-region setting: S3 should read KERP_AWS_REGION (added by T-0058 for SES/SNS) instead of its own KERP_S3_REGION | T-0058 | implementer |
-| [TD-341](../tracker/todo/TD-341.md) | Magic-link request: eligible path also writes and flushes a mail_send_log row (timing difference vs unknown/inactive); cover in T-0057 equalisation (defer row to worker or equivalent dummy write) | T-0058 | reviewer |
+| [TD-341](../tracker/todo/TD-341.md) | Magic-link request: eligible path also writes and flushes a mail_send_log row (timing difference vs unknown/inactive); cover in T-0057 equalisation (defer row to worker or equivalent dummy write) | T-0057, T-0058 | reviewer |
 | [TD-343](../tracker/todo/TD-343.md) | SNS certificate check should refuse a certificate that is not yet valid (not_valid_before_utc) | T-0058 | reviewer |
 | [TD-344](../tracker/todo/TD-344.md) | mail service: render template before transport.send so a transport bug is not recorded as permanent failed template:* | T-0058 | reviewer |
 | [TD-345](../tracker/todo/TD-345.md) | main.py lifespan: gate mail dispatcher drain/uninstall on broker alone | T-0058 | reviewer |
