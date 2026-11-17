@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 from app.core.config import Settings
 from app.core.security_headers import DOCS_CONTENT_SECURITY_POLICY, HSTS_VALUE
 from app.main import create_app
+from tests.auth_support import PRODUCTION_MAIL
 
 BASELINE = {
     "x-content-type-options": "nosniff",
@@ -18,7 +19,7 @@ BASELINE = {
     "referrer-policy": "no-referrer",
 }
 API_CSP = "default-src 'none'; frame-ancestors 'none'"
-# A production app needs its deployment tenant to start (T-0037).
+# A production app needs its deployment tenant (T-0037) and outbound e-mail (T-0058) to start.
 TENANT = uuid.UUID("00000000-0000-4000-8000-0000000000f1")
 
 
@@ -99,12 +100,16 @@ def test_no_hsts_outside_production_by_default(environment: str) -> None:
 
 def test_hsts_in_production_by_default() -> None:
     assert HSTS_VALUE == "max-age=31536000; includeSubDomains"
-    headers = _get(Settings(environment="production", default_tenant_id=TENANT)).headers
+    headers = _get(
+        Settings(environment="production", default_tenant_id=TENANT, **PRODUCTION_MAIL)
+    ).headers
     assert headers["strict-transport-security"] == HSTS_VALUE
 
 
 def test_hsts_can_be_forced_off_in_production() -> None:
-    settings = Settings(environment="production", hsts_enabled=False, default_tenant_id=TENANT)
+    settings = Settings(
+        environment="production", hsts_enabled=False, default_tenant_id=TENANT, **PRODUCTION_MAIL
+    )
     headers = _get(settings).headers
     assert "strict-transport-security" not in headers
 

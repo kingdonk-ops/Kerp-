@@ -423,5 +423,6 @@ DbSession = Annotated[Session, Depends(get_db, scope="function")]
 # ``tenancy.scope``: the soft-delete / tenancy read filters and write guard on every Session.
 from app.core.audit import models as _audit_models  # noqa: E402, F401
 from app.core.auth import models as _auth_models  # noqa: E402, F401
+from app.core.mail import models as _mail_models  # noqa: E402, F401  (T-0058)
 from app.core.module_loader import models as _module_models  # noqa: E402, F401
 from app.core.tenancy import scope as _tenancy_scope  # noqa: E402, F401

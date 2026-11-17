@@ -23,10 +23,12 @@ from saq.types import Context
 from app.core.config import Settings, get_settings
 from app.core.db import Database
 from app.core.logging import configure_logging
+from app.core.mail.service import Delivery
+from app.core.mail.transport import MailTransport, transport_from_settings
 from app.core.module_loader.loader import discover_modules, import_job_handlers
 from app.core.request_context import request_id_var
 from app.core.tenancy.context import TenancyContext, use_tenancy
-from app.modules.jobs import scheduler, service
+from app.modules.jobs import mail, scheduler, service
 from app.modules.jobs.broker import QUEUE_NAMES, RUN_JOB, LoopDispatcher, SaqBroker
 from app.modules.jobs.registry import JOB_REGISTRY, JobContext, JobRegistry
 
@@ -41,6 +43,8 @@ class WorkerContext(Context, total=False):
     registry: JobRegistry
     broker: SaqBroker
     settings: Settings
+    mail_queue: mail.MailQueue
+    mail_delivery: Delivery
 
 
 async def run_job(
@@ -167,8 +171,14 @@ def build_workers(
     db: Database,
     registry: JobRegistry,
     broker: SaqBroker,
+    mail_transport: MailTransport | None = None,
 ) -> list[Worker[WorkerContext]]:
-    """One SAQ worker per queue, sharing ``db`` and ``registry`` through the job context."""
+    """One SAQ worker per queue, sharing ``db`` and ``registry`` through the job context.
+
+    The interactive worker also runs ``kerp_send_mail`` (T-0058) through ``mail_transport``
+    (default: the one the settings name; production refuses the log transport)."""
+    transport = mail_transport or transport_from_settings(settings)
+    delivery = Delivery(db=db, transport=transport, settings=settings)
     concurrency = {
         "interactive": settings.jobs_interactive_concurrency,
         "batch": settings.jobs_batch_concurrency,
@@ -179,6 +189,8 @@ def build_workers(
         ctx["registry"] = registry
         ctx["broker"] = broker
         ctx["settings"] = settings
+        ctx["mail_queue"] = broker.queues["interactive"]
+        ctx["mail_delivery"] = delivery
 
     # The stuck-job sweep (T-0214) and the hourly per-project jobs (T-0215): batch worker only.
     cron_jobs: dict[str, list[CronJob[WorkerContext]]] = {
@@ -196,10 +208,14 @@ def build_workers(
             ),
         ],
     }
+    functions: dict[str, list[tuple[str, Any]]] = {
+        "interactive": [(RUN_JOB, run_job), (mail.SEND_MAIL, mail.send_mail_job)],
+        "batch": [(RUN_JOB, run_job)],
+    }
     return [
         Worker[WorkerContext](
             broker.queues[name],
-            functions=[(RUN_JOB, run_job)],
+            functions=functions[name],
             concurrency=concurrency[name],
             cron_jobs=cron_jobs[name],
             startup=startup,
@@ -217,13 +233,17 @@ async def serve(settings: Settings) -> None:
     connection is made: a check that raises refuses to start the worker (T-0213)."""
     registry = load_registry()
     registry.run_startup_checks(settings)
+    transport = transport_from_settings(settings)  # production refuses without SES (T-0058)
     if not settings.redis_url:
         raise RuntimeError("KERP_REDIS_URL is not set")
     db = Database.from_settings(settings)
     broker = SaqBroker(settings.redis_url)
     loop = asyncio.get_running_loop()
     service.set_dispatcher(LoopDispatcher(broker, loop))
-    workers = build_workers(settings, db=db, registry=registry, broker=broker)
+    mail_dispatcher = mail.install(broker.queues["interactive"], loop)
+    workers = build_workers(
+        settings, db=db, registry=registry, broker=broker, mail_transport=transport
+    )
     stopping = asyncio.Event()
     # Each SAQ worker would install its own SIGTERM/SIGINT handler (the last one wins and only
     # that worker would stop), so the signals are handled here and stop both at once.
@@ -242,6 +262,8 @@ async def serve(settings: Settings) -> None:
         await asyncio.gather(*(worker.stop() for worker in workers))
         await asyncio.gather(*tasks, return_exceptions=True)
         service.set_dispatcher(None)
+        mail.uninstall()
+        await mail_dispatcher.drain()
         await broker.close()
         db.dispose()
 

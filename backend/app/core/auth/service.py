@@ -313,13 +313,14 @@ class AuthService:
         payload = json.dumps({"uid": str(user.id), "tid": str(tenant)}).encode()
         self.runtime.store.put_magic_link(magic_link_digest(token), payload, MAGIC_LINK_TTL)
         self.runtime.magic_links.send(
+            session,
             MagicLink(
                 token=token,
                 email=user.email,
                 user_id=user.id,
                 tenant_id=tenant,
                 expires_at=utcnow() + MAGIC_LINK_TTL,
-            )
+            ),
         )
 
     def redeem_magic_link(

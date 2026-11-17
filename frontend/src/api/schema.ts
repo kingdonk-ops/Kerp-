@@ -430,6 +430,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/mail/sends": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Sends */
+        get: operations["list_sends_api_v1_mail_sends_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/mail/suppressions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Suppressions */
+        get: operations["list_suppressions_api_v1_mail_suppressions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/mail/suppressions/{suppression_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove Suppression */
+        delete: operations["remove_suppression_api_v1_mail_suppressions__suppression_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/modules": {
         parameters: {
             query?: never;
@@ -2378,6 +2429,64 @@ export interface components {
             /** Email */
             email: string;
         };
+        /** MailSendRead */
+        MailSendRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Template Key */
+            template_key: string;
+            /** Recipient Masked */
+            recipient_masked: string;
+            /** Recipient Hash */
+            recipient_hash: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "queued" | "sent" | "bounced" | "complained" | "failed" | "suppressed";
+            /** Attempts */
+            attempts: number;
+            /** Provider Message Id */
+            provider_message_id: string | null;
+            /** Error Code */
+            error_code: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Sent At */
+            sent_at: string | null;
+            /** Status At */
+            status_at: string | null;
+        };
+        /** MailSuppressionRead */
+        MailSuppressionRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Recipient Masked */
+            recipient_masked: string;
+            /** Recipient Hash */
+            recipient_hash: string;
+            /**
+             * Reason
+             * @enum {string}
+             */
+            reason: "bounce" | "complaint";
+            /** Detail */
+            detail: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
         /** MeResponse */
         MeResponse: {
             /**
@@ -4263,6 +4372,100 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    list_sends_api_v1_mail_sends_get: {
+        parameters: {
+            query?: {
+                status?: ("queued" | "sent" | "bounced" | "complained" | "failed" | "suppressed") | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MailSendRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_suppressions_api_v1_mail_suppressions_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MailSuppressionRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_suppression_api_v1_mail_suppressions__suppression_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                suppression_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
             };
         };
     };

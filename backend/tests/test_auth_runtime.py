@@ -18,7 +18,7 @@ from app.core.auth.runtime import (
 from app.core.config import Settings
 from app.core.db import Base
 from app.main import create_app
-from tests.auth_support import T1, auth_app, make_settings
+from tests.auth_support import PRODUCTION_MAIL, T1, auth_app, make_settings
 
 
 def test_defaults_follow_the_spec() -> None:
@@ -91,7 +91,8 @@ def test_production_startup_fails_without_the_deployment_tenant() -> None:
 def test_startup_with_a_tenant_or_outside_production(
     environment: str, tenant: uuid.UUID | None
 ) -> None:
-    app = create_app(make_settings(environment=environment, default_tenant_id=tenant))
+    mail = PRODUCTION_MAIL if environment == "production" else {}  # T-0058
+    app = create_app(make_settings(environment=environment, default_tenant_id=tenant, **mail))
     with TestClient(app) as client:
         assert client.get("/health").status_code == 200
 

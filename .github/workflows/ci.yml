@@ -148,7 +148,12 @@ jobs:
           echo "uid=$uid"; [ "$uid" != "0" ]
           # Production startup requires the deployment tenant (T-0037, diff §4.1); a synthetic
           # UUID, not a real tenant. /health needs no signing key or Redis (auth builds lazily).
-          docker run -d --name kerp-smoke -p 8000:8000 \
+          # Production also requires outbound e-mail (T-0058, diff §4.6): synthetic SES settings;
+          # nothing calls AWS at startup (boto3 is imported lazily, in the worker).
+          mail=(-e KERP_MAIL_TRANSPORT=ses -e KERP_MAIL_FROM_ADDRESS=no-reply@example.test
+            -e KERP_MAIL_SNS_TOPIC_ARN=arn:aws:sns:ap-southeast-2:000000000000:kerp-mail-smoke
+            -e KERP_WEB_ORIGIN=https://kerp.example.test)
+          docker run -d --name kerp-smoke -p 8000:8000 "${mail[@]}" \
             -e KERP_DEFAULT_TENANT_ID=00000000-0000-4000-8000-00000000c1c1 kerp-backend:ci
           for _ in $(seq 1 30); do
             if body="$(curl -fsS http://127.0.0.1:8000/health)"; then break; fi
@@ -168,6 +173,14 @@ jobs:
           echo "no-tenant exit: $rc"
           [ "$rc" -ne 0 ] && [ "$rc" -ne 124 ]
           echo "$out" | grep -q 'KERP_DEFAULT_TENANT_ID must be set'
+          # Negative check: production without an e-mail transport must fail fast (T-0058).
+          rc=0
+          out="$(timeout 60 docker run --rm --name kerp-no-mail \
+            -e KERP_DEFAULT_TENANT_ID=00000000-0000-4000-8000-00000000c1c1 kerp-backend:ci 2>&1)" \
+            || rc=$?
+          echo "no-mail exit: $rc"
+          [ "$rc" -ne 0 ] && [ "$rc" -ne 124 ]
+          echo "$out" | grep -q 'KERP_MAIL_TRANSPORT=ses'
           # The same image runs the SAQ job worker (T-0015, compose service "worker").
           docker run --rm kerp-backend:ci python -c "import app.modules.jobs.worker"
       - name: Container logs

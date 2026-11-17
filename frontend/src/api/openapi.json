@@ -1029,6 +1029,201 @@
         }
       }
     },
+    "/api/v1/mail/sends": {
+      "get": {
+        "tags": [
+          "mail"
+        ],
+        "summary": "List Sends",
+        "operationId": "list_sends_api_v1_mail_sends_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "queued",
+                    "sent",
+                    "bounced",
+                    "complained",
+                    "failed",
+                    "suppressed"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MailSendRead"
+                  },
+                  "title": "Response List Sends Api V1 Mail Sends Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/mail/suppressions": {
+      "get": {
+        "tags": [
+          "mail"
+        ],
+        "summary": "List Suppressions",
+        "operationId": "list_suppressions_api_v1_mail_suppressions_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MailSuppressionRead"
+                  },
+                  "title": "Response List Suppressions Api V1 Mail Suppressions Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/mail/suppressions/{suppression_id}": {
+      "delete": {
+        "tags": [
+          "mail"
+        ],
+        "summary": "Remove Suppression",
+        "operationId": "remove_suppression_api_v1_mail_suppressions__suppression_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "suppression_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Suppression Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/modules": {
       "get": {
         "tags": [
@@ -7210,6 +7405,160 @@
           "email"
         ],
         "title": "MagicLinkRequest"
+      },
+      "MailSendRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "template_key": {
+            "type": "string",
+            "title": "Template Key"
+          },
+          "recipient_masked": {
+            "type": "string",
+            "title": "Recipient Masked"
+          },
+          "recipient_hash": {
+            "type": "string",
+            "title": "Recipient Hash"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "sent",
+              "bounced",
+              "complained",
+              "failed",
+              "suppressed"
+            ],
+            "title": "Status"
+          },
+          "attempts": {
+            "type": "integer",
+            "title": "Attempts"
+          },
+          "provider_message_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Message Id"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "sent_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sent At"
+          },
+          "status_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "template_key",
+          "recipient_masked",
+          "recipient_hash",
+          "status",
+          "attempts",
+          "provider_message_id",
+          "error_code",
+          "created_at",
+          "sent_at",
+          "status_at"
+        ],
+        "title": "MailSendRead"
+      },
+      "MailSuppressionRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "recipient_masked": {
+            "type": "string",
+            "title": "Recipient Masked"
+          },
+          "recipient_hash": {
+            "type": "string",
+            "title": "Recipient Hash"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "bounce",
+              "complaint"
+            ],
+            "title": "Reason"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "recipient_masked",
+          "recipient_hash",
+          "reason",
+          "detail",
+          "created_at"
+        ],
+        "title": "MailSuppressionRead"
       },
       "MeResponse": {
         "properties": {
