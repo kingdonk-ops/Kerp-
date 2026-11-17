@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 207 · **Closed:** 129
+**Open:** 212 · **Closed:** 129
 
 ## decision (7)
 
@@ -112,7 +112,7 @@
 | [TD-322](../tracker/todo/TD-322.md) | Entra ID SSO: certificate (client assertion) credentials for the code redemption instead of the client secret | T-0054 | implementer |
 | [TD-336](../tracker/todo/TD-336.md) | Mail: settle send-log rows stuck in queued (enqueue failed or Redis payload lost); no re-enqueue is possible because the payload (with the link token) is never persisted | T-0058 | implementer |
 
-## later (92)
+## later (96)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -208,6 +208,10 @@
 | [TD-332](../tracker/todo/TD-332.md) | SSO callback: a 503 when Redis is unreachable does not clear the pre-auth cookie | T-0054 | reviewer |
 | [TD-334](../tracker/todo/TD-334.md) | SSO return landings (/login/sso-return, /app/sso-return) must send Referrer-Policy: no-referrer (T-0055 / T-0143) | T-0055, T-0143 | reviewer |
 | [TD-338](../tracker/todo/TD-338.md) | One deployment-region setting: S3 should read KERP_AWS_REGION (added by T-0058 for SES/SNS) instead of its own KERP_S3_REGION | T-0058 | implementer |
+| [TD-341](../tracker/todo/TD-341.md) | Magic-link request: eligible path also writes and flushes a mail_send_log row (timing difference vs unknown/inactive); cover in T-0057 equalisation (defer row to worker or equivalent dummy write) | T-0058 | reviewer |
+| [TD-343](../tracker/todo/TD-343.md) | SNS certificate check should refuse a certificate that is not yet valid (not_valid_before_utc) | T-0058 | reviewer |
+| [TD-344](../tracker/todo/TD-344.md) | mail service: render template before transport.send so a transport bug is not recorded as permanent failed template:* | T-0058 | reviewer |
+| [TD-345](../tracker/todo/TD-345.md) | main.py lifespan: gate mail dispatcher drain/uninstall on broker alone | T-0058 | reviewer |
 
 ## bug (5)
 
@@ -219,7 +223,7 @@
 | [TD-330](../tracker/todo/TD-330.md) | scripts/pr_suggestions.py rebuild fails in cloud sessions: gh api --paginate follows numeric-ID repository Link URLs that the agent proxy rejects (HTTP 403); paginate with explicit repos/{owner}/{repo} page params | — | coordinator |
 | [TD-339](../tracker/todo/TD-339.md) | jobs LoopDispatcher.drain can spin forever when the commit ran on the loop's own thread (finished tasks stay in the set until their done callbacks run) | T-0058 | implementer |
 
-## risk (23)
+## risk (24)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -246,6 +250,7 @@
 | [TD-320](../tracker/todo/TD-320.md) | Access-request filing has no rate limit: withdraw and re-request (no cooldown) can flood a project's PER-09 holders with notifications | T-0050 | implementer |
 | [TD-324](../tracker/todo/TD-324.md) | kerp_lobby_projects_by_id returns code and name for any live project id regardless of lobby visibility; restrict to lobby-visible / requested projects or check the ticket first, and record the third narrow read path in edge §6 | T-0050 | reviewer |
 | [TD-333](../tracker/todo/TD-333.md) | Reverse proxy / ingress / load balancer in front of the API must not log query strings on /api/v1/auth/sso/* (Entra code and state) | T-0054 | reviewer |
+| [TD-342](../tracker/todo/TD-342.md) | SNS endpoint /api/v1/mail/ses-events fetches an uncached certificate per new SigningCertURL path before the signature check (outbound-GET amplification for anyone knowing the topic ARN) | T-0058 | reviewer |
 
 ## Closed
 
