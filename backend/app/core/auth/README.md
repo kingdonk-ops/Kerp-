@@ -453,8 +453,12 @@ clients reach directly: they could then choose their own `X-Forwarded-For` and g
 per-client lock on every request (only the backstop would remain). IPv6 clients can rotate
 within their /64 (TD-226).
 
-Unknown addresses lock exactly like real ones. Link delivery is the `MagicLinkSender` seam:
-development logs the token, production logs "not delivered" until e-mail exists (TD-084).
+Unknown addresses lock exactly like real ones. Link delivery is the `MagicLinkSender` seam;
+the default `MailMagicLinkSender` queues the `auth.magic_link` e-mail through the outbound
+e-mail service in the request's unit of work (`app/core/mail/`, T-0058): sent by the worker
+after the commit, the token only in the link fragment (`<KERP_WEB_ORIGIN>/magic-link#<token>`),
+never in the send log. The development log transport prints the e-mail; production refuses to
+start without SES.
 
 ## Tokens
 

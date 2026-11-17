@@ -6,15 +6,19 @@ from fastapi.testclient import TestClient
 from app.core.config import Settings
 from app.main import create_app
 from app.openapi import openapi_schema
-from tests.auth_support import T1
+from tests.auth_support import PRODUCTION_MAIL, T1
 
 DOCS_PATHS = ("/docs", "/redoc", "/docs/oauth2-redirect", "/openapi.json")
 
 
 def _production(api_docs_enabled: bool | None = None) -> Settings:
-    """Production settings that pass the startup check (T-0037 needs the deployment tenant)."""
+    """Production settings that pass the startup check (T-0037 needs the deployment tenant,
+    T-0058 the mail transport)."""
     return Settings(
-        environment="production", default_tenant_id=T1, api_docs_enabled=api_docs_enabled
+        environment="production",
+        default_tenant_id=T1,
+        api_docs_enabled=api_docs_enabled,
+        **PRODUCTION_MAIL,
     )
 
 

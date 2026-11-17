@@ -3,9 +3,9 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 202 · **Closed:** 129
+**Open:** 207 · **Closed:** 129
 
-## decision (6)
+## decision (7)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -15,6 +15,7 @@
 | [TD-317](../tracker/todo/TD-317.md) | Confirm lobby project-code lookup rate limits (30/h per user, 1000/h deployment, 1-15 min escalating lockout) | T-0040 | coordinator |
 | [TD-329](../tracker/todo/TD-329.md) | Module map: access requests live in the new access_requests module (router mount /api/v1/<module>), not admin/lobby as T-0050 and lobby README assumed; planner to align the module map and T-0050 front-matter | T-0050 | reviewer |
 | [TD-335](../tracker/todo/TD-335.md) | Planner sizing: SSO-sized security flows landed at ~3.8k changed lines (M guideline < ~800); split such tasks further in future phases | T-0054 | reviewer |
+| [TD-340](../tracker/todo/TD-340.md) | Mail planner defaults to confirm: only permanent bounces and complaints suppress; recipient locale falls back to KERP_MAIL_DEFAULT_LOCALE (users have no locale yet); send_mail takes the caller's session | T-0058 | implementer |
 
 ## spec-gap (38)
 
@@ -59,7 +60,7 @@
 | [TD-312](../tracker/todo/TD-312.md) | Override binding and routing defaults (T-0035): which values are 'checked', who the approver user is | T-0035 | implementer |
 | [TD-319](../tracker/todo/TD-319.md) | Active-requests panel: a pending request hides the older decided request of the same project (diff §4.1 reads 'every pending plus the latest decided per project') | T-0050 | implementer |
 
-## missed (6)
+## missed (7)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -69,8 +70,9 @@
 | [TD-208](../tracker/todo/TD-208.md) | Uploads infra: provision the kerp-vault bucket (CORS for browser PUT/GET, lifecycle on staging/), wire KERP_S3_* in compose, add MinIO to CI for the gated round-trip test | T-0016 | implementer |
 | [TD-297](../tracker/todo/TD-297.md) | Admin UI screen for deployment settings (Admin > System) is not planned in any task | T-0044 | implementer |
 | [TD-327](../tracker/todo/TD-327.md) | Frontend i18n key notifications.kind.access_requests.requested for the inbox (needed when the access-request UI lands) | T-0050 | reviewer |
+| [TD-337](../tracker/todo/TD-337.md) | Web/Android route /magic-link#<token> that redeems the e-mailed sign-in link (POST /auth/magic-link/redeem); the e-mail now links there | T-0058 | implementer |
 
-## deferred (34)
+## deferred (35)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -108,8 +110,9 @@
 | [TD-288](../tracker/todo/TD-288.md) | pending_updates on a set with no parent default answers 409 instead of an empty offer | T-0036 | reviewer |
 | [TD-315](../tracker/todo/TD-315.md) | Override request currency: a later fully passing run of the record is not visible (no run log) | T-0035 | implementer |
 | [TD-322](../tracker/todo/TD-322.md) | Entra ID SSO: certificate (client assertion) credentials for the code redemption instead of the client secret | T-0054 | implementer |
+| [TD-336](../tracker/todo/TD-336.md) | Mail: settle send-log rows stuck in queued (enqueue failed or Redis payload lost); no re-enqueue is possible because the payload (with the link token) is never persisted | T-0058 | implementer |
 
-## later (91)
+## later (92)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -204,8 +207,9 @@
 | [TD-331](../tracker/todo/TD-331.md) | EntraJwks.key_for holds its lock across the JWKS HTTP fetch, and with no keys cached a failed first load refetches on every callback outside the once-a-minute limit; add a short negative cache / apply the limit | T-0054 | reviewer |
 | [TD-332](../tracker/todo/TD-332.md) | SSO callback: a 503 when Redis is unreachable does not clear the pre-auth cookie | T-0054 | reviewer |
 | [TD-334](../tracker/todo/TD-334.md) | SSO return landings (/login/sso-return, /app/sso-return) must send Referrer-Policy: no-referrer (T-0055 / T-0143) | T-0055, T-0143 | reviewer |
+| [TD-338](../tracker/todo/TD-338.md) | One deployment-region setting: S3 should read KERP_AWS_REGION (added by T-0058 for SES/SNS) instead of its own KERP_S3_REGION | T-0058 | implementer |
 
-## bug (4)
+## bug (5)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -213,6 +217,7 @@
 | [TD-252](../tracker/todo/TD-252.md) | tracker.py new-todo cannot see open PRs in cloud sessions: gh pr list uses GraphQL (blocked), so TODO ids collide | T-0029 | coordinator |
 | [TD-287](../tracker/todo/TD-287.md) | Upgrade offer: a soft-deleted own rule holding a new default's key shows key_in_use forever | T-0036 | reviewer |
 | [TD-330](../tracker/todo/TD-330.md) | scripts/pr_suggestions.py rebuild fails in cloud sessions: gh api --paginate follows numeric-ID repository Link URLs that the agent proxy rejects (HTTP 403); paginate with explicit repos/{owner}/{repo} page params | — | coordinator |
+| [TD-339](../tracker/todo/TD-339.md) | jobs LoopDispatcher.drain can spin forever when the commit ran on the loop's own thread (finished tasks stay in the set until their done callbacks run) | T-0058 | implementer |
 
 ## risk (23)
 

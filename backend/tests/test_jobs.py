@@ -777,15 +777,18 @@ def test_worker_builds_one_saq_worker_per_queue_with_its_concurrency(db: Databas
         ("t:interactive", 3),
         ("t:batch", 1),
     ]
-    # Both run job rows; the batch worker also runs the stuck-job sweep cron (T-0214).
+    # Both run job rows; the batch worker also runs the stuck-job sweep cron (T-0214), the
+    # interactive one the outbound e-mail sends (T-0058).
     assert [set(w.functions) for w in workers] == [
-        {"kerp_run_job"},
+        {"kerp_run_job", "kerp_send_mail"},
         {"kerp_run_job", "sweep_cron", "hourly_project_jobs"},
     ]
     ctx: WorkerContext = {"worker": workers[0]}
     assert workers[0].startup is not None
     asyncio.run(workers[0].startup[0](ctx))
     assert (ctx["db"], ctx["registry"]) == (db, REGISTRY)
+    assert ctx["mail_queue"] is broker.queues["interactive"]
+    assert ctx["mail_delivery"].db is db
 
 
 def test_serve_needs_redis() -> None:

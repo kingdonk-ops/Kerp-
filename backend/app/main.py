@@ -28,10 +28,13 @@ from app.core.body_limit import BodyLimitMiddleware
 from app.core.config import Settings, get_settings
 from app.core.db import Database
 from app.core.logging import configure_logging
+from app.core.mail.router import router as mail_router
+from app.core.mail.transport import check_mail_config
 from app.core.module_loader.loader import DEFAULT_PACKAGE, install_modules
 from app.core.request_context import RequestContextMiddleware
 from app.core.security_headers import SecurityHeadersMiddleware
 from app.core.tenancy.scope import OutOfScopeError
+from app.modules.jobs import mail as jobs_mail
 from app.modules.jobs.broker import LoopDispatcher, SaqBroker
 from app.modules.jobs.service import set_dispatcher
 
@@ -57,15 +60,21 @@ def create_app(
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         check_startup_config(settings)
+        check_mail_config(settings)  # production refuses to start without SES (T-0058)
         # Jobs (T-0015): rows committed by requests are enqueued on SAQ after the commit.
+        # Mail (T-0058): the jobs module installs core mail's post-commit enqueuer.
         broker = SaqBroker(settings.redis_url) if settings.redis_url else None
-        dispatcher = LoopDispatcher(broker, asyncio.get_running_loop()) if broker else None
+        loop = asyncio.get_running_loop()
+        dispatcher = LoopDispatcher(broker, loop) if broker else None
+        mail_dispatcher = jobs_mail.install(broker.queues["interactive"], loop) if broker else None
         if dispatcher is not None:
             set_dispatcher(dispatcher)
         yield
-        if broker is not None and dispatcher is not None:
+        if broker is not None and dispatcher is not None and mail_dispatcher is not None:
             set_dispatcher(None)
+            jobs_mail.uninstall()
             await dispatcher.drain()
+            await mail_dispatcher.drain()
             await broker.close()
         close_auth_runtime(_app)
         if database is not None:
@@ -125,6 +134,7 @@ def create_app(
     app.include_router(auth_router)  # core auth + JWKS (T-0008)
     app.include_router(sso_router)  # Entra ID SSO, auth config, assetlinks (T-0054)
     app.include_router(device_router)  # device registry (T-0043)
+    app.include_router(mail_router)  # outbound e-mail admin + SES bounce endpoint (T-0058)
     # Domain modules (app/modules/<name>/) and the per-project toggle API (T-0011).
     install_modules(app, modules_package)
 

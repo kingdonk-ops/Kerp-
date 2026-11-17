@@ -16,6 +16,7 @@ FastAPI modular monolith (see `docs/spec/` and `CLAUDE.md` §6).
 | `app/core/cel/` | CEL rule evaluation (celpy, lazy) with the KERP error taxonomy — see its `README.md` |
 | `app/core/audit/` | Hash-chained, append-only audit ledger (`append`, `verify_chain`; REVOKE + triggers) — see its `README.md` |
 | `app/core/auth/` | Users, scrypt passwords, EdDSA/RS256 JWTs + JWKS, rotating refresh, Redis `jti` revocation — see its `README.md` |
+| `app/core/mail/` | Outbound e-mail: `send_mail` (enqueue after commit), SES / fake / log transports, i18n templates, send log, bounce/complaint suppression, SNS endpoint — see its `README.md` |
 | `app/core/module_loader/` | Module loader + manifest contract, per-project enable/disable, toggle API `/api/v1/modules` — see its `README.md` |
 | `app/modules/<name>/` | Domain modules (`manifest.py`, `models.py`, `router.py`, `service.py`, `schemas.py`, `README.md`), mounted at `/api/v1/<name>` |
 | `app/modules/validation/` | Verification engine: `run_checks(context, rule_set)` and the single rule store (kinds, engines, compile-on-save, findings log) — see its `README.md` |
@@ -46,6 +47,8 @@ hardcoded config, no `.env` file is read).
 | `KERP_STORAGE_BUCKET`, `KERP_S3_ENDPOINT_URL`, `KERP_S3_PUBLIC_ENDPOINT_URL`, `KERP_S3_ACCESS_KEY_ID`, `KERP_S3_SECRET_ACCESS_KEY`, `KERP_UPLOAD_*`, `KERP_DOWNLOAD_URL_SECONDS` | see `app/modules/uploads/README.md` | Object storage (S3 / MinIO) and upload limits |
 | `KERP_ACCESS_REQUEST_COOLDOWN_HOURS` | `24` | Hours after a rejected access request before the same user may ask for the same project again (409 `ACCESS_REQUEST_COOLDOWN` before that); `0` disables the cooldown (`app/modules/access_requests/README.md`, diff §4.1) |
 | `KERP_S3_REGION` | `ap-southeast-2` | S3 region, set per deployment (TD-171 decision 13a, diff §4.4); MinIO ignores it |
+| `KERP_AWS_REGION` | `ap-southeast-2` | The deployment region (diff §4.4): the SES client and the SNS certificate host check read it |
+| `KERP_MAIL_TRANSPORT`, `KERP_MAIL_FROM_ADDRESS`, `KERP_MAIL_SES_CONFIGURATION_SET`, `KERP_MAIL_SNS_TOPIC_ARN`, `KERP_MAIL_DEFAULT_LOCALE` | see `app/core/mail/README.md` | Outbound e-mail (T-0058): SES in production (required: startup fails without it), the log transport in development; bounce/complaint topic; deployment steps in `docs/deploy/outbound-email.md` |
 | `KERP_LOG_LEVEL` | `INFO` | Root log level (`DEBUG`…`CRITICAL`, case-insensitive) |
 | `KERP_CONTENT_SECURITY_POLICY` | `default-src 'none'; frame-ancestors 'none'` | CSP for API responses |
 | `KERP_HSTS_ENABLED` | unset (= on only in `production`) | Force `Strict-Transport-Security` on/off |
@@ -175,6 +178,11 @@ A production container (the image default) needs:
   `https://localhost`. Needs `KERP_WEB_ORIGIN`; containing it stops the app at startup
   (`app/core/auth/README.md`, *Native app origins*).
 - `KERP_DATABASE_URL` for anything beyond `/health`.
+- Outbound e-mail (T-0058, `app/core/mail/README.md`): `KERP_MAIL_TRANSPORT=ses`,
+  `KERP_MAIL_FROM_ADDRESS`, `KERP_MAIL_SNS_TOPIC_ARN` (in `KERP_AWS_REGION`) and
+  `KERP_WEB_ORIGIN`. **Startup fails fast without them** (API and worker). SES credentials come
+  from the task / instance role, never from configuration. Domain, DKIM/SPF/DMARC, production
+  access and the bounce wiring: `docs/deploy/outbound-email.md`.
 - `KERP_INTERNAL_EMAIL_DOMAINS` (optional): the company's e-mail domains, comma-separated
   (e.g. `company.example,company-group.example`). Accounts on them are internal staff and see
   the lobby list; others are external until linked to a company Entra member account (T-0049,
@@ -195,7 +203,8 @@ A production container (the image default) needs:
   `/.well-known/assetlinks.json`.
 
 ```bash
-docker run --rm -p 8000:8000 -e KERP_DEFAULT_TENANT_ID=<tenant uuid> \
+docker run --rm -p 8000:8000 -e KERP_DEFAULT_TENANT_ID=<tenant uuid> -e KERP_MAIL_TRANSPORT=ses \
+  -e KERP_MAIL_FROM_ADDRESS=… -e KERP_MAIL_SNS_TOPIC_ARN=… -e KERP_WEB_ORIGIN=https://… \
   -e KERP_REDIS_URL=redis://… -e KERP_JWT_PRIVATE_KEY_FILE=/run/secrets/jwt.pem kerp-backend
 ```
 
@@ -234,6 +243,7 @@ pinned to a version outside its specifier, if a pin has no hash, or if the Docke
 
 - `GET /health` → `200 {"status": "ok", "version": "<version>"}` (plus `warnings` when there are any, e.g. `sso_acct_claim_missing`, T-0054)
 - `GET /.well-known/jwks.json`, `POST /api/v1/auth/{login,refresh,logout}`, `GET /api/v1/auth/me`, `GET /api/v1/auth/config`, `/api/v1/auth/sso/entra/*`, `GET /.well-known/assetlinks.json` — see `app/core/auth/README.md`
+- `GET /api/v1/mail/{sends,suppressions}`, `DELETE /api/v1/mail/suppressions/{id}` (System admin), `POST /api/v1/mail/ses-events` (SNS) — see `app/core/mail/README.md`
 
 ## Database (T-0005)
 

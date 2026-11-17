@@ -14,6 +14,7 @@ contract, `update(progress, message)` and the sanitised error (ADR 0007).
 | `scheduler.py` | `deployment_scopes`, `sweep_cron` (SAQ cron, every 5 min, batch worker; T-0214), `hourly_project_jobs` (queues every `schedule_hourly_per_project` kind in every live project at :17; T-0215) |
 | `worker.py` | `run_job` (the one SAQ function), `build_workers`, `serve`; `python -m app.modules.jobs.worker` |
 | `router.py`, `schemas.py` | `POST /api/v1/jobs`, `GET /api/v1/jobs/{id}` |
+| `mail.py` | Outbound e-mail's queue (T-0058): `install` sets core mail's post-commit enqueuer at start-up (API lifespan, worker), `MailDispatcher` stores the payload in Redis (`kerp:mail:<send id>`, TTL) and enqueues `kerp_send_mail` on the interactive queue with ids only; `send_mail_job` runs `app.core.mail.service.deliver` (SAQ retries with back-off). See `app/core/mail/README.md` |
 
 ## Writing a job (ADR 0007 rules 3, 4)
 

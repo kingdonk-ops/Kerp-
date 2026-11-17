@@ -44,6 +44,15 @@ def fake_store() -> RedisRevocationStore:
     return RedisRevocationStore(fakeredis.FakeRedis())
 
 
+# What production needs for outbound e-mail to pass the startup check (T-0058); synthetic.
+PRODUCTION_MAIL: dict[str, Any] = {
+    "mail_transport": "ses",
+    "mail_from_address": "no-reply@example.test",
+    "mail_sns_topic_arn": "arn:aws:sns:ap-southeast-2:000000000000:kerp-mail-test",
+    "web_origin": "https://kerp.example.test",
+}
+
+
 def make_settings(**overrides: Any) -> Settings:
     """Test settings; the deployment's hidden tenant is ``T1`` unless overridden."""
     values: dict[str, Any] = {"environment": "test", "redis_url": None, "default_tenant_id": T1}
@@ -57,7 +66,7 @@ class CapturingSender:
     def __init__(self) -> None:
         self.sent: list[MagicLink] = []
 
-    def send(self, link: MagicLink) -> None:
+    def send(self, _session: Any, link: MagicLink) -> None:
         self.sent.append(link)
 
 

@@ -145,6 +145,25 @@ class Settings(BaseSettings):
     android_app_package: str | None = None
     android_app_cert_fingerprints: Annotated[tuple[str, ...], NoDecode] = ()
 
+    # The deployment's AWS region (diff §4.4): SES and the SNS signing-certificate host check
+    # read it; nothing hard-codes a region. ap-southeast-2 (Sydney) for Australian deployments.
+    aws_region: str = Field(default="ap-southeast-2", pattern=r"^[a-z]{2}(-[a-z]+)+-[0-9]$")
+
+    # Outbound e-mail (T-0058, diff §4.6). ``mail_transport`` unset: the log transport outside
+    # production; production refuses to start unless it is ``ses`` with a sender address and
+    # the bounce/complaint topic. Credentials come from the instance role / secret store
+    # (the AWS default credential chain), never from settings or the repo.
+    mail_transport: Literal["ses", "log"] | None = None
+    mail_from_address: str | None = None
+    mail_ses_configuration_set: str | None = None
+    # The SNS topic SES publishes bounces and complaints to; the public endpoint accepts
+    # messages of this topic only (``arn:aws:sns:<region>:<account>:<name>``).
+    mail_sns_topic_arn: str | None = Field(
+        default=None, pattern=r"^arn:aws:sns:[a-z0-9-]+:[0-9]{12}:[A-Za-z0-9_-]{1,256}$"
+    )
+    # Locale of an e-mail whose recipient has none (BCP 47).
+    mail_default_locale: str = Field(default="en-AU", pattern=r"^[a-z]{2,3}(-[A-Z]{2})?$")
+
     # Notification channels (T-0019, TD-168): the registered channel names every notification
     # goes to (JSON list in the environment). ``in_app`` is the inbox record and always on;
     # FCM push (T-0144) and e-mail (TD-084) are added here once they exist.

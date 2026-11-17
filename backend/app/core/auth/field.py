@@ -22,8 +22,12 @@ wrong PIN ends PIN unlock on that device until the next online sign-in there; PI
 never revoke a session or a device and never trigger a wipe. The device reports failures it
 made offline with its next unlock (``failed_offline``), counted with the same escalation.
 
-Delivery of the link is a seam (``MagicLinkSender``). Outbound e-mail is TD-084; until then
-development logs the link and production refuses to pretend it sent one.
+Delivery of the link is a seam (``MagicLinkSender``). The default, ``MailMagicLinkSender``,
+queues the ``auth.magic_link`` e-mail through the outbound e-mail service (T-0058, diff §4.6):
+a send-log row in the request's unit of work, the SAQ send after the commit, the token only
+in the link fragment. Production refuses to start without a mail transport
+(``app.core.mail.transport.check_mail_config``); the development log transport prints the
+link and never runs in production.
 """
 
 from __future__ import annotations
@@ -38,6 +42,7 @@ from typing import Final, Literal, Protocol
 
 from fastapi import Request
 from fastapi.responses import JSONResponse
+from sqlalchemy.orm import Session
 
 from app.core.config import Settings
 
@@ -110,31 +115,37 @@ class MagicLink:
 
 
 class MagicLinkSender(Protocol):
-    """Delivers a magic link to its user. Must not raise for an undeliverable address."""
+    """Delivers a magic link to its user, in the request's unit of work (so the delivery is
+    queued only if it commits). Must not raise for an undeliverable address."""
 
-    def send(self, link: MagicLink) -> None: ...
-
-
-class LoggingMagicLinkSender:
-    """Development only: writes the link token to the log so a developer can redeem it."""
-
-    def send(self, link: MagicLink) -> None:
-        _logger.warning(
-            "magic link (development delivery, never used in production) for user %s: %s",
-            link.user_id,
-            link.token,
-        )
+    def send(self, session: Session, link: MagicLink) -> None: ...
 
 
-class UndeliverableMagicLinkSender:
-    """Production without an e-mail transport (TD-084): nothing is sent, the token is not
-    logged, and the operator is told."""
+MAGIC_LINK_TEMPLATE: Final = "auth.magic_link"
 
-    def send(self, link: MagicLink) -> None:
-        _logger.error("magic link for user %s not delivered: no e-mail transport", link.user_id)
+
+class MailMagicLinkSender:
+    """Queues the sign-in e-mail (T-0058): never sent from the request, the token travels
+    only in the link fragment and never reaches the send log."""
+
+    def send(self, session: Session, link: MagicLink) -> None:
+        # Imported here: the mail service needs the DB layer, which imports this module
+        # while it initialises (db → tenancy → bearer → runtime → field).
+        from app.core.mail.service import send_mail
+
+        minutes = int(MAGIC_LINK_TTL.total_seconds() // 60)
+        try:
+            send_mail(
+                session,
+                MAGIC_LINK_TEMPLATE,
+                link.email,
+                {"token": link.token, "expires_minutes": minutes},
+            )
+        except ValueError:  # an address the mail service cannot send to: answer neutrally
+            _logger.warning("magic link for user %s not queued: invalid address", link.user_id)
 
 
 def sender_from_settings(settings: Settings) -> MagicLinkSender:
-    if settings.environment == "production":
-        return UndeliverableMagicLinkSender()
-    return LoggingMagicLinkSender()
+    """The magic-link delivery (``settings`` reserved for per-deployment choices)."""
+    del settings
+    return MailMagicLinkSender()

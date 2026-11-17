@@ -12,7 +12,6 @@ device, without revoking anything. Runs on the real migration with a store clock
 clock the tests control.
 """
 
-import logging
 import uuid
 from collections.abc import Iterator
 from dataclasses import replace
@@ -34,8 +33,7 @@ from app.core.auth.field import (
     PIN_INVALID,
     PIN_REQUIRED,
     PIN_TTL_MARGIN,
-    LoggingMagicLinkSender,
-    UndeliverableMagicLinkSender,
+    MailMagicLinkSender,
     is_weak_pin,
     magic_link_digest,
     sender_from_settings,
@@ -1113,29 +1111,10 @@ def test_store_outage_is_503(tmp_path: Path, db: Database, users: dict[str, uuid
 # --- delivery -------------------------------------------------------------------------------
 
 
-def test_development_logs_the_link_and_production_never_does(
-    caplog: pytest.LogCaptureFixture, users: dict[str, uuid.UUID]
-) -> None:
-    from datetime import UTC, datetime
-
-    from app.core.auth.field import MagicLink
-
-    link = MagicLink(
-        token="tok-synthetic",
-        email=ALICE,
-        user_id=users["alice"],
-        tenant_id=T1,
-        expires_at=datetime.now(UTC),
-    )
-    dev = sender_from_settings(make_settings(environment="development"))
-    prod = sender_from_settings(make_settings(environment="production"))
-    assert isinstance(dev, LoggingMagicLinkSender)
-    assert isinstance(prod, UndeliverableMagicLinkSender)
-    with caplog.at_level(logging.INFO, logger="kerp.auth.field"):
-        dev.send(link)
-        assert "tok-synthetic" in caplog.text
-        caplog.clear()
-        prod.send(link)
-    assert "tok-synthetic" not in caplog.text
-    assert ALICE not in caplog.text
-    assert "not delivered" in caplog.text
+def test_every_environment_delivers_through_the_mail_service() -> None:
+    # T-0058: no environment-specific sender any more; the mail service queues the e-mail
+    # (the dev log transport, SES in production; production refuses to start without SES).
+    # The queued e-mail itself is covered in tests/test_mail.py.
+    for environment in ("development", "test", "production"):
+        sender = sender_from_settings(make_settings(environment=environment))
+        assert isinstance(sender, MailMagicLinkSender)
