@@ -20,6 +20,7 @@ EXPECTED: dict[str, tuple[str | None, bool]] = {
     "backend-image": ("backend", False),
     "backend-publish": ("backend", True),
     "frontend": ("frontend", False),
+    "perf": ("frontend", False),  # NFR budgets (T-0045): warn-only on breach, fails if broken
     "e2e": ("e2e", False),
 }
 

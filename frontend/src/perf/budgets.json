@@ -1,0 +1,37 @@
+{
+  "$comment": "NFR budgets of docs/spec/KERP-CONSOLIDATION-AND-DIFF.md §6.3 (TD-174, decision 18a). The one config of the CI performance job: T-0045 (form open), T-0145 (delta sync) and T-0146 (sets enforcement to \"fail\") read it. Reference device and network profile: TD-205.",
+  "enforcement": "warn",
+  "referenceDevice": {
+    "name": "CI proxy: headless Chrome with 4x CPU throttling (pilot tablet model not named yet)",
+    "confirmed": false,
+    "todo": "TD-205"
+  },
+  "cpuThrottleRate": 4,
+  "network": {
+    "name": "Simulated 4G (planner default, kept by the product owner 2026-11-16)",
+    "downloadKbps": 9000,
+    "uploadKbps": 3000,
+    "rttMs": 85,
+    "todo": "TD-205"
+  },
+  "budgets": {
+    "formOpen": {
+      "label": "Form open: 300-question template, first interactive render",
+      "size": 300,
+      "unit": "questions",
+      "runs": 5,
+      "statistic": "median",
+      "maxMs": 1500,
+      "task": "T-0045"
+    },
+    "deltaSync": {
+      "label": "Delta sync: 1,000 records pulled and applied on 4G",
+      "size": 1000,
+      "unit": "records",
+      "runs": 1,
+      "statistic": "median",
+      "maxMs": 30000,
+      "task": "T-0145"
+    }
+  }
+}

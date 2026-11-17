@@ -31,6 +31,7 @@ npm run typecheck  # tsc --noEmit (strict)
 npm run test       # vitest run: `unit` (jsdom) + `a11y` (headless Chrome) projects
 npx vitest run --project unit   # jsdom suites only
 npm run build      # typecheck + production build to dist/
+npm run perf       # NFR performance budgets (headless Chrome, 4x CPU throttle; warn-only, see below)
 npm run gen:api    # regenerate src/api/ from the backend OpenAPI schema (backend venv active)
 ```
 
@@ -45,6 +46,7 @@ src/
   i18n/       i18next instance + message catalogues (locales/en.ts)
   lib/api/    API client (bearer token, single-flight refresh rotation + one retry on 401)
   lib/cel/    offline CEL rule evaluation (@marcbachmann/cel-js), parity with the server
+  perf/       NFR performance budgets: budgets.json (single config), measurements, CI reporter
   pages/      route components (incl. the placeholder lobby route `/lobby`)
   projects/   project scope: `/me/projects` fetch + portfolio personas, ProjectScopeProvider, top-bar ProjectSwitcher
   shells/     RegisterPage, DetailPage (gate banner, tabs, audit), Dynamic Form Renderer (README.md)
@@ -109,6 +111,29 @@ src/
   contrast (7:1) in the outdoor theme, and on any rendered control under 48 × 48 px
   (`glove-target`: axe accepts a small target with free space around it; gloves do not). New
   field screens add a case there.
+
+## Performance budgets (T-0045, diff §6.3)
+
+- **One config.** `src/perf/budgets.json` holds the budgets (form open: 300 questions,
+  median of 5 runs, < 1500 ms; delta sync: 1,000 records, < 30 s), the CPU throttle (4x), the
+  simulated 4G profile (9000/3000 kbit/s, 85 ms RTT) and `enforcement` (`warn` now; T-0146 sets
+  `fail`). `src/perf/budgets.ts` validates it. The delta-sync budget is measured by T-0145 with
+  the same config. The reference device is not named yet and the profile is a planner default:
+  TD-205.
+- **Measurement.** `npm run perf` runs `src/**/*.perf.{ts,tsx}` (config `vitest.perf.config.ts`,
+  not part of `npm run test`) in headless Chrome; `cdp()` applies the CPU throttle.
+  `formOpen.perf.tsx` renders a synthetic 300-question template (`syntheticTemplate.ts`: all
+  data types, `visible_if` / `required_if` / validation CEL rules, help text) in `DynamicForm`
+  and times from the render call to the next painted frame with the first control focused
+  ("first interactive render"), 5 fresh mounts. The test fails only if the measurement is
+  broken (not all questions rendered, form not interactive).
+- **Reporting.** The Vitest reporter `src/perf/reporter.ts` takes the samples from the test
+  meta, computes the median (`report.ts`), prints the table, appends it to
+  `$GITHUB_STEP_SUMMARY`, writes `perf-results.json` and prints a `::warning` annotation per
+  breach. With `enforcement: "fail"` it prints `::error` and fails the run instead.
+- **CI.** Job `perf` in `.github/workflows/ci.yml` runs on every PR and push when the frontend
+  exists, uploads `perf-results.json`, and is part of `ci-gate` (a breach warns; a broken
+  harness fails).
 
 ## Shells (T-0025)
 
