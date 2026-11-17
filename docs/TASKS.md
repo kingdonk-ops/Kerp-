@@ -50,7 +50,7 @@
 | ✅ | [T-0014](../tracker/tasks/T-0014.md) | admin module: user + project-membership administration API (PER-09 on its projects), admin grants table, membership-based RLS on projects and tenant-level tables | admin | M | T-0010, T-0011, T-0012 | #86 |
 | ✅ | [T-0039](../tracker/tasks/T-0039.md) | System admin appoints Project Admins: system_admin/create_projects grant API, project creation gated on create_projects, creator gets PER-09 | admin | S | T-0014 | #92 |
 | ✅ | [T-0044](../tracker/tasks/T-0044.md) | Deployment (tenant) settings: offline window (default 7, max 14 days) and new-project defaults (status, timezone, currency, locale) | admin | S | T-0039 | #93 |
-| 🟦 | [T-0073](../tracker/tasks/T-0073.md) | Team-derived project grants in core auth: membership rows keyed by source (direct \| team_link), sync/revoke API, load_grants union, PER-09 sees but cannot edit team rows | identity | M | T-0010, T-0014, T-0076 |  |
+| 🟪 | [T-0073](../tracker/tasks/T-0073.md) | Team-derived project grants in core auth: membership rows keyed by source (direct \| team_link), sync/revoke API, load_grants union, PER-09 sees but cannot edit team rows | identity | M | T-0010, T-0014, T-0076 | #119 |
 | ✅ | [T-0076](../tracker/tasks/T-0076.md) | PER-16 Project Viewer persona: Viewer tier (V only), single-project scope, in the core persona/capability model and membership CHECK | identity | S | T-0010 | #76 |
 | ▶ | [T-0079](../tracker/tasks/T-0079.md) | Tenants directory table + tenant_id FK on every table (ADR) | platform | M | T-0014 |  |
 | ⬜ | [T-0013](../tracker/tasks/T-0013.md) | teams module: tenant-level teams, team membership, team-project links with a role, team service contract | teams | M | T-0010, T-0011, T-0012, T-0014, T-0073 |  |
