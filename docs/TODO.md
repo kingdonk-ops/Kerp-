@@ -3,9 +3,9 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 197 · **Closed:** 129
+**Open:** 202 · **Closed:** 129
 
-## decision (5)
+## decision (6)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -14,6 +14,7 @@
 | [TD-301](../tracker/todo/TD-301.md) | Field PIN API details not in the spec: PIN set via enrolment (409 PIN_ALREADY_SET), PUT /devices/{id}/pin from a bound session without the old PIN, 401 codes PIN_INVALID/PIN_EXHAUSTED, failed_offline only on unlock | T-0038 | implementer |
 | [TD-317](../tracker/todo/TD-317.md) | Confirm lobby project-code lookup rate limits (30/h per user, 1000/h deployment, 1-15 min escalating lockout) | T-0040 | coordinator |
 | [TD-329](../tracker/todo/TD-329.md) | Module map: access requests live in the new access_requests module (router mount /api/v1/<module>), not admin/lobby as T-0050 and lobby README assumed; planner to align the module map and T-0050 front-matter | T-0050 | reviewer |
+| [TD-335](../tracker/todo/TD-335.md) | Planner sizing: SSO-sized security flows landed at ~3.8k changed lines (M guideline < ~800); split such tasks further in future phases | T-0054 | reviewer |
 
 ## spec-gap (38)
 
@@ -108,7 +109,7 @@
 | [TD-315](../tracker/todo/TD-315.md) | Override request currency: a later fully passing run of the record is not visible (no run log) | T-0035 | implementer |
 | [TD-322](../tracker/todo/TD-322.md) | Entra ID SSO: certificate (client assertion) credentials for the code redemption instead of the client secret | T-0054 | implementer |
 
-## later (88)
+## later (91)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -200,6 +201,9 @@
 | [TD-325](../tracker/todo/TD-325.md) | Access-request RLS: add WITH CHECK so the requester can only set status pending/withdrawn on their own row | T-0050 | reviewer |
 | [TD-326](../tracker/todo/TD-326.md) | Notifications service helper to notify project members from a tenant-level session, replacing the access_requests _ProjectBinding re-bind | T-0050 | reviewer |
 | [TD-328](../tracker/todo/TD-328.md) | persona_holders does not filter deactivated users, so deactivated PER-09 holders still get access-request inbox rows | T-0050 | reviewer |
+| [TD-331](../tracker/todo/TD-331.md) | EntraJwks.key_for holds its lock across the JWKS HTTP fetch, and with no keys cached a failed first load refetches on every callback outside the once-a-minute limit; add a short negative cache / apply the limit | T-0054 | reviewer |
+| [TD-332](../tracker/todo/TD-332.md) | SSO callback: a 503 when Redis is unreachable does not clear the pre-auth cookie | T-0054 | reviewer |
+| [TD-334](../tracker/todo/TD-334.md) | SSO return landings (/login/sso-return, /app/sso-return) must send Referrer-Policy: no-referrer (T-0055 / T-0143) | T-0055, T-0143 | reviewer |
 
 ## bug (4)
 
@@ -210,7 +214,7 @@
 | [TD-287](../tracker/todo/TD-287.md) | Upgrade offer: a soft-deleted own rule holding a new default's key shows key_in_use forever | T-0036 | reviewer |
 | [TD-330](../tracker/todo/TD-330.md) | scripts/pr_suggestions.py rebuild fails in cloud sessions: gh api --paginate follows numeric-ID repository Link URLs that the agent proxy rejects (HTTP 403); paginate with explicit repos/{owner}/{repo} page params | — | coordinator |
 
-## risk (22)
+## risk (23)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -236,6 +240,7 @@
 | [TD-316](../tracker/todo/TD-316.md) | Override void vs the record's audit-chain lock: T-0119 signing and inspection submit/approve must call run_checks before appending to the record chain | T-0035 | implementer |
 | [TD-320](../tracker/todo/TD-320.md) | Access-request filing has no rate limit: withdraw and re-request (no cooldown) can flood a project's PER-09 holders with notifications | T-0050 | implementer |
 | [TD-324](../tracker/todo/TD-324.md) | kerp_lobby_projects_by_id returns code and name for any live project id regardless of lobby visibility; restrict to lobby-visible / requested projects or check the ticket first, and record the third narrow read path in edge §6 | T-0050 | reviewer |
+| [TD-333](../tracker/todo/TD-333.md) | Reverse proxy / ingress / load balancer in front of the API must not log query strings on /api/v1/auth/sso/* (Entra code and state) | T-0054 | reviewer |
 
 ## Closed
 
