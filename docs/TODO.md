@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 216 · **Closed:** 129
+**Open:** 219 · **Closed:** 129
 
 ## decision (8)
 
@@ -114,7 +114,7 @@
 | [TD-322](../tracker/todo/TD-322.md) | Entra ID SSO: certificate (client assertion) credentials for the code redemption instead of the client secret | T-0054 | implementer |
 | [TD-336](../tracker/todo/TD-336.md) | Mail: settle send-log rows stuck in queued (enqueue failed or Redis payload lost); no re-enqueue is possible because the payload (with the link token) is never persisted | T-0058 | implementer |
 
-## later (96)
+## later (99)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -214,6 +214,9 @@
 | [TD-343](../tracker/todo/TD-343.md) | SNS certificate check should refuse a certificate that is not yet valid (not_valid_before_utc) | T-0058 | reviewer |
 | [TD-344](../tracker/todo/TD-344.md) | mail service: render template before transport.send so a transport bug is not recorded as permanent failed template:* | T-0058 | reviewer |
 | [TD-345](../tracker/todo/TD-345.md) | main.py lifespan: gate mail dispatcher drain/uninstall on broker alone | T-0058 | reviewer |
+| [TD-350](../tracker/todo/TD-350.md) | sync_team_link_grants does not check project_id is a live project of the tenant; add an injected project-existence check (core must not import projects) | T-0013 | reviewer |
+| [TD-351](../tracker/todo/TD-351.md) | Member-admin UI must PUT only source=direct grants; round-tripping the full member list would silently turn team-derived grants into individual rows | T-0026 | reviewer |
+| [TD-352](../tracker/todo/TD-352.md) | Perf harness before hard gate: discard a warm-up mount (runs 2-5 measure warm JIT/CEL cache) and fail on not_measured for budgets whose task is done | T-0146 | reviewer |
 
 ## bug (5)
 
