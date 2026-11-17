@@ -3,9 +3,9 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 188 · **Closed:** 129
+**Open:** 195 · **Closed:** 129
 
-## decision (4)
+## decision (5)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -13,6 +13,7 @@
 | [TD-293](../tracker/todo/TD-293.md) | Do pilot crews share tablets? Confirm with the pilot team before go-live; if yes, add a shared-device task (device row per (device_id, user), whole-device wipe warning) | T-0143 | planner |
 | [TD-301](../tracker/todo/TD-301.md) | Field PIN API details not in the spec: PIN set via enrolment (409 PIN_ALREADY_SET), PUT /devices/{id}/pin from a bound session without the old PIN, 401 codes PIN_INVALID/PIN_EXHAUSTED, failed_offline only on unlock | T-0038 | implementer |
 | [TD-317](../tracker/todo/TD-317.md) | Confirm lobby project-code lookup rate limits (30/h per user, 1000/h deployment, 1-15 min escalating lockout) | T-0040 | coordinator |
+| [TD-329](../tracker/todo/TD-329.md) | Module map: access requests live in the new access_requests module (router mount /api/v1/<module>), not admin/lobby as T-0050 and lobby README assumed; planner to align the module map and T-0050 front-matter | T-0050 | reviewer |
 
 ## spec-gap (38)
 
@@ -57,7 +58,7 @@
 | [TD-312](../tracker/todo/TD-312.md) | Override binding and routing defaults (T-0035): which values are 'checked', who the approver user is | T-0035 | implementer |
 | [TD-319](../tracker/todo/TD-319.md) | Active-requests panel: a pending request hides the older decided request of the same project (diff §4.1 reads 'every pending plus the latest decided per project') | T-0050 | implementer |
 
-## missed (5)
+## missed (6)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -66,6 +67,7 @@
 | [TD-131](../tracker/todo/TD-131.md) | Add a root .env.example for the dev stack (the implementer agent's permission rules block writing .env* files) | T-0003 | implementer |
 | [TD-208](../tracker/todo/TD-208.md) | Uploads infra: provision the kerp-vault bucket (CORS for browser PUT/GET, lifecycle on staging/), wire KERP_S3_* in compose, add MinIO to CI for the gated round-trip test | T-0016 | implementer |
 | [TD-297](../tracker/todo/TD-297.md) | Admin UI screen for deployment settings (Admin > System) is not planned in any task | T-0044 | implementer |
+| [TD-327](../tracker/todo/TD-327.md) | Frontend i18n key notifications.kind.access_requests.requested for the inbox (needed when the access-request UI lands) | T-0050 | reviewer |
 
 ## deferred (33)
 
@@ -105,7 +107,7 @@
 | [TD-288](../tracker/todo/TD-288.md) | pending_updates on a set with no parent default answers 409 instead of an empty offer | T-0036 | reviewer |
 | [TD-315](../tracker/todo/TD-315.md) | Override request currency: a later fully passing run of the record is not visible (no run log) | T-0035 | implementer |
 
-## later (84)
+## later (87)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -193,16 +195,20 @@
 | [TD-314](../tracker/todo/TD-314.md) | Override UI: Request override on a blocked gate, approver inbox, i18n for validation.override_* notification kinds | T-0035 | implementer |
 | [TD-318](../tracker/todo/TD-318.md) | Narrow the void-path except OperationalError in validation _persist_findings to LockNotAvailable (55P03) | T-0035 | coordinator |
 | [TD-321](../tracker/todo/TD-321.md) | Access-request notification to PER-09 holders is not pinned or cleared on decision, and System admins without a membership get none | T-0050 | implementer |
+| [TD-325](../tracker/todo/TD-325.md) | Access-request RLS: add WITH CHECK so the requester can only set status pending/withdrawn on their own row | T-0050 | reviewer |
+| [TD-326](../tracker/todo/TD-326.md) | Notifications service helper to notify project members from a tenant-level session, replacing the access_requests _ProjectBinding re-bind | T-0050 | reviewer |
+| [TD-328](../tracker/todo/TD-328.md) | persona_holders does not filter deactivated users, so deactivated PER-09 holders still get access-request inbox rows | T-0050 | reviewer |
 
-## bug (3)
+## bug (4)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
 | [TD-159](../tracker/todo/TD-159.md) | Site filter from the bound project is applied to all site-scoped rows: a PER-07 on A who is PER-01 on B loses B's site-scoped rows (over-restrictive) | T-0010 | reviewer |
 | [TD-252](../tracker/todo/TD-252.md) | tracker.py new-todo cannot see open PRs in cloud sessions: gh pr list uses GraphQL (blocked), so TODO ids collide | T-0029 | coordinator |
 | [TD-287](../tracker/todo/TD-287.md) | Upgrade offer: a soft-deleted own rule holding a new default's key shows key_in_use forever | T-0036 | reviewer |
+| [TD-330](../tracker/todo/TD-330.md) | scripts/pr_suggestions.py rebuild fails in cloud sessions: gh api --paginate follows numeric-ID repository Link URLs that the agent proxy rejects (HTTP 403); paginate with explicit repos/{owner}/{repo} page params | — | coordinator |
 
-## risk (21)
+## risk (22)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -227,6 +233,7 @@
 | [TD-313](../tracker/todo/TD-313.md) | Override approver routing reads direct memberships only (persona_holders): follow load_grants when team-derived grants land (T-0073) | T-0035 | implementer |
 | [TD-316](../tracker/todo/TD-316.md) | Override void vs the record's audit-chain lock: T-0119 signing and inspection submit/approve must call run_checks before appending to the record chain | T-0035 | implementer |
 | [TD-320](../tracker/todo/TD-320.md) | Access-request filing has no rate limit: withdraw and re-request (no cooldown) can flood a project's PER-09 holders with notifications | T-0050 | implementer |
+| [TD-324](../tracker/todo/TD-324.md) | kerp_lobby_projects_by_id returns code and name for any live project id regardless of lobby visibility; restrict to lobby-visible / requested projects or check the ticket first, and record the third narrow read path in edge §6 | T-0050 | reviewer |
 
 ## Closed
 
