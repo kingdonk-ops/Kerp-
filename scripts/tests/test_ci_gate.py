@@ -22,7 +22,7 @@ def needs(flags: str = "true", **results: str) -> dict:
     """``toJSON(needs)``-shaped dict; every job green unless overridden."""
     out = {"backend": flags, "frontend": flags, "e2e": flags}
     jobs = {"detect": {"result": "success", "outputs": out}}
-    for job in ("tracker", "backend", "backend-image", "backend-publish", "frontend", "e2e"):
+    for job in ("tracker", "backend", "backend-image", "backend-publish", "frontend", "perf", "e2e"):
         jobs[job] = {"result": "success", "outputs": {}}
     for job, result in results.items():
         jobs[job.replace("_", "-")]["result"] = result
@@ -39,16 +39,16 @@ def test_publish_must_skip_on_pull_request() -> None:
 
 
 def test_components_absent_may_skip() -> None:
-    skipped = {j: "skipped" for j in ("backend", "backend_image", "backend_publish", "frontend", "e2e")}
+    skipped = {j: "skipped" for j in ("backend", "backend_image", "backend_publish", "frontend", "perf", "e2e")}
     assert ci_gate.evaluate(needs("false", **skipped), "push") == []
 
 
-@pytest.mark.parametrize("job", ["backend", "backend_image", "backend_publish", "frontend", "e2e"])
+@pytest.mark.parametrize("job", ["backend", "backend_image", "backend_publish", "frontend", "perf", "e2e"])
 def test_component_present_but_skipped_fails(job: str) -> None:
     assert ci_gate.evaluate(needs(**{job: "skipped"}), "push") != []
 
 
-@pytest.mark.parametrize("job", ["detect", "tracker", "backend", "backend_image", "frontend", "e2e"])
+@pytest.mark.parametrize("job", ["detect", "tracker", "backend", "backend_image", "frontend", "perf", "e2e"])
 @pytest.mark.parametrize("result", ["failure", "cancelled", "skipped"])
 def test_any_non_success_fails(job: str, result: str) -> None:
     assert ci_gate.evaluate(needs(**{job: result}), "push") != []
@@ -57,7 +57,7 @@ def test_any_non_success_fails(job: str, result: str) -> None:
 def test_detect_failure_without_outputs_fails() -> None:
     jobs = needs("false")
     jobs["detect"] = {"result": "failure", "outputs": {}}
-    for job in ("backend", "backend-image", "backend-publish", "frontend", "e2e"):
+    for job in ("backend", "backend-image", "backend-publish", "frontend", "perf", "e2e"):
         jobs[job]["result"] = "skipped"
     assert ci_gate.evaluate(jobs, "push") != []
 
@@ -120,6 +120,20 @@ def test_checkout_never_persists_credentials() -> None:
     for i in checkouts:
         block = "\n".join(lines[i + 1 : i + 4])
         assert "persist-credentials: false" in block, lines[i]
+
+
+def test_perf_job_runs_with_the_frontend_and_is_not_skippable() -> None:
+    """T-0045: the NFR job runs whenever the frontend exists (so on every PR touching
+    frontend/), measures through `npm run perf`, and warns on a breach inside the reporter;
+    it is never allowed to fail silently (no continue-on-error, no path filter)."""
+    perf = _jobs()["perf"]
+    assert "if: needs.detect.outputs.frontend == 'true'" in perf
+    assert "run: npm run perf" in perf
+    assert "continue-on-error" not in perf
+    assert "paths" not in perf
+    assert ci_gate.EXPECTED["perf"] == ("frontend", False)
+    head = CI.read_text(encoding="utf-8").split("\njobs:\n", 1)[0]
+    assert "paths" not in head  # the workflow itself runs on every PR to dev
 
 
 def test_install_does_not_reference_postgres_extra() -> None:

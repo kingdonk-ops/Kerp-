@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 212 · **Closed:** 129
+**Open:** 213 · **Closed:** 129
 
 ## decision (7)
 
@@ -223,7 +223,7 @@
 | [TD-330](../tracker/todo/TD-330.md) | scripts/pr_suggestions.py rebuild fails in cloud sessions: gh api --paginate follows numeric-ID repository Link URLs that the agent proxy rejects (HTTP 403); paginate with explicit repos/{owner}/{repo} page params | — | coordinator |
 | [TD-339](../tracker/todo/TD-339.md) | jobs LoopDispatcher.drain can spin forever when the commit ran on the loop's own thread (finished tasks stay in the set until their done callbacks run) | T-0058 | implementer |
 
-## risk (24)
+## risk (25)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -251,6 +251,7 @@
 | [TD-324](../tracker/todo/TD-324.md) | kerp_lobby_projects_by_id returns code and name for any live project id regardless of lobby visibility; restrict to lobby-visible / requested projects or check the ticket first, and record the third narrow read path in edge §6 | T-0050 | reviewer |
 | [TD-333](../tracker/todo/TD-333.md) | Reverse proxy / ingress / load balancer in front of the API must not log query strings on /api/v1/auth/sso/* (Entra code and state) | T-0054 | reviewer |
 | [TD-342](../tracker/todo/TD-342.md) | SNS endpoint /api/v1/mail/ses-events fetches an uncached certificate per new SigningCertURL path before the signature check (outbound-GET amplification for anyone knowing the topic ARN) | T-0058 | reviewer |
+| [TD-346](../tracker/todo/TD-346.md) | NFR perf job timings on shared GitHub runners are noisy (form open median ~0.3 s locally at 4x throttle); before T-0146 makes it a hard gate, decide on retries/headroom or a dedicated runner and keep a trend of perf-results.json | T-0045, T-0146 | implementer |
 
 ## Closed
 

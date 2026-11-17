@@ -244,6 +244,36 @@ jobs:
       - run: npm run test
       - run: npm run build
 
+  # NFR performance budgets (T-0045, diff §6.3): headless Chrome, 4x CPU throttle; budgets and
+  # profile in frontend/src/perf/budgets.json. Runs on every PR (so on every PR touching
+  # frontend/). A breach is a ::warning annotation + job summary row, not a failure, until
+  # T-0146 sets enforcement to "fail"; a broken measurement fails the job (and ci-gate).
+  perf:
+    needs: detect
+    if: needs.detect.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - name: NFR budgets (warn-only)
+        run: npm run perf
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: perf-results
+          path: frontend/perf-results.json
+          if-no-files-found: ignore
+
   e2e:
     needs: [detect, backend, frontend]
     if: always() && needs.detect.outputs.e2e == 'true' && !contains(needs.*.result, 'failure')
@@ -269,7 +299,7 @@ jobs:
   # Single required check for branch rules. Passes only if every job succeeded or skipped
   # because it is expected to (component absent, or publish on a non-push) — scripts/ci_gate.py.
   ci-gate:
-    needs: [detect, tracker, backend, backend-image, backend-publish, frontend, e2e]
+    needs: [detect, tracker, backend, backend-image, backend-publish, frontend, perf, e2e]
     if: always()
     runs-on: ubuntu-latest
     steps:
