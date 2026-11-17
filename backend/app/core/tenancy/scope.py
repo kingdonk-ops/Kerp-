@@ -23,7 +23,10 @@ same on SQLite (where it is the only filter) and on PostgreSQL (where RLS backs 
   ``TenancyContext.described_project_ids``, it is the caller's own row, or the session is
   ``is_system_admin``; an ``admin_grant`` row when it is the caller's own or the session is
   ``is_system_admin``. Updates and deletes need that visibility too; admin grants are
-  written by ``is_system_admin`` sessions only.
+  written by ``is_system_admin`` sessions only. An ``access_request`` row (T-0050) is
+  visible to its requester, to the PER-09 holders of its project
+  (``TenancyContext.admin_project_ids``) and to ``is_system_admin`` sessions; only the
+  requester inserts one and nobody deletes one.
 
 An unbound session is not filtered here. On PostgreSQL RLS then shows it nothing.
 ORM bulk ``update()``/``delete()`` statements skip both the loader criteria and the flush
@@ -103,7 +106,10 @@ def _policy_allows(context: TenancyContext, record: object) -> bool:
         return True
     if policy.kind == "admin_grant" or policy.project_column is None:
         return False
-    return getattr(record, policy.project_column) in context.described_project_ids
+    project = getattr(record, policy.project_column)
+    if policy.kind == "access_request":
+        return project in context.admin_project_ids
+    return project in context.described_project_ids
 
 
 def _policy_criteria(
@@ -116,6 +122,10 @@ def _policy_criteria(
         described = sorted(context.described_project_ids)
         if described:
             clauses.append(getattr(cls, policy.project_column).in_(described))
+    if policy.kind == "access_request" and policy.project_column is not None:
+        administered = sorted(context.admin_project_ids)
+        if administered:
+            clauses.append(getattr(cls, policy.project_column).in_(administered))
     return or_(*clauses) if clauses else false()
 
 
@@ -228,5 +238,12 @@ def _guard_writes(session: Session, flush_context: UOWTransaction, instances: ob
             continue
         if policy.kind == "admin_grant" and not context.is_system_admin:
             raise OutOfScopeError(f"{type(obj).__name__} not found")
+        if policy.kind == "access_request" and policy.owner_column is not None:
+            # Only the requester files a request; nobody deletes one (mirrors RLS, T-0050).
+            own = context.user_id is not None and getattr(obj, policy.owner_column) == (
+                context.user_id
+            )
+            if (obj in session.new and not own) or obj in session.deleted:
+                raise OutOfScopeError(f"{type(obj).__name__} not found")
         if obj not in session.new and not _policy_allows(context, obj):
             raise OutOfScopeError(f"{type(obj).__name__} not found")

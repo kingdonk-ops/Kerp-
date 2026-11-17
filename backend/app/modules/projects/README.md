@@ -9,7 +9,7 @@ modules carries the project's `id` as its `project_id`.
 |---|---|
 | `models.py` | `oe_projects_project` (`BaseRecordMixin`, tenant-level row; migration `0008`, membership-based RLS since `0015`, `visible_in_lobby` since `0021`) |
 | `schemas.py` | `ProjectCreate` / `ProjectUpdate` / `ProjectRead`, `LobbyVisibility`, `PolygonGeoJSON`; timezone, ISO 4217, BCP 47 validation from `app.core.locale` (shared with the settings module) |
-| `service.py` | `create_project`, `get_project`, `list_projects`, `live_project_ids` (the jobs scheduler, T-0214), `update_project`, `delete_project`, `site_zone`, `bind_project` (project-scoped routers, T-0217), `set_lobby_visibility`, the narrow lobby read `lobby_projects` / `project_by_code` (T-0040) |
+| `service.py` | `create_project`, `get_project`, `list_projects`, `live_project_ids` (the jobs scheduler, T-0214), `update_project`, `delete_project`, `site_zone`, `bind_project` (project-scoped routers, T-0217), `set_lobby_visibility`, the narrow lobby read `lobby_projects` / `project_by_code` (T-0040) and `lobby_projects_by_id` (access requests, T-0050) |
 | `router.py` | `GET/POST /api/v1/projects`, `GET/PATCH/DELETE /api/v1/projects/{id}`, `PUT /api/v1/projects/{id}/lobby` |
 
 ## Record
@@ -79,6 +79,13 @@ policy is not widened (edge spec §6 amendments). Because the definer is the app
 dev, which `FORCE` RLS also binds (TD-056), the function body raises `app.is_system_admin`
 transaction-locally for its own read and restores the caller's value before returning. On
 SQLite the service runs the same rule as a Core query past the ORM scope.
+
+`lobby_projects_by_id(session, ids)` (T-0050) is the access requests' narrow read: id, code,
+name and `visible_in_lobby` (`LobbyRef`) of the live projects among `ids`, for any active user
+of the tenant (`kerp_lobby_projects_by_id(uuid[])`, migration `0023`, built like the `0021`
+functions). Knowing a project id is not enough to file a request (the access-request module
+checks the lookup ticket or lobby visibility first), and the API shows its result only for the
+caller's own requests or to the project's administrators.
 
 ## Setting a new project up
 

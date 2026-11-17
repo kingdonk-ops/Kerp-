@@ -1,11 +1,11 @@
 # lobby — find a project to request access to (T-0040)
 
 The entry point to an access request (diff §4.1, edge spec §6 amendments, TD-202). The request
-lifecycle itself is T-0050; invites are T-0052.
+lifecycle itself is the `access_requests` module (T-0050); invites are T-0052.
 
 | File | What |
 |---|---|
-| `models.py` | no table (access requests, T-0050, add the first) |
+| `models.py` | no table (access requests live in the `access_requests` module, T-0050) |
 | `schemas.py` | `LobbyProject` (`id`, `code`, `name`, `member`), `LobbyCodeMatch` (+ `lookup_ticket`, `lookup_ticket_expires_at`), `LobbyError` |
 | `service.py` | `lobby_projects`, `find_by_code`, `throttle_code_lookup`, `issue_lookup_ticket` / `verify_lookup_ticket` |
 | `router.py` | `GET /api/v1/lobby/projects`, `GET /api/v1/lobby/projects/by-code/{code}` |
@@ -39,7 +39,8 @@ depth). On SQLite the projects service runs the same rule.
 ## Lookup ticket
 
 A code lookup returns a signed JWT bound to the caller (`sub`, `tid`) and the project (`pid`),
-valid 15 minutes (`LOOKUP_TICKET_TTL`, planner default). T-0050 requires it, through
+valid 15 minutes (`LOOKUP_TICKET_TTL`, planner default). `POST /api/v1/access-requests`
+(T-0050, `app/modules/access_requests/README.md`) requires it, through
 `verify_lookup_ticket`, on a user's **first** access request for a project when the user is
 external or the project is not lobby-visible (re-requests after a rejected or withdrawn request
 need none), so a leaked project id alone is not enough. It is signed with the deployment's

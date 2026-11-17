@@ -744,6 +744,108 @@ export interface paths {
         patch: operations["update_view_api_v1_saved_views_projects__project_id__views__view_id__patch"];
         trace?: never;
     };
+    "/api/v1/access-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** File Request */
+        post: operations["file_request_api_v1_access_requests_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/access-requests/mine": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My Requests */
+        get: operations["my_requests_api_v1_access_requests_mine_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/access-requests/{request_id}/withdraw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Withdraw */
+        post: operations["withdraw_api_v1_access_requests__request_id__withdraw_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/access-requests/pending": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Pending Requests */
+        get: operations["pending_requests_api_v1_access_requests_pending_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/access-requests/{request_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approve */
+        post: operations["approve_api_v1_access_requests__request_id__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/access-requests/{request_id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reject */
+        post: operations["reject_api_v1_access_requests__request_id__reject_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/uploads/projects/{project_id}/files": {
         parameters: {
             query?: never;
@@ -1281,6 +1383,148 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * AccessRequestApprove
+         * @description ``POST /access-requests/{id}/approve``: the persona(s) and site scope to grant.
+         *
+         *     They are added to any direct grants the requester already holds on the project. PER-09
+         *     together with a hold-authority persona needs ``confirm_sod: true`` (else 409
+         *     ``sod_confirmation_required``, TD-151).
+         */
+        AccessRequestApprove: {
+            /** Grants */
+            grants: components["schemas"]["GrantIn"][];
+            /**
+             * Confirm Sod
+             * @default false
+             */
+            confirm_sod: boolean;
+        };
+        /**
+         * AccessRequestCreate
+         * @description ``POST /access-requests``: ask for access to a project.
+         *
+         *     ``lookup_ticket``: the ticket of a code lookup (``GET /lobby/projects/by-code/{code}``) for
+         *     this project. A user's **first** request for a project needs it when the user is external,
+         *     or internal and the project is not listed in the lobby; a new request after an earlier
+         *     rejected or withdrawn one needs none.
+         */
+        AccessRequestCreate: {
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /** Message */
+            message?: string | null;
+            /** Lookup Ticket */
+            lookup_ticket?: string | null;
+        };
+        /**
+         * AccessRequestDecided
+         * @description The request after a decision.
+         */
+        AccessRequestDecided: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /**
+             * Requester Id
+             * Format: uuid
+             */
+            requester_id: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "approved" | "rejected" | "withdrawn";
+            /** Decided By */
+            decided_by: string | null;
+            /** Decided At */
+            decided_at: string | null;
+            /** Rejection Reason */
+            rejection_reason: string | null;
+            /** Granted */
+            granted: components["schemas"]["GrantRead"][] | null;
+            /**
+             * Sod Warning
+             * @description PER-09 together with a hold-authority persona (confirmed with confirm_sod)
+             * @default false
+             */
+            sod_warning: boolean;
+        };
+        /**
+         * AccessRequestError
+         * @description A refusal with a machine-readable ``code`` (e.g. ``ACCESS_REQUEST_COOLDOWN``).
+         *     ``retry_after``: when a new request becomes allowed (cooldown only).
+         */
+        AccessRequestError: {
+            /** Detail */
+            detail: string;
+            /** Code */
+            code: string;
+            /** Retry After */
+            retry_after?: string | null;
+        };
+        /**
+         * AccessRequestRead
+         * @description One of the caller's own requests (the lobby's "Active requests" panel).
+         *
+         *     ``rejection_reason``: the decider's reason, on a ``rejected`` request only.
+         *     ``request_again_at``: on a ``rejected`` request, when "Request again" is allowed (the
+         *     re-request cooldown); ``null`` when a new request is allowed now, and on every other status.
+         */
+        AccessRequestRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /** Project Code */
+            project_code: string;
+            /** Project Name */
+            project_name: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "approved" | "rejected" | "withdrawn";
+            /** Message */
+            message: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Decided At */
+            decided_at: string | null;
+            /** Withdrawn At */
+            withdrawn_at: string | null;
+            /** Rejection Reason */
+            rejection_reason: string | null;
+            /** Request Again At */
+            request_again_at: string | null;
+        };
+        /**
+         * AccessRequestReject
+         * @description ``POST /access-requests/{id}/reject``: an optional reason, shown to the requester.
+         */
+        AccessRequestReject: {
+            /** Reason */
+            reason?: string | null;
+        };
         /**
          * AdminGrantIn
          * @description ``POST /admin/grants``: give ``grant`` to the user (``system_admin`` callers only).
@@ -2298,6 +2542,34 @@ export interface components {
             audit_chain_key: string;
         };
         /**
+         * PendingAccessRequest
+         * @description A pending request, as the project's PER-09 holders (and System admins) see it.
+         */
+        PendingAccessRequest: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /** Project Code */
+            project_code: string;
+            /** Project Name */
+            project_name: string;
+            requester: components["schemas"]["Requester"];
+            /** Message */
+            message: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /**
          * Persona
          * @enum {string}
          */
@@ -2466,6 +2738,18 @@ export interface components {
             groups: {
                 [key: string]: string | null;
             };
+        };
+        /** Requester */
+        Requester: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Email */
+            email: string;
+            /** Display Name */
+            display_name: string;
         };
         /**
          * ResolvedColumn
@@ -4690,6 +4974,277 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["SavedViewRead"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    file_request_api_v1_access_requests_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccessRequestCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccessRequestRead"];
+                };
+            };
+            /** @description No such project, or not found through the lobby or a code lookup */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Already a member, already pending, or the cooldown (`code: ACCESS_REQUEST_COOLDOWN`) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccessRequestError"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_requests_api_v1_access_requests_mine_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccessRequestRead"][];
+                };
+            };
+        };
+    };
+    withdraw_api_v1_access_requests__request_id__withdraw_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccessRequestRead"];
+                };
+            };
+            /** @description Not the caller's request */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not pending */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    pending_requests_api_v1_access_requests_pending_get: {
+        parameters: {
+            query?: {
+                project_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PendingAccessRequest"][];
+                };
+            };
+            /** @description Administers no project */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_api_v1_access_requests__request_id__approve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccessRequestApprove"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccessRequestDecided"];
+                };
+            };
+            /** @description Not an administrator of the project (or the caller's own request) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such request for the caller */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not pending, or PER-09 + hold authority without `confirm_sod` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reject_api_v1_access_requests__request_id__reject_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["AccessRequestReject"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccessRequestDecided"];
+                };
+            };
+            /** @description Not an administrator of the project (or the caller's own request) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such request for the caller */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not pending, or PER-09 + hold authority without `confirm_sod` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

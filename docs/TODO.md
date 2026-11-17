@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 185 · **Closed:** 129
+**Open:** 188 · **Closed:** 129
 
 ## decision (4)
 
@@ -14,7 +14,7 @@
 | [TD-301](../tracker/todo/TD-301.md) | Field PIN API details not in the spec: PIN set via enrolment (409 PIN_ALREADY_SET), PUT /devices/{id}/pin from a bound session without the old PIN, 401 codes PIN_INVALID/PIN_EXHAUSTED, failed_offline only on unlock | T-0038 | implementer |
 | [TD-317](../tracker/todo/TD-317.md) | Confirm lobby project-code lookup rate limits (30/h per user, 1000/h deployment, 1-15 min escalating lockout) | T-0040 | coordinator |
 
-## spec-gap (37)
+## spec-gap (38)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -55,6 +55,7 @@
 | [TD-270](../tracker/todo/TD-270.md) | Membership-based policy needs app.member_project_ids: spec says visible when the project is in app.allowed_project_ids or app.is_system_admin, but the allowed list holds only portfolio projects | T-0014 | implementer |
 | [TD-310](../tracker/todo/TD-310.md) | Default landing scope for portfolio personas: first project by name or All-Projects when nothing is remembered | T-0042 | implementer |
 | [TD-312](../tracker/todo/TD-312.md) | Override binding and routing defaults (T-0035): which values are 'checked', who the approver user is | T-0035 | implementer |
+| [TD-319](../tracker/todo/TD-319.md) | Active-requests panel: a pending request hides the older decided request of the same project (diff §4.1 reads 'every pending plus the latest decided per project') | T-0050 | implementer |
 
 ## missed (5)
 
@@ -104,7 +105,7 @@
 | [TD-288](../tracker/todo/TD-288.md) | pending_updates on a set with no parent default answers 409 instead of an empty offer | T-0036 | reviewer |
 | [TD-315](../tracker/todo/TD-315.md) | Override request currency: a later fully passing run of the record is not visible (no run log) | T-0035 | implementer |
 
-## later (83)
+## later (84)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -191,6 +192,7 @@
 | [TD-311](../tracker/todo/TD-311.md) | Deploy: when the migration owner and runtime role are split (TD-056), grant EXECUTE on kerp_lobby_projects() and kerp_lobby_project_by_code(text) to the runtime role | T-0040 | implementer |
 | [TD-314](../tracker/todo/TD-314.md) | Override UI: Request override on a blocked gate, approver inbox, i18n for validation.override_* notification kinds | T-0035 | implementer |
 | [TD-318](../tracker/todo/TD-318.md) | Narrow the void-path except OperationalError in validation _persist_findings to LockNotAvailable (55P03) | T-0035 | coordinator |
+| [TD-321](../tracker/todo/TD-321.md) | Access-request notification to PER-09 holders is not pinned or cleared on decision, and System admins without a membership get none | T-0050 | implementer |
 
 ## bug (3)
 
@@ -200,7 +202,7 @@
 | [TD-252](../tracker/todo/TD-252.md) | tracker.py new-todo cannot see open PRs in cloud sessions: gh pr list uses GraphQL (blocked), so TODO ids collide | T-0029 | coordinator |
 | [TD-287](../tracker/todo/TD-287.md) | Upgrade offer: a soft-deleted own rule holding a new default's key shows key_in_use forever | T-0036 | reviewer |
 
-## risk (20)
+## risk (21)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -224,6 +226,7 @@
 | [TD-305](../tracker/todo/TD-305.md) | Cross-tab broadcasts are not tied to a session: a sign-in in one tab hands that session's access token to other signed-in tabs (possibly another account); tag messages with the session id and ignore foreign ones | T-0072 | reviewer |
 | [TD-313](../tracker/todo/TD-313.md) | Override approver routing reads direct memberships only (persona_holders): follow load_grants when team-derived grants land (T-0073) | T-0035 | implementer |
 | [TD-316](../tracker/todo/TD-316.md) | Override void vs the record's audit-chain lock: T-0119 signing and inspection submit/approve must call run_checks before appending to the record chain | T-0035 | implementer |
+| [TD-320](../tracker/todo/TD-320.md) | Access-request filing has no rate limit: withdraw and re-request (no cooldown) can flood a project's PER-09 holders with notifications | T-0050 | implementer |
 
 ## Closed
 

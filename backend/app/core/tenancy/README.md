@@ -52,6 +52,7 @@ leftover standard policy as unexpected), and the ORM scope (`scope.py`) mirrors 
 |---|---|---|---|---|
 | `membership` (`membership_{read,insert,update,delete}_policy`) | `oe_projects_project` (project = `id`), `auth_project_membership` (project = `member_project_id`, owner = `user_id`) | the described project is `app.current_project_id`, in `app.allowed_project_ids` or `app.member_project_ids`, or `app.is_system_admin`; or the row's owner is `app.current_user_id` | exact scope | exact scope **and** readable (old and new row) |
 | `admin_grant` (`admin_grant_{read,write}_policy`) | `oe_admin_grant` | own rows (`user_id = app.current_user_id`) or `app.is_system_admin` | `app.is_system_admin` + exact scope | `app.is_system_admin` + exact scope |
+| `access_request` (`access_request_{read,insert,update}_policy`; T-0050) | `oe_access_requests_request` (project = `requested_project_id`, owner = `requester_id`) | own rows, rows of a project in `app.admin_project_ids` (the caller's PER-09 projects), or `app.is_system_admin` | exact scope **and** own row | exact scope **and** readable (old and new row); no DELETE policy: nobody deletes |
 
 So a client-portal user who is a member of project A reads A's project row and memberships but
 not B's (404); a plain tenant-level session (no user, no flag) reads no project row at all; a
@@ -66,6 +67,7 @@ Settings bound per transaction (all from the server, never from the request):
 | `app.current_project_id` | the bound project (not from the request yet, TD-122) |
 | `app.allowed_project_ids` | projects of the caller's portfolio personas (T-0010) |
 | `app.member_project_ids` | every project of the caller's memberships, whatever the persona (T-0014); it widens only the `membership` tables |
+| `app.admin_project_ids` | the projects where the caller holds PER-09 (T-0050); it widens only the `access_request` table |
 | `app.current_user_id` | token `sub` (T-0014) |
 | `app.is_system_admin` | `true` or unset: the caller's own `system_admin` grant, loaded at authentication through the admin module's lookup (`access.register_admin_grant_lookup`; on PostgreSQL the `SECURITY DEFINER` function `kerp_caller_admin_grants()`) in the same unit of work that reads the memberships (T-0014). The only other writer: the narrow lobby read functions of migration `0021` (T-0040) raise it transaction-locally for their own three-column read and restore the caller's value before returning |
 

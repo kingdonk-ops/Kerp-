@@ -3,11 +3,11 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 57/172 tasks done (33%) · **ready now:** 18 · **epics awaiting breakdown:** 47
+**Overall:** 58/172 tasks done (34%) · **ready now:** 18 · **epics awaiting breakdown:** 47
 
 | Phase | Tasks done | Progress |
 |---|---|---|
-| 0 · Platform foundations | 57/88 | `██████░░░░` 65% |
+| 0 · Platform foundations | 58/88 | `██████░░░░` 66% |
 | 1 · Asset & Quality backbone | 0/75 (+1 epics) | `░░░░░░░░░░` 0% |
 | 2 · Welding quality | 0/9 | `░░░░░░░░░░` 0% |
 | 3 · Logistics | 0/0 (+7 epics) | `░░░░░░░░░░` 0% |
@@ -64,7 +64,7 @@
 | ✅ | [T-0019](../tracker/tasks/T-0019.md) | notifications module (in-app) behind a pluggable channel interface | notifications | S | T-0012 | #64 |
 | ✅ | [T-0035](../tracker/tasks/T-0035.md) | Per-record override of a blocked check: reasoned request, routed approver (never self), notifications, audit, bound to the checked values | validation | M | T-0018, T-0010, T-0019 | #110 |
 | ✅ | [T-0040](../tracker/tasks/T-0040.md) | Lobby discovery API: visible-in-lobby flag, lobby listing for internal users, project-code lookup | admin | S | T-0014, T-0049 | #109 |
-| ▶ | [T-0050](../tracker/tasks/T-0050.md) | Access-request lifecycle API: pending/approved/rejected/withdrawn, rejection reason, re-request cooldown, requester's active-requests list | admin | M | T-0040, T-0019 |  |
+| ✅ | [T-0050](../tracker/tasks/T-0050.md) | Access-request lifecycle API: pending/approved/rejected/withdrawn, rejection reason, re-request cooldown, requester's active-requests list | admin | M | T-0040, T-0019 | #112 |
 | ▶ | [T-0058](../tracker/tasks/T-0058.md) | Outbound e-mail core service: AWS SES transport, i18n templates, async send via SAQ, send log, bounce/complaint suppression (Pilot-0) | platform | M | T-0015, T-0037 |  |
 | ✅ | [T-0020](../tracker/tasks/T-0020.md) | saved_views module | saved_views | S | T-0012 | #65 |
 | ⬜ | [T-0052](../tracker/tasks/T-0052.md) | Project invites API: single-use expiring invite_token bound to the invited e-mail, one-click join, membership granted right after first sign-in (password, SSO; magic link for PER-14 invites) | admin | M | T-0014, T-0054, T-0057 |  |
@@ -84,7 +84,7 @@
 | ⬜ | [T-0041](../tracker/tasks/T-0041.md) | Lobby screens: lobby list (internal users), project-code entry, Active requests panel with status chips, rejection reason and Request again after cooldown | frontend | M | T-0040, T-0050, T-0051, T-0042 |  |
 | ✅ | [T-0042](../tracker/tasks/T-0042.md) | Top-bar project picker wired to memberships + post-login landing (one project -> in, several -> last used, none -> lobby) | frontend | S | T-0014, T-0024 | #108 |
 | ▶ | [T-0048](../tracker/tasks/T-0048.md) | Devices screen: list enrolled devices, revoke with wipe warning (admin and own devices) | frontend | S | T-0043, T-0024 |  |
-| ⬜ | [T-0051](../tracker/tasks/T-0051.md) | Admin access-request inbox screen: pending requests for the user's PER-09 projects, approve with persona/site scope, reject with optional reason | frontend | S | T-0050, T-0042 |  |
+| ▶ | [T-0051](../tracker/tasks/T-0051.md) | Admin access-request inbox screen: pending requests for the user's PER-09 projects, approve with persona/site scope, reject with optional reason | frontend | S | T-0050, T-0042 |  |
 | ⬜ | [T-0053](../tracker/tasks/T-0053.md) | Invite link screens: one-click 'Join project' for signed-in users, invite token carried through sign-in, land in the project (lobby skipped) | frontend | S | T-0052, T-0042, T-0055, T-0026 |  |
 | ⬜ | [T-0055](../tracker/tasks/T-0055.md) | Web sign-in with Microsoft (Entra ID SSO): button when enabled, callback landing, translated refusals | frontend | S | T-0054, T-0042 |  |
 | ⬜ | [T-0027](../tracker/tasks/T-0027.md) | Playwright setup + Phase 0 exit journey | e2e | S | T-0023, T-0024, T-0018 |  |
