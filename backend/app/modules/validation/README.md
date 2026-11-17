@@ -8,10 +8,11 @@ Built fresh; Inspection-ERP's `Finding(key, severity, message)` shape was a refe
 
 | File | What |
 |---|---|
-| `models.py` | `oe_validation_rule_set`, `oe_validation_rule`, `oe_validation_finding` (migration `0005`), `oe_validation_unlock_request` (migration `0014`; one pending per rule: `0020`); all `BaseRecordMixin` + RLS |
+| `models.py` | `oe_validation_rule_set`, `oe_validation_rule`, `oe_validation_finding` (migration `0005`; `checked_values_hash`: `0022`), `oe_validation_unlock_request` (migration `0014`; one pending per rule: `0020`), `oe_validation_override` (migration `0022`); all `BaseRecordMixin` + RLS |
 | `compiler.py` | compile-on-save: kind/engine rules, per-kind CEL context schema, RE2 regex compile |
 | `defaults.py` | system default seed files `app/modules/<m>/rules/defaults/*.yaml`: `load_defaults()` |
 | `service.py` | rule store (`create_rule_set`, `save_rule`, `set_rule_enabled`, `delete_rule`, `reset_rule`, `reset_rule_set`), layers (`sync_system_layer`, `sync_system_defaults`, `seed_tenant`, `seed_project`, `copy_module_defaults`), unlock (`request_unlock`, `approve_unlock`, `reject_unlock`), `resolve_rule_set`, `run_checks` |
+| `overrides.py` | per-record override of a blocked check (`request_override`, `approve_override`, `reject_override`, `list_overrides`, `get_override`; binding hash and voiding used by `run_checks`) — T-0035 |
 | `upgrades.py` | default-upgrade offers (`pending_updates`, `accept_update`), the tenant drift report (`drift_report`), "Try it" (`try_rule`) — T-0036 |
 | `schemas.py` | `RuleSpec` (input), `CheckResult` / `CheckFinding` (output), the Rules API shapes |
 | `router.py` | Rules settings API (ADR 0004 §7), see below |
@@ -54,12 +55,71 @@ if result.blocked:
   in the caller's transaction, or the second writer waits for the database lock.
 - Ties between visible sets of one layer (possible only on SQLite, see uniqueness below)
   break by set id, deterministically.
+- Every finding carries the `finding_id` it was logged under (an override request names it)
+  and, in the log, the `checked_values_hash` of the values its rule checked (below).
 - `result.blocked` is true when a finding has `action == "block"`; `result.reason` joins those
   findings' messages. A finding's message is the rule's `params.message` (rule data, written
   by the rule author), else `"<rule_key>: check failed"`. `warn` findings never block.
 
+- With a record subject (`"<record_type>:<uuid>"`), a failing blocking rule (outcome `fail`;
+  an `error` is never overridden) the record holds an **approved override** for passes while
+  it is still bound (below): no finding, listed in `result.overrides` (`AppliedOverride`:
+  `override_id`, `rule_key`, `rule_version`).
+- **Caller contract (T-0035):** call `run_checks` **before** appending to the record's own
+  audit chain (`<record_type>:<record_id>`) in the same transaction. Voiding a stale override
+  appends to that chain on the side pool; if the caller already holds the chain's lock, the
+  void waits out `lock_timeout`, is rolled back and logged, and is retried at the next
+  evaluation. The findings (committed first) and the block stand either way; the stale
+  override is never applied by the evaluation that found it stale (TD-316).
+
 The signature `run_checks(context, rule_set, *, session, subject=None)` and the result shape
 are frozen at M1 (T-0131).
+
+## Per-record override of a blocked check (ADR 0004 Amendment A, T-0035)
+
+One record may pass one blocking `check` rule with an approved, reasoned override. This is
+separate from unlocking a rule (Amendment B, below). The table `oe_validation_override` has
+exactly the columns of `docs/spec/modules/quality-and-inspection.md` §Per-record override
+(the single source of the shape, frozen at M1, T-0131); `decision` is `pending` → `approved` |
+`rejected` | `void`.
+
+1. **Request** (`request_override`, `POST /projects/{p}/overrides` with `finding_id`, `reason`,
+   optional `approver_user_id`): any member with `C` (create). Accepted only for a
+   **blocking** finding (`action = block`) of a run whose subject names the record, from the
+   record's latest run of that set that logged findings, while the record has no pending or
+   approved override of the rule (409; a partial unique index backs it). An empty or
+   whitespace reason is 422 (and a CHECK in the database). The override copies the finding's
+   rule (`rule_set_key`, `rule_key`, `rule_version`) and `checked_values_hash`.
+2. **Routing** (A.4): the approver persona is PER-06 QA/QC Lead; a requester holding PER-06 is
+   routed to PER-02 Project Manager; a requester holding PER-02 to PER-06. Every other holder of
+   the persona on the project may decide and is notified; `approver_user_id` is set when the
+   request was routed to one user (named in the request, or the only holder). No holder but the
+   requester → 409. **The requester never decides their own request** (403, and CHECKs
+   `never_self_decided` / `never_self_routed`); a caller without the routed persona, or not
+   the named approver, is 403.
+3. **Notifications** (A.3, through `notifications.notify`): the approver(s) get
+   `validation.override_requested` (priority high), the requester gets
+   `validation.override_approved` / `validation.override_rejected`; subject
+   `validation.override` + the override id, label `validation`, params `record_type`,
+   `rule_set`, `rule_key`.
+4. **Audit** (A.5): request, decision and void are appended to the record's activity history,
+   the ledger chain `audit_chain_key` = `<record_type>:<record_id>` in the project scope
+   (`validation_override_requested` / `_approved` / `_rejected` / `_voided`, with reason,
+   approver persona and user, decider, comment and UTC timestamps).
+5. **Binding** (A.6): `checked_values_hash` is the SHA-256 of the canonical JSON (sorted keys,
+   no whitespace) of the values the rule checked: the context paths in the rule's
+   `params.override_binding` (e.g. `["fields.equipment_id", "fields.spec_revision",
+   "fields.inspection_date"]`; 1–32 paths under `record`, `fields` or `project` (never `actor`),
+   checked on save), or the whole `record` and `fields` when the rule names none. On every
+   `run_checks` of the record, a pending or approved override whose rule version or hash
+   differs from this evaluation is set to `void` (`decision_comment` `rule_changed` /
+   `checked_values_changed`, `decided_by` NULL) in a side unit of work after the findings, so
+   the block returns; void is final, a new request answers the new finding. Decisions are
+   guarded in the database (`UPDATE ... WHERE decision = 'pending'`): a decision on a row
+   decided or voided meanwhile is 409, never an overwrite. Only `fail` findings can be
+   requested (an `error` is 409).
+
+`GET /projects/{p}/overrides?decision=&record_type=&record_id=` and `GET .../{id}`: every member.
 
 ## The rule store
 
@@ -259,7 +319,6 @@ request binds no project yet (TD-122): project routes bind the path's project.
 ## Not here
 
 "Try it" on a recent real context (only supplied samples so far) and offering whole rule sets
-a running project lacks: see the TODOs raised by T-0036. Per-record override of a blocked check
-(Amendment A): **T-0035**. Storing the project's chosen client pack (so a module enabled
+a running project lacks: see the TODOs raised by T-0036. Storing the project's chosen client pack (so a module enabled
 later copies that pack's sets): **T-0108**. The Rules settings screen (frontend): see the
 TODO raised by T-0034.

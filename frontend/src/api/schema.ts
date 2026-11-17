@@ -744,6 +744,77 @@ export interface paths {
         patch: operations["update_view_api_v1_saved_views_projects__project_id__views__view_id__patch"];
         trace?: never;
     };
+    "/api/v1/uploads/projects/{project_id}/files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Upload */
+        post: operations["create_upload_api_v1_uploads_projects__project_id__files_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/uploads/projects/{project_id}/files/{file_id}/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Complete Upload
+         * @description ``verifying`` (poll the file or its job) or ``rejected`` with a reason code.
+         */
+        post: operations["complete_upload_api_v1_uploads_projects__project_id__files__file_id__complete_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/uploads/projects/{project_id}/files/{file_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read File */
+        get: operations["read_file_api_v1_uploads_projects__project_id__files__file_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/uploads/projects/{project_id}/files/{file_id}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download File */
+        get: operations["download_file_api_v1_uploads_projects__project_id__files__file_id__download_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/validation/rule-sets": {
         parameters: {
             query?: never;
@@ -1137,52 +1208,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/uploads/projects/{project_id}/files": {
+    "/api/v1/validation/projects/{project_id}/overrides": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** List Overrides */
+        get: operations["list_overrides_api_v1_validation_projects__project_id__overrides_get"];
         put?: never;
-        /** Create Upload */
-        post: operations["create_upload_api_v1_uploads_projects__project_id__files_post"];
+        /** Request Override */
+        post: operations["request_override_api_v1_validation_projects__project_id__overrides_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/v1/uploads/projects/{project_id}/files/{file_id}/complete": {
+    "/api/v1/validation/projects/{project_id}/overrides/{override_id}": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get?: never;
-        put?: never;
-        /**
-         * Complete Upload
-         * @description ``verifying`` (poll the file or its job) or ``rejected`` with a reason code.
-         */
-        post: operations["complete_upload_api_v1_uploads_projects__project_id__files__file_id__complete_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/uploads/projects/{project_id}/files/{file_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Read File */
-        get: operations["read_file_api_v1_uploads_projects__project_id__files__file_id__get"];
+        /** Get Override */
+        get: operations["get_override_api_v1_validation_projects__project_id__overrides__override_id__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1191,17 +1243,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/uploads/projects/{project_id}/files/{file_id}/download": {
+    "/api/v1/validation/projects/{project_id}/overrides/{override_id}/approve": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Download File */
-        get: operations["download_file_api_v1_uploads_projects__project_id__files__file_id__download_get"];
+        get?: never;
         put?: never;
-        post?: never;
+        /** Approve Override */
+        post: operations["approve_override_api_v1_validation_projects__project_id__overrides__override_id__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/validation/projects/{project_id}/overrides/{override_id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reject Override */
+        post: operations["reject_override_api_v1_validation_projects__project_id__overrides__override_id__reject_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1273,6 +1342,8 @@ export interface components {
             severity: string;
             /** Message */
             message: string;
+            /** Finding Id */
+            finding_id?: string | null;
         };
         /** DeliveryRead */
         DeliveryRead: {
@@ -2137,6 +2208,94 @@ export interface components {
             notification: components["schemas"]["NotificationRead"];
             /** Deliveries */
             deliveries: components["schemas"]["DeliveryRead"][];
+        };
+        /**
+         * OverrideCreate
+         * @description Body of an override request: the blocking finding and the mandatory typed reason.
+         */
+        OverrideCreate: {
+            /**
+             * Finding Id
+             * Format: uuid
+             */
+            finding_id: string;
+            /** Reason */
+            reason: string;
+            /** Approver User Id */
+            approver_user_id?: string | null;
+        };
+        /**
+         * OverrideDecisionInput
+         * @description Body of an approval or rejection.
+         */
+        OverrideDecisionInput: {
+            /** Comment */
+            comment?: string | null;
+        };
+        /**
+         * OverrideRead
+         * @description An override as stored (quality-and-inspection.md §Per-record override).
+         */
+        OverrideRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /** Record Type */
+            record_type: string;
+            /**
+             * Record Id
+             * Format: uuid
+             */
+            record_id: string;
+            /** Rule Set Key */
+            rule_set_key: string;
+            /** Rule Key */
+            rule_key: string;
+            /** Rule Version */
+            rule_version: number;
+            /**
+             * Finding Id
+             * Format: uuid
+             */
+            finding_id: string;
+            /**
+             * Requested By
+             * Format: uuid
+             */
+            requested_by: string;
+            /**
+             * Requested At
+             * Format: date-time
+             */
+            requested_at: string;
+            /** Reason */
+            reason: string;
+            /** Approver Persona */
+            approver_persona: string;
+            /** Approver User Id */
+            approver_user_id: string | null;
+            /**
+             * Decision
+             * @enum {string}
+             */
+            decision: "pending" | "approved" | "rejected" | "void";
+            /** Decided By */
+            decided_by: string | null;
+            /** Decided At */
+            decided_at: string | null;
+            /** Decision Comment */
+            decision_comment: string | null;
+            /** Checked Values Hash */
+            checked_values_hash: string;
+            /** Audit Chain Key */
+            audit_chain_key: string;
         };
         /**
          * Persona
@@ -4543,6 +4702,137 @@ export interface operations {
             };
         };
     };
+    create_upload_api_v1_uploads_projects__project_id__files_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UploadCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadTicket"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    complete_upload_api_v1_uploads_projects__project_id__files__file_id__complete_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                file_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FileRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_file_api_v1_uploads_projects__project_id__files__file_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                file_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FileRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    download_file_api_v1_uploads_projects__project_id__files__file_id__download_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                file_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PresignedRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_tenant_rule_sets_api_v1_validation_rule_sets_get: {
         parameters: {
             query?: never;
@@ -5340,7 +5630,42 @@ export interface operations {
             };
         };
     };
-    create_upload_api_v1_uploads_projects__project_id__files_post: {
+    list_overrides_api_v1_validation_projects__project_id__overrides_get: {
+        parameters: {
+            query?: {
+                decision?: ("pending" | "approved" | "rejected" | "void") | null;
+                record_type?: string | null;
+                record_id?: string | null;
+            };
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OverrideRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    request_override_api_v1_validation_projects__project_id__overrides_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -5351,7 +5676,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["UploadCreate"];
+                "application/json": components["schemas"]["OverrideCreate"];
             };
         };
         responses: {
@@ -5361,7 +5686,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["UploadTicket"];
+                    "application/json": components["schemas"]["OverrideRead"];
                 };
             };
             /** @description Validation Error */
@@ -5375,13 +5700,13 @@ export interface operations {
             };
         };
     };
-    complete_upload_api_v1_uploads_projects__project_id__files__file_id__complete_post: {
+    get_override_api_v1_validation_projects__project_id__overrides__override_id__get: {
         parameters: {
             query?: never;
             header?: never;
             path: {
                 project_id: string;
-                file_id: string;
+                override_id: string;
             };
             cookie?: never;
         };
@@ -5393,7 +5718,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["FileRead"];
+                    "application/json": components["schemas"]["OverrideRead"];
                 };
             };
             /** @description Validation Error */
@@ -5407,17 +5732,21 @@ export interface operations {
             };
         };
     };
-    read_file_api_v1_uploads_projects__project_id__files__file_id__get: {
+    approve_override_api_v1_validation_projects__project_id__overrides__override_id__approve_post: {
         parameters: {
             query?: never;
             header?: never;
             path: {
                 project_id: string;
-                file_id: string;
+                override_id: string;
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OverrideDecisionInput"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -5425,7 +5754,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["FileRead"];
+                    "application/json": components["schemas"]["OverrideRead"];
                 };
             };
             /** @description Validation Error */
@@ -5439,17 +5768,21 @@ export interface operations {
             };
         };
     };
-    download_file_api_v1_uploads_projects__project_id__files__file_id__download_get: {
+    reject_override_api_v1_validation_projects__project_id__overrides__override_id__reject_post: {
         parameters: {
             query?: never;
             header?: never;
             path: {
                 project_id: string;
-                file_id: string;
+                override_id: string;
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OverrideDecisionInput"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -5457,7 +5790,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PresignedRead"];
+                    "application/json": components["schemas"]["OverrideRead"];
                 };
             };
             /** @description Validation Error */

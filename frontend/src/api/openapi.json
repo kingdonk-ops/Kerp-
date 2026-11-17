@@ -2463,6 +2463,239 @@
         }
       }
     },
+    "/api/v1/uploads/projects/{project_id}/files": {
+      "post": {
+        "tags": [
+          "uploads"
+        ],
+        "summary": "Create Upload",
+        "operationId": "create_upload_api_v1_uploads_projects__project_id__files_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Project Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UploadCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadTicket"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/uploads/projects/{project_id}/files/{file_id}/complete": {
+      "post": {
+        "tags": [
+          "uploads"
+        ],
+        "summary": "Complete Upload",
+        "description": "``verifying`` (poll the file or its job) or ``rejected`` with a reason code.",
+        "operationId": "complete_upload_api_v1_uploads_projects__project_id__files__file_id__complete_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "file_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "File Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/uploads/projects/{project_id}/files/{file_id}": {
+      "get": {
+        "tags": [
+          "uploads"
+        ],
+        "summary": "Read File",
+        "operationId": "read_file_api_v1_uploads_projects__project_id__files__file_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "file_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "File Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/uploads/projects/{project_id}/files/{file_id}/download": {
+      "get": {
+        "tags": [
+          "uploads"
+        ],
+        "summary": "Download File",
+        "operationId": "download_file_api_v1_uploads_projects__project_id__files__file_id__download_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "file_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "File Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PresignedRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/validation/rule-sets": {
       "get": {
         "tags": [
@@ -3933,13 +4166,13 @@
         }
       }
     },
-    "/api/v1/uploads/projects/{project_id}/files": {
+    "/api/v1/validation/projects/{project_id}/overrides": {
       "post": {
         "tags": [
-          "uploads"
+          "validation"
         ],
-        "summary": "Create Upload",
-        "operationId": "create_upload_api_v1_uploads_projects__project_id__files_post",
+        "summary": "Request Override",
+        "operationId": "request_override_api_v1_validation_projects__project_id__overrides_post",
         "security": [
           {
             "HTTPBearer": []
@@ -3962,7 +4195,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/UploadCreate"
+                "$ref": "#/components/schemas/OverrideCreate"
               }
             }
           }
@@ -3973,7 +4206,113 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/UploadTicket"
+                  "$ref": "#/components/schemas/OverrideRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "validation"
+        ],
+        "summary": "List Overrides",
+        "operationId": "list_overrides_api_v1_validation_projects__project_id__overrides_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "decision",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "pending",
+                    "approved",
+                    "rejected",
+                    "void"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Decision"
+            }
+          },
+          {
+            "name": "record_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 60
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Record Type"
+            }
+          },
+          {
+            "name": "record_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Record Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OverrideRead"
+                  },
+                  "title": "Response List Overrides Api V1 Validation Projects  Project Id  Overrides Get"
                 }
               }
             }
@@ -3991,14 +4330,71 @@
         }
       }
     },
-    "/api/v1/uploads/projects/{project_id}/files/{file_id}/complete": {
+    "/api/v1/validation/projects/{project_id}/overrides/{override_id}": {
+      "get": {
+        "tags": [
+          "validation"
+        ],
+        "summary": "Get Override",
+        "operationId": "get_override_api_v1_validation_projects__project_id__overrides__override_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "override_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Override Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OverrideRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/validation/projects/{project_id}/overrides/{override_id}/approve": {
       "post": {
         "tags": [
-          "uploads"
+          "validation"
         ],
-        "summary": "Complete Upload",
-        "description": "``verifying`` (poll the file or its job) or ``rejected`` with a reason code.",
-        "operationId": "complete_upload_api_v1_uploads_projects__project_id__files__file_id__complete_post",
+        "summary": "Approve Override",
+        "operationId": "approve_override_api_v1_validation_projects__project_id__overrides__override_id__approve_post",
         "security": [
           {
             "HTTPBearer": []
@@ -4016,23 +4412,33 @@
             }
           },
           {
-            "name": "file_id",
+            "name": "override_id",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
               "format": "uuid",
-              "title": "File Id"
+              "title": "Override Id"
             }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OverrideDecisionInput"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FileRead"
+                  "$ref": "#/components/schemas/OverrideRead"
                 }
               }
             }
@@ -4050,13 +4456,13 @@
         }
       }
     },
-    "/api/v1/uploads/projects/{project_id}/files/{file_id}": {
-      "get": {
+    "/api/v1/validation/projects/{project_id}/overrides/{override_id}/reject": {
+      "post": {
         "tags": [
-          "uploads"
+          "validation"
         ],
-        "summary": "Read File",
-        "operationId": "read_file_api_v1_uploads_projects__project_id__files__file_id__get",
+        "summary": "Reject Override",
+        "operationId": "reject_override_api_v1_validation_projects__project_id__overrides__override_id__reject_post",
         "security": [
           {
             "HTTPBearer": []
@@ -4074,81 +4480,33 @@
             }
           },
           {
-            "name": "file_id",
+            "name": "override_id",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
               "format": "uuid",
-              "title": "File Id"
+              "title": "Override Id"
             }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OverrideDecisionInput"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FileRead"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/uploads/projects/{project_id}/files/{file_id}/download": {
-      "get": {
-        "tags": [
-          "uploads"
-        ],
-        "summary": "Download File",
-        "operationId": "download_file_api_v1_uploads_projects__project_id__files__file_id__download_get",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "project_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Project Id"
-            }
-          },
-          {
-            "name": "file_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "File Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PresignedRead"
+                  "$ref": "#/components/schemas/OverrideRead"
                 }
               }
             }
@@ -4283,6 +4641,18 @@
           "message": {
             "type": "string",
             "title": "Message"
+          },
+          "finding_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finding Id"
           }
         },
         "type": "object",
@@ -6290,6 +6660,209 @@
         ],
         "title": "NotificationSent",
         "description": "The stored notification and each channel's outcome."
+      },
+      "OverrideCreate": {
+        "properties": {
+          "finding_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Finding Id"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "pattern": "\\S",
+            "title": "Reason"
+          },
+          "approver_user_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approver User Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "finding_id",
+          "reason"
+        ],
+        "title": "OverrideCreate",
+        "description": "Body of an override request: the blocking finding and the mandatory typed reason."
+      },
+      "OverrideDecisionInput": {
+        "properties": {
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "OverrideDecisionInput",
+        "description": "Body of an approval or rejection."
+      },
+      "OverrideRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "project_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Project Id"
+          },
+          "record_type": {
+            "type": "string",
+            "title": "Record Type"
+          },
+          "record_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Record Id"
+          },
+          "rule_set_key": {
+            "type": "string",
+            "title": "Rule Set Key"
+          },
+          "rule_key": {
+            "type": "string",
+            "title": "Rule Key"
+          },
+          "rule_version": {
+            "type": "integer",
+            "title": "Rule Version"
+          },
+          "finding_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Finding Id"
+          },
+          "requested_by": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Requested By"
+          },
+          "requested_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Requested At"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "approver_persona": {
+            "type": "string",
+            "title": "Approver Persona"
+          },
+          "approver_user_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approver User Id"
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "approved",
+              "rejected",
+              "void"
+            ],
+            "title": "Decision"
+          },
+          "decided_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided By"
+          },
+          "decided_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided At"
+          },
+          "decision_comment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision Comment"
+          },
+          "checked_values_hash": {
+            "type": "string",
+            "title": "Checked Values Hash"
+          },
+          "audit_chain_key": {
+            "type": "string",
+            "title": "Audit Chain Key"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "project_id",
+          "record_type",
+          "record_id",
+          "rule_set_key",
+          "rule_key",
+          "rule_version",
+          "finding_id",
+          "requested_by",
+          "requested_at",
+          "reason",
+          "approver_persona",
+          "approver_user_id",
+          "decision",
+          "decided_by",
+          "decided_at",
+          "decision_comment",
+          "checked_values_hash",
+          "audit_chain_key"
+        ],
+        "title": "OverrideRead",
+        "description": "An override as stored (quality-and-inspection.md §Per-record override)."
       },
       "Persona": {
         "type": "string",

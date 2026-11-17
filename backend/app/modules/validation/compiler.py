@@ -9,6 +9,7 @@ spec; they are recorded for confirmation in the T-0018 spec-gap TODO.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from typing import Any, Final
 
@@ -52,6 +53,17 @@ ACTIONS: Final[Mapping[str, frozenset[str]]] = {
 
 MAX_PATTERN_LENGTH: Final = 1024  # characters; RE2 also caps program size and memory
 
+# T-0035 (ADR 0004 Amendment A.6): a ``check`` rule may name, in ``params.override_binding``,
+# the context paths it checks (e.g. ``["fields.equipment_id", "fields.spec_revision",
+# "fields.inspection_date"]``). An override of the rule is bound to the hash of exactly those
+# values. Without it the binding is the whole ``record`` and ``fields`` (any change voids).
+OVERRIDE_BINDING_PARAM: Final = "override_binding"
+DEFAULT_OVERRIDE_BINDING: Final = ("record", "fields")
+# Never ``actor`` (who submits is not what was checked), ``now`` or ``params``.
+BINDING_ROOTS: Final = frozenset({"record", "fields", "project"})
+MAX_BINDING_PATHS: Final = 32
+_BINDING_PATH: Final = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*){0,15}$")
+
 
 class RuleCompileError(ValueError):
     """The rule cannot be stored; the message says why (shown to the rule author)."""
@@ -75,6 +87,8 @@ def compile_rule(
         decode_context({"params": dict(params)})
     except (TypeError, ValueError) as exc:
         raise RuleCompileError(f"params are not valid KERP CEL JSON: {exc}") from exc
+    if kind == "check" and OVERRIDE_BINDING_PARAM in params:
+        check_override_binding(params[OVERRIDE_BINDING_PARAM])
     if engine == "cel":
         error = compile_expression(expression, CEL_CONTEXT[kind])
         if error is not None:
@@ -87,6 +101,25 @@ def compile_rule(
                 raise RuleCompileError(f"unknown named group {unknown[0]!r} in p6_grammar")
             if "anchor_code" not in groups:
                 raise RuleCompileError("a p6_grammar pattern needs the named group anchor_code")
+
+
+def check_override_binding(paths: object) -> None:
+    """``params.override_binding`` must be 1-32 distinct dotted paths under a bindable root
+    (``record``, ``fields``, ``project``; never ``actor``, ``now`` or ``params``)."""
+    if not isinstance(paths, list) or not paths or len(paths) > MAX_BINDING_PATHS:
+        raise RuleCompileError(
+            f"params.{OVERRIDE_BINDING_PARAM} must be a list of 1-{MAX_BINDING_PATHS} paths"
+        )
+    for path in paths:
+        if not isinstance(path, str) or not _BINDING_PATH.fullmatch(path):
+            raise RuleCompileError(f"params.{OVERRIDE_BINDING_PARAM}: {path!r} is not a path")
+        if path.split(".", 1)[0] not in BINDING_ROOTS:
+            raise RuleCompileError(
+                f"params.{OVERRIDE_BINDING_PARAM}: {path!r} must start with one of "
+                f"{sorted(BINDING_ROOTS)}"
+            )
+    if len(set(paths)) != len(paths):
+        raise RuleCompileError(f"params.{OVERRIDE_BINDING_PARAM} lists a path twice")
 
 
 def compile_regex(pattern: str) -> frozenset[str]:

@@ -17,13 +17,15 @@ two-person unlock (``request_unlock`` + ``approve_unlock``) has cleared it (§5,
 Permissions (who may call what, §7) are the router's.
 
 Upgrade offers, the drift report and "Try it" (T-0036) are in ``upgrades.py``; the
-per-record override of a blocked check (Amendment A) is T-0035.
+per-record override of a blocked check (Amendment A, T-0035) is in ``overrides.py``:
+``run_checks`` applies and voids overrides, the request and decision API is there.
 """
 
 from __future__ import annotations
 
 import dataclasses
 import json
+import logging
 import re
 import uuid
 from collections.abc import Callable, Collection, Iterable, Mapping
@@ -31,7 +33,7 @@ from functools import cache
 from typing import TYPE_CHECKING, Any, Final
 
 from sqlalchemy import ColumnElement, select
-from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from sqlalchemy.exc import IntegrityError, OperationalError, SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.audit import service as audit
@@ -43,6 +45,7 @@ from app.core.tenancy.context import TenancyContext
 from app.core.tenancy.rls import SESSION_INFO_KEY, bind_tenancy, session_tenancy
 from app.core.tenancy.scope import OutOfScopeError, get_or_404
 from app.modules.projects import service as projects
+from app.modules.validation import overrides
 from app.modules.validation.compiler import RuleCompileError, compile_rule
 from app.modules.validation.defaults import SeedRuleSet, load_defaults
 from app.modules.validation.models import (
@@ -54,7 +57,13 @@ from app.modules.validation.models import (
     RuleSet,
     UnlockRequest,
 )
-from app.modules.validation.schemas import KEY_PATTERN, CheckFinding, CheckResult, RuleSpec
+from app.modules.validation.schemas import (
+    KEY_PATTERN,
+    AppliedOverride,
+    CheckFinding,
+    CheckResult,
+    RuleSpec,
+)
 
 if TYPE_CHECKING:
     from app.modules.projects.models import Project
@@ -88,6 +97,8 @@ __all__ = [
     "sync_system_defaults",
     "sync_system_layer",
 ]
+
+logger = logging.getLogger("kerp.validation")
 
 # Most specific first: a project's own set wins over the tenant's, which wins over system.
 _LAYER_PRIORITY: Final = {"project": 0, "tenant": 1, "system": 2}
@@ -317,6 +328,21 @@ def run_checks(
     That pool is never the caller's request pool, so logging a finding never waits on a
     connection a request already holds. The rule set must be committed before it is run (the
     findings reference it).
+
+    Overrides (T-0035, Amendment A): with a ``"<record_type>:<uuid>"`` subject, a blocking
+    rule that **fails** (outcome ``fail``, not ``error``) passes when the record has an
+    **approved** override of it (listed in ``result.overrides``, no finding) while the rule
+    version and the hash of the values it checked (``overrides.checked_values_hash``) equal
+    the override's. Every finding records its ``checked_values_hash``. A pending or approved
+    override whose rule version or hash differs is never applied by this evaluation (the
+    block returns at once) and is voided after the findings are committed, in a second side
+    unit of work that also appends ``validation_override_voided`` to the record's audit
+    chain. **Caller contract:** call ``run_checks`` *before* appending to the record's own
+    audit chain (``<record_type>:<record_id>``) in the same transaction. A caller holding
+    that chain's lock makes the void wait out the side pool's ``lock_timeout``; the void is
+    then rolled back and retried at the next evaluation (logged; the findings and the block
+    stand, the gate never fails on it). Until a void lands, an evaluation with the original
+    values would apply the override again (TD-316).
     """
     tenancy = _context(session)
     if "params" in context:
@@ -330,11 +356,35 @@ def run_checks(
     run_id = uuid.uuid4()
     findings: list[CheckFinding] = []
     rows: list[Finding] = []
+    active = overrides.active_overrides(session, subject, found.key)
+    applied: list[AppliedOverride] = []
+    voids: list[overrides.Void] = []
     for rule in rules:
         result = evaluate(rule.expression, {**context, "params": rule.params})
+        values_hash = overrides.checked_values_hash(rule.params, context)
+        override = active.get(rule.rule_key)
+        if override is not None:
+            cause = overrides.void_cause(override, rule.version, values_hash)
+            if cause is not None:  # Amendment A.6: the values (or the rule) changed
+                voids.append(overrides.Void(override.id, cause, values_hash, rule.version))
+                override = None
         if isinstance(result, CelOk) and result.value is True:
             continue
+        if (
+            override is not None
+            and override.decision == "approved"
+            and rule.action == "block"
+            and not isinstance(result, CelError)  # an override answers a fail, never an error
+        ):
+            applied.append(
+                AppliedOverride(
+                    override_id=override.id, rule_key=rule.rule_key, rule_version=rule.version
+                )
+            )
+            continue
+        finding_id = uuid.uuid4()
         finding = CheckFinding(
+            finding_id=finding_id,
             rule_key=rule.rule_key,
             rule_version=rule.version,
             outcome="error" if isinstance(result, CelError) else "fail",
@@ -345,6 +395,7 @@ def run_checks(
         findings.append(finding)
         rows.append(
             Finding(
+                id=finding_id,
                 tenant_id=tenancy.tenant_id,
                 project_id=tenancy.project_id,
                 run_id=run_id,
@@ -355,16 +406,18 @@ def run_checks(
                 rule_id=rule.id,
                 created_by=tenancy.user_id,
                 source="system",
-                **finding.model_dump(),
+                checked_values_hash=values_hash,
+                **finding.model_dump(exclude={"finding_id"}),
             )
         )
-    _persist_findings(session, tenancy, rows)
+    _persist_findings(session, tenancy, rows, voids)
     return CheckResult(
         run_id=run_id,
         rule_set=found.key,
         rule_set_version=found.version,
         evaluated=len(rules),
         findings=tuple(findings),
+        overrides=tuple(applied),
     )
 
 
@@ -1132,8 +1185,14 @@ def _audit_unlock(
 # --- helpers ------------------------------------------------------------------------------
 
 
-def _persist_findings(session: Session, tenancy: TenancyContext, rows: list[Finding]) -> None:
-    """Commit ``rows`` independently of the caller's transaction (see ``run_checks``).
+def _persist_findings(
+    session: Session,
+    tenancy: TenancyContext,
+    rows: list[Finding],
+    voids: list[overrides.Void] | None = None,
+) -> None:
+    """Commit ``rows``, then void stale overrides (T-0035), independently of the caller's
+    transaction (see ``run_checks``).
 
     The write runs on the ``Database``'s dedicated side-write pool, never on the request pool
     the caller's connection belongs to: that pool can be fully held by requests sitting inside
@@ -1142,12 +1201,28 @@ def _persist_findings(session: Session, tenancy: TenancyContext, rows: list[Find
     cannot form that cycle. On SQLite (local tests only) a caller that has already written in
     its open transaction holds the database write lock, so call ``run_checks`` before writing.
     """
-    if not rows:
+    maker = _side_write_sessionmaker(session)
+    if rows:
+        with maker() as log:
+            bind_tenancy(log, tenancy)
+            log.add_all(rows)
+            log.commit()
+    if not voids:
         return
-    with _side_write_sessionmaker(session)() as log:
-        bind_tenancy(log, tenancy)
-        log.add_all(rows)
-        log.commit()
+    # Second unit of work: the void and its ledger entry land together or not at all. A caller
+    # holding the record's chain lock (it appended to it before ``run_checks``) makes the append
+    # wait out ``lock_timeout``; the findings are committed already and this evaluation did not
+    # apply the stale override, so the gate's answer stands and the void is retried next time.
+    try:
+        with maker() as log:
+            bind_tenancy(log, tenancy)
+            overrides.apply_voids(log, voids)
+            log.commit()
+    except OperationalError:
+        logger.warning(
+            "override void deferred: the record's audit chain is locked by the caller",
+            extra={"override_ids": [str(v.override_id) for v in voids]},
+        )
 
 
 def _side_write_sessionmaker(session: Session) -> sessionmaker[Session]:

@@ -72,6 +72,12 @@ notifications.clear_pins(session, pin_key=f"handover.ack:{handover.id}", recipie
 
 The session must be bound to the project.
 
+## Kinds sent by other modules
+
+| Kind | Sent by |
+|---|---|
+| `validation.override_requested`, `validation.override_approved`, `validation.override_rejected` | `validation` (T-0035, ADR 0004 Amendment A.3) |
+
 ## API
 
 The project is the one in the path; a non-member or a deleted project is 404.
