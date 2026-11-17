@@ -2463,6 +2463,355 @@
         }
       }
     },
+    "/api/v1/access-requests": {
+      "post": {
+        "tags": [
+          "access-requests"
+        ],
+        "summary": "File Request",
+        "operationId": "file_request_api_v1_access_requests_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccessRequestCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessRequestRead"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such project, or not found through the lobby or a code lookup"
+          },
+          "409": {
+            "description": "Already a member, already pending, or the cooldown (`code: ACCESS_REQUEST_COOLDOWN`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessRequestError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/access-requests/mine": {
+      "get": {
+        "tags": [
+          "access-requests"
+        ],
+        "summary": "My Requests",
+        "operationId": "my_requests_api_v1_access_requests_mine_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AccessRequestRead"
+                  },
+                  "type": "array",
+                  "title": "Response My Requests Api V1 Access Requests Mine Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/access-requests/{request_id}/withdraw": {
+      "post": {
+        "tags": [
+          "access-requests"
+        ],
+        "summary": "Withdraw",
+        "operationId": "withdraw_api_v1_access_requests__request_id__withdraw_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Request Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessRequestRead"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not the caller's request"
+          },
+          "409": {
+            "description": "Not pending"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/access-requests/pending": {
+      "get": {
+        "tags": [
+          "access-requests"
+        ],
+        "summary": "Pending Requests",
+        "operationId": "pending_requests_api_v1_access_requests_pending_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Project Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PendingAccessRequest"
+                  },
+                  "title": "Response Pending Requests Api V1 Access Requests Pending Get"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Administers no project"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/access-requests/{request_id}/approve": {
+      "post": {
+        "tags": [
+          "access-requests"
+        ],
+        "summary": "Approve",
+        "operationId": "approve_api_v1_access_requests__request_id__approve_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Request Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccessRequestApprove"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessRequestDecided"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not an administrator of the project (or the caller's own request)"
+          },
+          "404": {
+            "description": "No such request for the caller"
+          },
+          "409": {
+            "description": "Not pending, or PER-09 + hold authority without `confirm_sod`"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/access-requests/{request_id}/reject": {
+      "post": {
+        "tags": [
+          "access-requests"
+        ],
+        "summary": "Reject",
+        "operationId": "reject_api_v1_access_requests__request_id__reject_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Request Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/AccessRequestReject"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessRequestDecided"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not an administrator of the project (or the caller's own request)"
+          },
+          "404": {
+            "description": "No such request for the caller"
+          },
+          "409": {
+            "description": "Not pending, or PER-09 + hold authority without `confirm_sod`"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/uploads/projects/{project_id}/files": {
       "post": {
         "tags": [
@@ -4527,6 +4876,330 @@
   },
   "components": {
     "schemas": {
+      "AccessRequestApprove": {
+        "properties": {
+          "grants": {
+            "items": {
+              "$ref": "#/components/schemas/GrantIn"
+            },
+            "type": "array",
+            "maxItems": 16,
+            "minItems": 1,
+            "title": "Grants"
+          },
+          "confirm_sod": {
+            "type": "boolean",
+            "title": "Confirm Sod",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "grants"
+        ],
+        "title": "AccessRequestApprove",
+        "description": "``POST /access-requests/{id}/approve``: the persona(s) and site scope to grant.\n\nThey are added to any direct grants the requester already holds on the project. PER-09\ntogether with a hold-authority persona needs ``confirm_sod: true`` (else 409\n``sod_confirmation_required``, TD-151)."
+      },
+      "AccessRequestCreate": {
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Project Id"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "lookup_ticket": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4096
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lookup Ticket"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "project_id"
+        ],
+        "title": "AccessRequestCreate",
+        "description": "``POST /access-requests``: ask for access to a project.\n\n``lookup_ticket``: the ticket of a code lookup (``GET /lobby/projects/by-code/{code}``) for\nthis project. A user's **first** request for a project needs it when the user is external,\nor internal and the project is not listed in the lobby; a new request after an earlier\nrejected or withdrawn one needs none."
+      },
+      "AccessRequestDecided": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "project_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Project Id"
+          },
+          "requester_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Requester Id"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "approved",
+              "rejected",
+              "withdrawn"
+            ],
+            "title": "Status"
+          },
+          "decided_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided By"
+          },
+          "decided_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided At"
+          },
+          "rejection_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rejection Reason"
+          },
+          "granted": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/GrantRead"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Granted"
+          },
+          "sod_warning": {
+            "type": "boolean",
+            "title": "Sod Warning",
+            "description": "PER-09 together with a hold-authority persona (confirmed with confirm_sod)",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "project_id",
+          "requester_id",
+          "status",
+          "decided_by",
+          "decided_at",
+          "rejection_reason",
+          "granted"
+        ],
+        "title": "AccessRequestDecided",
+        "description": "The request after a decision."
+      },
+      "AccessRequestError": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "retry_after": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retry After"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail",
+          "code"
+        ],
+        "title": "AccessRequestError",
+        "description": "A refusal with a machine-readable ``code`` (e.g. ``ACCESS_REQUEST_COOLDOWN``).\n``retry_after``: when a new request becomes allowed (cooldown only)."
+      },
+      "AccessRequestRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "project_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Project Id"
+          },
+          "project_code": {
+            "type": "string",
+            "title": "Project Code"
+          },
+          "project_name": {
+            "type": "string",
+            "title": "Project Name"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "approved",
+              "rejected",
+              "withdrawn"
+            ],
+            "title": "Status"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "decided_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided At"
+          },
+          "withdrawn_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Withdrawn At"
+          },
+          "rejection_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rejection Reason"
+          },
+          "request_again_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Again At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "project_id",
+          "project_code",
+          "project_name",
+          "status",
+          "message",
+          "created_at",
+          "decided_at",
+          "withdrawn_at",
+          "rejection_reason",
+          "request_again_at"
+        ],
+        "title": "AccessRequestRead",
+        "description": "One of the caller's own requests (the lobby's \"Active requests\" panel).\n\n``rejection_reason``: the decider's reason, on a ``rejected`` request only.\n``request_again_at``: on a ``rejected`` request, when \"Request again\" is allowed (the\nre-request cooldown); ``null`` when a new request is allowed now, and on every other status."
+      },
+      "AccessRequestReject": {
+        "properties": {
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "AccessRequestReject",
+        "description": "``POST /access-requests/{id}/reject``: an optional reason, shown to the requester."
+      },
       "AdminGrantIn": {
         "properties": {
           "user_id": {
@@ -6864,6 +7537,59 @@
         "title": "OverrideRead",
         "description": "An override as stored (quality-and-inspection.md §Per-record override)."
       },
+      "PendingAccessRequest": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "project_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Project Id"
+          },
+          "project_code": {
+            "type": "string",
+            "title": "Project Code"
+          },
+          "project_name": {
+            "type": "string",
+            "title": "Project Name"
+          },
+          "requester": {
+            "$ref": "#/components/schemas/Requester"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "project_id",
+          "project_code",
+          "project_name",
+          "requester",
+          "message",
+          "created_at"
+        ],
+        "title": "PendingAccessRequest",
+        "description": "A pending request, as the project's PER-09 holders (and System admins) see it."
+      },
       "Persona": {
         "type": "string",
         "enum": [
@@ -7317,6 +8043,30 @@
           "groups"
         ],
         "title": "RegexMatch"
+      },
+      "Requester": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "email",
+          "display_name"
+        ],
+        "title": "Requester"
       },
       "ResolvedColumn": {
         "properties": {

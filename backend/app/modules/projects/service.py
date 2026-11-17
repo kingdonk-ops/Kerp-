@@ -60,6 +60,7 @@ from app.modules.settings import service as deployment_settings
 
 __all__ = [
     "DuplicateProjectCodeError",
+    "LobbyRef",
     "ProjectSummary",
     "add_created_listener",
     "bind_project",
@@ -69,6 +70,7 @@ __all__ = [
     "list_projects",
     "live_project_ids",
     "lobby_projects",
+    "lobby_projects_by_id",
     "project_by_code",
     "set_lobby_visibility",
     "site_zone",
@@ -79,6 +81,8 @@ CHAIN_PREFIX: Final = "project:"
 # The narrow lobby read of migration 0021 (PostgreSQL).
 LOBBY_FUNCTION: Final = "kerp_lobby_projects"
 CODE_FUNCTION: Final = "kerp_lobby_project_by_code"
+# The narrow read by id of migration 0023 (access requests, T-0050).
+BY_ID_FUNCTION: Final = "kerp_lobby_projects_by_id"
 
 
 class ProjectSummary(NamedTuple):
@@ -87,6 +91,17 @@ class ProjectSummary(NamedTuple):
     id: uuid.UUID
     code: str
     name: str
+
+
+class LobbyRef(NamedTuple):
+    """A project an access request names (T-0050): id, code, name and whether it is listed in
+    the lobby; nothing else of the row."""
+
+    id: uuid.UUID
+    code: str
+    name: str
+    visible_in_lobby: bool
+
 
 # ``listener(session, project)``: called by ``create_project`` once the row is flushed.
 CreatedListener = Callable[[Session, Project], None]
@@ -339,3 +354,35 @@ def project_by_code(session: Session, code: str) -> ProjectSummary | None:
     else:
         found = _narrow_select(session, internal=False, where=Project.__table__.c.code == code)
     return found[0] if found else None
+
+
+def lobby_projects_by_id(
+    session: Session, project_ids: Collection[uuid.UUID]
+) -> dict[uuid.UUID, LobbyRef]:
+    """The live projects among ``project_ids`` (id, code, name, ``visible_in_lobby``), for any
+    active user of the tenant: the narrow read behind access requests (T-0050), which name a
+    project the caller found through the lobby or a code lookup but need not be a member of.
+    Deleted and unknown ids are left out. It grants nothing; callers show it only for projects
+    the caller already has a request for, or after checking how the project was found."""
+    ids = sorted(set(project_ids), key=str)
+    if not ids:
+        return {}
+    if _on_postgres(session):
+        query = text(
+            f"SELECT id, code, name, visible_in_lobby FROM {BY_ID_FUNCTION}(CAST(:ids AS uuid[]))"
+        )
+        rows: Iterable[Sequence[object]] = session.execute(query, {"ids": ids}).all()
+    else:
+        tenant_id = _lobby_caller(session, internal=False)
+        if tenant_id is None:
+            return {}
+        table = Project.__table__
+        rows = session.connection().execute(
+            select(table.c.id, table.c.code, table.c.name, table.c.visible_in_lobby).where(
+                table.c.tenant_id == tenant_id,
+                table.c.deleted_at.is_(None),
+                table.c.id.in_(ids),
+            )
+        )
+    refs = [LobbyRef(uuid.UUID(str(r[0])), str(r[1]), str(r[2]), bool(r[3])) for r in rows]
+    return {ref.id: ref for ref in refs}

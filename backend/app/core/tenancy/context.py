@@ -40,6 +40,10 @@ class TenancyContext:
       T-0014, diff §4.1). Loaded server-side at authentication, never from the request; a
       script or provisioning job may set it explicitly. It reads every project row and
       membership and writes admin grants, but reads no project-scoped record.
+    * ``admin_project_ids``: the projects where the user holds PER-09 Project Administrator
+      (``app.admin_project_ids``, T-0050). Bound only from the user's memberships; it widens
+      only the rows a project's administrators decide on (access requests), never
+      project-scoped records.
     """
 
     tenant_id: uuid.UUID
@@ -49,6 +53,7 @@ class TenancyContext:
     site_node_ids: frozenset[uuid.UUID] | None = None
     member_project_ids: frozenset[uuid.UUID] = frozenset()
     is_system_admin: bool = False
+    admin_project_ids: frozenset[uuid.UUID] = frozenset()
 
     @property
     def readable_project_ids(self) -> frozenset[uuid.UUID]:

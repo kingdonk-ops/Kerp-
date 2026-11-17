@@ -124,6 +124,9 @@ class Settings(BaseSettings):
     # comma-separated in the environment, lower-cased, exact match (no wildcards, a subdomain
     # is a different domain). Empty: no domain rule (only the Entra member link counts).
     internal_email_domains: Annotated[tuple[str, ...], NoDecode] = ()
+    # Re-request cooldown after a rejected access request (T-0050, diff §4.1): hours from the
+    # rejection before the user may ask for the same project again. 0 disables it.
+    access_request_cooldown_hours: int = Field(default=24, ge=0, le=24 * 365)
 
     # Notification channels (T-0019, TD-168): the registered channel names every notification
     # goes to (JSON list in the environment). ``in_app`` is the inbox record and always on;

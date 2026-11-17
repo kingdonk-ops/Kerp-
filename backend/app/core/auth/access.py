@@ -222,7 +222,8 @@ def resolve_scope(
     The allowed (read-only) projects are those of the user's portfolio-scope personas; the
     bound project, if any, must be one of the user's projects and sets the site filter. Every
     project of the grants becomes a member project (it widens only the rows describing a
-    project, T-0014); ``base.is_system_admin`` is kept.
+    project, T-0014); the projects where the user holds PER-09 become admin projects (they widen
+    only the access requests of those projects, T-0050); ``base.is_system_admin`` is kept.
     """
     grants = list(grants)
     allowed = frozenset(
@@ -237,6 +238,9 @@ def resolve_scope(
         site_node_ids=sites,
         member_project_ids=frozenset(g.project_id for g in grants),
         is_system_admin=base.is_system_admin,
+        admin_project_ids=frozenset(
+            g.project_id for g in grants if g.persona is Persona.PROJECT_ADMINISTRATOR
+        ),
     )
 
 

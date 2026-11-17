@@ -31,6 +31,11 @@ instead (T-0014, TD-053, edge spec §6 amendments), declared on the model's tabl
   Inserts need the exact scope; updates and deletes need the exact scope *and* visibility.
 * ``admin_grant``: the caller reads their own rows; an ``app.is_system_admin`` session reads
   and writes all of them; nobody else inserts, updates or deletes.
+* ``access_request`` (T-0050, edge spec §6 amendments): a row is readable by its owner (the
+  requester, ``app.current_user_id``), by the PER-09 holders of the project it names
+  (``app.admin_project_ids``) and by ``app.is_system_admin`` sessions; nobody else. The owner
+  inserts their own rows only; updates need the exact scope and visibility; nobody deletes
+  (decided and withdrawn rows are history).
 
 * ``NULLIF(..., '')``: once a connection has set a custom setting, it reads back as ``''``
   after the transaction, not ``NULL``. ``''::uuid`` would raise; ``NULL`` matches nothing.
@@ -65,6 +70,7 @@ ALLOWED_SETTING: Final = "app.allowed_project_ids"
 MEMBER_SETTING: Final = "app.member_project_ids"
 USER_SETTING: Final = "app.current_user_id"
 SYSTEM_ADMIN_SETTING: Final = "app.is_system_admin"
+ADMIN_PROJECTS_SETTING: Final = "app.admin_project_ids"
 SETTINGS: Final = (
     TENANT_SETTING,
     PROJECT_SETTING,
@@ -72,6 +78,7 @@ SETTINGS: Final = (
     MEMBER_SETTING,
     USER_SETTING,
     SYSTEM_ADMIN_SETTING,
+    ADMIN_PROJECTS_SETTING,
 )
 POLICY_NAME: Final = "project_isolation_policy"
 READ_POLICY_NAME: Final = "tenant_level_read_policy"
@@ -84,6 +91,11 @@ MEMBERSHIP_POLICY_NAMES: Final = (
     "membership_delete_policy",
 )
 ADMIN_GRANT_POLICY_NAMES: Final = ("admin_grant_read_policy", "admin_grant_write_policy")
+ACCESS_REQUEST_POLICY_NAMES: Final = (
+    "access_request_read_policy",
+    "access_request_insert_policy",
+    "access_request_update_policy",
+)
 SESSION_INFO_KEY: Final = "kerp_tenancy"
 RLS_INFO_KEY: Final = "kerp_rls"
 
@@ -125,9 +137,12 @@ class RlsPolicy:
       ``owner_column`` (optional) names the user who always reads their own rows.
     * ``kind="admin_grant"``: own rows (``owner_column``) readable; only ``system_admin``
       sessions read all rows and write any.
+    * ``kind="access_request"`` (T-0050): readable by the owner (``owner_column``), by the
+      administrators (PER-09) of the project in ``project_column`` and by ``system_admin``
+      sessions; only the owner inserts; updates need visibility; nobody deletes.
     """
 
-    kind: Literal["membership", "admin_grant"]
+    kind: Literal["membership", "admin_grant", "access_request"]
     owner_column: str | None = None
     project_column: str | None = None
 
@@ -156,11 +171,41 @@ def membership_visible_sql(project_column: str, owner_column: str | None = None)
     return f"tenant_id = {_TENANT_EXPR} AND ({' OR '.join(clauses)})"
 
 
+def access_request_visible_sql(project_column: str, owner_column: str) -> str:
+    """Read rule of an ``access_request`` table: the requester, the PER-09 holders of the
+    named project, or a System admin (edge spec §6 amendments, T-0050)."""
+    clauses = [
+        f"{owner_column} = {_USER_EXPR}",
+        f"{project_column} = ANY({_id_list_sql(ADMIN_PROJECTS_SETTING)})",
+        SYSTEM_ADMIN_SQL,
+    ]
+    return f"tenant_id = {_TENANT_EXPR} AND ({' OR '.join(clauses)})"
+
+
+def _access_request_policy_sql(table: str, policy: RlsPolicy) -> list[str]:
+    if policy.project_column is None or policy.owner_column is None:
+        raise ValueError(f"{table}: an access_request policy needs project and owner columns")
+    read, insert, update = ACCESS_REQUEST_POLICY_NAMES
+    visible = access_request_visible_sql(policy.project_column, policy.owner_column)
+    guarded = f"{SCOPE_ROW_SQL} AND {visible}"
+    own = f"{SCOPE_ROW_SQL} AND {policy.owner_column} = {_USER_EXPR}"
+    # No DELETE policy: nobody deletes a request (decided and withdrawn rows are history).
+    return [
+        f"CREATE POLICY {read} ON {table} FOR SELECT USING ({visible})",
+        f"CREATE POLICY {insert} ON {table} FOR INSERT WITH CHECK ({own})",
+        f"CREATE POLICY {update} ON {table} FOR UPDATE USING ({guarded}) WITH CHECK ({guarded})",
+    ]
+
+
 def _special_policy_sql(table: str, policy: RlsPolicy) -> list[str]:
-    if policy.kind == "membership":
+    names: tuple[str, ...]
+    if policy.kind == "access_request":
+        names = ACCESS_REQUEST_POLICY_NAMES
+        creates = _access_request_policy_sql(table, policy)
+    elif policy.kind == "membership":
         if policy.project_column is None:
             raise ValueError(f"{table}: a membership policy needs project_column")
-        names: tuple[str, ...] = MEMBERSHIP_POLICY_NAMES
+        names = MEMBERSHIP_POLICY_NAMES
         read, insert, update, delete = names
         visible = membership_visible_sql(policy.project_column, policy.owner_column)
         guarded = f"{SCOPE_ROW_SQL} AND {visible}"
@@ -197,6 +242,8 @@ def expected_policy_names(table: Table) -> tuple[str, ...]:
     policy = table_policy(table)
     if policy is None:
         return POLICY_NAMES
+    if policy.kind == "access_request":
+        return ACCESS_REQUEST_POLICY_NAMES
     return MEMBERSHIP_POLICY_NAMES if policy.kind == "membership" else ADMIN_GRANT_POLICY_NAMES
 
 
@@ -381,6 +428,7 @@ def setting_values(context: TenancyContext | None) -> dict[str, str]:
         MEMBER_SETTING: _ids(context.member_project_ids),
         USER_SETTING: str(context.user_id) if context.user_id else "",
         SYSTEM_ADMIN_SETTING: "true" if context.is_system_admin else "",
+        ADMIN_PROJECTS_SETTING: _ids(context.admin_project_ids),
     }
 
 

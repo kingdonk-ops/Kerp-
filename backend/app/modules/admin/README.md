@@ -79,7 +79,9 @@ T-0044), which the projects module depends on.
 tenant): exact, case-insensitive match only; inactive accounts are not found; per-caller
 rate limit (`LOOKUP_POLICY`: 20 back to back, then 1 min doubling to 15 min, per hour; 429
 with `Retry-After`); every lookup, hit or miss, is audited with the e-mail as a SHA-256
-digest. Invites by e-mail are T-0052.
+digest. Invites by e-mail are T-0052. Access requests (a user asks, a PER-09 approves or rejects) are the
+`access_requests` module (T-0050); approving one calls `assign_member` with the request's
+personas added to the requester's direct grants, so the SoD rule below applies there too.
 
 **Memberships.** Personas are `PER-01`…`PER-16` (`access.Persona`, TD-256); PER-07 needs a
 `site_node_id`, other personas must not have one (422). PER-09 may be assigned by a PER-09
