@@ -38,7 +38,7 @@ There is **no password option**. The account is created without credentials, so 
 in the repository, the environment, the shell history or a log. The admin then signs in with
 Microsoft (Entra ID SSO links an existing account by e-mail, T-0054; SSO never creates
 accounts, diff §4.5) or sets a password through a one-time link: the self-service reset link of
-T-0077 (TD-358 until it ships). If the e-mail's domain is on `KERP_INTERNAL_EMAIL_DOMAINS`,
+T-0077 (TD-360 until it ships). If the e-mail's domain is on `KERP_INTERNAL_EMAIL_DOMAINS`,
 the account is internal from the start (T-0049).
 
 ## What a run does
