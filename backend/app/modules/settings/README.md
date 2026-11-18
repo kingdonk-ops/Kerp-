@@ -9,7 +9,7 @@ is never taken or returned by the API.
 |---|---|
 | `models.py` | `oe_settings_deployment` (`BaseRecordMixin`, tenant-level, standard RLS; migration `0017`), `SHIPPED_DEFAULTS`, bounds |
 | `schemas.py` | `DeploymentSettingsRead`, `DeploymentSettingsUpdate` (partial, strict integers, no nulls, no unknown fields) |
-| `service.py` | `get_settings`, `project_defaults`, `update_settings`, `stored_record` |
+| `service.py` | `get_settings`, `project_defaults`, `update_settings`, `stored_record`, `ensure_record` (first-run, T-0023) |
 | `router.py` | `/api/v1/settings/deployment` (below) |
 
 ## Settings
@@ -29,9 +29,11 @@ Zone, currency and locale use the same validators as a project's own settings
 window below `offline_grace_hours / 24` without lowering the grace is refused (422), never
 clamped.
 
-Until a System admin first changes a value there is **no row**: `get_settings` answers
-`SHIPPED_DEFAULTS` and reading never writes. The first change creates the row (at most one live
-row per tenant, partial unique index; a concurrent first write loses with 409).
+Until the record is created there is **no row**: `get_settings` answers `SHIPPED_DEFAULTS` and
+reading never writes. First-run provisioning (T-0023, `app/modules/onboarding`) creates it with
+the shipped defaults (`ensure_record`, audited `{"action": "provision", "values": …}`; an
+existing record is left alone); otherwise a System admin's first change creates it (at most one
+live row per tenant, partial unique index; a concurrent first write loses with 409).
 
 **Region is not a setting here.** It is deployment configuration (environment, like the
 database URL): AWS `ap-southeast-2` for Australian deployments, `eu-central-1` only if an EU

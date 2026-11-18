@@ -19,6 +19,7 @@ FastAPI modular monolith (see `docs/spec/` and `CLAUDE.md` §6).
 | `app/core/mail/` | Outbound e-mail: `send_mail` (enqueue after commit), SES / fake / log transports, i18n templates, send log, bounce/complaint suppression, SNS endpoint — see its `README.md` |
 | `app/core/module_loader/` | Module loader + manifest contract, per-project enable/disable, toggle API `/api/v1/modules` — see its `README.md` |
 | `app/modules/<name>/` | Domain modules (`manifest.py`, `models.py`, `router.py`, `service.py`, `schemas.py`, `README.md`), mounted at `/api/v1/<name>` |
+| `app/modules/onboarding/` | First-run provisioning of a deployment: `python -m app.modules.onboarding.first_run` (the one hidden tenant, deployment settings, the first System admin; deploy steps in `docs/deploy/first-run.md`) — see its `README.md` |
 | `app/modules/validation/` | Verification engine: `run_checks(context, rule_set)` and the single rule store (kinds, engines, compile-on-save, findings log) — see its `README.md` |
 | `app/openapi.py` | `python -m app.openapi <file>`: writes the OpenAPI schema (used by the frontend's `npm run gen:api`) |
 | `tests/` | pytest suite |
@@ -45,6 +46,7 @@ hardcoded config, no `.env` file is read).
 | `KERP_REDIS_URL` | unset | Redis URL (auth token revocation; job queue later). Required in production |
 | `KERP_JWT_*`, `KERP_ACCESS_TOKEN_MINUTES`, `KERP_REFRESH_TOKEN_HOURS`, `KERP_DEFAULT_TENANT_ID`, `KERP_WEB_ORIGIN`, `KERP_NATIVE_APP_ORIGINS`, `KERP_INTERNAL_EMAIL_DOMAINS`, `KERP_ENTRA_*`, `KERP_ANDROID_APP_*` | see `app/core/auth/README.md` | Token signing keys and lifetimes, the deployment tenant (required in production: the app does not start without it), refresh-cookie origin (optional; set it behind a proxy, see Container image), the native field app's origins (optional; body refresh-token transport and the API's CORS list; must not contain the web origin, which must then be set, or the app does not start), the e-mail domains of internal staff (optional; comma-separated, exact match; a malformed entry refuses startup) |
 | `KERP_STORAGE_BUCKET`, `KERP_S3_ENDPOINT_URL`, `KERP_S3_PUBLIC_ENDPOINT_URL`, `KERP_S3_ACCESS_KEY_ID`, `KERP_S3_SECRET_ACCESS_KEY`, `KERP_UPLOAD_*`, `KERP_DOWNLOAD_URL_SECONDS` | see `app/modules/uploads/README.md` | Object storage (S3 / MinIO) and upload limits |
+| `KERP_FIRST_ADMIN_EMAIL` | unset | Only read by the first-run command (`app/modules/onboarding/README.md`): the first System admin's e-mail when `--admin-email` is not given |
 | `KERP_ACCESS_REQUEST_COOLDOWN_HOURS` | `24` | Hours after a rejected access request before the same user may ask for the same project again (409 `ACCESS_REQUEST_COOLDOWN` before that); `0` disables the cooldown (`app/modules/access_requests/README.md`, diff §4.1) |
 | `KERP_S3_REGION` | `ap-southeast-2` | S3 region, set per deployment (TD-171 decision 13a, diff §4.4); MinIO ignores it |
 | `KERP_AWS_REGION` | `ap-southeast-2` | The deployment region (diff §4.4): the SES client and the SNS certificate host check read it |
