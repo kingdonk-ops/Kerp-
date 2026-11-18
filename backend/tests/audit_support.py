@@ -14,20 +14,22 @@ from alembic.config import Config
 from sqlalchemy import create_engine, text
 
 from app.core.db import Database
-from tests.db_support import ON_POSTGRES, database_url
+from tests.db_support import FIXTURE_TENANTS, ON_POSTGRES, database_url, seed_tenants
 
 ALEMBIC_INI = Path(__file__).resolve().parents[1] / "alembic.ini"
 OWNER_URL = os.environ.get("KERP_TEST_OWNER_URL", "")
 
 
 def migrated_database(tmp_path: Path) -> Iterator[Database]:
-    """Upgrade to head, hand out a ``Database``, downgrade to base afterwards."""
+    """Upgrade to head, seed the fixture tenants' directory rows, hand out a ``Database``,
+    downgrade to base afterwards."""
     url = database_url(tmp_path)
     cfg = Config(str(ALEMBIC_INI))
     cfg.attributes.update(url=url, configure_logger=False)
     command.upgrade(cfg, "head")
     db = Database(url)
     try:
+        seed_tenants(db, *FIXTURE_TENANTS)
         yield db
     finally:
         db.dispose()

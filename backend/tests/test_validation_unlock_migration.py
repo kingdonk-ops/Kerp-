@@ -23,7 +23,7 @@ from app.modules.validation import service as rule_store
 from app.modules.validation.defaults import SeedRuleSet
 from app.modules.validation.models import Rule, RuleSet, UnlockRequest
 from tests.audit_support import ALEMBIC_INI
-from tests.db_support import database_url
+from tests.db_support import database_url, seed_tenants
 from tests.tenancy_support import T1
 
 QD = uuid.UUID("00000000-0000-4000-8000-00000000d013")
@@ -40,6 +40,7 @@ def migrated(tmp_path: Path) -> Iterator[tuple[Config, Database]]:
     command.upgrade(cfg, "head")
     db = Database(database_url(tmp_path))
     try:
+        seed_tenants(db, T1)
         yield cfg, db
     finally:
         db.dispose()

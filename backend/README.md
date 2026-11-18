@@ -12,7 +12,7 @@ FastAPI modular monolith (see `docs/spec/` and `CLAUDE.md` §6).
 | `migrations/`, `alembic.ini` | Alembic (URL from settings, metadata from every module's `models.py`) |
 | `app/api/health.py` | `GET /health` liveness endpoint |
 | `app/core/body_limit.py` | App-wide request body limit (`KERP_MAX_BODY_BYTES`, 413) |
-| `app/core/tenancy/` | Project-scoped RLS, tenancy context, ORM scope + soft-delete filter — see its `README.md` |
+| `app/core/tenancy/` | Project-scoped RLS, tenancy context, ORM scope + soft-delete filter, the `tenants` directory + provisioning (`python -m app.core.tenancy.provision`) — see its `README.md` |
 | `app/core/cel/` | CEL rule evaluation (celpy, lazy) with the KERP error taxonomy — see its `README.md` |
 | `app/core/audit/` | Hash-chained, append-only audit ledger (`append`, `verify_chain`; REVOKE + triggers) — see its `README.md` |
 | `app/core/auth/` | Users, scrypt passwords, EdDSA/RS256 JWTs + JWKS, rotating refresh, Redis `jti` revocation — see its `README.md` |
@@ -166,7 +166,9 @@ A production container (the image default) needs:
 
 - `KERP_DEFAULT_TENANT_ID`: the deployment's one tenant (T-0037). **Startup fails fast without
   it**: the app exits before serving `/health`. CI's smoke test checks both that and a start with
-  a synthetic tenant id.
+  a synthetic tenant id. With `KERP_DATABASE_URL` set, start-up also creates the tenant's
+  directory row if it is missing (idempotent; run the migrations first; T-0079,
+  `docs/deploy/tenants.md`).
 - A JWT signing key (`KERP_JWT_PRIVATE_KEY` or `KERP_JWT_PRIVATE_KEY_FILE`) and
   `KERP_REDIS_URL`: checked when auth is first used, not at startup (`/health` needs neither).
 - `KERP_WEB_ORIGIN` when the SPA is served from a different origin than the API. Unset, the

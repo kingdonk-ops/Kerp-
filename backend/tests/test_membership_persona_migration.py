@@ -19,7 +19,7 @@ from app.core.db import GUID, Database, JSONType
 from app.core.tenancy.context import TenancyContext
 from tests.audit_support import ALEMBIC_INI
 from tests.auth_support import ALICE, BOB, T1, revoke_project_viewers, seed_user
-from tests.db_support import database_url
+from tests.db_support import database_url, seed_tenants
 from tests.tenancy_support import PA, PB
 
 TENANT = TenancyContext(tenant_id=T1, is_system_admin=True)  # reads every membership (T-0014)
@@ -32,6 +32,7 @@ def migrated(tmp_path: Path) -> Iterator[tuple[Config, Database]]:
     command.upgrade(cfg, "head")
     db = Database(database_url(tmp_path))
     try:
+        seed_tenants(db, T1)
         yield cfg, db
     finally:
         revoke_project_viewers(db)  # the 0012 downgrade refuses while they are active
