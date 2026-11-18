@@ -22,6 +22,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError
 
+from app import main as app_main
 from app.core.audit.service import chain_entries
 from app.core.auth import access, memberships, team_grants
 from app.core.auth.access import (
@@ -551,29 +552,47 @@ def test_deactivated_members_keep_their_rows_and_regain_access_on_reactivation(
 # --- startup check --------------------------------------------------------------------------
 
 
-def _start(tmp_path: Path) -> None:
+class _WithoutTeams:
+    """The module registry as start-up sees it, minus the teams module (T-0013 ships it, so
+    a deployment without it is simulated)."""
+
+    def __init__(self, registry: Any) -> None:
+        self._names = tuple(n for n in registry.names() if n != team_grants.TEAMS_MODULE)
+
+    def names(self) -> tuple[str, ...]:
+        return self._names
+
+
+def _start(tmp_path: Path, monkeypatch: pytest.MonkeyPatch | None = None) -> None:
+    """Start the app; with ``monkeypatch`` as if the teams module were not loaded."""
+    if monkeypatch is not None:
+        real = app_main.registry_of
+        monkeypatch.setattr(app_main, "registry_of", lambda a: _WithoutTeams(real(a)))
     app, _runtime = auth_app(make_settings(database_url=database_url(tmp_path)))
     try:
         with TestClient(app) as client:
             assert client.get("/health").status_code == 200
     finally:
         app.state.db.dispose()  # a refused start-up never reaches the lifespan's dispose
+        if monkeypatch is not None:
+            monkeypatch.undo()
 
 
 def test_startup_refuses_live_derived_rows_without_the_teams_module(
-    tmp_path: Path, db: Database
+    tmp_path: Path, db: Database, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    _start(tmp_path)  # no derived rows: starts
+    _start(tmp_path, monkeypatch)  # no derived rows: starts
     [alice] = _users(db, ALICE)
     _sync(db, [alice])
     assert live_team_link_grant_count(db) == 1
     with pytest.raises(OrphanedTeamGrantsError, match="revoke_team_link_grants"):
-        _start(tmp_path)
+        _start(tmp_path, monkeypatch)
+    _start(tmp_path)  # the teams module is loaded (T-0013): it maintains them, so it starts
     check_team_grants_at_startup(db, ("projects", team_grants.TEAMS_MODULE))  # loaded: fine
     check_team_grants_at_startup(None, ())
     _revoke(db)
     assert live_team_link_grant_count(db) == 0
-    _start(tmp_path)
+    _start(tmp_path, monkeypatch)
 
 
 def test_the_count_is_zero_on_a_schema_without_source_columns(tmp_path: Path) -> None:

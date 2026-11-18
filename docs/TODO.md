@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 221 · **Closed:** 130
+**Open:** 223 · **Closed:** 130
 
 ## decision (8)
 
@@ -18,7 +18,7 @@
 | [TD-340](../tracker/todo/TD-340.md) | Mail planner defaults to confirm: only permanent bounces and complaints suppress; recipient locale falls back to KERP_MAIL_DEFAULT_LOCALE (users have no locale yet); send_mail takes the caller's session | T-0058 | implementer |
 | [TD-348](../tracker/todo/TD-348.md) | T-0073: deleting a project with team-derived members answers 409 (unlink teams first); T-0013 to confirm or cascade | T-0073 | implementer |
 
-## spec-gap (39)
+## spec-gap (40)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -61,6 +61,7 @@
 | [TD-312](../tracker/todo/TD-312.md) | Override binding and routing defaults (T-0035): which values are 'checked', who the approver user is | T-0035 | implementer |
 | [TD-319](../tracker/todo/TD-319.md) | Active-requests panel: a pending request hides the older decided request of the same project (diff §4.1 reads 'every pending plus the latest decided per project') | T-0050 | implementer |
 | [TD-347](../tracker/todo/TD-347.md) | T-0073: 'PUT/DELETE on a derived row returns 409' read for the per-user member API | T-0073 | implementer |
+| [TD-356](../tracker/todo/TD-356.md) | teams RLS read scope: T-0013 lists bound + allowed projects; implemented with app.member_project_ids too (membership pattern) | T-0013 | implementer |
 
 ## missed (7)
 
@@ -113,7 +114,7 @@
 | [TD-322](../tracker/todo/TD-322.md) | Entra ID SSO: certificate (client assertion) credentials for the code redemption instead of the client secret | T-0054 | implementer |
 | [TD-336](../tracker/todo/TD-336.md) | Mail: settle send-log rows stuck in queued (enqueue failed or Redis payload lost); no re-enqueue is possible because the payload (with the link token) is never persisted | T-0058 | implementer |
 
-## later (100)
+## later (101)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -217,6 +218,7 @@
 | [TD-351](../tracker/todo/TD-351.md) | Member-admin UI must PUT only source=direct grants; round-tripping the full member list would silently turn team-derived grants into individual rows | T-0026 | reviewer |
 | [TD-352](../tracker/todo/TD-352.md) | Perf harness before hard gate: discard a warm-up mount (runs 2-5 measure warm JIT/CEL cache) and fail on not_measured for budgets whose task is done | T-0146 | reviewer |
 | [TD-354](../tracker/todo/TD-354.md) | Magic-link post-response task runs in the API process: move it to the SAQ interactive queue if losing a request on an API crash matters | T-0057 | implementer |
+| [TD-357](../tracker/todo/TD-357.md) | admin module depends on teams (team-name fill-in): removing the teams module tenant-wide also needs that dependency made optional | T-0013 | implementer |
 
 ## bug (5)
 

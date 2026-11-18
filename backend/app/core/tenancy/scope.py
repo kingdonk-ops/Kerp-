@@ -26,7 +26,11 @@ same on SQLite (where it is the only filter) and on PostgreSQL (where RLS backs 
   written by ``is_system_admin`` sessions only. An ``access_request`` row (T-0050) is
   visible to its requester, to the PER-09 holders of its project
   (``TenancyContext.admin_project_ids``) and to ``is_system_admin`` sessions; only the
-  requester inserts one and nobody deletes one.
+  requester inserts one and nobody deletes one. A ``team`` row (T-0013) is visible when its
+  team has a live link to a project in ``described_project_ids`` or the caller is a live
+  member of it (an ``EXISTS`` on the policy's link and member tables, read as plain tables so
+  no criteria recurse), or the session is ``is_system_admin``; only ``is_system_admin``
+  sessions write team rows.
 
 An unbound session is not filtered here. On PostgreSQL RLS then shows it nothing.
 ORM bulk ``update()``/``delete()`` statements skip both the loader criteria and the flush
@@ -39,7 +43,18 @@ from __future__ import annotations
 import uuid
 from typing import Any, Final
 
-from sqlalchemy import ColumnElement, and_, event, false, inspect, or_
+from sqlalchemy import (
+    ColumnElement,
+    and_,
+    column,
+    event,
+    exists,
+    false,
+    inspect,
+    or_,
+    select,
+    table,
+)
 from sqlalchemy.orm import (
     Mapped,
     ORMExecuteState,
@@ -104,6 +119,8 @@ def _policy_allows(context: TenancyContext, record: object) -> bool:
         and getattr(record, owner) == context.user_id
     ):
         return True
+    if policy.kind == "team":
+        return True  # needs a query: ``_team_allows``
     if policy.kind == "admin_grant" or policy.project_column is None:
         return False
     project = getattr(record, policy.project_column)
@@ -112,10 +129,67 @@ def _policy_allows(context: TenancyContext, record: object) -> bool:
     return project in context.described_project_ids
 
 
+def _team_clauses(
+    team_id: object, policy: RlsPolicy, context: TenancyContext
+) -> list[ColumnElement[bool]]:
+    """``team_id`` (a column or a value) belongs to a team the session sees (``team`` policy,
+    mirrors ``rls.team_visible_sql``). Plain tables, so no loader criteria apply inside."""
+    if policy.link_table is None or policy.member_table is None:
+        return []
+    clauses: list[ColumnElement[bool]] = []
+    described = sorted(context.described_project_ids)
+    if described:
+        link = table(
+            policy.link_table,
+            column("team_id", GUID()),
+            column("linked_project_id", GUID()),
+            column("tenant_id", GUID()),
+            column("deleted_at"),
+        )
+        clauses.append(
+            exists().where(
+                link.c.team_id == team_id,
+                link.c.tenant_id == context.tenant_id,
+                link.c.deleted_at.is_(None),
+                link.c.linked_project_id.in_(described),
+            )
+        )
+    if context.user_id is not None:
+        member = table(
+            policy.member_table,
+            column("team_id", GUID()),
+            column("user_id", GUID()),
+            column("tenant_id", GUID()),
+            column("deleted_at"),
+        )
+        clauses.append(
+            exists().where(
+                member.c.team_id == team_id,
+                member.c.tenant_id == context.tenant_id,
+                member.c.deleted_at.is_(None),
+                member.c.user_id == context.user_id,
+            )
+        )
+    return clauses
+
+
+def _team_allows(session: Session, context: TenancyContext, record: object) -> bool:
+    """Whether a loaded ``team`` row is visible (one query; system admins see all)."""
+    policy = _policy_of(type(record))
+    if policy is None or policy.kind != "team" or context.is_system_admin:
+        return True
+    if policy.team_column is None:
+        return False
+    clauses = _team_clauses(getattr(record, policy.team_column), policy, context)
+    return bool(clauses) and bool(session.scalar(select(or_(*clauses))))
+
+
 def _policy_criteria(
     cls: type[Any], policy: RlsPolicy, context: TenancyContext
 ) -> ColumnElement[bool]:
     clauses: list[ColumnElement[bool]] = []
+    if policy.kind == "team" and policy.team_column is not None:
+        clauses.extend(_team_clauses(getattr(cls, policy.team_column), policy, context))
     if policy.owner_column is not None and context.user_id is not None:
         clauses.append(getattr(cls, policy.owner_column) == context.user_id)
     if policy.kind == "membership" and policy.project_column is not None:
@@ -141,6 +215,7 @@ def is_visible(session: Session, record: BaseRecordMixin, *, include_deleted: bo
         and (record.project_id is None or record.project_id in context.readable_project_ids)
         and _site_allows(context, record)
         and _policy_allows(context, record)
+        and _team_allows(session, context, record)
     )
 
 
@@ -236,7 +311,7 @@ def _guard_writes(session: Session, flush_context: UOWTransaction, instances: ob
         policy = _policy_of(type(obj))
         if policy is None:
             continue
-        if policy.kind == "admin_grant" and not context.is_system_admin:
+        if policy.kind in ("admin_grant", "team") and not context.is_system_admin:
             raise OutOfScopeError(f"{type(obj).__name__} not found")
         if policy.source_column is not None and not context.is_system_admin:
             # Derived (non-direct) membership rows: system admins only (mirrors RLS, T-0073).

@@ -138,7 +138,7 @@ class MemberGrantRead(GrantRead):
     )
     source_id: uuid.UUID | None = Field(description="The team link id of a team-derived grant")
     team_name: str | None = Field(
-        description="The team's name (null until the teams module fills it in, T-0013)"
+        description="The team's name of a team-derived grant (teams service, T-0013)"
     )
 
 

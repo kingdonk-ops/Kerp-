@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 64/172 tasks done (37%) · **ready now:** 19 · **epics awaiting breakdown:** 47
+**Overall:** 64/172 tasks done (37%) · **ready now:** 18 · **epics awaiting breakdown:** 47
 
 | Phase | Tasks done | Progress |
 |---|---|---|
@@ -53,7 +53,7 @@
 | ✅ | [T-0073](../tracker/tasks/T-0073.md) | Team-derived project grants in core auth: membership rows keyed by source (direct \| team_link), sync/revoke API, load_grants union, PER-09 sees but cannot edit team rows | identity | M | T-0010, T-0014, T-0076 | #119 |
 | ✅ | [T-0076](../tracker/tasks/T-0076.md) | PER-16 Project Viewer persona: Viewer tier (V only), single-project scope, in the core persona/capability model and membership CHECK | identity | S | T-0010 | #76 |
 | ✅ | [T-0079](../tracker/tasks/T-0079.md) | Tenants directory table + tenant_id FK on every table (ADR) | platform | M | T-0014 | #121 |
-| ▶ | [T-0013](../tracker/tasks/T-0013.md) | teams module: tenant-level teams, team membership, team-project links with a role, team service contract | teams | M | T-0010, T-0011, T-0012, T-0014, T-0073 |  |
+| 🟦 | [T-0013](../tracker/tasks/T-0013.md) | teams module: tenant-level teams, team membership, team-project links with a role, team service contract | teams | M | T-0010, T-0011, T-0012, T-0014, T-0073 |  |
 | ✅ | [T-0015](../tracker/tasks/T-0015.md) | SAQ worker + Redis + jobs module (enqueue/status/poll), interactive+batch priority queues | jobs | M | T-0003, T-0011 | #40 |
 | ⬜ | [T-0075](../tracker/tasks/T-0075.md) | teams reconcile: full-tuple comparison of team-derived grants against the teams tables, orphan link ids, --fix | teams | S | T-0013, T-0073 |  |
 | ✅ | [T-0016](../tracker/tasks/T-0016.md) | Storage service + presigned uploads (presign/complete, sha256 verify, scan stub, orphan sweep) | uploads | M | T-0015 | #49 |

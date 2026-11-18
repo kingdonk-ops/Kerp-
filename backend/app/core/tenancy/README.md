@@ -53,6 +53,14 @@ leftover standard policy as unexpected), and the ORM scope (`scope.py`) mirrors 
 | `membership` (`membership_{read,insert,update,delete}_policy`) | `oe_projects_project` (project = `id`), `auth_project_membership` (project = `member_project_id`, owner = `user_id`) | the described project is `app.current_project_id`, in `app.allowed_project_ids` or `app.member_project_ids`, or `app.is_system_admin`; or the row's owner is `app.current_user_id` | exact scope | exact scope **and** readable (old and new row) |
 | `admin_grant` (`admin_grant_{read,write}_policy`) | `oe_admin_grant` | own rows (`user_id = app.current_user_id`) or `app.is_system_admin` | `app.is_system_admin` + exact scope | `app.is_system_admin` + exact scope |
 | `access_request` (`access_request_{read,insert,update}_policy`; T-0050) | `oe_access_requests_request` (project = `requested_project_id`, owner = `requester_id`) | own rows, rows of a project in `app.admin_project_ids` (the caller's PER-09 projects), or `app.is_system_admin` | exact scope **and** own row | exact scope **and** readable (old and new row); no DELETE policy: nobody deletes |
+| `team` (`team_{read,write}_policy`; T-0013) | `oe_teams_team` (team = `id`), `oe_teams_member`, `oe_teams_project_link` (team = `team_id`) | `app.is_system_admin`, or the row's team is in `kerp_visible_team_ids()`: it has a live link to the bound project, one in `app.allowed_project_ids` or `app.member_project_ids`, or a live membership of `app.current_user_id` (a link row also by its own project, a member row by its own user) | `app.is_system_admin` + exact scope | `app.is_system_admin` + exact scope |
+
+`kerp_visible_team_ids()` (migration `0028`) is an invoker-rights function: a policy on the
+link or member table cannot query its own table, so the policies call it instead. It raises
+`app.team_lookup` transaction-locally for its own two reads and restores the caller's value;
+while the flag is raised the read policies skip the function call (`CASE`), so nothing
+recurses. The flag can only hide rows, so a session that sets it sees less, never more. The
+ORM scope mirrors the rule with `EXISTS` subqueries on the link and member tables.
 
 So a client-portal user who is a member of project A reads A's project row and memberships but
 not B's (404); a plain tenant-level session (no user, no flag) reads no project row at all; a
