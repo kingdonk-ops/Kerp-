@@ -10,9 +10,10 @@ Core-table change covered by ADR 0011 (master spec §1.1, CLAUDE.md §6).
   ``KERP_DEFAULT_TENANT_ID`` when it is set (idempotent: ``ON CONFLICT DO NOTHING``). On
   PostgreSQL the read runs with ``FORCE ROW LEVEL SECURITY`` lifted (as in ``0012``), because
   the migration role owns the tables and would otherwise see no rows; it is forced again in
-  the same transaction, before the foreign keys are added.
+  the same transaction, before the foreign keys are added. The ``FORCE`` toggle holds an
+  ``ACCESS EXCLUSIVE`` lock on each table until this revision commits (ADR 0011).
 * ``fk_<table>_tenant_id_tenants`` on every table carrying ``tenant_id``. On PostgreSQL it is
-  added ``NOT VALID`` (no scan of existing rows, so only a brief lock); revision ``0027``
+  added ``NOT VALID`` (no per-row check of existing rows); revision ``0027``
   validates it in its own transaction (``env.py`` commits per revision). On SQLite the
   tables are rebuilt in batch mode (online only; ``--sql`` output for SQLite skips them).
 

@@ -40,7 +40,11 @@ added later adds to the cost, so it is done early in phase 0.
      with `NOT VALID` on PostgreSQL: no scan, only a brief `SHARE ROW EXCLUSIVE` lock. The
      backfill read lifts `FORCE ROW LEVEL SECURITY` for the owner inside the transaction and
      restores it before the FKs are added (as `0012`/`0020`/`0025` do), because the migration
-     role owns the tables and otherwise would see no rows. The table list is fixed in the
+     role owns the tables and otherwise would see no rows. Lifting `FORCE` takes an
+     `ACCESS EXCLUSIVE` lock on each table until `0026` commits, so `0026` holds it for the
+     backfill read of the `tenant_id` values (one indexed column per table, no per-row FK
+     check). Accepted: phase 0, one tenant per deployment, no populated production database yet;
+     the per-row check itself (`VALIDATE`) runs in `0027` without that lock. The table list is fixed in the
      revision (not reflected), so `--sql` output is identical; on SQLite (the fast test
      backend only) the tables are rebuilt in batch mode, online only.
    - `0027` runs `VALIDATE CONSTRAINT` on every not-yet-valid FK to `tenants`

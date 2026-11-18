@@ -17,7 +17,8 @@ ADR 0011). A deployment has one hidden tenant (diff §4.1), `KERP_DEFAULT_TENANT
 
 ## Upgrading a populated database to `0026`/`0027`
 
-`0026` adds the foreign keys `NOT VALID` (brief locks, no scan); `0027` validates them
+`0026` adds the foreign keys `NOT VALID` (no per-row check; it reads each table's `tenant_id`
+once for the backfill, under the lock its RLS toggle takes, see ADR 0011); `0027` validates them
 (`SHARE UPDATE EXCLUSIVE`: reads and writes continue). Each revision commits on its own. On a
 large database run them as two steps, so the validation scan can be scheduled separately:
 
