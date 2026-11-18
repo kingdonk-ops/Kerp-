@@ -7,9 +7,11 @@ delete re-syncs the derived project grants of each affected link through
 ``app.core.auth.team_grants`` (T-0073) in the same transaction. The sync is always fed
 **every live member of the team, whatever their account status**: a deactivated member keeps
 their derived rows (they grant nothing while the account cannot sign in) and gets the access
-back on reactivation with no re-sync. Each change is audited on chain ``team:<id>`` with the
-actor; an idempotent no-op writes nothing. The derived-row changes are audited by core on
-``membership:<project>``.
+back on reactivation with no re-sync. A link whose project has been deleted (an empty team's
+link does not stop the delete) is never synced: any rows it holds are revoked, and it stays
+removable by ``unlink`` (README, "Derived access"). Each change is audited on chain
+``team:<id>`` with the actor; an idempotent no-op writes nothing. The derived-row changes
+are audited by core on ``membership:<project>``.
 
 **Separation of duties** (ADR 0008): a change that would give a hold-authority persona
 (PER-02, PER-06, PER-07, PER-11) on a linked project to a user who holds individual PER-09
@@ -312,9 +314,32 @@ def update_team(
     return team
 
 
+def _live_project_links(
+    session: Session, links: Collection[TeamProjectLink]
+) -> list[TeamProjectLink]:
+    """The links whose project is live. Writes run in ``system_admin`` sessions, which see
+    every live project of the tenant, so a link missing here points at a deleted project."""
+    live = {p.id for p in projects.list_projects(session, {k.linked_project_id for k in links})}
+    return [link for link in links if link.linked_project_id in live]
+
+
+def _sync_links(session: Session, links: Collection[TeamProjectLink], *, confirm_sod: bool) -> None:
+    """Re-sync ``links``: a link to a live project from its team's members, a link to a
+    deleted project (an empty team's link does not stop the delete) only has whatever rows it
+    still holds revoked. Such a link confers nothing; it stays until unlinked or the team is
+    deleted (both still work)."""
+    live = {link.id for link in _live_project_links(session, links)}
+    for link in links:
+        if link.id in live:
+            _sync(session, link, confirm_sod=confirm_sod)
+        else:
+            team_grants.revoke_team_link_grants(session, link_id=link.id)
+
+
 def _sync(session: Session, link: TeamProjectLink, *, confirm_sod: bool) -> None:
-    """Re-sync the derived grants of ``link`` from every live member of its team, whatever
-    their account status (ADR 0008). Accounts that no longer exist cannot hold access."""
+    """Re-sync the derived grants of ``link`` (to a live project) from every live member of
+    its team, whatever their account status (ADR 0008). Accounts that no longer exist cannot
+    hold access."""
     members = _live_members(session, [link.team_id])[link.team_id]
     existing = set(users.users_by_id(session, members))
     team_grants.sync_team_link_grants(
@@ -385,9 +410,9 @@ def add_member(
     if user_id in _live_members(session, [team.id])[team.id]:
         return False
     links = _links(session, [team.id])
-    sod_projects = [
+    sod_projects = [  # a deleted project's link confers nothing, so it never triggers SoD
         link.linked_project_id
-        for link in links
+        for link in _live_project_links(session, links)
         if _is_hold(link.persona) and user_id in _individual_admins(session, link.linked_project_id)
     ]
     if sod_projects and not confirm_sod:
@@ -403,8 +428,7 @@ def add_member(
         )
     )
     session.flush()
-    for link in links:
-        _sync(session, link, confirm_sod=confirm_sod)
+    _sync_links(session, links, confirm_sod=confirm_sod)
     payload: dict[str, Any] = {
         "action": "member_add",
         "user_id": str(user_id),
@@ -429,8 +453,7 @@ def remove_member(
     row.soft_delete()
     row.updated_by = actor_id
     session.flush()
-    for link in _links(session, [team.id]):
-        _sync(session, link, confirm_sod=False)
+    _sync_links(session, _links(session, [team.id]), confirm_sod=False)
     _audit(session, team.id, {"action": "member_remove", "user_id": str(user_id)}, actor_id)
     return True
 
@@ -510,11 +533,12 @@ def unlink(
     session: Session, team_id: uuid.UUID, project_id: uuid.UUID, *, actor_id: uuid.UUID | None
 ) -> bool:
     """Remove the team's link to the project and revoke its derived grants (``False`` when the
-    team is not linked there). A deleted or other-tenant project is ``OutOfScopeError``."""
+    team is not linked there). A live link is removable even when its project has been deleted
+    since; without one, a deleted or other-tenant project is ``OutOfScopeError``."""
     team = get_team(session, team_id)
-    projects.get_project(session, project_id)
     link = _live_link(session, team.id, project_id)
     if link is None:
+        projects.get_project(session, project_id)
         return False
     team_grants.revoke_team_link_grants(session, link_id=link.id)
     link.soft_delete()

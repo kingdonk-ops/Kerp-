@@ -61,7 +61,7 @@ The ORM scope mirrors it on SQLite.
 | `PUT /{team}/members/{user}` | `system_admin` | add (idempotent, 204); body `{confirm_sod?}` optional. Unknown, deactivated or other-tenant user: 422, always the same body |
 | `DELETE /{team}/members/{user}` | `system_admin` | remove (204; not a member: no-op) |
 | `PUT /{team}/projects/{p}` | `system_admin` | `{persona, site_node_id?, confirm_sod?}`: link or re-role (idempotent when unchanged); deleted / other-tenant project 404 |
-| `DELETE /{team}/projects/{p}` | `system_admin` | unlink (204; not linked: no-op); deleted / other-tenant project 404 |
+| `DELETE /{team}/projects/{p}` | `system_admin` | unlink (204; not linked: no-op). A live link is removable even after its project was deleted; with no link, a deleted / other-tenant project is 404 |
 
 A non-admin gets 403 on a write to a team they can see, 404 on one they cannot. The project
 routes bind the path project like `uploads` (`projects.bind_project`, until TD-122). No
@@ -85,6 +85,18 @@ create/re-role/remove and team delete calls `app.core.auth.team_grants.sync_team
 deactivated member keeps their derived rows (a deactivated account cannot sign in, so they
 grant nothing) and gets the access back on reactivation with no re-sync. Only the read
 contract below filters to active accounts. An individual membership is never touched.
+
+**Links to a deleted project confer nothing.** Deleting a project is refused while team-derived
+rows exist on it (`memberships.revoke_project`), but an *empty* team's link does not stop it,
+so a link can outlive its project. Every sync checks each link's project through
+`projects.list_projects` (writes are `system_admin` sessions, which see every live project of
+the tenant): a link to a deleted project is **never synced**; any rows it still holds are
+revoked instead, and it never triggers the SoD check. The link itself stays until a system
+admin unlinks it (`DELETE /{team}/projects/{p}` still answers 204 and audits `link_remove`)
+or the team is deleted. Until then `GET /{team}` lists it and `project_count` counts it: the
+reads cannot tell a deleted project from one the caller may not see (a member sees every link
+of their team), so they do not filter by project. Removing such links at project delete is
+TD-358.
 
 ## Audit
 

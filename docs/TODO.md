@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 223 · **Closed:** 130
+**Open:** 225 · **Closed:** 130
 
 ## decision (8)
 
@@ -114,7 +114,7 @@
 | [TD-322](../tracker/todo/TD-322.md) | Entra ID SSO: certificate (client assertion) credentials for the code redemption instead of the client secret | T-0054 | implementer |
 | [TD-336](../tracker/todo/TD-336.md) | Mail: settle send-log rows stuck in queued (enqueue failed or Redis payload lost); no re-enqueue is possible because the payload (with the link token) is never persisted | T-0058 | implementer |
 
-## later (101)
+## later (103)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -219,6 +219,8 @@
 | [TD-352](../tracker/todo/TD-352.md) | Perf harness before hard gate: discard a warm-up mount (runs 2-5 measure warm JIT/CEL cache) and fail on not_measured for budgets whose task is done | T-0146 | reviewer |
 | [TD-354](../tracker/todo/TD-354.md) | Magic-link post-response task runs in the API process: move it to the SAQ interactive queue if losing a request on an API crash matters | T-0057 | implementer |
 | [TD-357](../tracker/todo/TD-357.md) | admin module depends on teams (team-name fill-in): removing the teams module tenant-wide also needs that dependency made optional | T-0013 | implementer |
+| [TD-358](../tracker/todo/TD-358.md) | Teams: remove team-project links when their project is deleted (projects delete hook), so GET /teams/{team} and project_count stop showing them | T-0013 | implementer |
+| [TD-359](../tracker/todo/TD-359.md) | PER-07 site_node_id is not checked against the project's breakdown (team link PUT and admin member PUT) | T-0013 | implementer |
 
 ## bug (5)
 

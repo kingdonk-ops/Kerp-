@@ -474,6 +474,72 @@ def test_unlinking_or_deleting_the_team_takes_access_away_but_never_individual_r
         assert live == []
 
 
+def _team_link_rows(db: Database, project: uuid.UUID) -> list[ProjectMembership]:
+    with db.unit_of_work(ROOT) as s:
+        return list(
+            s.scalars(
+                select(ProjectMembership).where(
+                    ProjectMembership.source_type == SOURCE_TEAM_LINK,
+                    ProjectMembership.member_project_id == project,
+                )
+            )
+        )
+
+
+def test_a_link_to_a_deleted_project_confers_nothing_and_can_still_be_removed(
+    api: Api,
+) -> None:
+    """Review round 1: an empty team's link does not stop a project delete; later member
+    adds/removes must not create rows on the deleted project, and the link stays removable."""
+    erin, frank = api.users[ERIN], api.users[FRANK]
+    team = api.team()
+    assert api.link(team, api.third, "PER-04").status_code == 200
+    assert api.link(team, api.home, "PER-05").status_code == 200
+    with api.db.unit_of_work(ROOT) as s:
+        projects.delete_project(s, api.third, actor_id=None)
+    assert api.add(team, ERIN).status_code == 204
+    assert _team_link_rows(api.db, api.third) == []
+    assert _grants(api.db, erin) == {(api.home, Persona.AREA_PLANNER)}  # the live link only
+    assert api.add(team, FRANK).status_code == 204
+    assert api.call("DELETE", f"/{team}/members/{frank}").status_code == 204
+    assert _team_link_rows(api.db, api.third) == []
+    assert not any(project == api.third for project, _ in _grants(api.db, frank))
+    # The dangling link is still removable (204), audited, and then gone.
+    assert api.call("DELETE", f"/{team}/projects/{api.third}").status_code == 204
+    removed = [e for e in api.chain(team) if e["action"] == "link_remove"]
+    assert [e["project_id"] for e in removed] == [str(api.third)]
+    assert [link["project_id"] for link in api.call("GET", f"/{team}").json()["links"]] == [
+        str(api.home)
+    ]
+    # Unlinked now: the deleted project is 404 again, like one that was never linked.
+    assert api.call("DELETE", f"/{team}/projects/{api.third}").status_code == 404
+    assert _grants(api.db, erin) == {(api.home, Persona.AREA_PLANNER)}
+
+
+@pytest.mark.parametrize("via", ["member_add", "unlink"])
+def test_rows_left_on_a_deleted_project_are_revoked(api: Api, via: str) -> None:
+    """Rows a link still holds on a deleted project (written before this fix) are revoked by
+    the next sync of the team, never refreshed, or by unlinking it."""
+    erin = api.users[ERIN]
+    team = api.team()
+    api.add(team, ERIN)
+    api.link(team, api.third, "PER-04")
+    with api.db.unit_of_work(ROOT) as s:
+        (row,) = (r for r in s.scalars(select(ProjectMembership)) if r.user_id == erin)
+        row.soft_delete()  # let the project delete through, then bring the row back
+        s.flush()
+        projects.delete_project(s, api.third, actor_id=None)
+        row.deleted_at = None
+    assert len(_team_link_rows(api.db, api.third)) == 1
+    if via == "member_add":
+        assert api.add(team, FRANK).status_code == 204
+    else:
+        assert api.call("DELETE", f"/{team}/projects/{api.third}").status_code == 204
+        assert [e["action"] for e in api.chain(team)][-1] == "link_remove"
+    assert _team_link_rows(api.db, api.third) == []
+    assert _grants(api.db, erin) == set()
+
+
 def test_a_deactivated_member_keeps_their_rows_and_regains_access_on_reactivation(
     api: Api,
 ) -> None:
