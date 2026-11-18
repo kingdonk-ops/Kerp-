@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 218 · **Closed:** 130
+**Open:** 219 · **Closed:** 130
 
 ## decision (8)
 
@@ -227,7 +227,7 @@
 | [TD-330](../tracker/todo/TD-330.md) | scripts/pr_suggestions.py rebuild fails in cloud sessions: gh api --paginate follows numeric-ID repository Link URLs that the agent proxy rejects (HTTP 403); paginate with explicit repos/{owner}/{repo} page params | — | coordinator |
 | [TD-339](../tracker/todo/TD-339.md) | jobs LoopDispatcher.drain can spin forever when the commit ran on the loop's own thread (finished tasks stay in the set until their done callbacks run) | T-0058 | implementer |
 
-## risk (26)
+## risk (27)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -257,6 +257,7 @@
 | [TD-342](../tracker/todo/TD-342.md) | SNS endpoint /api/v1/mail/ses-events fetches an uncached certificate per new SigningCertURL path before the signature check (outbound-GET amplification for anyone knowing the topic ARN) | T-0058 | reviewer |
 | [TD-346](../tracker/todo/TD-346.md) | NFR perf job timings on shared GitHub runners are noisy (form open median ~0.3 s locally at 4x throttle); before T-0146 makes it a hard gate, decide on retries/headroom or a dedicated runner and keep a trend of perf-results.json | T-0045, T-0146 | implementer |
 | [TD-349](../tracker/todo/TD-349.md) | T-0073: census read policy on auth_project_membership is opened by the app.team_link_census setting | T-0073 | implementer |
+| [TD-353](../tracker/todo/TD-353.md) | 0026 holds ACCESS EXCLUSIVE on every tenant-scoped table during the tenants backfill (FORCE RLS toggle); revisit before any populated deployment | T-0079 | implementer |
 
 ## Closed
 

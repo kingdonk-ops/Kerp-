@@ -198,6 +198,40 @@ def test_ensure_tenant_is_idempotent(db: Database) -> None:
     assert _tenant_ids(db, TenancyContext(tenant_id=T1)) == [T1]
 
 
+def test_ensure_tenant_survives_a_concurrent_provisioning(
+    db: Database, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Two processes starting at once: the loser's insert conflicts and it reports 'present'."""
+    real_exists = provision._exists
+    calls: list[uuid.UUID] = []
+
+    def racing_exists(session: Session, tenant_id: uuid.UUID) -> bool:
+        calls.append(tenant_id)
+        if len(calls) == 1:  # the other process inserts right after our first look
+            assert ensure_tenant_without_race(db, tenant_id)
+            return False
+        return real_exists(session, tenant_id)
+
+    def ensure_tenant_without_race(database: Database, tenant_id: uuid.UUID) -> bool:
+        with monkeypatch.context() as patch:
+            patch.setattr(provision, "_exists", real_exists)
+            return ensure_tenant(database, tenant_id)
+
+    monkeypatch.setattr(provision, "_exists", racing_exists)
+    assert ensure_tenant(db, T1) is False
+    assert calls == [T1, T1]  # looked, lost the race, looked again
+    assert _tenant_ids(db, TenancyContext(tenant_id=T1)) == [T1]
+
+
+def test_ensure_tenant_reraises_a_conflict_it_cannot_explain(
+    db: Database, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    assert ensure_tenant(db, T1) is True
+    monkeypatch.setattr(provision, "_exists", lambda session, tenant_id: False)
+    with pytest.raises(IntegrityError):
+        ensure_tenant(db, T1)
+
+
 def test_ensure_default_tenant_needs_a_database_and_a_tenant(db: Database) -> None:
     assert ensure_default_tenant(None, Settings(default_tenant_id=T1)) is False
     assert ensure_default_tenant(db, Settings(default_tenant_id=None)) is False

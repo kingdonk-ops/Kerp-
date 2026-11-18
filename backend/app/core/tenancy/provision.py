@@ -1,9 +1,11 @@
 """Tenant provisioning: make sure a tenant's directory row exists (T-0079, ADR 0011).
 
 ``ensure_tenant`` is the one runtime path that writes a ``tenants`` row. It is idempotent: a
-second call finds the row (soft-deleted or not) and creates nothing. It runs in a tenant-level
-unit of work bound to that tenant, so it works under ``FORCE ROW LEVEL SECURITY`` as the
-runtime role. Callers: the API start-up (``ensure_default_tenant``, for
+second call finds the row (soft-deleted or not) and creates nothing, and two processes
+starting at once (API replicas, worker) do not fail: the insert runs in a savepoint and a
+primary-key conflict with a row that appeared meanwhile counts as "present". It runs in a
+tenant-level unit of work bound to that tenant, so it works under ``FORCE ROW LEVEL
+SECURITY`` as the runtime role. Callers: the API start-up (``ensure_default_tenant``, for
 ``KERP_DEFAULT_TENANT_ID``), this module's command line
 (``python -m app.core.tenancy.provision``) and T-0023's first-run command. Migration ``0026``
 inserts the configured default tenant too, and a directory row for every tenant id already in
@@ -18,6 +20,8 @@ import uuid
 from typing import Final
 
 from sqlalchemy import inspect, select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
 from app.core.config import Settings, get_settings
 from app.core.db import TENANTS_TABLE, Database
@@ -34,15 +38,28 @@ def ensure_tenant(
 ) -> bool:
     """Create the directory row of ``tenant_id`` unless it exists. True if it was created."""
     with database.unit_of_work(TenancyContext(tenant_id=tenant_id)) as session:
-        existing = session.scalars(
-            select(Tenant.id).where(Tenant.id == tenant_id).execution_options(include_deleted=True)
-        ).first()
-        if existing is not None:
+        if _exists(session, tenant_id):
             return False
-        session.add(
-            Tenant(id=tenant_id, tenant_id=tenant_id, display_name=display_name, source="system")
-        )
+        try:
+            with session.begin_nested():
+                row = Tenant(
+                    id=tenant_id, tenant_id=tenant_id, display_name=display_name, source="system"
+                )
+                session.add(row)
+        except IntegrityError:
+            # Another process provisioned it between our look and our insert.
+            if _exists(session, tenant_id):
+                return False
+            raise
     return True
+
+
+def _exists(session: Session, tenant_id: uuid.UUID) -> bool:
+    """True if the directory row exists, soft-deleted or not."""
+    found = session.scalars(
+        select(Tenant.id).where(Tenant.id == tenant_id).execution_options(include_deleted=True)
+    ).first()
+    return found is not None
 
 
 def ensure_default_tenant(database: Database | None, settings: Settings) -> bool:

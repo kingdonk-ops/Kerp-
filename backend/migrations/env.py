@@ -44,6 +44,9 @@ def run_migrations_offline() -> None:
         dialect_opts={"paramstyle": "named"},
         compare_type=True,
         include_object=include_object,
+        # Online and offline alike (T-0079, ADR 0011): ``--sql`` output commits each
+        # revision apart, so ``0027``'s VALIDATE never runs under ``0026``'s locks.
+        transaction_per_migration=True,
     )
     with context.begin_transaction():
         context.run_migrations()

@@ -42,16 +42,20 @@ added later adds to the cost, so it is done early in phase 0.
      restores it before the FKs are added (as `0012`/`0020`/`0025` do), because the migration
      role owns the tables and otherwise would see no rows. Lifting `FORCE` takes an
      `ACCESS EXCLUSIVE` lock on each table until `0026` commits, so `0026` holds it for the
-     backfill read of the `tenant_id` values (one indexed column per table, no per-row FK
-     check). Accepted: phase 0, one tenant per deployment, no populated production database yet;
-     the per-row check itself (`VALIDATE`) runs in `0027` without that lock. The table list is fixed in the
+     backfill read of the `tenant_id` values: still a full scan of every one of the 20 tables
+     (at best index-only on its `tenant_id` index), just no per-row FK check, and no reads or
+     writes on those tables until `0026` commits. Accepted: phase 0, one tenant per deployment,
+     no populated production database yet; the per-row check itself (`VALIDATE`) runs in `0027`
+     without that lock. Tracked as a risk to revisit before any populated deployment: TD-353
+     (ways out: a `SECURITY DEFINER` census function as in `0025`, a pre-deploy provisioning
+     step, or a `lock_timeout` guard). The table list is fixed in the
      revision (not reflected), so `--sql` output is identical; on SQLite (the fast test
      backend only) the tables are rebuilt in batch mode, online only.
    - `0027` runs `VALIDATE CONSTRAINT` on every not-yet-valid FK to `tenants`
      (`SHARE UPDATE EXCLUSIVE`: reads and writes continue during the scan).
    - `migrations/env.py` now runs **one transaction per revision**
-     (`transaction_per_migration=True`), so `0027`'s scan never runs inside `0026`'s
-     transaction and its locks. Large deployments may run `alembic upgrade 0026` and
+     (`transaction_per_migration=True`), online and in offline `--sql` output alike, so
+     `0027`'s scan never runs inside `0026`'s transaction and its locks. Large deployments may run `alembic upgrade 0026` and
      `alembic upgrade 0027` as two separate deploy steps (`docs/deploy/tenants.md`).
 4. **Provisioning order.** `ensure_tenant(db, tenant_id, display_name)`
    (`app/core/tenancy/provision.py`) is the one runtime path that writes a directory row: a
