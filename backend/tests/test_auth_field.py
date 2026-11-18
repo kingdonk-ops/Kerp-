@@ -69,7 +69,7 @@ from tests.auth_support import (
     fake_store,
     make_settings,
     refresh,
-    seed_user,
+    seed_field_worker,
     token_body,
 )
 from tests.db_support import database_url
@@ -198,10 +198,11 @@ def db(tmp_path: Path) -> Iterator[Database]:
 @pytest.fixture
 def users(db: Database) -> dict[str, uuid.UUID]:
     return {
-        "alice": seed_user(db, T1, ALICE, display_name="Alice Example"),
-        "carol": seed_user(db, T1, CAROL),
-        "bob_t2": seed_user(db, T2, BOB),
-        "inactive": seed_user(db, T1, "inactive@example.test", is_active=False),
+        # Field Workers (PER-14): the only accounts that may sign in by magic link (T-0057).
+        "alice": seed_field_worker(db, T1, ALICE, display_name="Alice Example"),
+        "carol": seed_field_worker(db, T1, CAROL),
+        "bob_t2": seed_field_worker(db, T2, BOB),
+        "inactive": seed_field_worker(db, T1, "inactive@example.test", is_active=False),
     }
 
 

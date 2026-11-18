@@ -32,6 +32,7 @@ credentials an unknown, an active and a revoked device get the same answer.
 from __future__ import annotations
 
 import json
+import logging
 import uuid
 from collections.abc import Collection
 from dataclasses import dataclass, replace
@@ -40,6 +41,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.audit import service as audit
 from app.core.auth.device_signal import DeviceRevokedError
 from app.core.auth.devices import device_status, pin_device
 from app.core.auth.field import (
@@ -60,16 +62,26 @@ from app.core.auth.lockout import (
     PIN_POLICY,
     ProgressiveLockout,
 )
+from app.core.auth.magic_link import (
+    MAGIC_LINK_AUDIT_CHAIN,
+    MAGIC_LINK_NOT_FIELD_WORKER,
+    MagicLinkCandidate,
+    MagicLinkJob,
+    log_refusal,
+    magic_link_eligible,
+)
 from app.core.auth.models import DEVICE_REVOKED, Device, User, normalize_email
 from app.core.auth.passwords import hash_password, verify_password
 from app.core.auth.providers import AuthProvider, LocalPasswordProvider, PasswordCredentials
 from app.core.auth.runtime import AuthRuntime
 from app.core.auth.tokens import InvalidTokenError, IssuedToken, TokenClaims
 from app.core.config import get_settings
-from app.core.db import utcnow
+from app.core.db import Database, utcnow
 from app.core.tenancy.context import TenancyContext
 from app.core.tenancy.rls import bind_tenancy
 from app.core.tenancy.scope import get_or_404
+
+_logger = logging.getLogger("kerp.auth")
 
 
 class AuthenticationError(Exception):
@@ -297,28 +309,65 @@ class AuthService:
             raise PinGateError(PIN_REQUIRED)
         return self._rotate(session, claims, device_id=bound)
 
-    def request_magic_link(self, session: Session, *, email: str) -> None:
-        """Send a one-time sign-in link to an active user. Silent for anyone else."""
+    def request_magic_link(self, *, email: str) -> MagicLinkJob | None:
+        """The request half of a magic-link request: count it (the per-mailbox lockout,
+        ``LockedOutError`` when locked) and return the job to run after the response.
+
+        Nothing here depends on the address: unknown, inactive, ineligible and eligible
+        accounts get the same work and the same job (diff §4.2 *no timing oracle*, T-0057).
+        ``None`` only without a deployment tenant (the same for every address).
+        """
         tenant = self.runtime.settings.default_tenant_id
         if tenant is None:
-            return
+            return None
         self.magic_link_lockout.begin(_subject(tenant, email))
-        bind_tenancy(session, TenancyContext(tenant_id=tenant))
-        user = session.scalars(
-            select(User).where(User.tenant_id == tenant, User.email == normalize_email(email))
+        return MagicLinkJob(tenant_id=tenant, email=normalize_email(email))
+
+    def issue_magic_link(self, database: Database, job: MagicLinkJob) -> None:
+        """The deferred half (after the response, own unit of work): issue and send a link to
+        an active Field Worker; refuse (log + audit) any other active account; nothing for an
+        unknown or inactive one. Never raises: the client has had its ``202`` already."""
+        try:
+            with database.unit_of_work(TenancyContext(tenant_id=job.tenant_id)) as session:
+                self._issue_magic_link(session, job)
+        except Exception:
+            _logger.exception("magic-link request not processed")
+
+    def _issue_magic_link(self, session: Session, job: MagicLinkJob) -> None:
+        # Columns only: the session holds no objects, so it can be rebound to the user.
+        found = session.execute(
+            select(User.id, User.is_active).where(
+                User.tenant_id == job.tenant_id, User.email == job.email
+            )
         ).one_or_none()
-        if user is None or not user.is_active:
+        if found is None or not found.is_active:
+            return
+        user_id: uuid.UUID = found.id
+        bind_tenancy(session, TenancyContext(tenant_id=job.tenant_id, user_id=user_id))
+        candidate = MagicLinkCandidate(tenant_id=job.tenant_id, user_id=user_id, email=job.email)
+        if not magic_link_eligible(session, candidate):
+            log_refusal(user_id, "request")
+            audit.append(
+                session,
+                MAGIC_LINK_AUDIT_CHAIN,
+                {
+                    "action": "magic_link_refused",
+                    "reason": MAGIC_LINK_NOT_FIELD_WORKER,
+                    "user_id": str(user_id),
+                },
+                source="api",
+            )
             return
         token = new_magic_link_token()
-        payload = json.dumps({"uid": str(user.id), "tid": str(tenant)}).encode()
+        payload = json.dumps({"uid": str(user_id), "tid": str(job.tenant_id)}).encode()
         self.runtime.store.put_magic_link(magic_link_digest(token), payload, MAGIC_LINK_TTL)
         self.runtime.magic_links.send(
             session,
             MagicLink(
                 token=token,
-                email=user.email,
-                user_id=user.id,
-                tenant_id=tenant,
+                email=job.email,
+                user_id=user_id,
+                tenant_id=job.tenant_id,
                 expires_at=utcnow() + MAGIC_LINK_TTL,
             ),
         )
@@ -353,6 +402,10 @@ class AuthService:
         ).one_or_none()
         if user is None or not user.is_active:
             raise AuthenticationError("user not active")
+        candidate = MagicLinkCandidate(tenant_id=tenant_id, user_id=user_id, email=user.email)
+        if not magic_link_eligible(session, candidate):  # PER-14 lost since the request
+            log_refusal(user_id, "redeem")
+            raise AuthenticationError("not eligible for a magic link")
         return self.start_session(session, user, device_id=device_id)
 
     def start_session(

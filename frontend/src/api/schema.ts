@@ -76,10 +76,11 @@ export interface paths {
         put?: never;
         /**
          * Request Magic Link
-         * @description Send a one-time sign-in link (15 min) to a field worker's e-mail.
+         * @description Send a one-time sign-in link (15 min) to a Field Worker's e-mail (PER-14, diff §4.2).
          *
-         *     Always ``202`` (unknown, inactive and other-tenant addresses included), so the answer
-         *     reveals no accounts.
+         *     Always ``202`` (unknown, inactive, non-Field-Worker and other-tenant addresses included),
+         *     so the answer reveals no accounts or personas. The request only counts the attempt; the
+         *     lookup, the eligibility check, the link and its e-mail run after the response (T-0057).
          */
         post: operations["request_magic_link_api_v1_auth_magic_link_post"];
         delete?: never;

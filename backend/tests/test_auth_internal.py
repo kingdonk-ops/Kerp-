@@ -39,6 +39,7 @@ from tests.auth_support import (
     CapturingSender,
     auth_app,
     make_settings,
+    seed_field_worker,
     seed_user,
     token_body,
 )
@@ -207,7 +208,7 @@ def test_password_sign_in_recomputes_the_flag_after_the_list_changes(
 
 
 def test_magic_link_sign_in_recomputes_the_flag(tmp_path: Path, db: Database) -> None:
-    staff = seed_user(db, T1, STAFF)
+    staff = seed_field_worker(db, T1, STAFF)
     sender = CapturingSender()
     settings = make_settings(database_url=database_url(tmp_path), internal_email_domains=COMPANY)
     app, _runtime = auth_app(settings, magic_links=sender)

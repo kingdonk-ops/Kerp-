@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 219 · **Closed:** 130
+**Open:** 221 · **Closed:** 130
 
 ## decision (8)
 
@@ -113,7 +113,7 @@
 | [TD-322](../tracker/todo/TD-322.md) | Entra ID SSO: certificate (client assertion) credentials for the code redemption instead of the client secret | T-0054 | implementer |
 | [TD-336](../tracker/todo/TD-336.md) | Mail: settle send-log rows stuck in queued (enqueue failed or Redis payload lost); no re-enqueue is possible because the payload (with the link token) is never persisted | T-0058 | implementer |
 
-## later (99)
+## later (100)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -216,6 +216,7 @@
 | [TD-350](../tracker/todo/TD-350.md) | sync_team_link_grants does not check project_id is a live project of the tenant; add an injected project-existence check (core must not import projects) | T-0013 | reviewer |
 | [TD-351](../tracker/todo/TD-351.md) | Member-admin UI must PUT only source=direct grants; round-tripping the full member list would silently turn team-derived grants into individual rows | T-0026 | reviewer |
 | [TD-352](../tracker/todo/TD-352.md) | Perf harness before hard gate: discard a warm-up mount (runs 2-5 measure warm JIT/CEL cache) and fail on not_measured for budgets whose task is done | T-0146 | reviewer |
+| [TD-354](../tracker/todo/TD-354.md) | Magic-link post-response task runs in the API process: move it to the SAQ interactive queue if losing a request on an API crash matters | T-0057 | implementer |
 
 ## bug (5)
 
@@ -227,7 +228,7 @@
 | [TD-330](../tracker/todo/TD-330.md) | scripts/pr_suggestions.py rebuild fails in cloud sessions: gh api --paginate follows numeric-ID repository Link URLs that the agent proxy rejects (HTTP 403); paginate with explicit repos/{owner}/{repo} page params | — | coordinator |
 | [TD-339](../tracker/todo/TD-339.md) | jobs LoopDispatcher.drain can spin forever when the commit ran on the loop's own thread (finished tasks stay in the set until their done callbacks run) | T-0058 | implementer |
 
-## risk (27)
+## risk (28)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -258,6 +259,7 @@
 | [TD-346](../tracker/todo/TD-346.md) | NFR perf job timings on shared GitHub runners are noisy (form open median ~0.3 s locally at 4x throttle); before T-0146 makes it a hard gate, decide on retries/headroom or a dedicated runner and keep a trend of perf-results.json | T-0045, T-0146 | implementer |
 | [TD-349](../tracker/todo/TD-349.md) | T-0073: census read policy on auth_project_membership is opened by the app.team_link_census setting | T-0073 | implementer |
 | [TD-353](../tracker/todo/TD-353.md) | 0026 holds ACCESS EXCLUSIVE on every tenant-scoped table during the tenants backfill (FORCE RLS toggle); revisit before any populated deployment | T-0079 | implementer |
+| [TD-355](../tracker/todo/TD-355.md) | Magic-link eligibility ignores project soft-delete unless memberships were revoked with it (core cannot read the projects table) | T-0057 | implementer |
 
 ## Closed
 

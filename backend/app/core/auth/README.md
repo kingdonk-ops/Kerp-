@@ -21,6 +21,7 @@ rewritten (HS256 → RS256/EdDSA + JWKS + `jti` revocation in Redis).
 | `sso.py`, `sso_router.py` | SSO flow state in the store (`state` entries, native exchange codes, `acct_claim_missing` marker), the `auth:sso:entra` audit chain; endpoints `/auth/config`, `/auth/sso/entra/{start,callback,exchange}`, `/.well-known/assetlinks.json` (T-0054) |
 | `service.py` | `AuthService` login / refresh / logout / magic link / PIN unlock; `start_session` (the one way any provider's sign-in becomes a KERP session); `create_user`, `set_password`; user reads for the admin module (`list_users`, `get_user`, `users_by_id`, `find_user_by_email`, T-0014); internal staff rule (`is_internal_user`, T-0049) |
 | `field.py` | Magic-link tokens + delivery seam, PIN rules and the `PIN_REQUIRED` / `PIN_INVALID` / `PIN_EXHAUSTED` answers (T-0009, T-0038) |
+| `magic_link.py` | Magic links for Field Workers only (T-0057): `magic_link_eligible` (PER-14 via `load_grants`, plus registered providers), the eligibility extension point (`register_magic_link_eligibility`), `MagicLinkJob` (the post-response half of a request), refusal reason `magic_link_not_field_worker` |
 | `lockout.py` | `ProgressiveLockout` + policies, Redis-backed (T-0009); offline failures counted with `extra` (T-0038) |
 | `models.py` | `auth_user` table (tenant-level rows, RLS) — migration `0003`, internal staff flag + Entra link in `0013` (T-0049, ADR 0009); `auth_project_membership` (T-0010) — migration `0006`, persona CHECK widened for PER-16 in `0012` (T-0076), membership-based RLS in `0015` (T-0014), grant sources (`source_type`, `source_id`) in `0025` (T-0073, ADR 0008); `oe_identity_device` (T-0043) — migration `0016`, `wipe_secret_hash` in `0018` (T-0080), `pin_hash` + `pin_set_at` in `0019` (T-0038) |
 | `memberships.py` | The membership store's write side for **individual** (`direct`) rows (`project_grants`, `set_user_grants`, `revoke_project`; revoke = soft delete, re-grant revives) and the member list with sources (`project_member_grants`), used by the admin module (T-0014) and the projects module (creator PER-09, revoke on delete; T-0039) |
@@ -45,8 +46,8 @@ rewritten (HS256 → RS256/EdDSA + JWKS + `jti` revocation in Redis).
 | `GET /api/v1/auth/sso/entra/callback` | pre-auth cookie | `303` to the web landing (refresh cookie set) or the App Link (exchange code); refusals `?error=<code>` |
 | `POST /api/v1/auth/sso/entra/exchange` | native origin | `{code, verifier, device_id}` → `TokenResponse` with `refresh_token` (native body); `401` uniform; `401 {code: DEVICE_REVOKED}`; `403` other origins |
 | `GET /.well-known/assetlinks.json` | none | Digital Asset Links of the Android app (from configuration); `404` unconfigured |
-| `POST /api/v1/auth/magic-link` | none | `{email}` → always `202`; sends a 15-min one-time link to an active user; `429` when throttled |
-| `POST /api/v1/auth/magic-link/redeem` | none | `{token}` → `TokenResponse` + cookie of a new session (on an enrolled device: bound to it, PIN kept) |
+| `POST /api/v1/auth/magic-link` | none | `{email}` → always the same `202`; after the response, sends a 15-min one-time link to an active **Field Worker** (PER-14) only (*Magic links for Field Workers only*); `429` when throttled |
+| `POST /api/v1/auth/magic-link/redeem` | none | `{token}` → `TokenResponse` + cookie of a new session (on an enrolled device: bound to it, PIN kept); eligibility re-checked, else the neutral `401` |
 | `POST /api/v1/auth/pin/unlock` | refresh cookie + Origin (native app: `refresh_token` in the body) | `{pin, failed_offline?}` → rotated `TokenResponse` + cookie; `401 {code: PIN_INVALID \| PIN_EXHAUSTED}`; `429` when locked; `403` cross-origin |
 | `POST /api/v1/devices/enrol` | bearer | `{device_id, platform, os_version, app_version, pin?}` → device + `wipe_secret`; `201` new (the only response carrying the secret), `200` known (`wipe_secret: null`); binds the session to the device; sets the PIN once; `409` another account's id, a session already bound elsewhere, or `code: PIN_ALREADY_SET` |
 | `PUT /api/v1/devices/{device_id}/pin` | bearer (a session bound to the device) | `{pin}` → `204`; a new device PIN (the old one is not needed); `403` another session, `404` not the caller's active device |
@@ -456,10 +457,47 @@ within their /64 (TD-226).
 
 Unknown addresses lock exactly like real ones. Link delivery is the `MagicLinkSender` seam;
 the default `MailMagicLinkSender` queues the `auth.magic_link` e-mail through the outbound
-e-mail service in the request's unit of work (`app/core/mail/`, T-0058): sent by the worker
+e-mail service in the post-response unit of work (below) (`app/core/mail/`, T-0058): sent by the worker
 after the commit, the token only in the link fragment (`<KERP_WEB_ORIGIN>/magic-link#<token>`),
 never in the send log. The development log transport prints the e-mail; production refuses to
 start without SES.
+
+## Magic links for Field Workers only (T-0057)
+
+`magic_link.py`. Diff §4.2 *Magic links for Field Workers only* (product owner, 2026-11-14;
+TD-136). Only an **active** account holding **PER-14 Field Worker** on at least one project
+may sign in by magic link. Everyone else (other personas only, no membership, a deactivated
+account, an unknown address) signs in by password or, for internal staff, Entra ID SSO.
+
+- **Eligibility** is one core function, `magic_link_eligible(session, candidate)`: the
+  effective grants from `access.load_grants` (direct and team-derived rows alike, T-0073;
+  soft-deleted rows excluded, and deleting a project revokes its memberships, so PER-14 on a
+  deleted project never counts) contain PER-14, **or** a registered eligibility provider says
+  yes. Providers are the extension point for reasons core does not own: the module that owns
+  invites registers one at start-up (`register_magic_link_eligibility`, T-0052: a valid
+  pending invite naming PER-14 for the account's e-mail). None is registered by default. Core
+  reads no module table and never imports `app.modules`.
+- **Neutral answer.** `POST /auth/magic-link` answers the same `202`, with the same (empty)
+  body and headers, for an eligible account, an ineligible or deactivated one, an unknown
+  address and another tenant's address. For anyone but an eligible account no link is stored
+  and no e-mail is queued.
+- **No timing oracle.** The request does the same work on every path: it counts the attempt
+  in the per-mailbox lockout (unchanged, T-0068 / TD-224) and schedules one `MagicLinkJob`
+  (tenant + normalised e-mail), identical for every address. Everything that differs runs in
+  `AuthService.issue_magic_link` **after the response has been sent** (a FastAPI post-response
+  task in the API process, its own unit of work): the account lookup, the eligibility check,
+  the token and its store write, the `auth.magic_link` e-mail (send-log row; the SAQ
+  interactive queue delivers it after that unit of work commits) and the refusal audit. A
+  failure there is logged, never raised (the client has its `202`). A crash of the API
+  process between the response and the task loses that one request; the user asks again.
+- **Refusal record.** An active account that is not eligible is logged (`kerp.auth.magic_link`,
+  user id + reason) and audited on the tenant's `auth:magic-link` chain as
+  `{"action": "magic_link_refused", "reason": "magic_link_not_field_worker", "user_id": ...}`:
+  never the e-mail or a token. Unknown and deactivated addresses leave no record.
+- **Redeem re-checks.** `POST /auth/magic-link/redeem` checks eligibility again after the
+  link is spent: a link issued while the user held PER-14 is refused with the neutral invalid
+  link answer (`401`, as for a garbage link) once the last PER-14 grant was removed, the
+  project deleted, or the account deactivated.
 
 ## Tokens
 

@@ -108,7 +108,7 @@
           "auth"
         ],
         "summary": "Request Magic Link",
-        "description": "Send a one-time sign-in link (15 min) to a field worker's e-mail.\n\nAlways ``202`` (unknown, inactive and other-tenant addresses included), so the answer\nreveals no accounts.",
+        "description": "Send a one-time sign-in link (15 min) to a Field Worker's e-mail (PER-14, diff §4.2).\n\nAlways ``202`` (unknown, inactive, non-Field-Worker and other-tenant addresses included),\nso the answer reveals no accounts or personas. The request only counts the attempt; the\nlookup, the eligibility check, the link and its e-mail run after the response (T-0057).",
         "operationId": "request_magic_link_api_v1_auth_magic_link_post",
         "requestBody": {
           "content": {
@@ -142,12 +142,7 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
+        }
       }
     },
     "/api/v1/auth/magic-link/redeem": {
