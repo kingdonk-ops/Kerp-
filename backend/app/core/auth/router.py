@@ -24,7 +24,17 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Annotated, Any, Final
 
-from fastapi import APIRouter, Body, Cookie, Depends, HTTPException, Request, Response, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Body,
+    Cookie,
+    Depends,
+    HTTPException,
+    Request,
+    Response,
+    status,
+)
 
 from app.core.auth.bearer import AUTH_UNAVAILABLE
 from app.core.auth.deps import CurrentPrincipal, get_auth_service, unauthorized
@@ -45,7 +55,7 @@ from app.core.auth.schemas import (
 )
 from app.core.auth.service import AuthenticationError, AuthService, TokenPair
 from app.core.config import Settings
-from app.core.db import DbSession
+from app.core.db import Database, DbSession
 
 PREFIX: Final = "/api/v1/auth"
 JWKS_PATH: Final = "/.well-known/jwks.json"
@@ -248,18 +258,31 @@ def login(
     status_code=status.HTTP_202_ACCEPTED,
     responses=_LOCKED_RESPONSE,
 )
-def request_magic_link(body: MagicLinkRequest, session: DbSession, service: AuthServiceDep) -> None:
-    """Send a one-time sign-in link (15 min) to a field worker's e-mail.
+def request_magic_link(
+    body: MagicLinkRequest, request: Request, tasks: BackgroundTasks, service: AuthServiceDep
+) -> None:
+    """Send a one-time sign-in link (15 min) to a Field Worker's e-mail (PER-14, diff §4.2).
 
-    Always ``202`` (unknown, inactive and other-tenant addresses included), so the answer
-    reveals no accounts.
+    Always ``202`` (unknown, inactive, non-Field-Worker and other-tenant addresses included),
+    so the answer reveals no accounts or personas. The request only counts the attempt; the
+    lookup, the eligibility check, the link and its e-mail run after the response (T-0057).
     """
+    database = _database(request)
     try:
-        service.request_magic_link(session, email=body.email)
+        job = service.request_magic_link(email=body.email)
     except LockedOutError as exc:
         raise _locked(exc) from exc
     except RevocationUnavailableError as exc:
         raise _unavailable() from exc
+    if job is not None:
+        tasks.add_task(service.issue_magic_link, database, job)
+
+
+def _database(request: Request) -> Database:
+    database: Database | None = getattr(request.app.state, "db", None)
+    if database is None:
+        raise RuntimeError("database not configured (set KERP_DATABASE_URL)")
+    return database
 
 
 @router.post(f"{PREFIX}/magic-link/redeem", **_TOKEN_ROUTE, responses=_DEVICE_REVOKED_RESPONSE)

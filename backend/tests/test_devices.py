@@ -58,6 +58,7 @@ from tests.auth_support import (
     make_settings,
     refresh,
     revoke_project_viewers,
+    seed_field_worker,
     seed_user,
     token_body,
 )
@@ -804,7 +805,7 @@ def test_magic_link_redeem_from_a_revoked_device_is_refused(tmp_path: Path, db: 
     sender = CapturingSender()
     settings = make_settings(database_url=database_url(tmp_path))
     app, _runtime = auth_app(settings, magic_links=sender)
-    seed_user(db, T1, BOB)
+    seed_field_worker(db, T1, BOB)
     with TestClient(app) as client:
         api = Api.__new__(Api)
         api.client = client
@@ -945,7 +946,7 @@ def test_unlock_of_a_session_killed_by_a_device_revoke_is_device_revoked(
     sender = CapturingSender()
     settings = make_settings(database_url=database_url(tmp_path))
     app, _runtime = auth_app(settings, magic_links=sender)
-    seed_user(db, T1, BOB)
+    seed_field_worker(db, T1, BOB)
     with TestClient(app) as client:
         assert client.post("/api/v1/auth/magic-link", json={"email": BOB}).status_code == 202
         redeem = {"token": sender.sent[-1].token}

@@ -62,7 +62,7 @@ from app.core.tenancy.rls import expected_policy_names, rls_tables
 from app.main import create_app
 from app.modules.jobs import mail as jobs_mail
 from tests.audit_support import migrated_database
-from tests.auth_support import ALICE, T1, auth_app, make_settings, seed_user
+from tests.auth_support import ALICE, T1, auth_app, make_settings, seed_field_worker
 from tests.db_support import database_url
 
 BACKEND = Path(__file__).resolve().parents[1]
@@ -356,7 +356,7 @@ def test_send_mail_refuses_bad_input_before_writing(db: Database) -> None:
 def test_magic_link_request_queues_the_mail_and_never_sends_it(
     tmp_path: Path, db: Database, captured: Captured
 ) -> None:
-    seed_user(db, T1, ALICE)
+    seed_field_worker(db, T1, ALICE)  # PER-14: may sign in by magic link (T-0057)
     settings = _settings(database_url=database_url(tmp_path))
     app, _ = auth_app(settings)  # default sender: the mail service
     with TestClient(app) as client:

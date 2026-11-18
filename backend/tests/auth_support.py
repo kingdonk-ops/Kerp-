@@ -108,6 +108,37 @@ def seed_user(
         return user.id
 
 
+# The synthetic project a Field Worker grant names when a test needs one but no project row.
+FIELD_PROJECT = uuid.UUID("00000000-0000-4000-8000-0000000000f1")
+
+
+def grant_persona(
+    db: Database,
+    tenant_id: uuid.UUID,
+    user_id: uuid.UUID,
+    persona: str = "PER-14",
+    project_id: uuid.UUID = FIELD_PROJECT,
+) -> None:
+    """Give ``user_id`` a direct ``persona`` membership (default PER-14 Field Worker, the one
+    persona that may sign in by magic link, T-0057)."""
+    with db.unit_of_work(TenancyContext(tenant_id=tenant_id, is_system_admin=True)) as session:
+        session.add(
+            ProjectMembership(
+                tenant_id=tenant_id,
+                user_id=user_id,
+                member_project_id=project_id,
+                persona=persona,
+            )
+        )
+
+
+def seed_field_worker(db: Database, tenant_id: uuid.UUID, email: str, **fields: Any) -> uuid.UUID:
+    """``seed_user`` plus a PER-14 grant: an account that may sign in by magic link."""
+    user_id = seed_user(db, tenant_id, email, **fields)
+    grant_persona(db, tenant_id, user_id)
+    return user_id
+
+
 def revoke_project_viewers(db: Database, tenant_id: uuid.UUID = T1) -> None:
     """Soft-delete the tenant's PER-16 memberships: the ``0012`` downgrade refuses while any
     is active, so tests that grant PER-16 call this before migrating down to base."""

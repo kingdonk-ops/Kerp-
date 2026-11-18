@@ -28,6 +28,7 @@ from tests.auth_support import (
     auth_app,
     cookie_headers,
     make_settings,
+    seed_field_worker,
     seed_user,
 )
 from tests.db_support import database_url
@@ -54,7 +55,7 @@ def sender() -> CapturingSender:
 
 @pytest.fixture
 def client(tmp_path: Path, db: Database, sender: CapturingSender) -> Iterator[TestClient]:
-    seed_user(db, T1, ALICE)
+    seed_field_worker(db, T1, ALICE)  # PER-14: may sign in by magic link (T-0057)
     settings = make_settings(
         database_url=database_url(tmp_path),
         web_origin=WEB,

@@ -4,7 +4,8 @@ reworked to the hybrid model by T-0038).
 Diff §4.2 *Field PIN, hybrid* (TD-135, decision 8a). The PIN belongs to the enrolled device,
 not to a server session:
 
-1. ``POST /auth/magic-link`` sends a one-time link (15 minutes) to an active user's e-mail;
+1. ``POST /auth/magic-link`` sends a one-time link (15 minutes) to an active Field
+   Worker's e-mail (PER-14 only, ``magic_link.py``, T-0057);
    ``POST /auth/magic-link/redeem`` (or a password login) starts an ordinary session. On an
    enrolled device (``X-KERP-Device-Id``) the session is bound to it at once; the device's
    PIN is **not** reset by a sign-in.
@@ -24,7 +25,8 @@ made offline with its next unlock (``failed_offline``), counted with the same es
 
 Delivery of the link is a seam (``MagicLinkSender``). The default, ``MailMagicLinkSender``,
 queues the ``auth.magic_link`` e-mail through the outbound e-mail service (T-0058, diff §4.6):
-a send-log row in the request's unit of work, the SAQ send after the commit, the token only
+a send-log row in the post-response unit of work of the request (T-0057), the SAQ send after
+its commit, the token only
 in the link fragment. Production refuses to start without a mail transport
 (``app.core.mail.transport.check_mail_config``); the development log transport prints the
 link and never runs in production.
@@ -115,8 +117,9 @@ class MagicLink:
 
 
 class MagicLinkSender(Protocol):
-    """Delivers a magic link to its user, in the request's unit of work (so the delivery is
-    queued only if it commits). Must not raise for an undeliverable address."""
+    """Delivers a magic link to its user, in the unit of work that issued it (after the
+    request's response, T-0057), so the delivery is queued only if it commits. Must not raise
+    for an undeliverable address."""
 
     def send(self, session: Session, link: MagicLink) -> None: ...
 
