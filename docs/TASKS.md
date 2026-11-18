@@ -3,11 +3,11 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 63/172 tasks done (37%) · **ready now:** 18 · **epics awaiting breakdown:** 47
+**Overall:** 64/172 tasks done (37%) · **ready now:** 19 · **epics awaiting breakdown:** 47
 
 | Phase | Tasks done | Progress |
 |---|---|---|
-| 0 · Platform foundations | 63/88 | `███████░░░` 72% |
+| 0 · Platform foundations | 64/88 | `███████░░░` 73% |
 | 1 · Asset & Quality backbone | 0/75 (+1 epics) | `░░░░░░░░░░` 0% |
 | 2 · Welding quality | 0/9 | `░░░░░░░░░░` 0% |
 | 3 · Logistics | 0/0 (+7 epics) | `░░░░░░░░░░` 0% |
@@ -67,8 +67,8 @@
 | ✅ | [T-0050](../tracker/tasks/T-0050.md) | Access-request lifecycle API: pending/approved/rejected/withdrawn, rejection reason, re-request cooldown, requester's active-requests list | admin | M | T-0040, T-0019 | #112 |
 | ✅ | [T-0058](../tracker/tasks/T-0058.md) | Outbound e-mail core service: AWS SES transport, i18n templates, async send via SAQ, send log, bounce/complaint suppression (Pilot-0) | platform | M | T-0015, T-0037 | #116 |
 | ✅ | [T-0020](../tracker/tasks/T-0020.md) | saved_views module | saved_views | S | T-0012 | #65 |
-| ⬜ | [T-0052](../tracker/tasks/T-0052.md) | Project invites API: single-use expiring invite_token bound to the invited e-mail, one-click join, membership granted right after first sign-in (password, SSO; magic link for PER-14 invites) | admin | M | T-0014, T-0054, T-0057 |  |
-| 🟪 | [T-0057](../tracker/tasks/T-0057.md) | Magic-link sign-in limited to Field Workers (PER-14): neutral 202 and no link for anyone else, eligibility re-checked on redeem | identity | S | T-0014, T-0073 | #122 |
+| ▶ | [T-0052](../tracker/tasks/T-0052.md) | Project invites API: single-use expiring invite_token bound to the invited e-mail, one-click join, membership granted right after first sign-in (password, SSO; magic link for PER-14 invites) | admin | M | T-0014, T-0054, T-0057 |  |
+| ✅ | [T-0057](../tracker/tasks/T-0057.md) | Magic-link sign-in limited to Field Workers (PER-14): neutral 202 and no link for anyone else, eligibility re-checked on redeem | identity | S | T-0014, T-0073 | #122 |
 | ⬜ | [T-0074](../tracker/tasks/T-0074.md) | saved_views: share a team view with several teams linked to the project (view-team link table, migrate team_id, wire teams contract) | saved_views | S | T-0013, T-0020 |  |
 | ▶ | [T-0077](../tracker/tasks/T-0077.md) | Local password policy (NIST 800-63B style, minimum 8) and self-service password reset by e-mail: neutral 202, single-use expiring link, sessions revoked | identity | M | T-0037, T-0058, T-0068 |  |
 | ✅ | [T-0021](../tracker/tasks/T-0021.md) | Observability + security headers (request id, structured logs, CSP/HSTS) | platform | S | T-0001 | #9 |
