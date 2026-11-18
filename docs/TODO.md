@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 225 · **Closed:** 130
+**Open:** 226 · **Closed:** 130
 
 ## decision (8)
 
@@ -75,7 +75,7 @@
 | [TD-327](../tracker/todo/TD-327.md) | Frontend i18n key notifications.kind.access_requests.requested for the inbox (needed when the access-request UI lands) | T-0050 | reviewer |
 | [TD-337](../tracker/todo/TD-337.md) | Web/Android route /magic-link#<token> that redeems the e-mailed sign-in link (POST /auth/magic-link/redeem); the e-mail now links there | T-0058 | implementer |
 
-## deferred (34)
+## deferred (35)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -113,6 +113,7 @@
 | [TD-315](../tracker/todo/TD-315.md) | Override request currency: a later fully passing run of the record is not visible (no run log) | T-0035 | implementer |
 | [TD-322](../tracker/todo/TD-322.md) | Entra ID SSO: certificate (client assertion) credentials for the code redemption instead of the client secret | T-0054 | implementer |
 | [TD-336](../tracker/todo/TD-336.md) | Mail: settle send-log rows stuck in queued (enqueue failed or Redis payload lost); no re-enqueue is possible because the payload (with the link token) is never persisted | T-0058 | implementer |
+| [TD-360](../tracker/todo/TD-360.md) | First-run: one-time password link for the first System admin once T-0077 ships | T-0023 | implementer |
 
 ## later (103)
 
