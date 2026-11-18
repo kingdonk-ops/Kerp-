@@ -41,6 +41,15 @@ instead (T-0014, TD-053, edge spec §6 amendments), declared on the model's tabl
   (``app.admin_project_ids``) and by ``app.is_system_admin`` sessions; nobody else. The owner
   inserts their own rows only; updates need the exact scope and visibility; nobody deletes
   (decided and withdrawn rows are history).
+* ``team`` (T-0013, ADR 0008): the teams module's team, member and project-link tables. A row
+  is readable when its team is *visible*: the team has a live link to a project the session
+  describes (bound, ``app.allowed_project_ids`` or ``app.member_project_ids``, as for a
+  membership) or ``app.current_user_id`` is a live member of it; ``app.is_system_admin``
+  sessions read every row. Only ``app.is_system_admin`` sessions insert, update or delete.
+  The visible team ids come from the invoker-rights function ``kerp_visible_team_ids()``
+  (a policy on the link or member table cannot query its own table). The function raises
+  ``app.team_lookup`` for its own read, which only *narrows* the policies (they skip the
+  function call while it is raised), so nothing recurses and setting it widens nothing.
 
 * ``NULLIF(..., '')``: once a connection has set a custom setting, it reads back as ``''``
   after the transaction, not ``NULL``. ``''::uuid`` would raise; ``NULL`` matches nothing.
@@ -101,6 +110,11 @@ MEMBERSHIP_CENSUS_POLICY_NAME: Final = "membership_team_link_census_policy"
 CENSUS_SETTING: Final = "app.team_link_census"
 DIRECT_SOURCE: Final = "direct"
 ADMIN_GRANT_POLICY_NAMES: Final = ("admin_grant_read_policy", "admin_grant_write_policy")
+TEAM_POLICY_NAMES: Final = ("team_read_policy", "team_write_policy")
+# The visible-team function of a ``team`` policy (T-0013) and the flag it raises for its own
+# read; the flag only narrows the policies, so a session that sets it sees less, never more.
+TEAM_FUNCTION: Final = "kerp_visible_team_ids"
+TEAM_LOOKUP_SETTING: Final = "app.team_lookup"
 ACCESS_REQUEST_POLICY_NAMES: Final = (
     "access_request_read_policy",
     "access_request_insert_policy",
@@ -150,15 +164,23 @@ class RlsPolicy:
     * ``kind="access_request"`` (T-0050): readable by the owner (``owner_column``), by the
       administrators (PER-09) of the project in ``project_column`` and by ``system_admin``
       sessions; only the owner inserts; updates need visibility; nobody deletes.
+    * ``kind="team"`` (T-0013): ``team_column`` names the row's team (``id`` on the team table,
+      ``team_id`` elsewhere). The team is visible when ``link_table`` (columns ``team_id``,
+      ``linked_project_id``) has a live row linking it to a described project, or
+      ``member_table`` (columns ``team_id``, ``user_id``) has a live row for the caller. Only
+      ``system_admin`` sessions write.
 
     ``source_column`` (membership only, T-0073): rows whose value there is not ``'direct'``
     are written by ``system_admin`` sessions only.
     """
 
-    kind: Literal["membership", "admin_grant", "access_request"]
+    kind: Literal["membership", "admin_grant", "access_request", "team"]
     owner_column: str | None = None
     project_column: str | None = None
     source_column: str | None = None
+    team_column: str | None = None
+    link_table: str | None = None
+    member_table: str | None = None
 
 
 def rls_table_info(policy: RlsPolicy) -> dict[str, Any]:
@@ -218,9 +240,85 @@ def _access_request_policy_sql(table: str, policy: RlsPolicy) -> list[str]:
     ]
 
 
+def team_lookup_function_sql(link_table: str, member_table: str) -> str:
+    """``kerp_visible_team_ids()``: the ids of the bound tenant's teams the session sees.
+
+    A team is visible with a live link to a described project or a live membership of the
+    caller. Invoker rights: it reads only what the session's own policies show. The link and
+    member reads run with ``app.team_lookup`` raised, under which their policies use only the
+    row's own columns (no recursion); the caller's value is restored before it returns.
+    """
+    described = " OR ".join(
+        [
+            f"l.linked_project_id = {_PROJECT_EXPR}",
+            f"l.linked_project_id = ANY({_id_list_sql(ALLOWED_SETTING)})",
+            f"l.linked_project_id = ANY({_id_list_sql(MEMBER_SETTING)})",
+        ]
+    )
+    return f"""
+CREATE OR REPLACE FUNCTION {TEAM_FUNCTION}() RETURNS uuid[]
+LANGUAGE plpgsql VOLATILE SET search_path = public, pg_temp AS $fn$
+DECLARE
+    prior text := current_setting('{TEAM_LOOKUP_SETTING}', true);
+    found uuid[];
+BEGIN
+    PERFORM set_config('{TEAM_LOOKUP_SETTING}', 'true', true);
+    SELECT COALESCE(array_agg(DISTINCT v.team_id), '{{}}') INTO found FROM (
+        SELECT l.team_id FROM {link_table} l
+            WHERE l.tenant_id = {_TENANT_EXPR} AND l.deleted_at IS NULL AND ({described})
+        UNION
+        SELECT m.team_id FROM {member_table} m
+            WHERE m.tenant_id = {_TENANT_EXPR} AND m.deleted_at IS NULL
+            AND m.user_id = {_USER_EXPR}
+    ) v;
+    PERFORM set_config('{TEAM_LOOKUP_SETTING}', COALESCE(prior, ''), true);
+    RETURN found;
+END
+$fn$
+"""
+
+
+def team_visible_sql(policy: RlsPolicy, table: str) -> str:
+    """Read rule of a ``team`` table (see ``RlsPolicy``)."""
+    if policy.team_column is None:
+        raise ValueError(f"{table}: a team policy needs team_column")
+    lookup = f"COALESCE(NULLIF(current_setting('{TEAM_LOOKUP_SETTING}', true), '')::boolean, false)"
+    clauses = [SYSTEM_ADMIN_SQL]
+    # The row's own columns: what the lookup function itself needs to read.
+    if table == policy.link_table:
+        clauses += [
+            f"linked_project_id = {_PROJECT_EXPR}",
+            f"linked_project_id = ANY({_id_list_sql(ALLOWED_SETTING)})",
+            f"linked_project_id = ANY({_id_list_sql(MEMBER_SETTING)})",
+        ]
+    if table == policy.member_table:
+        clauses.append(f"user_id = {_USER_EXPR}")
+    # CASE, not AND: the only evaluation order SQL guarantees (no call while looking up).
+    clauses.append(
+        f"CASE WHEN {lookup} THEN false"
+        f" ELSE {policy.team_column} IN (SELECT unnest({TEAM_FUNCTION}())) END"
+    )
+    return f"tenant_id = {_TENANT_EXPR} AND ({' OR '.join(clauses)})"
+
+
+def _team_policy_sql(table: str, policy: RlsPolicy) -> list[str]:
+    if policy.link_table is None or policy.member_table is None:
+        raise ValueError(f"{table}: a team policy needs link_table and member_table")
+    read, write = TEAM_POLICY_NAMES
+    admin = f"{SCOPE_ROW_SQL} AND {SYSTEM_ADMIN_SQL}"
+    return [
+        team_lookup_function_sql(policy.link_table, policy.member_table),
+        f"CREATE POLICY {read} ON {table} FOR SELECT USING ({team_visible_sql(policy, table)})",
+        f"CREATE POLICY {write} ON {table} FOR ALL USING ({admin}) WITH CHECK ({admin})",
+    ]
+
+
 def _special_policy_sql(table: str, policy: RlsPolicy) -> list[str]:
     names: tuple[str, ...]
-    if policy.kind == "access_request":
+    if policy.kind == "team":
+        names = TEAM_POLICY_NAMES
+        creates = _team_policy_sql(table, policy)
+    elif policy.kind == "access_request":
         names = ACCESS_REQUEST_POLICY_NAMES
         creates = _access_request_policy_sql(table, policy)
     elif policy.kind == "membership":
@@ -275,6 +373,8 @@ def expected_policy_names(table: Table) -> tuple[str, ...]:
         return POLICY_NAMES
     if policy.kind == "access_request":
         return ACCESS_REQUEST_POLICY_NAMES
+    if policy.kind == "team":
+        return TEAM_POLICY_NAMES
     if policy.kind == "membership":
         if policy.source_column is not None:
             return (*MEMBERSHIP_POLICY_NAMES, MEMBERSHIP_CENSUS_POLICY_NAME)

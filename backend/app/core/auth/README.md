@@ -641,7 +641,7 @@ refuse other sessions' writes to derived rows as well):
 - **Deactivated users** keep their derived rows: a deactivated account cannot authenticate, so
   the rows grant nothing, and reactivation restores team access with no re-sync.
 - **PER-09 member admin** (admin module): lists derived rows (`source: team`, the link id,
-  `team_name` null until T-0013 fills it in); PUT and DELETE change individual rows only;
+  `team_name` filled in by the admin module through the teams service, T-0013); PUT and DELETE change individual rows only;
   DELETE of a user whose access is only team-derived is 409 `managed_through_team`.
   `memberships.revoke_project` (project delete) refuses while derived rows remain on the
   project (`TeamGrantsPresentError`, 409 `team_links_present`): unlink its teams first.

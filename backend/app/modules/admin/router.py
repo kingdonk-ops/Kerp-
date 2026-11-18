@@ -11,6 +11,7 @@ bound with, loaded from the grants table at authentication, never from the reque
   member without PER-09 403. The list shows team-derived grants (``source: team``, the link
   id) next to individual ones; PUT and DELETE change individual grants only, and DELETE of a
   user whose access is only team-derived answers 409 ``managed_through_team`` (T-0073).
+  A team-derived grant carries its team's name, from the teams service (T-0013).
 
 * ``GET/POST /grants``, ``DELETE /grants/{user}/{grant}``: ``system_admin`` only (else 403):
   appoint and remove System admins and Project Admins (``create_projects``); the last System
@@ -23,10 +24,12 @@ never assignable through the membership endpoints.
 from __future__ import annotations
 
 import uuid
+from collections.abc import Iterable, Mapping
 from datetime import timedelta
 from typing import Annotated, Any, Final
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
+from sqlalchemy.orm import Session
 
 from app.core.auth import service as auth_service
 from app.core.auth.access import (
@@ -59,6 +62,7 @@ from app.modules.admin.schemas import (
     UserSummary,
     UserUpdate,
 )
+from app.modules.teams import service as teams
 
 router = APIRouter(tags=["admin"])
 
@@ -93,14 +97,21 @@ def _require_project_admin(grants: list[Grant], is_admin: bool, project_id: uuid
         raise _forbidden()
 
 
-def _grant(row: MemberGrant) -> MemberGrantRead:
+def _grant(row: MemberGrant, team_names: Mapping[uuid.UUID, str]) -> MemberGrantRead:
     return MemberGrantRead(
         persona=row.grant.persona,
         site_node_id=row.grant.site_node_id,
         source=GrantSource.DIRECT if row.is_direct else GrantSource.TEAM,
         source_id=row.source_id,
-        team_name=None,  # filled in by the teams module (T-0013); core imports no module
+        # Core leaves it out (it imports no module); the teams service names the link's team.
+        team_name=team_names.get(row.source_id) if row.source_id is not None else None,
     )
+
+
+def _team_names(session: Session, members: Iterable[service.Member]) -> dict[uuid.UUID, str]:
+    """The team name of every team-derived grant of ``members`` (T-0013)."""
+    link_ids = {g.source_id for m in members for g in m.grants if g.source_id is not None}
+    return teams.link_team_names(session, link_ids)
 
 
 def _managed_through_team(exc: service.ManagedThroughTeamError) -> HTTPException:
@@ -114,7 +125,7 @@ def _managed_through_team(exc: service.ManagedThroughTeamError) -> HTTPException
     )
 
 
-def _member(member: service.Member) -> dict[str, Any]:
+def _member(member: service.Member, team_names: Mapping[uuid.UUID, str]) -> dict[str, Any]:
     grants = sorted(
         member.grants,
         key=lambda g: (
@@ -128,7 +139,7 @@ def _member(member: service.Member) -> dict[str, Any]:
         "user_id": member.user.id,
         "email": member.user.email,
         "display_name": member.user.display_name,
-        "grants": [_grant(g) for g in grants],
+        "grants": [_grant(g, team_names) for g in grants],
     }
 
 
@@ -211,7 +222,8 @@ def list_members(
 ) -> list[MemberRead]:
     _require_project_admin(grants, is_admin, project_id)
     members = service.project_members(session, project_id)
-    return [MemberRead.model_validate(_member(m)) for m in members]
+    names = _team_names(session, members)
+    return [MemberRead.model_validate(_member(m, names)) for m in members]
 
 
 @router.put(f"{MEMBERS}/{{user_id}}", response_model=MemberAssigned)
@@ -240,7 +252,8 @@ def assign_member(
             status.HTTP_409_CONFLICT,
             {"code": "sod_confirmation_required", "sod_warning": True, "message": str(exc)},
         ) from exc
-    return MemberAssigned.model_validate({**_member(member), "sod_warning": warn})
+    names = _team_names(session, [member])
+    return MemberAssigned.model_validate({**_member(member, names), "sod_warning": warn})
 
 
 @router.delete(f"{MEMBERS}/{{user_id}}", status_code=status.HTTP_204_NO_CONTENT)
