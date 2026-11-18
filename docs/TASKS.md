@@ -3,11 +3,11 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 65/172 tasks done (38%) · **ready now:** 19 · **epics awaiting breakdown:** 47
+**Overall:** 66/172 tasks done (38%) · **ready now:** 20 · **epics awaiting breakdown:** 47
 
 | Phase | Tasks done | Progress |
 |---|---|---|
-| 0 · Platform foundations | 65/88 | `███████░░░` 74% |
+| 0 · Platform foundations | 66/88 | `███████░░░` 75% |
 | 1 · Asset & Quality backbone | 0/75 (+1 epics) | `░░░░░░░░░░` 0% |
 | 2 · Welding quality | 0/9 | `░░░░░░░░░░` 0% |
 | 3 · Logistics | 0/0 (+7 epics) | `░░░░░░░░░░` 0% |
@@ -74,7 +74,7 @@
 | ✅ | [T-0021](../tracker/tasks/T-0021.md) | Observability + security headers (request id, structured logs, CSP/HSTS) | platform | S | T-0001 | #9 |
 | ⬜ | [T-0059](../tracker/tasks/T-0059.md) | Invite e-mail with setup_token and first-password set at invite acceptance for external invitees (one request: set password, accept, sign in) | admin | S | T-0052, T-0058, T-0077 |  |
 | ✅ | [T-0022](../tracker/tasks/T-0022.md) | Lint rule: heavy libs (fitz, cv2, rectpack, celpy, pyhanko) lazily imported | platform | S | T-0001 | #10 |
-| 🟪 | [T-0023](../tracker/tasks/T-0023.md) | onboarding: first-run provisioning (the deployment's hidden tenant, first System admin, deployment settings) | onboarding | S | T-0012, T-0014, T-0044, T-0079 | #124 |
+| ✅ | [T-0023](../tracker/tasks/T-0023.md) | onboarding: first-run provisioning (the deployment's hidden tenant, first System admin, deployment settings) | onboarding | S | T-0012, T-0014, T-0044, T-0079 | #124 |
 | ✅ | [T-0024](../tracker/tasks/T-0024.md) | Frontend shell: auth, design tokens, 8-group nav (4 pillars + Backbone/Overview/Documents/Admin), project switcher + All-Projects, generated API client | frontend | M | T-0002, T-0008 | #38 |
 | ✅ | [T-0046](../tracker/tasks/T-0046.md) | Field ergonomics tokens: 48 dp glove touch targets and an outdoor high-contrast theme (WCAG 2.1 AA) | frontend | S | T-0024 | #78 |
 | ✅ | [T-0025](../tracker/tasks/T-0025.md) | Reusable UI shells: RegisterPage, DetailPage (gate banner, tabs, audit), Dynamic Form Renderer | frontend | M | T-0024, T-0017 | #42 |
@@ -87,7 +87,7 @@
 | ▶ | [T-0051](../tracker/tasks/T-0051.md) | Admin access-request inbox screen: pending requests for the user's PER-09 projects, approve with persona/site scope, reject with optional reason | frontend | S | T-0050, T-0042 |  |
 | ⬜ | [T-0053](../tracker/tasks/T-0053.md) | Invite link screens: one-click 'Join project' for signed-in users, invite token carried through sign-in, land in the project (lobby skipped) | frontend | S | T-0052, T-0042, T-0055, T-0026 |  |
 | ▶ | [T-0055](../tracker/tasks/T-0055.md) | Web sign-in with Microsoft (Entra ID SSO): button when enabled, callback landing, translated refusals | frontend | S | T-0054, T-0042 |  |
-| ⬜ | [T-0027](../tracker/tasks/T-0027.md) | Playwright setup + Phase 0 exit journey | e2e | S | T-0023, T-0024, T-0018 |  |
+| ▶ | [T-0027](../tracker/tasks/T-0027.md) | Playwright setup + Phase 0 exit journey | e2e | S | T-0023, T-0024, T-0018 |  |
 | ▶ | [T-0056](../tracker/tasks/T-0056.md) | Transactional e-mails for access-request decisions (approve / reject) via the outbound e-mail service | admin | S | T-0050, T-0058 |  |
 | ⬜ | [T-0078](../tracker/tasks/T-0078.md) | Screens: create your password at invite acceptance, forgot password and reset password (web and Android) | frontend | S | T-0053, T-0059, T-0077 |  |
 | ✅ | [T-0028](../tracker/tasks/T-0028.md) | CI hardening: detect in ci-gate needs, least-privilege GHCR publish, SHA-pinned actions, base image digest + Renovate, drop empty postgres extra | platform | S | T-0004 | #18 |
