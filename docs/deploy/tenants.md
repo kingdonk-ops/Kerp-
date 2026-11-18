@@ -12,8 +12,8 @@ ADR 0011). A deployment has one hidden tenant (diff §4.1), `KERP_DEFAULT_TENANT
    `KERP_DEFAULT_TENANT_ID` row if it is missing and does nothing otherwise. T-0023's first-run
    command writes the deployment tenant through the same path.
 3. **Start** the API. Its start-up runs the same idempotent step before serving, so the
-   deployment tenant's row exists before any tenant-scoped insert. A database that is not
-   migrated makes start-up fail.
+   deployment tenant's row exists before any tenant-scoped insert. On a database not yet
+   migrated to `0026` it logs `tenant provisioning skipped` and creates nothing: migrate first.
 
 ## Upgrading a populated database to `0026`/`0027`
 

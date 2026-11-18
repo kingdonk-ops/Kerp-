@@ -62,11 +62,11 @@ NAMING_CONVENTION: Final[dict[str, str]] = {
     "pk": "pk_%(table_name)s",
 }
 
-# Allowed values of ``BaseRecordMixin.source``. ``ai`` writes need human confirmation
-# before they are applied (CLAUDE.md §6).
 # The tenants directory table (T-0079, ADR 0011): every ``tenant_id`` references its ``id``.
 TENANTS_TABLE: Final = "tenants"
 
+# Allowed values of ``BaseRecordMixin.source``. ``ai`` writes need human confirmation
+# before they are applied (CLAUDE.md §6).
 RECORD_SOURCES: Final[frozenset[str]] = frozenset({"ui", "api", "import", "sync", "ai", "system"})
 
 # The dedicated side-write pool (see ``Database.side_write_sessionmaker``). A write that must

@@ -4,7 +4,7 @@ PostgreSQL only: ``VALIDATE CONSTRAINT`` on every ``NOT VALID`` foreign key to `
 that ``0026`` added. It scans existing rows under a ``SHARE UPDATE EXCLUSIVE`` lock, so reads
 and writes go on meanwhile, and ``env.py`` runs it in its own transaction (one per revision),
 apart from ``0026``'s brief schema locks. Large deployments may run ``alembic upgrade 0026``
-and ``alembic upgrade 0027`` as two separate steps (``docs/deploy.md``). SQLite has no
+and ``alembic upgrade 0027`` as two separate steps (``docs/deploy/tenants.md``). SQLite has no
 ``NOT VALID``; nothing to do there.
 
 The downgrade is a no-op: a validated constraint is the same schema object; ``0026``'s
