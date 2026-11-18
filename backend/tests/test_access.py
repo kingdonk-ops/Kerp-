@@ -36,7 +36,7 @@ from app.core.auth.access import (
 )
 from app.core.auth.models import PERSONA_CODES, ProjectMembership
 from app.core.auth.runtime import AuthRuntime
-from app.core.db import NAMING_CONVENTION, BaseRecordMixin, Database, DbSession
+from app.core.db import NAMING_CONVENTION, TENANTS_TABLE, BaseRecordMixin, Database, DbSession
 from app.core.tenancy.context import TenancyContext
 from app.core.tenancy.rls import apply_rls_policies, session_tenancy
 from app.core.tenancy.scope import OutOfScopeError, SiteScopedMixin, get_or_404
@@ -51,7 +51,7 @@ from tests.auth_support import (
     seed_user,
 )
 from tests.auth_support import T1 as AUTH_T1
-from tests.db_support import Widget, database_url
+from tests.db_support import Widget, database_url, seed_tenants
 from tests.tenancy_support import CTX_A, PA, PB, PC, T1, seeded_database
 
 S1 = uuid.UUID("00000000-0000-4000-8000-0000000005a1")
@@ -249,6 +249,14 @@ class SiteBase(DeclarativeBase):
 SiteBase.metadata.naming_convention = NAMING_CONVENTION
 
 
+class SiteTenant(SiteBase, BaseRecordMixin):
+    """This scratch schema's ``tenants`` directory (T-0079), like ``db_support.ScratchTenant``."""
+
+    __tablename__ = TENANTS_TABLE
+
+    display_name: Mapped[str] = mapped_column(String(200), nullable=False)
+
+
 class Inspection(SiteBase, BaseRecordMixin, SiteScopedMixin):
     __tablename__ = "test_site_inspection"
 
@@ -265,6 +273,7 @@ def site_db(tmp_path: Path) -> Iterator[Database]:
     with database.engine.begin() as conn:
         apply_rls_policies(conn, SiteBase.metadata)
     try:
+        seed_tenants(database, T1)
         with database.unit_of_work(CTX_A) as s:
             for name, site in (("on-s1", S1), ("on-s2", S2), ("unplaced", None)):
                 s.add(Inspection(tenant_id=T1, project_id=PA, site_node_id=site, name=name))

@@ -34,6 +34,7 @@ from app.core.mail.transport import check_mail_config
 from app.core.module_loader.loader import DEFAULT_PACKAGE, install_modules, registry_of
 from app.core.request_context import RequestContextMiddleware
 from app.core.security_headers import SecurityHeadersMiddleware
+from app.core.tenancy.provision import ensure_default_tenant
 from app.core.tenancy.scope import OutOfScopeError
 from app.modules.jobs import mail as jobs_mail
 from app.modules.jobs.broker import LoopDispatcher, SaqBroker
@@ -64,6 +65,9 @@ def create_app(
         check_mail_config(settings)  # production refuses to start without SES (T-0058)
         # Team-derived grants without the teams module: refuse to start (T-0073, ADR 0008).
         check_team_grants_at_startup(database, registry_of(_app).names())
+        # The deployment's tenant has its directory row before any tenant-scoped insert
+        # (T-0079, ADR 0011): every tenant_id is a foreign key to it. Idempotent.
+        ensure_default_tenant(database, settings)
         # Jobs (T-0015): rows committed by requests are enqueued on SAQ after the commit.
         # Mail (T-0058): the jobs module installs core mail's post-commit enqueuer.
         broker = SaqBroker(settings.redis_url) if settings.redis_url else None

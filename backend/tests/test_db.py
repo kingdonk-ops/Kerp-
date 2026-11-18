@@ -25,7 +25,7 @@ from app.core.db import (
     utcnow,
 )
 from app.main import create_app
-from tests.db_support import ScratchBase, Widget, database_url
+from tests.db_support import ScratchBase, Widget, database_url, seed_tenants
 
 TENANT = uuid.UUID("00000000-0000-4000-8000-000000000001")
 PROJECT = uuid.UUID("00000000-0000-4000-8000-0000000000a1")
@@ -35,6 +35,7 @@ PROJECT = uuid.UUID("00000000-0000-4000-8000-0000000000a1")
 def db(tmp_path: Path) -> Iterator[Database]:
     database = Database(database_url(tmp_path))
     ScratchBase.metadata.create_all(database.engine)
+    seed_tenants(database, TENANT)
     try:
         yield database
     finally:
@@ -243,6 +244,7 @@ def db_app(tmp_path: Path) -> Iterator[FastAPI]:
     app = create_app(Settings(environment="test", database_url=database_url(tmp_path)))
     database: Database = app.state.db
     ScratchBase.metadata.create_all(database.engine)
+    seed_tenants(database, TENANT)
     try:
         yield app
     finally:

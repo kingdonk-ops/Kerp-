@@ -265,8 +265,11 @@ def test_demoting_a_project_row_to_tenant_level_is_refused(db: Database) -> None
 
 
 def test_rls_tables_cover_every_tenant_table() -> None:
-    assert rls_tables(ScratchBase.metadata) == ["test_gadget", "test_widget"]
-    assert rls_tables(ScratchBase.metadata, exempt=frozenset({"test_gadget"})) == ["test_widget"]
+    assert rls_tables(ScratchBase.metadata) == ["tenants", "test_gadget", "test_widget"]
+    assert rls_tables(ScratchBase.metadata, exempt=frozenset({"test_gadget"})) == [
+        "tenants",
+        "test_widget",
+    ]
 
 
 def test_policy_sql_forces_rls_and_guards_empty_settings() -> None:

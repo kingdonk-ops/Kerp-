@@ -8,12 +8,12 @@ import uuid
 from collections.abc import Iterator
 from pathlib import Path
 
-from sqlalchemy import select
+from sqlalchemy import inspect, select
 
 from app.core.db import Database
 from app.core.tenancy.context import TenancyContext
 from app.core.tenancy.rls import apply_rls_policies
-from tests.db_support import Gadget, ScratchBase, Widget, database_url
+from tests.db_support import Gadget, ScratchBase, Widget, database_url, seed_tenants
 
 T1 = uuid.UUID("00000000-0000-4000-8000-000000000001")
 T2 = uuid.UUID("00000000-0000-4000-8000-000000000002")
@@ -40,10 +40,15 @@ DELETED_IN_A = "a-deleted"
 def seeded_database(tmp_path: Path) -> Iterator[Database]:
     """Create the scratch tables (under RLS on PostgreSQL), seed them, drop them after."""
     db = Database(database_url(tmp_path))
-    ScratchBase.metadata.create_all(db.engine)
+    # Over a migrated schema the real ``tenants`` directory already exists: reuse it and leave
+    # it to the migration's downgrade (T-0079).
+    existing = set(inspect(db.engine).get_table_names())
+    created = [t for t in ScratchBase.metadata.sorted_tables if t.name not in existing]
+    ScratchBase.metadata.create_all(db.engine, tables=created)
     with db.engine.begin() as conn:
         apply_rls_policies(conn, ScratchBase.metadata)
     try:
+        seed_tenants(db, T1, T2)
         for ctx, widgets, gadgets in SEED:
             with db.unit_of_work(ctx) as s:
                 s.add_all(
@@ -60,7 +65,7 @@ def seeded_database(tmp_path: Path) -> Iterator[Database]:
             s.add(deleted)
         yield db
     finally:
-        ScratchBase.metadata.drop_all(db.engine)
+        ScratchBase.metadata.drop_all(db.engine, tables=created)
         db.dispose()
 
 

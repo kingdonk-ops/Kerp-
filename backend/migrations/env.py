@@ -44,6 +44,9 @@ def run_migrations_offline() -> None:
         dialect_opts={"paramstyle": "named"},
         compare_type=True,
         include_object=include_object,
+        # Online and offline alike (T-0079, ADR 0011): ``--sql`` output commits each
+        # revision apart, so ``0027``'s VALIDATE never runs under ``0026``'s locks.
+        transaction_per_migration=True,
     )
     with context.begin_transaction():
         context.run_migrations()
@@ -58,6 +61,9 @@ def run_migrations_online() -> None:
             compare_type=True,
             include_object=include_object,
             render_as_batch=connection.dialect.name == "sqlite",
+            # One transaction per revision (T-0079, ADR 0011): a revision that validates a
+            # ``NOT VALID`` constraint must not run inside the transaction that added it.
+            transaction_per_migration=True,
         )
         with context.begin_transaction():
             context.run_migrations()

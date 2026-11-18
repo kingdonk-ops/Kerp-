@@ -89,6 +89,23 @@ own-rows clauses let it read the caller's memberships and grants without dependi
 decides (TD-152). Seeds, scripts and provisioning jobs that need every project row bind
 `TenancyContext(tenant_id, is_system_admin=True)` explicitly.
 
+## Tenants directory (T-0079, ADR 0011)
+
+`tenants` (`models.py`, `Tenant`) is the directory every `tenant_id` references: the FK is
+declared once on `BaseRecordMixin` (`fk_<table>_tenant_id_tenants`). The row's `tenant_id` is
+its own `id` (CHECK `own_tenant`) and it is tenant-level (CHECK `tenant_level`), so the standard
+policies show and let a session write only its own tenant's row. The tenant is hidden from users
+(diff §4.1): no endpoint exposes it.
+
+`provision.ensure_tenant(db, tenant_id, display_name)` is the one runtime writer: idempotent,
+in a tenant-level unit of work bound to that tenant. The API start-up runs it for
+`KERP_DEFAULT_TENANT_ID` (`ensure_default_tenant`); `python -m app.core.tenancy.provision` does
+the same by hand; T-0023's first-run command uses it. Migrations `0026` (table, backfill, FKs
+`NOT VALID`) and `0027` (`VALIDATE CONSTRAINT`): provisioning order and upgrade steps in
+`docs/deploy/tenants.md`. `tenant_fk_problems(connection)` lists tables whose `tenant_id` lacks
+the (validated) FK; `tests/test_tenants.py` runs it at head. Test fixtures create their tenant
+rows with `tests/db_support.seed_tenants` (synthetic ids only).
+
 ## Binding
 
 - **Requests:** `get_db` binds the session to `get_tenancy_context()` (`context.py`), which

@@ -27,6 +27,7 @@ from sqlalchemy import (
     CHAR,
     JSON,
     DateTime,
+    ForeignKey,
     Integer,
     MetaData,
     String,
@@ -60,6 +61,9 @@ NAMING_CONVENTION: Final[dict[str, str]] = {
     "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
     "pk": "pk_%(table_name)s",
 }
+
+# The tenants directory table (T-0079, ADR 0011): every ``tenant_id`` references its ``id``.
+TENANTS_TABLE: Final = "tenants"
 
 # Allowed values of ``BaseRecordMixin.source``. ``ai`` writes need human confirmation
 # before they are applied (CLAUDE.md §6).
@@ -129,7 +133,8 @@ class BaseRecordMixin:
     """The KERP record contract. Every table carries these columns.
 
     * ``id``: UUID primary key.
-    * ``tenant_id``: mandatory and indexed. It comes from the JWT only and is the RLS key.
+    * ``tenant_id``: mandatory, indexed, a foreign key to the ``tenants`` directory table
+      (master spec §1.1, ADR 0011). It comes from the JWT only and is the RLS key.
     * ``project_id``: indexed. ``NULL`` marks a tenant-level row, such as the project row
       itself or a tenant-wide library. A model that must always belong to a project
       redeclares it as ``nullable=False``.
@@ -144,7 +149,9 @@ class BaseRecordMixin:
     """
 
     id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
-    tenant_id: Mapped[uuid.UUID] = mapped_column(GUID(), nullable=False, index=True)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        GUID(), ForeignKey(f"{TENANTS_TABLE}.id"), nullable=False, index=True
+    )
     project_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utcnow
@@ -220,6 +227,11 @@ def _table_violations(table: Table) -> list[str]:
             problems.append(f"{table.name}: missing mixin column '{column_name}'")
         elif must_be_not_null and column.nullable:
             problems.append(f"{table.name}: '{column_name}' must be NOT NULL")
+    tenant_column = table.columns.get("tenant_id")
+    if tenant_column is not None and not any(
+        fk.target_fullname == f"{TENANTS_TABLE}.id" for fk in tenant_column.foreign_keys
+    ):
+        problems.append(f"{table.name}: 'tenant_id' must reference {TENANTS_TABLE}.id")
     id_column = table.columns.get("id")
     if id_column is not None and not id_column.primary_key:
         problems.append(f"{table.name}: 'id' must be the primary key")
@@ -425,4 +437,5 @@ from app.core.audit import models as _audit_models  # noqa: E402, F401
 from app.core.auth import models as _auth_models  # noqa: E402, F401
 from app.core.mail import models as _mail_models  # noqa: E402, F401  (T-0058)
 from app.core.module_loader import models as _module_models  # noqa: E402, F401
+from app.core.tenancy import models as _tenancy_models  # noqa: E402, F401  (T-0079)
 from app.core.tenancy import scope as _tenancy_scope  # noqa: E402, F401

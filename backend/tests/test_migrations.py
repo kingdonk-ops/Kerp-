@@ -4,6 +4,7 @@
 without its migration breaks CI.
 """
 
+import io
 from pathlib import Path
 
 import pytest
@@ -42,7 +43,7 @@ def test_upgrade_head_then_check_is_clean(url: str) -> None:
         engine = create_engine(url)
         try:
             with engine.connect() as conn:
-                assert MigrationContext.configure(conn).get_current_revision() == "0025"
+                assert MigrationContext.configure(conn).get_current_revision() == "0027"
         finally:
             engine.dispose()
     finally:
@@ -89,6 +90,29 @@ def test_env_requires_a_url(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_offline_sql_generation(url: str, capsys: pytest.CaptureFixture[str]) -> None:
     command.upgrade(_config(url), "head", sql=True)
     assert "alembic_version" in capsys.readouterr().out
+
+
+def test_offline_sql_commits_each_revision_apart() -> None:
+    """``--sql`` output runs ``0027``'s VALIDATE in its own transaction (T-0079, ADR 0011).
+
+    Offline generation never connects, so a PostgreSQL URL renders the transactional DDL.
+    """
+    cfg = _config("postgresql+psycopg://offline@localhost/offline")
+    cfg.output_buffer = io.StringIO()
+    command.upgrade(cfg, "0025:0027", sql=True)
+    lines = [
+        line
+        for line in cfg.output_buffer.getvalue().splitlines()
+        if line in ("BEGIN;", "COMMIT;") or line.startswith("-- Running upgrade")
+    ]
+    assert lines == [
+        "BEGIN;",
+        "-- Running upgrade 0025 -> 0026",
+        "COMMIT;",
+        "BEGIN;",
+        "-- Running upgrade 0026 -> 0027",
+        "COMMIT;",
+    ]
 
 
 def test_unknown_revision_is_an_error(url: str) -> None:

@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 219 · **Closed:** 129
+**Open:** 219 · **Closed:** 130
 
 ## decision (8)
 
@@ -74,12 +74,11 @@
 | [TD-327](../tracker/todo/TD-327.md) | Frontend i18n key notifications.kind.access_requests.requested for the inbox (needed when the access-request UI lands) | T-0050 | reviewer |
 | [TD-337](../tracker/todo/TD-337.md) | Web/Android route /magic-link#<token> that redeems the e-mailed sign-in link (POST /auth/magic-link/redeem); the e-mail now links there | T-0058 | implementer |
 
-## deferred (35)
+## deferred (34)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
 | [TD-011](../tracker/todo/TD-011.md) | forms F13 report-slot mapping + F14 AI import assistant (SPEC-11 §2) not in Phase 1 tasks | T-0110 | planner |
-| [TD-032](../tracker/todo/TD-032.md) | tenant_id FK to the tenants directory table (spec §1.1) once the tenants table exists | T-0005, T-0079 | implementer |
 | [TD-041](../tracker/todo/TD-041.md) | CEL parity gaps between celpy 0.5.0 and @marcbachmann/cel-js 8 (pinned known_gap fixtures) must be closed or accepted before T-0131 | T-0017, T-0018 | implementer |
 | [TD-047](../tracker/todo/TD-047.md) | Automate refresh of backend/requirements*.lock (uv pip compile output): Dependabot pip does not find *.lock files or re-run uv; options: scheduled uv --upgrade workflow opening a PR, or Renovate pip-compile manager | T-0028, T-0032 | implementer |
 | [TD-074](../tracker/todo/TD-074.md) | Handover: offline drafting on tablets via the Dexie outbox | E-04-11 | planner |
@@ -228,7 +227,7 @@
 | [TD-330](../tracker/todo/TD-330.md) | scripts/pr_suggestions.py rebuild fails in cloud sessions: gh api --paginate follows numeric-ID repository Link URLs that the agent proxy rejects (HTTP 403); paginate with explicit repos/{owner}/{repo} page params | — | coordinator |
 | [TD-339](../tracker/todo/TD-339.md) | jobs LoopDispatcher.drain can spin forever when the commit ran on the loop's own thread (finished tasks stay in the set until their done callbacks run) | T-0058 | implementer |
 
-## risk (26)
+## risk (27)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -258,6 +257,7 @@
 | [TD-342](../tracker/todo/TD-342.md) | SNS endpoint /api/v1/mail/ses-events fetches an uncached certificate per new SigningCertURL path before the signature check (outbound-GET amplification for anyone knowing the topic ARN) | T-0058 | reviewer |
 | [TD-346](../tracker/todo/TD-346.md) | NFR perf job timings on shared GitHub runners are noisy (form open median ~0.3 s locally at 4x throttle); before T-0146 makes it a hard gate, decide on retries/headroom or a dedicated runner and keep a trend of perf-results.json | T-0045, T-0146 | implementer |
 | [TD-349](../tracker/todo/TD-349.md) | T-0073: census read policy on auth_project_membership is opened by the app.team_link_census setting | T-0073 | implementer |
+| [TD-353](../tracker/todo/TD-353.md) | 0026 holds ACCESS EXCLUSIVE on every tenant-scoped table during the tenants backfill (FORCE RLS toggle); revisit before any populated deployment | T-0079 | implementer |
 
 ## Closed
 
@@ -288,6 +288,7 @@
 | ⚫ | [TD-029](../tracker/todo/TD-029.md) | Backend image is linux/amd64 only (locks target x86_64-manylinux_2_28); add arm64 if a deployment target needs it | Production on AWS x86_64 is enough; reopen if an arm64 (Graviton) target is chosen (user, 2026-11-09) |
 | ✅ | [TD-030](../tracker/todo/TD-030.md) | CI: detect job is not in ci-gate.needs - if detect fails, backend/frontend/e2e/backend-image are skipped and ci-gate still passes; add detect to needs and fail on non-success | T-0028: detect is in ci-gate.needs; scripts/ci_gate.py fails the gate unless every needed job is success, or skipped only when its component is absent (detect output false) or it is the push-only publish job on a non-push event. Tested in scripts/tests/test_ci_gate.py. |
 | ✅ | [TD-031](../tracker/todo/TD-031.md) | CI hardening: split GHCR publish into a push-only job holding packages:write, pin docker/* actions to commit SHAs, persist-credentials:false; declare packaging as backend dev dep; assert .dockerignore starts with * | T-0028: GHCR publish moved to the push-only backend-publish job, the only job with packages:write; all actions in ci.yml (incl. docker/*) pinned to commit SHAs; every checkout sets persist-credentials:false; packaging declared as a backend dev dependency; test asserts .dockerignore starts with *. |
+| ✅ | [TD-032](../tracker/todo/TD-032.md) | tenant_id FK to the tenants directory table (spec §1.1) once the tenants table exists | Done in T-0079 (ADR 0011): tenants directory table; BaseRecordMixin.tenant_id is a FK to tenants.id on every table (migrations 0026 NOT VALID + 0027 VALIDATE). |
 | ✅ | [TD-033](../tracker/todo/TD-033.md) | Default soft-delete filtering: exclude deleted_at IS NOT NULL from ORM reads unless opted in | Done in T-0007: app/core/tenancy/scope.py adds a do_orm_execute with_loader_criteria filter on BaseRecordMixin that hides deleted_at IS NOT NULL rows from every ORM SELECT unless the statement sets execution_options(include_deleted=True). Raw SQL and Core table selects are not filtered. |
 | ✅ | [TD-034](../tracker/todo/TD-034.md) | Port/rewrite assessment of remaining Inspection-ERP core packages (jobs, sync, forms, workflow, events, files, schema_engine/items/mapping, reporting) | ADR 0007 (docs/decisions/0007-port-remaining-inspection-erp-core.md): jobs rewrite on SAQ (record shape as reference, table keeps RLS); sync port skeleton + rewrite apply for ADR 0005; files port helpers + rewrite as presigned; events do not port (transactional outbox); forms/workflow/schema_engine/items/mapping do not port; reporting port and adapt |
 | ✅ | [TD-036](../tracker/todo/TD-036.md) | Guard against bare Depends(get_db) outside app/core/db.py (endpoints must use DbSession) | Done in T-0011: backend/tests/test_lint_get_db.py walks every file under backend/app and fails if anything other than app/core/db.py names get_db (import, call, attribute or alias), so endpoints must use DbSession. |
