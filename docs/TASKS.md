@@ -74,7 +74,7 @@
 | ✅ | [T-0021](../tracker/tasks/T-0021.md) | Observability + security headers (request id, structured logs, CSP/HSTS) | platform | S | T-0001 | #9 |
 | ⬜ | [T-0059](../tracker/tasks/T-0059.md) | Invite e-mail with setup_token and first-password set at invite acceptance for external invitees (one request: set password, accept, sign in) | admin | S | T-0052, T-0058, T-0077 |  |
 | ✅ | [T-0022](../tracker/tasks/T-0022.md) | Lint rule: heavy libs (fitz, cv2, rectpack, celpy, pyhanko) lazily imported | platform | S | T-0001 | #10 |
-| 🟦 | [T-0023](../tracker/tasks/T-0023.md) | onboarding: first-run provisioning (the deployment's hidden tenant, first System admin, deployment settings) | onboarding | S | T-0012, T-0014, T-0044, T-0079 |  |
+| 🟪 | [T-0023](../tracker/tasks/T-0023.md) | onboarding: first-run provisioning (the deployment's hidden tenant, first System admin, deployment settings) | onboarding | S | T-0012, T-0014, T-0044, T-0079 | #124 |
 | ✅ | [T-0024](../tracker/tasks/T-0024.md) | Frontend shell: auth, design tokens, 8-group nav (4 pillars + Backbone/Overview/Documents/Admin), project switcher + All-Projects, generated API client | frontend | M | T-0002, T-0008 | #38 |
 | ✅ | [T-0046](../tracker/tasks/T-0046.md) | Field ergonomics tokens: 48 dp glove touch targets and an outdoor high-contrast theme (WCAG 2.1 AA) | frontend | S | T-0024 | #78 |
 | ✅ | [T-0025](../tracker/tasks/T-0025.md) | Reusable UI shells: RegisterPage, DetailPage (gate banner, tabs, audit), Dynamic Form Renderer | frontend | M | T-0024, T-0017 | #42 |
