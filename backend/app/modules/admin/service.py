@@ -225,11 +225,12 @@ def create_user(
     session: Session,
     data: UserCreate,
     *,
-    actor_id: uuid.UUID,
+    actor_id: uuid.UUID | None,
     internal_domains: Collection[str] | None = None,
 ) -> User:
     """A new account without credentials; ``is_internal`` is derived by core auth from
-    ``internal_domains`` (default: ``KERP_INTERNAL_EMAIL_DOMAINS``)."""
+    ``internal_domains`` (default: ``KERP_INTERNAL_EMAIL_DOMAINS``). ``actor_id`` is ``None``
+    only for first-run provisioning (T-0023), which has no signed-in actor."""
     if users.find_user_by_email(session, data.email) is not None:
         raise DuplicateUserError("an account with this e-mail exists already")
     try:

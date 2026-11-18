@@ -51,6 +51,13 @@ instead (T-0014, TD-053, edge spec §6 amendments), declared on the model's tabl
   ``app.team_lookup`` for its own read, which only *narrows* the policies (they skip the
   function call while it is raised), so nothing recurses and setting it widens nothing.
 
+* ``tenants`` (the directory, T-0079) keeps the standard policies plus one extra read policy
+  (T-0023, ADR 0012): ``tenant_directory_census_policy`` shows every directory row, of any
+  tenant, but only while ``app.tenant_census`` is raised, which only the census function
+  ``kerp_tenant_directory_count()`` (migration ``0029``) does, for its own count, before
+  restoring the caller's value. First-run provisioning uses the count to refuse a second
+  tenant in a deployment.
+
 * ``NULLIF(..., '')``: once a connection has set a custom setting, it reads back as ``''``
   after the transaction, not ``NULL``. ``''::uuid`` would raise; ``NULL`` matches nothing.
   An unbound session therefore sees no rows and cannot write any (fail closed).
@@ -109,6 +116,14 @@ MEMBERSHIP_POLICY_NAMES: Final = (
 MEMBERSHIP_CENSUS_POLICY_NAME: Final = "membership_team_link_census_policy"
 CENSUS_SETTING: Final = "app.team_link_census"
 DIRECT_SOURCE: Final = "direct"
+# The extra read policy of the tenants directory (T-0023, ADR 0012): only while the census
+# function of migration 0029 raises ``app.tenant_census`` for its own count.
+# ``app.core.db.TENANTS_TABLE`` (``db`` imports this module, so it is repeated here; a test
+# keeps the two equal).
+TENANTS_TABLE: Final = "tenants"
+TENANT_CENSUS_POLICY_NAME: Final = "tenant_directory_census_policy"
+TENANT_CENSUS_SETTING: Final = "app.tenant_census"
+TENANT_CENSUS_FUNCTION: Final = "kerp_tenant_directory_count"
 ADMIN_GRANT_POLICY_NAMES: Final = ("admin_grant_read_policy", "admin_grant_write_policy")
 TEAM_POLICY_NAMES: Final = ("team_read_policy", "team_write_policy")
 # The visible-team function of a ``team`` policy (T-0013) and the flag it raises for its own
@@ -212,6 +227,17 @@ def membership_census_sql(source_column: str) -> str:
     ``app.team_link_census`` is raised (by the census function of migration ``0025``)."""
     census = f"COALESCE(NULLIF(current_setting('{CENSUS_SETTING}', true), '')::boolean, false)"
     return f"{census} AND {source_column} <> '{DIRECT_SOURCE}' AND deleted_at IS NULL"
+
+
+def tenant_census_policy_sql(table: str = TENANTS_TABLE) -> list[str]:
+    """The census read policy of the tenants directory (T-0023, ADR 0012): every row of any
+    tenant, only while ``app.tenant_census`` is raised (by ``kerp_tenant_directory_count()``)."""
+    raised = f"NULLIF(current_setting('{TENANT_CENSUS_SETTING}', true), '')::boolean"
+    census = f"COALESCE({raised}, false)"
+    return [
+        f"DROP POLICY IF EXISTS {TENANT_CENSUS_POLICY_NAME} ON {table}",
+        f"CREATE POLICY {TENANT_CENSUS_POLICY_NAME} ON {table} FOR SELECT USING ({census})",
+    ]
 
 
 def access_request_visible_sql(project_column: str, owner_column: str) -> str:
@@ -370,6 +396,8 @@ def expected_policy_names(table: Table) -> tuple[str, ...]:
     """The policies ``rls_coverage_problems`` requires on ``table``."""
     policy = table_policy(table)
     if policy is None:
+        if table.name == TENANTS_TABLE:
+            return (*POLICY_NAMES, TENANT_CENSUS_POLICY_NAME)
         return POLICY_NAMES
     if policy.kind == "access_request":
         return ACCESS_REQUEST_POLICY_NAMES
@@ -423,6 +451,9 @@ def apply_rls_policies(connection: Connection, metadata: MetaData) -> list[str]:
     for table in tables:
         for statement in rls_policy_sql(table, table_policy(metadata.tables[table])):
             connection.execute(text(statement))
+        if table == TENANTS_TABLE:
+            for statement in tenant_census_policy_sql(table):
+                connection.execute(text(statement))
     return tables
 
 

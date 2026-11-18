@@ -10,6 +10,8 @@
   the update (``InvalidSettingsError``, 422). Changes are appended to the audit chain
   ``deployment-settings:<tenant>`` with ``{field: [old, new]}``; a call that changes nothing
   writes nothing. Authorisation (``system_admin``) is the router's.
+* ``ensure_record``: first-run provisioning (T-0023) stores the shipped defaults as the
+  tenant's record, unless one exists; audited as ``{"action": "provision"}``.
 """
 
 from __future__ import annotations
@@ -38,6 +40,7 @@ __all__ = [
     "ConcurrentUpdateError",
     "InvalidSettingsError",
     "ProjectDefaults",
+    "ensure_record",
     "get_settings",
     "project_defaults",
     "stored_record",
@@ -100,6 +103,32 @@ def project_defaults(session: Session) -> ProjectDefaults:
         currency_code=values.default_currency_code,
         locale=values.default_locale,
     )
+
+
+def ensure_record(session: Session, *, actor_id: uuid.UUID | None) -> bool:
+    """Store ``SHIPPED_DEFAULTS`` as the tenant's record unless it has one (first-run
+    provisioning, T-0023). True if it was created. Needs a tenant-level session."""
+    tenant_id = _context_tenant(session, tenant_level=True)
+    if stored_record(session, for_update=True) is not None:
+        return False
+    record = DeploymentSettings(
+        id=uuid.uuid4(),
+        tenant_id=tenant_id,
+        project_id=None,
+        created_by=actor_id,
+        updated_by=actor_id,
+        source="system",
+        **SHIPPED_DEFAULTS.as_dict(),
+    )
+    session.add(record)
+    try:
+        session.flush()
+    except IntegrityError as exc:
+        raise ConcurrentUpdateError("the deployment settings changed meanwhile; retry") from exc
+    payload = {"action": "provision", "values": SHIPPED_DEFAULTS.as_dict()}
+    chain = f"{CHAIN_PREFIX}{tenant_id}"
+    audit.append(session, chain, payload, actor_id=actor_id, source="system")
+    return True
 
 
 def update_settings(
