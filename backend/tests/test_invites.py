@@ -655,7 +655,8 @@ def test_a_re_send_rotates_the_token(api: Api) -> None:
     assert [e["reason"] for e in api.audit(chain="project-invites")] == ["unmatched_token"]
     resent = api.audit()[1]
     assert resent["invite_id"] == first["id"]
-    assert set(resent) == {"action", "invite_id", "expires_at"}  # actor, invite; no token
+    # Actor, invite, whether the e-mail was queued (T-0059); no token.
+    assert set(resent) == {"action", "invite_id", "expires_at", "email_queued"}
 
 
 def test_an_expired_invite_is_re_sent_as_pending(api: Api) -> None:

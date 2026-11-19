@@ -4048,6 +4048,128 @@
         ]
       }
     },
+    "/api/v1/admin/invites/setup-preview": {
+      "post": {
+        "tags": [
+          "admin",
+          "admin"
+        ],
+        "summary": "Setup Preview",
+        "description": "What the e-mailed invite link shows before sign-in (no session needed; both tokens of\n`/invite#<invite_token>.<setup_token>` in the body): the project's code and name and\n`can_set_password: true` for an account without credentials. For an account that already\nhas credentials only `can_set_password: false`: sign in, the invite is accepted right\nafter. A copied link has no `setup_token` and cannot use this endpoint.",
+        "operationId": "setup_preview_api_v1_admin_invites_setup_preview_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InviteSetupIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InviteSetupPreview"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "`INVITE_GONE`: expired, revoked, used or unknown (one neutral message)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InviteRefusal"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/invites/accept-with-password": {
+      "post": {
+        "tags": [
+          "admin",
+          "admin"
+        ],
+        "summary": "Accept With Password",
+        "description": "A brand-new invitee sets their first password from the e-mailed invite link, joins\nthe project and is signed in: one request, one transaction (diff §4.1). Only for an\nactive account without credentials whose e-mail is the invited one. The answer is the\nnormal token response of a sign-in (refresh cookie, or the body for a native app) with\n`joined_project_id`. Single use, also under concurrency.",
+        "operationId": "accept_with_password_api_v1_admin_invites_accept_with_password_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InviteAcceptWithPassword"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponse"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "`INVITE_GONE`: expired, revoked, used or unknown (one neutral message)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InviteRefusal"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`code: DEVICE_REVOKED`: `X-KERP-Device-Id` names a revoked device (wipe its local data). Answered only for valid tokens and an acceptable password; nothing was changed and the invite stays pending"
+          },
+          "409": {
+            "description": "`INVITE_SIGN_IN_REQUIRED`: the account already has credentials. Sign in instead (with the `invite_token`); nothing was changed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InviteRefusal"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The password policy refused the new password: `{detail, code, min_length, max_length}` with `code` `PASSWORD_TOO_SHORT`, `PASSWORD_TOO_LONG` or `PASSWORD_TOO_COMMON` (the invite stays pending, the link still works). Or a malformed body"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/uploads/projects/{project_id}/files": {
       "post": {
         "tags": [
@@ -8119,6 +8241,37 @@
         ],
         "title": "HealthResponse"
       },
+      "InviteAcceptWithPassword": {
+        "properties": {
+          "invite_token": {
+            "type": "string",
+            "maxLength": 512,
+            "minLength": 1,
+            "title": "Invite Token"
+          },
+          "setup_token": {
+            "type": "string",
+            "maxLength": 512,
+            "minLength": 1,
+            "title": "Setup Token"
+          },
+          "new_password": {
+            "type": "string",
+            "maxLength": 1024,
+            "minLength": 1,
+            "title": "New Password"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "invite_token",
+          "setup_token",
+          "new_password"
+        ],
+        "title": "InviteAcceptWithPassword",
+        "description": "Set the first password, accept the invite and sign in (one request)."
+      },
       "InviteAccepted": {
         "properties": {
           "joined_project_id": {
@@ -8353,7 +8506,8 @@
               "INVITE_WRONG_USER",
               "INVITE_GONE",
               "INVITE_CONFLICT",
-              "INVITE_NOT_RESENDABLE"
+              "INVITE_NOT_RESENDABLE",
+              "INVITE_SIGN_IN_REQUIRED"
             ],
             "title": "Code"
           }
@@ -8441,6 +8595,66 @@
         ],
         "title": "InviteSent",
         "description": "An invite right after a send (creation or re-send), with the copyable link. Shown\nonce: the server keeps only a hash of the token. The link carries the `invite_token`\nonly, so it can never set a password (diff §4.1)."
+      },
+      "InviteSetupIn": {
+        "properties": {
+          "invite_token": {
+            "type": "string",
+            "maxLength": 512,
+            "minLength": 1,
+            "title": "Invite Token"
+          },
+          "setup_token": {
+            "type": "string",
+            "maxLength": 512,
+            "minLength": 1,
+            "title": "Setup Token"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "invite_token",
+          "setup_token"
+        ],
+        "title": "InviteSetupIn",
+        "description": "Both tokens of the **e-mailed** invite link (`/invite#<invite_token>.<setup_token>`):\nalways in the body, never in a URL. Loose bounds on purpose: any wrong token gets the\nneutral 410."
+      },
+      "InviteSetupPreview": {
+        "properties": {
+          "can_set_password": {
+            "type": "boolean",
+            "title": "Can Set Password"
+          },
+          "project_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Code"
+          },
+          "project_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "can_set_password"
+        ],
+        "title": "InviteSetupPreview",
+        "description": "What the e-mailed link shows before sign-in. `can_set_password: false`: the account\nalready has credentials, so sign in (the invite is accepted right after); the project is\nnot named then."
       },
       "InviteTokenIn": {
         "properties": {

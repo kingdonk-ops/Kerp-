@@ -23,6 +23,7 @@ from app.core.mail.service import send_mail
 send_mail(session, "auth.magic_link", user.email, {"token": token, "expires_minutes": 15})
 # Core templates: auth.magic_link, auth.password_reset (link /reset-password#<token>),
 # auth.password_changed (the notice after a reset; no parameters) - T-0077.
+# Module templates: admin.project_invite (link /invite#<invite_token>.<setup_token>) - T-0059.
 ```
 
 - Call it inside the caller's unit of work. It checks the template and the address, adds a

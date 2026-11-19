@@ -1183,6 +1183,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/invites/setup-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Setup Preview
+         * @description What the e-mailed invite link shows before sign-in (no session needed; both tokens of
+         *     `/invite#<invite_token>.<setup_token>` in the body): the project's code and name and
+         *     `can_set_password: true` for an account without credentials. For an account that already
+         *     has credentials only `can_set_password: false`: sign in, the invite is accepted right
+         *     after. A copied link has no `setup_token` and cannot use this endpoint.
+         */
+        post: operations["setup_preview_api_v1_admin_invites_setup_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/invites/accept-with-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Accept With Password
+         * @description A brand-new invitee sets their first password from the e-mailed invite link, joins
+         *     the project and is signed in: one request, one transaction (diff §4.1). Only for an
+         *     active account without credentials whose e-mail is the invited one. The answer is the
+         *     normal token response of a sign-in (refresh cookie, or the body for a native app) with
+         *     `joined_project_id`. Single use, also under concurrency.
+         */
+        post: operations["accept_with_password_api_v1_admin_invites_accept_with_password_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/uploads/projects/{project_id}/files": {
         parameters: {
             query?: never;
@@ -2540,6 +2588,18 @@ export interface components {
              */
             warnings?: string[] | null;
         };
+        /**
+         * InviteAcceptWithPassword
+         * @description Set the first password, accept the invite and sign in (one request).
+         */
+        InviteAcceptWithPassword: {
+            /** Invite Token */
+            invite_token: string;
+            /** Setup Token */
+            setup_token: string;
+            /** New Password */
+            new_password: string;
+        };
         /** InviteAccepted */
         InviteAccepted: {
             /**
@@ -2676,7 +2736,7 @@ export interface components {
              * Code
              * @enum {string}
              */
-            code: "INVITE_WRONG_USER" | "INVITE_GONE" | "INVITE_CONFLICT" | "INVITE_NOT_RESENDABLE";
+            code: "INVITE_WRONG_USER" | "INVITE_GONE" | "INVITE_CONFLICT" | "INVITE_NOT_RESENDABLE" | "INVITE_SIGN_IN_REQUIRED";
         };
         /**
          * InviteSent
@@ -2725,6 +2785,32 @@ export interface components {
              * @description `<web origin>/invite#<invite_token>` (URL fragment)
              */
             invite_link: string;
+        };
+        /**
+         * InviteSetupIn
+         * @description Both tokens of the **e-mailed** invite link (`/invite#<invite_token>.<setup_token>`):
+         *     always in the body, never in a URL. Loose bounds on purpose: any wrong token gets the
+         *     neutral 410.
+         */
+        InviteSetupIn: {
+            /** Invite Token */
+            invite_token: string;
+            /** Setup Token */
+            setup_token: string;
+        };
+        /**
+         * InviteSetupPreview
+         * @description What the e-mailed link shows before sign-in. `can_set_password: false`: the account
+         *     already has credentials, so sign in (the invite is accepted right after); the project is
+         *     not named then.
+         */
+        InviteSetupPreview: {
+            /** Can Set Password */
+            can_set_password: boolean;
+            /** Project Code */
+            project_code?: string | null;
+            /** Project Name */
+            project_name?: string | null;
         };
         /**
          * InviteTokenIn
@@ -7089,6 +7175,104 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+        };
+    };
+    setup_preview_api_v1_admin_invites_setup_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InviteSetupIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InviteSetupPreview"];
+                };
+            };
+            /** @description `INVITE_GONE`: expired, revoked, used or unknown (one neutral message) */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InviteRefusal"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    accept_with_password_api_v1_admin_invites_accept_with_password_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InviteAcceptWithPassword"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TokenResponse"];
+                };
+            };
+            /** @description `code: DEVICE_REVOKED`: `X-KERP-Device-Id` names a revoked device (wipe its local data). Answered only for valid tokens and an acceptable password; nothing was changed and the invite stays pending */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `INVITE_SIGN_IN_REQUIRED`: the account already has credentials. Sign in instead (with the `invite_token`); nothing was changed */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InviteRefusal"];
+                };
+            };
+            /** @description `INVITE_GONE`: expired, revoked, used or unknown (one neutral message) */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InviteRefusal"];
+                };
+            };
+            /** @description The password policy refused the new password: `{detail, code, min_length, max_length}` with `code` `PASSWORD_TOO_SHORT`, `PASSWORD_TOO_LONG` or `PASSWORD_TOO_COMMON` (the invite stays pending, the link still works). Or a malformed body */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

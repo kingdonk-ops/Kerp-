@@ -247,6 +247,35 @@ class InviteTokenIn(BaseModel):
     invite_token: str = Field(min_length=16, max_length=INVITE_TOKEN_MAX, repr=False)
 
 
+class InviteSetupIn(BaseModel):
+    """Both tokens of the **e-mailed** invite link (`/invite#<invite_token>.<setup_token>`):
+    always in the body, never in a URL. Loose bounds on purpose: any wrong token gets the
+    neutral 410."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    invite_token: str = Field(min_length=1, max_length=INVITE_TOKEN_MAX, repr=False)
+    setup_token: str = Field(min_length=1, max_length=INVITE_TOKEN_MAX, repr=False)
+
+
+class InviteAcceptWithPassword(InviteSetupIn):
+    """Set the first password, accept the invite and sign in (one request)."""
+
+    # Bounded so a huge body cannot make scrypt hash megabytes; the password policy
+    # (minimum length, at most 256 characters, blocklist) answers with a ``code``.
+    new_password: str = Field(min_length=1, max_length=1024, repr=False)
+
+
+class InviteSetupPreview(BaseModel):
+    """What the e-mailed link shows before sign-in. `can_set_password: false`: the account
+    already has credentials, so sign in (the invite is accepted right after); the project is
+    not named then."""
+
+    can_set_password: bool
+    project_code: str | None = None
+    project_name: str | None = None
+
+
 class InvitePreview(BaseModel):
     """What the "Join project" confirmation shows the invitee."""
 
@@ -265,5 +294,9 @@ class InviteRefusal(BaseModel):
 
     detail: str
     code: Literal[
-        "INVITE_WRONG_USER", "INVITE_GONE", "INVITE_CONFLICT", "INVITE_NOT_RESENDABLE"
+        "INVITE_WRONG_USER",
+        "INVITE_GONE",
+        "INVITE_CONFLICT",
+        "INVITE_NOT_RESENDABLE",
+        "INVITE_SIGN_IN_REQUIRED",
     ]

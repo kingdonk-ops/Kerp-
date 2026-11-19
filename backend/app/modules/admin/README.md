@@ -116,6 +116,8 @@ authentication, in the same request, without the lobby.
 | `POST /projects/{p}/invites/{id}/resend` | PER-09 of `p`, `system_admin` (any of them, not only the inviter) | for a `pending` or `expired` (never accepted) invite: a fresh token (the old link gets the neutral `410` at once), `expires_at` = now + `KERP_INVITE_TTL_HOURS`, `last_sent_at` = now, status `pending`; e-mail, persona(s) and site scope are kept; the response carries the new `invite_token` + `invite_link` once; `409 INVITE_NOT_RESENDABLE` (accepted or revoked); `429` + `Retry-After` at the send cap |
 | `POST /invites/preview` | any signed-in user | `{invite_token}` → `{project_id, project_code, project_name, inviter_name}` for the "Join project" confirmation; grants nothing |
 | `POST /invites/accept` | any signed-in user | `{invite_token}` → `{joined_project_id}`: the direct membership (added to any direct grants the user holds there) and the invite's `accepted` mark in one transaction |
+| `POST /invites/setup-preview` | **not signed in** (T-0059) | `{invite_token, setup_token}` (both from the e-mailed link) → `{can_set_password: true, project_code, project_name}` for an account without credentials; `{can_set_password: false}` (nothing about the project) for an account that has credentials: sign in; `410 INVITE_GONE` for any token problem; grants nothing |
+| `POST /invites/accept-with-password` | **not signed in** (T-0059) | `{invite_token, setup_token, new_password}` → the normal token response of a sign-in (refresh cookie, or `refresh_token` in the body for a native app; `session_expires_at`, `joined_project_id`): first password, membership and session in one transaction; `410 INVITE_GONE` (any token problem, a deactivated account, the loser of two parallel calls); `409 INVITE_SIGN_IN_REQUIRED` (the account has credentials); `422 {detail, code, min_length, max_length}` when the password policy refuses (the invite stays pending); `401 {code: DEVICE_REVOKED}` when `X-KERP-Device-Id` names a revoked device (only after the tokens and the password passed; nothing is written) |
 
 A non-member of `p` (PER-09 of another project included) gets `404`, a member without PER-09
 `403`: the rule of the member endpoints. Preview and accept answer `403 {code:
@@ -183,12 +185,56 @@ after signing in (TD-370).
 **External invitees never use SSO** (product owner, 2026-11-14; diff §4.1, §4.5). Clients,
 subcontractors and other externals are not on the company Entra tenant. A brand-new invitee
 without credentials sets their first password at acceptance from the **e-mailed** link, which
-carries the `invite_token` and a second secret, the `setup_token`; that half (the invite
-e-mail, the `setup_token`, accept-with-password) is T-0059. This task stores the invite so
-T-0059 can add the `setup_token` to it. The copyable link in the create and re-send responses
-carries the **`invite_token` only**: it can never set a password, so an inviter who copies the
-link cannot take over the invitee's account. The invite e-mail itself is sent by T-0059
-through the outbound e-mail service (T-0058).
+carries the `invite_token` and a second secret, the `setup_token` (next section). The copyable
+link in the create and re-send responses carries the **`invite_token` only**: it can never set
+a password, so an inviter who copies the link cannot take over the invitee's account.
+
+### The invite e-mail, the `setup_token` and the first password (T-0059)
+
+**The e-mail.** Every send (creation and re-send) queues the template `admin.project_invite`
+through `app.core.mail.service.send_mail` in the same unit of work: the worker sends it after
+the commit, a rolled-back request sends nothing, and nothing is ever sent from the request.
+It names the project (code and name), the sender and the expiry, and its one link is
+`<KERP_WEB_ORIGIN>/invite#<invite_token>.<setup_token>` (both tokens in the fragment, joined
+by a dot; neither token contains one). The audit entry of the send carries `email_queued`
+(`false` when the mail service refuses the address or a text, e.g. one that is too long: the
+invite still stands and the copyable link is the fallback; a mail problem never fails an
+invite). Project and sender names are put on one line first (they may hold line breaks, a
+mail text may not); a sender whose account row is gone is named "A project administrator".
+The mail context key of the two tokens is `link_token`, a scrubbed field name.
+
+**The `setup_token`** is a second `secrets.token_urlsafe(32)` (256 random bits). Only its
+SHA-256 is stored (`setup_token_hash`, migration `0031`). It exists in clear only inside
+`invites.create_invite` / `resend_invite` and the queued e-mail: it is not part of
+`IssuedInvite`, so no response (create, re-send, list), audit entry or log line can carry it,
+and `app/core/logging.py` scrubs `setup_token` fields (log lines, and `scrub_sentry_event` for
+an error reporter, TD-371). It lives and dies with the invite: same expiry; a re-send rotates
+both tokens (the old e-mailed link gets `410` on both endpoints); accept and revoke
+(re-invite included) clear the hash.
+
+**Accept with password** (`invites.accept_with_password`, one request, one transaction):
+
+1. Both tokens are checked on the narrow system path; nobody is signed in. Any problem
+   (unknown invite token, missing or wrong `setup_token`, expired, revoked, used, deleted
+   project, deactivated account) is the same neutral `410 INVITE_GONE`, audited.
+2. An account that already has credentials (a password, or a linked Entra ID identity:
+   `auth.service.has_credentials`) gets `409 INVITE_SIGN_IN_REQUIRED`: it signs in and joins
+   through the carry-through. A first password is never set over existing credentials.
+3. The invite row is locked with a conditional no-op update. Of two parallel calls the second
+   waits and then finds the invite used: one `200`, one `410`.
+4. **Core auth** checks the password policy (T-0077), stores the hash and issues the normal
+   session: `AuthService.start_session_with_first_password`. It locks the account row and
+   refuses when the account got credentials or was deactivated meanwhile. **This module
+   never hashes a password or writes the users table.** A policy refusal (`422` with the
+   policy `code`) changes nothing: the invite stays pending and the link still works.
+5. The invite is marked `accepted` (which clears the `setup_token`) and the membership is
+   created, as in a signed-in accept.
+
+**The copied link cannot set a password.** It has no `setup_token`, and nothing derives one.
+The client offers "Send me an e-mail to set my password" (the self-service reset of T-0077,
+`POST /auth/password-reset/request`); after the reset the user signs in with the
+`invite_token` and the carry-through accepts the invite. The PER-09 never sees and can never
+set the invitee's password. Screens: T-0078.
 
 **Team links need no invite or user action** (ADR 0008). A System admin linking a team to a
 project, or adding a user to a linked team, grants access directly; nobody is invited and
@@ -198,10 +244,10 @@ nobody accepts anything.
 
 Tenant-level chains: `admin-user:<user>` (create, update), `admin-user-lookup:<caller>` (every
 lookup), `project-members:<project>` (`assign` with added / removed / grants / `sod_warning`,
-`remove`), `admin-grant:<user>` (grant, revoke), `project-invites:<project>` (`create`,
-`resend`, `revoke`, `accept` and `refuse` with stage and reason; the invitee by account id)
-and `project-invites` (`refuse` of a token that matches no invite). Invite entries never
-carry a token, a hash or an e-mail address. An accepted invite also writes the usual
+`remove`), `admin-grant:<user>` (grant, revoke), `project-invites:<project>` (`create` and
+`resend` with `email_queued`, `revoke`, `first_password_set`, `accept` and `refuse` with stage
+and reason; the invitee by account id) and `project-invites` (`refuse` of a token that matches
+no invite). Invite entries never carry a token, a hash, a password or an e-mail address. An accepted invite also writes the usual
 `assign` entry on `project-members:<project>`.
 
 ## Tests
@@ -209,4 +255,6 @@ carry a token, a hash or an e-mail address. An accepted invite also writes the u
 `tests/test_admin.py` (SQLite and PostgreSQL), `tests/test_rls_admin.py` (PostgreSQL as
 `kerp_app`: grant visibility and writes, client-portal user vs. System admin on projects),
 `tests/test_invites.py` (SQLite and PostgreSQL: the whole invite life cycle, carry-through,
-send cap, races, log scrubbing), `tests/test_rls_invites.py` (PostgreSQL as `kerp_app`).
+send cap, races, log scrubbing), `tests/test_invite_setup.py` (the invite e-mail, the
+`setup_token`, first password at acceptance, its races, scrubbing; capturing mail queue),
+`tests/test_rls_invites.py` (PostgreSQL as `kerp_app`).
