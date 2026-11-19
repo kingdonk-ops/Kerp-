@@ -38,8 +38,8 @@ from collections.abc import Collection
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy import bindparam, select, text
+from sqlalchemy.orm import Session, object_session
 
 from app.core.audit import service as audit
 from app.core.auth.device_signal import DeviceRevokedError
@@ -71,12 +71,13 @@ from app.core.auth.magic_link import (
     magic_link_eligible,
 )
 from app.core.auth.models import DEVICE_REVOKED, Device, User, normalize_email
+from app.core.auth.password_policy import BreachCheck, check_password
 from app.core.auth.passwords import hash_password, verify_password
 from app.core.auth.post_auth import NO_INVITE, PostAuthOutcome, run_post_authentication
 from app.core.auth.providers import AuthProvider, LocalPasswordProvider, PasswordCredentials
 from app.core.auth.runtime import AuthRuntime
 from app.core.auth.tokens import InvalidTokenError, IssuedToken, TokenClaims
-from app.core.config import get_settings
+from app.core.config import Settings, get_settings
 from app.core.db import Database, utcnow
 from app.core.tenancy.context import TenancyContext
 from app.core.tenancy.rls import bind_tenancy
@@ -136,14 +137,19 @@ def create_user(
     display_name: str = "",
     source: str = "api",
     internal_domains: Collection[str] | None = None,
+    settings: Settings | None = None,
 ) -> User:
     """Add a tenant-level user (admin/onboarding tasks build on this). Caller commits.
 
     ``is_internal`` is derived here from ``internal_domains`` (default: the deployment's
-    ``KERP_INTERNAL_EMAIL_DOMAINS``), never taken from the caller.
+    ``KERP_INTERNAL_EMAIL_DOMAINS``), never taken from the caller. A ``password`` is checked
+    against the deployment's password policy (T-0077, ``PasswordPolicyError``) and stored
+    NFKC-normalised, like every other password set.
     """
     if internal_domains is None:
-        internal_domains = get_settings().internal_email_domains
+        internal_domains = (settings or get_settings()).internal_email_domains
+    if password is not None:
+        password = check_password(password, email=normalize_email(email), settings=settings)
     user = User(
         tenant_id=tenant_id,
         project_id=None,
@@ -197,10 +203,98 @@ def find_user_by_email(session: Session, email: str) -> User | None:
     return session.scalars(query).one_or_none()
 
 
-def set_password(user: User, password: str) -> None:
-    """Replace the password; every token issued before now stops working."""
-    user.password_hash = hash_password(password)
+def set_password(
+    user: User,
+    password: str,
+    *,
+    settings: Settings | None = None,
+    breach_check: BreachCheck | None = None,
+) -> None:
+    """Replace the password under the deployment's password policy (T-0077, diff §4.2).
+
+    Raises ``PasswordPolicyError`` (nothing is changed then). The password is stored as the
+    scrypt hash of its NFKC form. Every access and refresh token issued before now stops
+    working (``token_predates_password_change``, exact to the microsecond: T-0037 / T-0061),
+    on every device, and so does every magic link issued before now. Device enrolment and
+    the device PIN are not touched.
+
+    For a ``user`` in a session, pending changes are flushed and the user's row stays locked
+    until the caller's transaction ends (``lock_user``): commit soon.
+    """
+    normalised = check_password(
+        password, email=user.email, settings=settings, breach_check=breach_check
+    )
+    apply_checked_password(user, normalised)
+
+
+# SQLite has no row locks (``FOR UPDATE`` is dropped there): a write that changes nothing
+# takes the database's write lock instead, which a concurrent writer waits for.
+_SQLITE_WRITE_LOCK = text(f"UPDATE {User.__tablename__} SET id = id WHERE id = :id").bindparams(
+    bindparam("id", type_=User.__table__.c.id.type)
+)
+
+
+def lock_user(session: Session, user_id: uuid.UUID, tenant_id: uuid.UUID) -> User | None:
+    """The account's row, locked until the caller's transaction ends and read again under
+    the lock (pending changes are flushed first; a loaded ``User`` is refreshed in place).
+
+    This is what orders a password change against token issuing (T-0077): the change stamps
+    ``password_changed_at`` under the lock, and every path that issues tokens checks the row
+    under the same lock and holds it until its tokens exist. So a token is either issued
+    before the stamp (``iat`` older: revoked by it) or after the change committed (the
+    issuing path saw the new row). ``FOR NO KEY UPDATE``: rows that reference the user are
+    not blocked.
+    """
+    session.flush()
+    if session.get_bind().dialect.name == "sqlite":
+        session.execute(_SQLITE_WRITE_LOCK, {"id": user_id})
+    return session.scalars(
+        select(User)
+        .where(User.id == user_id, User.tenant_id == tenant_id)
+        .with_for_update(key_share=True)
+        .execution_options(populate_existing=True)
+    ).one_or_none()
+
+
+def apply_checked_password(user: User, normalised: str, *, require_active: bool = False) -> bool:
+    """Store a password that ``check_password`` has just returned for this user. Core auth
+    only (the reset checks the policy before it spends its token); everyone else calls
+    ``set_password`` / ``set_user_password``.
+
+    The hash is computed first, then the row is locked (``lock_user``) and the change is
+    stamped under the lock. ``False``, with nothing changed, when ``require_active`` and the
+    locked row is gone or deactivated."""
+    password_hash = hash_password(normalised)
+    session = object_session(user)
+    if session is not None:
+        locked = lock_user(session, user.id, user.tenant_id)
+        if require_active and (locked is None or not locked.is_active):
+            return False
+    user.password_hash = password_hash
     user.password_changed_at = utcnow()
+    return True
+
+
+def set_user_password(
+    session: Session,
+    user_id: uuid.UUID,
+    password: str,
+    *,
+    settings: Settings | None = None,
+    breach_check: BreachCheck | None = None,
+) -> User:
+    """The one way a module sets an account's password (reset, first password at invite
+    acceptance: T-0059, change, admin-created accounts): no module hashes a password or
+    writes the users table itself (CLAUDE.md §6).
+
+    ``session`` is bound to the account's tenant. ``OutOfScopeError`` (404) for an account
+    that is not a live one of that tenant; ``PasswordPolicyError`` when the policy refuses
+    the password. See ``set_password`` for what it revokes. Caller commits.
+    """
+    user = get_user(session, user_id)
+    set_password(user, password, settings=settings, breach_check=breach_check)
+    session.flush()
+    return user
 
 
 def _aware(moment: datetime) -> datetime:
@@ -217,11 +311,31 @@ def token_predates_password_change(user: User, claims: TokenClaims) -> bool:
     return claims.issued_at < _aware(user.password_changed_at)
 
 
-def load_active_user(session: Session, claims: TokenClaims) -> User:
-    """The token's user, if it still exists, is active and the token is still current."""
-    user = session.scalars(
-        select(User).where(User.id == claims.user_id, User.tenant_id == claims.tenant_id)
-    ).one_or_none()
+def magic_link_predates_password_change(user: User, issued_at: object) -> bool:
+    """Whether a magic link issued at ``issued_at`` (epoch seconds from its stored payload)
+    is older than the account's last password change: a password set or reset invalidates
+    the user's outstanding magic links (T-0077, diff §4.2). A payload without a usable
+    ``iat`` (a link stored before T-0077) counts as issued at the earliest moment a live
+    link can have been issued, now minus the link lifetime."""
+    if user.password_changed_at is None:
+        return False
+    if isinstance(issued_at, int | float) and not isinstance(issued_at, bool):
+        issued = datetime.fromtimestamp(issued_at, tz=UTC)
+    else:
+        issued = utcnow() - MAGIC_LINK_TTL
+    return issued < _aware(user.password_changed_at)
+
+
+def load_active_user(session: Session, claims: TokenClaims, *, for_update: bool = False) -> User:
+    """The token's user, if it still exists, is active and the token is still current.
+    ``for_update``: checked on the locked row (``lock_user``), for a caller that goes on to
+    issue tokens."""
+    if for_update:
+        user = lock_user(session, claims.user_id, claims.tenant_id)
+    else:
+        user = session.scalars(
+            select(User).where(User.id == claims.user_id, User.tenant_id == claims.tenant_id)
+        ).one_or_none()
     if user is None or not user.is_active or token_predates_password_change(user, claims):
         raise AuthenticationError("user not active")
     return user
@@ -300,7 +414,9 @@ class AuthService:
         # Credentials first (T-0080, TD-291): only a caller who proved the account learns
         # that the device it names is revoked (and is told to wipe).
         refuse_revoked_device(session, device_id)
-        return self.start_session(session, user, device_id=device_id, invite_ref=invite_ref)
+        return self.start_session(
+            session, user, device_id=device_id, invite_ref=invite_ref, credential_bound=True
+        )
 
     def refresh(
         self, session: Session, refresh_token: str, *, device_id: uuid.UUID | None = None
@@ -369,7 +485,11 @@ class AuthService:
             )
             return
         token = new_magic_link_token()
-        record = {"uid": str(user_id), "tid": str(job.tenant_id)}
+        record: dict[str, object] = {
+            "uid": str(user_id),
+            "tid": str(job.tenant_id),
+            "iat": utcnow().timestamp(),
+        }
         if job.invite_ref is not None:
             record["inv"] = job.invite_ref  # the reference only; the link never carries it
         payload = json.dumps(record).encode()
@@ -415,12 +535,17 @@ class AuthService:
         ).one_or_none()
         if user is None or not user.is_active:
             raise AuthenticationError("user not active")
+        if magic_link_predates_password_change(user, data.get("iat")):
+            # A password set or reset invalidates the links issued before it (T-0077).
+            raise AuthenticationError("magic link issued before the password change")
         candidate = MagicLinkCandidate(tenant_id=tenant_id, user_id=user_id, email=user.email)
         if not magic_link_eligible(session, candidate):  # PER-14 lost since the request
             log_refusal(user_id, "redeem")
             raise AuthenticationError("not eligible for a magic link")
         invite_ref = data.get("inv")
-        return self.start_session(session, user, device_id=device_id, invite_ref=invite_ref)
+        return self.start_session(
+            session, user, device_id=device_id, invite_ref=invite_ref, credential_bound=True
+        )
 
     def start_session(
         self,
@@ -429,6 +554,7 @@ class AuthService:
         *,
         device_id: uuid.UUID | None = None,
         invite_ref: str | None = None,
+        credential_bound: bool = False,
     ) -> TokenPair:
         """A new KERP session for ``user``, whose identity a provider has just proved
         (password, magic link, Entra ID SSO: T-0054): the internal flag is recomputed, the
@@ -436,8 +562,23 @@ class AuthService:
         and the same 15-minute access + 12-hour refresh pair is issued. The caller has
         already refused a revoked device (credentials first, T-0080).
 
+        The user's row is locked and read again before the tokens are issued (``lock_user``,
+        T-0077), so a concurrent password change either waits and revokes this session or
+        has committed and is seen here. ``credential_bound`` (password, magic link: proofs a
+        password change invalidates): ``AuthenticationError`` when the account was
+        deactivated or its password changed since ``user`` was read, i.e. while the
+        credential was being checked.
+
         With ``invite_ref`` the post-authentication hook then accepts that invite in the same
         request (T-0052): its outcome rides on the pair and never fails the sign-in."""
+        seen = (user.password_hash, user.password_changed_at)
+        locked = lock_user(session, user.id, user.tenant_id)
+        if credential_bound and (
+            locked is None
+            or not locked.is_active
+            or (locked.password_hash, locked.password_changed_at) != seen
+        ):
+            raise AuthenticationError("account changed during sign-in")
         self._signed_in(user)
         session_id = uuid.uuid4()
         bound = self._bind_sign_in_device(session, user.id, user.tenant_id, session_id, device_id)
@@ -567,7 +708,7 @@ class AuthService:
             raise AuthenticationError("refresh token reused")
         bind_tenancy(session, TenancyContext(tenant_id=claims.tenant_id, user_id=claims.user_id))
         try:
-            load_active_user(session, claims)
+            load_active_user(session, claims, for_update=True)
         except AuthenticationError:
             self._revoke_session(claims.session_id)
             raise

@@ -397,6 +397,102 @@
         ]
       }
     },
+    "/api/v1/auth/password-reset/request": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Request Password Reset",
+        "description": "Ask for a password-reset link by e-mail (diff §4.2).\n\nAlways `202` with the same body and headers, whether the address has an active account,\na deactivated one or none: the answer reveals no accounts. An active account (with or\nwithout a password) is sent a single-use link `/reset-password#<token>` that expires\nafter `KERP_PASSWORD_RESET_TTL_MINUTES`; a new request invalidates the earlier link.\nThe request only counts the attempt; everything else runs after the response.",
+        "operationId": "request_password_reset_api_v1_auth_password_reset_request_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordResetRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "429": {
+            "description": "Throttled; retry after `Retry-After` seconds"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/password-reset/confirm": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Confirm Password Reset",
+        "description": "Set a new password with the token of a reset link (diff §4.2).\n\nOn success every session and refresh token of the user is revoked on all devices\n(device enrolment and PIN stay), outstanding magic links and reset links die, and a\n\"your password was changed\" notice is e-mailed. Nobody is signed in: sign in with the\nnew password.",
+        "operationId": "confirm_password_reset_api_v1_auth_password_reset_confirm_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordResetConfirm"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasswordResetDone"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "The link is unknown, used, expired or superseded by a newer one (`code: RESET_LINK_INVALID`): request a new link",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasswordResetRefusal"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The password policy refused the new password: `{detail, code, min_length, max_length}` with `code` `PASSWORD_TOO_SHORT`, `PASSWORD_TOO_LONG` or `PASSWORD_TOO_COMMON` (the link is still usable). Or a malformed body"
+          },
+          "429": {
+            "description": "Throttled; retry after `Retry-After` seconds"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/auth/config": {
       "get": {
         "tags": [
@@ -9710,6 +9806,109 @@
         },
         "type": "object",
         "title": "PasswordOption"
+      },
+      "PasswordResetConfirm": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "maxLength": 512,
+            "minLength": 1,
+            "title": "Token"
+          },
+          "new_password": {
+            "type": "string",
+            "maxLength": 1024,
+            "minLength": 1,
+            "title": "New Password"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "token",
+          "new_password"
+        ],
+        "title": "PasswordResetConfirm",
+        "description": "Spend a reset link: the token from the link fragment and the new password."
+      },
+      "PasswordResetDone": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "password_changed",
+            "title": "Status",
+            "default": "password_changed"
+          }
+        },
+        "type": "object",
+        "title": "PasswordResetDone",
+        "description": "The password was changed. Nobody is signed in: sign in with the new password."
+      },
+      "PasswordResetRefusal": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "code": {
+            "type": "string",
+            "enum": [
+              "RESET_LINK_INVALID",
+              "PASSWORD_TOO_SHORT",
+              "PASSWORD_TOO_LONG",
+              "PASSWORD_TOO_COMMON"
+            ],
+            "title": "Code"
+          },
+          "min_length": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Length",
+            "description": "Policy refusals: the deployment's minimum password length"
+          },
+          "max_length": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Length",
+            "description": "Policy refusals: the longest accepted password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail",
+          "code"
+        ],
+        "title": "PasswordResetRefusal",
+        "description": "``410``: the link is unknown, used, expired or superseded (`RESET_LINK_INVALID`).\n``422``: the password policy refused the new password (`PASSWORD_TOO_SHORT`,\n`PASSWORD_TOO_LONG`, `PASSWORD_TOO_COMMON`); the link is still usable."
+      },
+      "PasswordResetRequest": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "maxLength": 320,
+            "minLength": 3,
+            "title": "Email"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "email"
+        ],
+        "title": "PasswordResetRequest",
+        "description": "Ask for a password-reset link (T-0077). No tenant field: the deployment's tenant."
       },
       "PendingAccessRequest": {
         "properties": {

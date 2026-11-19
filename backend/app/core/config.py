@@ -130,6 +130,18 @@ class Settings(BaseSettings):
     # rejection before the user may ask for the same project again. 0 disables it.
     access_request_cooldown_hours: int = Field(default=24, ge=0, le=24 * 365)
 
+    # Local passwords (T-0077, diff §4.2 *Local passwords*, NIST SP 800-63B style). The minimum
+    # length of every new password: 8 by product-owner decision (2026-11-14), configurable
+    # upwards only; a value below 8 refuses start-up. Passwords are accepted up to 256
+    # characters (``password_policy.MAX_LENGTH``).
+    password_min_length: int = Field(default=8, ge=8, le=64)
+    # Optional breached-password lookup (k-anonymity range API: only the first 5 hex characters
+    # of the password's SHA-1 leave the deployment). Off by default; a lookup that fails never
+    # blocks a password.
+    password_breach_check: bool = False
+    # Self-service password reset: lifetime of the e-mailed single-use link.
+    password_reset_ttl_minutes: int = Field(default=60, ge=5, le=24 * 60)
+
     # Lifetime of a project invite (T-0052, diff §4.1 Invites): hours from creation, or from
     # the latest re-send, until its token expires. Default 168 = 7 days (planner default).
     invite_ttl_hours: int = Field(default=168, ge=1, le=24 * 90)

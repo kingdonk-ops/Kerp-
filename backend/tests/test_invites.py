@@ -1277,7 +1277,8 @@ def test_the_log_formatter_scrubs_invite_token_fields() -> None:
     }
     assert payload["note"] == f"retry with invite_token={REDACTED}&next=1"
     assert payload["message"] == f'body {{"invite_token": "{REDACTED}"}} rejected'
-    assert scrub_text("invite_tokens=5 and token=abc") == "invite_tokens=5 and token=abc"
+    # ``token=...`` itself is a credential pair since T-0077 (reset tokens): redacted too.
+    assert scrub_text("invite_tokens=5 and token=abc") == f"invite_tokens=5 and token={REDACTED}"
     assert scrub((1, "setup_token: abc")) == [1, f"setup_token: {REDACTED}"]
     try:
         raise ValueError(f"invite_token='{secret}'")

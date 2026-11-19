@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 234 · **Closed:** 130
+**Open:** 241 · **Closed:** 130
 
 ## decision (9)
 
@@ -19,7 +19,7 @@
 | [TD-348](../tracker/todo/TD-348.md) | T-0073: deleting a project with team-derived members answers 409 (unlink teams first); T-0013 to confirm or cascade | T-0073 | implementer |
 | [TD-373](../tracker/todo/TD-373.md) | Invite acceptance and SoD: accept proceeds (audited sod_warning) when the invitee gained a conflicting persona after the inviter confirmed | T-0052 | implementer |
 
-## spec-gap (43)
+## spec-gap (45)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -63,6 +63,8 @@
 | [TD-319](../tracker/todo/TD-319.md) | Active-requests panel: a pending request hides the older decided request of the same project (diff §4.1 reads 'every pending plus the latest decided per project') | T-0050 | implementer |
 | [TD-347](../tracker/todo/TD-347.md) | T-0073: 'PUT/DELETE on a derived row returns 409' read for the per-user member API | T-0073 | implementer |
 | [TD-356](../tracker/todo/TD-356.md) | teams RLS read scope: T-0013 lists bound + allowed projects; implemented with app.member_project_ids too (membership pattern) | T-0013 | implementer |
+| [TD-361](../tracker/todo/TD-361.md) | Password-reset request cap per mailbox: own counter or shared with magic links? | T-0077 | implementer |
+| [TD-362](../tracker/todo/TD-362.md) | Password policy details the spec leaves open: PASSWORD_TOO_LONG code, context-word matching, audit of unknown-address and throttled reset requests | T-0077 | implementer |
 | [TD-368](../tracker/todo/TD-368.md) | Invite endpoints live under /api/v1/admin (module loader prefix), spec names /api/v1/projects/{id}/invites and /api/v1/invites/* | T-0052 | implementer |
 | [TD-369](../tracker/todo/TD-369.md) | SSO start with an invite: spec §4.5 has GET /start keep the invite_token, but a token must never be in a URL query; T-0052 added a form POST | T-0052 | implementer |
 | [TD-370](../tracker/todo/TD-370.md) | Magic-link eligibility by invite: by the account's e-mail (spec §4.2) or only when the request presents that invite_token (T-0052 wording)? | T-0052 | implementer |
@@ -79,7 +81,7 @@
 | [TD-327](../tracker/todo/TD-327.md) | Frontend i18n key notifications.kind.access_requests.requested for the inbox (needed when the access-request UI lands) | T-0050 | reviewer |
 | [TD-337](../tracker/todo/TD-337.md) | Web/Android route /magic-link#<token> that redeems the e-mailed sign-in link (POST /auth/magic-link/redeem); the e-mail now links there | T-0058 | implementer |
 
-## deferred (35)
+## deferred (36)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -118,8 +120,9 @@
 | [TD-322](../tracker/todo/TD-322.md) | Entra ID SSO: certificate (client assertion) credentials for the code redemption instead of the client secret | T-0054 | implementer |
 | [TD-336](../tracker/todo/TD-336.md) | Mail: settle send-log rows stuck in queued (enqueue failed or Redis payload lost); no re-enqueue is possible because the payload (with the link token) is never persisted | T-0058 | implementer |
 | [TD-360](../tracker/todo/TD-360.md) | First-run: one-time password link for the first System admin once T-0077 ships | T-0023 | implementer |
+| [TD-365](../tracker/todo/TD-365.md) | Frontend translations of the password policy codes and the password policy in /auth/config | T-0077 | implementer |
 
-## later (105)
+## later (108)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -226,6 +229,9 @@
 | [TD-357](../tracker/todo/TD-357.md) | admin module depends on teams (team-name fill-in): removing the teams module tenant-wide also needs that dependency made optional | T-0013 | implementer |
 | [TD-358](../tracker/todo/TD-358.md) | Teams: remove team-project links when their project is deleted (projects delete hook), so GET /teams/{team} and project_count stop showing them | T-0013 | implementer |
 | [TD-359](../tracker/todo/TD-359.md) | PER-07 site_node_id is not checked against the project's breakdown (team link PUT and admin member PUT) | T-0013 | implementer |
+| [TD-363](../tracker/todo/TD-363.md) | Wire the credential scrubber into the error tracker when Sentry is added | T-0077 | implementer |
+| [TD-364](../tracker/todo/TD-364.md) | Replace the bundled common-password blocklist with a larger curated list | T-0077 | implementer |
+| [TD-366](../tracker/todo/TD-366.md) | Authenticated change-password endpoint and admin-set passwords go through set_user_password | T-0077 | implementer |
 | [TD-371](../tracker/todo/TD-371.md) | Error reporting (Sentry): pass events through app.core.logging.scrub in before_send so invite_token/setup_token never leave the process | T-0052 | implementer |
 | [TD-374](../tracker/todo/TD-374.md) | Invite housekeeping: credential-less accounts of invites never accepted, and a scheduled expired mark | T-0052 | implementer |
 
@@ -240,7 +246,7 @@
 | [TD-339](../tracker/todo/TD-339.md) | jobs LoopDispatcher.drain can spin forever when the commit ran on the loop's own thread (finished tasks stay in the set until their done callbacks run) | T-0058 | implementer |
 | [TD-375](../tracker/todo/TD-375.md) | mypy 2.3.1 (local toolchain) reports var-annotated in app/core/audit/guard.py:66 and app/modules/admin/service.py:122 on untouched dev code | T-0052 | implementer |
 
-## risk (29)
+## risk (30)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -273,6 +279,7 @@
 | [TD-353](../tracker/todo/TD-353.md) | 0026 holds ACCESS EXCLUSIVE on every tenant-scoped table during the tenants backfill (FORCE RLS toggle); revisit before any populated deployment | T-0079 | implementer |
 | [TD-355](../tracker/todo/TD-355.md) | Magic-link eligibility ignores project soft-delete unless memberships were revoked with it (core cannot read the projects table) | T-0057 | implementer |
 | [TD-372](../tracker/todo/TD-372.md) | Invite preview/accept refusals are audited per attempt without a per-user throttle (ledger growth by a signed-in user) | T-0052 | implementer |
+| [TD-376](../tracker/todo/TD-376.md) | Password-reset and magic-link requests defer the account-dependent work to after the response: on a kept-alive connection the time until the next request is served may still differ by path (measure; move the deferred half to the SAQ worker if it does) | T-0077 | implementer |
 
 ## Closed
 

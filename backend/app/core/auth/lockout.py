@@ -145,6 +145,39 @@ WIPE_CONFIRM_POLICY: Final = LockoutPolicy(
     window=timedelta(hours=1),
 )
 
+# Self-service password reset (T-0077, diff §4.2). Requests per tenant + e-mail use
+# ``MAGIC_LINK_REQUEST_POLICY`` (the same per-mailbox cap, TD-224) on their own counter.
+
+# Reset requests per client address, whatever the e-mail (TD-138): 20 back to back (no lock
+# after requests 1-19), then the usual escalation over one hour. Every request counts.
+PASSWORD_RESET_CLIENT_POLICY: Final = LockoutPolicy(
+    free_attempts=19,
+    base_delay=timedelta(seconds=30),
+    max_delay=timedelta(minutes=15),
+    window=timedelta(hours=1),
+)
+
+# Reset confirmations per client address: every refusal is audited, so, as for wipe
+# confirmations, a client gets 11 attempts back to back and then the escalation. Never
+# cleared by a success (a reset is rare; a valid token must not reset the counter).
+PASSWORD_RESET_CONFIRM_CLIENT_POLICY: Final = LockoutPolicy(
+    free_attempts=10,
+    base_delay=timedelta(seconds=30),
+    max_delay=timedelta(minutes=15),
+    window=timedelta(hours=1),
+)
+
+# Confirm attempts per reset token: only an attempt with a live token counts (a refused
+# password). 5 back to back, then 30 s doubling; the 10th attempt is the last, after it the
+# link is dead and a new one must be requested. ``window`` is replaced by the link lifetime.
+PASSWORD_RESET_TOKEN_POLICY: Final = LockoutPolicy(
+    free_attempts=4,
+    base_delay=timedelta(seconds=30),
+    max_delay=timedelta(minutes=15),
+    window=timedelta(hours=1),
+    max_attempts=10,
+)
+
 
 class ProgressiveLockout:
     """One policy applied to the subjects of one ``scope`` (``pin``, ``login``, ...)."""

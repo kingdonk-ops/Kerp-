@@ -15,8 +15,9 @@ can no longer matter:
 
 Field-worker auth (T-0009) keeps its short-lived state here too:
 
-* ``magic:<sha256(token)>``: a pending magic link (JSON ``{uid, tid}``). Taken atomically
-  (``GETDEL``), so a link signs in exactly once. TTL = the link lifetime.
+* ``magic:<sha256(token)>``: a pending magic link (JSON ``{uid, tid, iat}``; ``iat`` lets a
+  later password change invalidate it, T-0077). Taken atomically (``GETDEL``), so a link
+  signs in exactly once. TTL = the link lifetime.
 * ``lockout:<scope>:<subject digest>:n`` / ``:lock``: the progressive-lockout failure
   counter (TTL = the counting window, from the first failure) and the current lock
   (TTL = the delay). See ``lockout.py``. The field PIN's counter is per device
@@ -36,6 +37,11 @@ Entra ID SSO (T-0054, diff §4.5) keeps short-lived values under ``sso:`` (``put
 ``take_value`` atomic ``GETDEL``, ``peek_value``, ``claim`` = ``SET NX``): the sign-in
 ``state`` entries (10 min, single use), native exchange codes (60 s, single use), the
 deployment-wide JWKS refetch limit (1 min) and the ``acct_claim_missing`` health marker (24 h).
+
+Self-service password reset (T-0077, diff §4.2; ``password_reset.py``) uses the same
+short-lived values: ``pwreset:token:<sha256(token)>`` (JSON ``{uid, tid}``, taken atomically:
+single use) and ``pwreset:user:<tid>:<uid>`` (the digest of the account's one live token),
+both with the link lifetime as TTL.
 
 Any store failure raises ``RevocationUnavailableError``; callers fail closed (503), they
 never treat an unreachable store as "not revoked" or "not locked".

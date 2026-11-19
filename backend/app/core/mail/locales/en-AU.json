@@ -4,5 +4,12 @@
   "mail.auth.magic_link.subject": "Your {app_name} sign-in link",
   "mail.auth.magic_link.intro": "Use the link below to sign in to {app_name}. It works once and expires in {expires_minutes} minutes.",
   "mail.auth.magic_link.action": "Sign in",
-  "mail.auth.magic_link.outro": "If you did not ask for this link, you can ignore this e-mail."
+  "mail.auth.magic_link.outro": "If you did not ask for this link, you can ignore this e-mail.",
+  "mail.auth.password_reset.subject": "Reset your {app_name} password",
+  "mail.auth.password_reset.intro": "Use the link below to choose a new password for {app_name}. It works once and expires in {expires_minutes} minutes.",
+  "mail.auth.password_reset.action": "Choose a new password",
+  "mail.auth.password_reset.outro": "If you did not ask to reset your password, you can ignore this e-mail. Your password stays as it is.",
+  "mail.auth.password_changed.subject": "Your {app_name} password was changed",
+  "mail.auth.password_changed.intro": "The password of your {app_name} account was just changed. You have been signed out on all devices; sign in again with the new password.",
+  "mail.auth.password_changed.outro": "If you did not change your password, reset it now from the sign-in page (Forgot password?) and tell your administrator."
 }

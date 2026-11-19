@@ -198,6 +198,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/password-reset/request": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Request Password Reset
+         * @description Ask for a password-reset link by e-mail (diff §4.2).
+         *
+         *     Always `202` with the same body and headers, whether the address has an active account,
+         *     a deactivated one or none: the answer reveals no accounts. An active account (with or
+         *     without a password) is sent a single-use link `/reset-password#<token>` that expires
+         *     after `KERP_PASSWORD_RESET_TTL_MINUTES`; a new request invalidates the earlier link.
+         *     The request only counts the attempt; everything else runs after the response.
+         */
+        post: operations["request_password_reset_api_v1_auth_password_reset_request_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/password-reset/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm Password Reset
+         * @description Set a new password with the token of a reset link (diff §4.2).
+         *
+         *     On success every session and refresh token of the user is revoked on all devices
+         *     (device enrolment and PIN stay), outstanding magic links and reset links die, and a
+         *     "your password was changed" notice is e-mailed. Nobody is signed in: sign in with the
+         *     new password.
+         */
+        post: operations["confirm_password_reset_api_v1_auth_password_reset_confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/config": {
         parameters: {
             query?: never;
@@ -3273,6 +3324,61 @@ export interface components {
             available: true;
         };
         /**
+         * PasswordResetConfirm
+         * @description Spend a reset link: the token from the link fragment and the new password.
+         */
+        PasswordResetConfirm: {
+            /** Token */
+            token: string;
+            /** New Password */
+            new_password: string;
+        };
+        /**
+         * PasswordResetDone
+         * @description The password was changed. Nobody is signed in: sign in with the new password.
+         */
+        PasswordResetDone: {
+            /**
+             * Status
+             * @default password_changed
+             * @constant
+             */
+            status: "password_changed";
+        };
+        /**
+         * PasswordResetRefusal
+         * @description ``410``: the link is unknown, used, expired or superseded (`RESET_LINK_INVALID`).
+         *     ``422``: the password policy refused the new password (`PASSWORD_TOO_SHORT`,
+         *     `PASSWORD_TOO_LONG`, `PASSWORD_TOO_COMMON`); the link is still usable.
+         */
+        PasswordResetRefusal: {
+            /** Detail */
+            detail: string;
+            /**
+             * Code
+             * @enum {string}
+             */
+            code: "RESET_LINK_INVALID" | "PASSWORD_TOO_SHORT" | "PASSWORD_TOO_LONG" | "PASSWORD_TOO_COMMON";
+            /**
+             * Min Length
+             * @description Policy refusals: the deployment's minimum password length
+             */
+            min_length?: number | null;
+            /**
+             * Max Length
+             * @description Policy refusals: the longest accepted password
+             */
+            max_length?: number | null;
+        };
+        /**
+         * PasswordResetRequest
+         * @description Ask for a password-reset link (T-0077). No tenant field: the deployment's tenant.
+         */
+        PasswordResetRequest: {
+            /** Email */
+            email: string;
+        };
+        /**
          * PendingAccessRequest
          * @description A pending request, as the project's PER-09 holders (and System admins) see it.
          */
@@ -4565,6 +4671,93 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["MeResponse"];
                 };
+            };
+        };
+    };
+    request_password_reset_api_v1_auth_password_reset_request_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasswordResetRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Throttled; retry after `Retry-After` seconds */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    confirm_password_reset_api_v1_auth_password_reset_confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasswordResetConfirm"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PasswordResetDone"];
+                };
+            };
+            /** @description The link is unknown, used, expired or superseded by a newer one (`code: RESET_LINK_INVALID`): request a new link */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PasswordResetRefusal"];
+                };
+            };
+            /** @description The password policy refused the new password: `{detail, code, min_length, max_length}` with `code` `PASSWORD_TOO_SHORT`, `PASSWORD_TOO_LONG` or `PASSWORD_TOO_COMMON` (the link is still usable). Or a malformed body */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Throttled; retry after `Retry-After` seconds */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

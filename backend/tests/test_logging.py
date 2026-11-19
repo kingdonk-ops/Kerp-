@@ -12,7 +12,15 @@ from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
 from app.core.config import Settings
-from app.core.logging import JsonFormatter, configure_logging
+from app.core.logging import (
+    REDACTED,
+    JsonFormatter,
+    configure_logging,
+    is_sensitive_field,
+    scrub,
+    scrub_sentry_event,
+    scrub_text,
+)
 from app.core.request_context import ACCESS_LOGGER_NAME, REQUEST_ID_HEADER, request_id_var
 from app.main import create_app
 
@@ -257,3 +265,97 @@ def test_log_level_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_invalid_log_level_is_rejected() -> None:
     with pytest.raises(ValidationError):
         Settings(log_level="LOUD")  # type: ignore[arg-type]
+
+
+# --- secrets are scrubbed (T-0077, diff §4.2) -------------------------------------------------
+
+
+def test_credential_fields_in_extra_are_redacted_at_any_depth() -> None:
+    record = _record()
+    record.__dict__.update(
+        token="tok-SYNTHETIC-1",
+        new_password="synthetic pass 1",
+        body={"Token": "tok-SYNTHETIC-2", "nested": [{"new-password": "synthetic pass 2"}]},
+        user_id="u-1",
+    )
+    line = JsonFormatter().format(record)
+    out = json.loads(line)
+    assert out["token"] == out["new_password"] == REDACTED
+    assert out["body"] == {"Token": REDACTED, "nested": [{"new-password": REDACTED}]}
+    assert out["user_id"] == "u-1"
+    for secret in ("tok-SYNTHETIC-1", "tok-SYNTHETIC-2", "synthetic pass 1", "synthetic pass 2"):
+        assert secret not in line
+
+
+def test_token_and_password_pairs_in_messages_and_tracebacks_are_redacted() -> None:
+    message = 'confirm failed: body={"token": "tok-SYNTHETIC-3", "new_password": "pass \\" 3"}'
+    out = _format(_record(message + " token=%s", ("tok-SYNTHETIC-4",)))
+    assert "tok-SYNTHETIC" not in out["message"]
+    assert "pass " not in out["message"]
+    assert out["message"].count(REDACTED) == 3
+    try:
+        raise ValueError("bad request new_password='synthetic pass 5' rejected")
+    except ValueError:
+        record = _record()
+        record.exc_info = sys.exc_info()
+    assert "synthetic pass 5" not in _format(record)["exc_info"]
+    record = _record()
+    record.stack_info = "frame: token=tok-SYNTHETIC-6"
+    assert "tok-SYNTHETIC-6" not in str(_format(record)["stack_info"])
+
+
+def test_bearer_tokens_and_password_hashes_in_free_text_are_redacted() -> None:
+    header = "upstream said: Authorization: Bearer eyJhbGciOiJFZERTQSJ9.c3ludGhldGlj.sig-SYNTHETIC"
+    assert scrub_text(header) == f"upstream said: Authorization: Bearer {REDACTED}"
+    dump = "[parameters: {'password_hash': 'scrypt$synthetic$hash', 'id': 7}]"
+    assert scrub_text(dump) == f"[parameters: {{'password_hash': '{REDACTED}', 'id': 7}}]"
+    nested = r'body="{\"new_password\": \"synthetic pass 7\", \"n\": 1}" token="unterminated a b'
+    assert scrub_text(nested) == (
+        rf'body="{{\"new_password\": \"{REDACTED}\", \"n\": 1}}" token={REDACTED}'
+    )
+    assert scrub_text("password_hash=scrypt$synthetic done") == f"password_hash={REDACTED} done"
+
+
+def test_ordinary_text_about_tokens_and_passwords_is_left_alone() -> None:
+    for text in (
+        "3 tokens issued",
+        "the password was changed",
+        "retoken=5",
+        "broken=1",
+        "a bearer token is expected",
+        'WWW-Authenticate: Bearer error="invalid_token"',
+    ):
+        assert scrub_text(text) == text
+    assert scrub({"count": 3, "items": ("a", 1)}) == {"count": 3, "items": ["a", 1]}
+    assert is_sensitive_field("Authorization")
+    assert not is_sensitive_field(7)
+
+
+def test_scrubbing_stops_at_a_fixed_depth() -> None:
+    deep: dict[str, object] = {"leaf": "kept"}
+    for _ in range(12):
+        deep = {"inner": deep}
+    assert "kept" not in json.dumps(scrub(deep))
+
+
+def test_the_sentry_hook_scrubs_request_data_extra_and_breadcrumbs() -> None:
+    event = {
+        "request": {
+            "url": "https://kerp.example.test/api/v1/auth/password-reset/confirm",
+            "data": {"token": "tok-SYNTHETIC-7", "new_password": "synthetic pass 7"},
+            "headers": {"Authorization": "Bearer synthetic", "Accept": "application/json"},
+        },
+        "extra": {"reset_token": "tok-SYNTHETIC-8"},
+        "breadcrumbs": {
+            "values": [{"message": "POST token=tok-SYNTHETIC-9", "data": {"pin": "1"}}]
+        },
+        "exception": {"values": [{"stacktrace": {"frames": [{"vars": {"new_password": "x y"}}]}}]},
+    }
+    scrubbed = scrub_sentry_event(event, {})
+    text = json.dumps(scrubbed)
+    assert "SYNTHETIC" not in text
+    assert "synthetic" not in text
+    assert "x y" not in text
+    assert scrubbed["request"]["headers"]["Accept"] == "application/json"
+    assert scrubbed["request"]["url"].endswith("/confirm")
+    assert event["request"]["data"]["token"] == "tok-SYNTHETIC-7"  # the input is not mutated
