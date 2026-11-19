@@ -3,9 +3,9 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 226 · **Closed:** 130
+**Open:** 234 · **Closed:** 130
 
-## decision (8)
+## decision (9)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -17,8 +17,9 @@
 | [TD-335](../tracker/todo/TD-335.md) | Planner sizing: SSO-sized security flows landed at ~3.8k changed lines (M guideline < ~800); split such tasks further in future phases | T-0054 | reviewer |
 | [TD-340](../tracker/todo/TD-340.md) | Mail planner defaults to confirm: only permanent bounces and complaints suppress; recipient locale falls back to KERP_MAIL_DEFAULT_LOCALE (users have no locale yet); send_mail takes the caller's session | T-0058 | implementer |
 | [TD-348](../tracker/todo/TD-348.md) | T-0073: deleting a project with team-derived members answers 409 (unlink teams first); T-0013 to confirm or cascade | T-0073 | implementer |
+| [TD-373](../tracker/todo/TD-373.md) | Invite acceptance and SoD: accept proceeds (audited sod_warning) when the invitee gained a conflicting persona after the inviter confirmed | T-0052 | implementer |
 
-## spec-gap (40)
+## spec-gap (43)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -62,6 +63,9 @@
 | [TD-319](../tracker/todo/TD-319.md) | Active-requests panel: a pending request hides the older decided request of the same project (diff §4.1 reads 'every pending plus the latest decided per project') | T-0050 | implementer |
 | [TD-347](../tracker/todo/TD-347.md) | T-0073: 'PUT/DELETE on a derived row returns 409' read for the per-user member API | T-0073 | implementer |
 | [TD-356](../tracker/todo/TD-356.md) | teams RLS read scope: T-0013 lists bound + allowed projects; implemented with app.member_project_ids too (membership pattern) | T-0013 | implementer |
+| [TD-368](../tracker/todo/TD-368.md) | Invite endpoints live under /api/v1/admin (module loader prefix), spec names /api/v1/projects/{id}/invites and /api/v1/invites/* | T-0052 | implementer |
+| [TD-369](../tracker/todo/TD-369.md) | SSO start with an invite: spec §4.5 has GET /start keep the invite_token, but a token must never be in a URL query; T-0052 added a form POST | T-0052 | implementer |
+| [TD-370](../tracker/todo/TD-370.md) | Magic-link eligibility by invite: by the account's e-mail (spec §4.2) or only when the request presents that invite_token (T-0052 wording)? | T-0052 | implementer |
 
 ## missed (7)
 
@@ -115,7 +119,7 @@
 | [TD-336](../tracker/todo/TD-336.md) | Mail: settle send-log rows stuck in queued (enqueue failed or Redis payload lost); no re-enqueue is possible because the payload (with the link token) is never persisted | T-0058 | implementer |
 | [TD-360](../tracker/todo/TD-360.md) | First-run: one-time password link for the first System admin once T-0077 ships | T-0023 | implementer |
 
-## later (103)
+## later (105)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -222,8 +226,10 @@
 | [TD-357](../tracker/todo/TD-357.md) | admin module depends on teams (team-name fill-in): removing the teams module tenant-wide also needs that dependency made optional | T-0013 | implementer |
 | [TD-358](../tracker/todo/TD-358.md) | Teams: remove team-project links when their project is deleted (projects delete hook), so GET /teams/{team} and project_count stop showing them | T-0013 | implementer |
 | [TD-359](../tracker/todo/TD-359.md) | PER-07 site_node_id is not checked against the project's breakdown (team link PUT and admin member PUT) | T-0013 | implementer |
+| [TD-371](../tracker/todo/TD-371.md) | Error reporting (Sentry): pass events through app.core.logging.scrub in before_send so invite_token/setup_token never leave the process | T-0052 | implementer |
+| [TD-374](../tracker/todo/TD-374.md) | Invite housekeeping: credential-less accounts of invites never accepted, and a scheduled expired mark | T-0052 | implementer |
 
-## bug (5)
+## bug (6)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -232,8 +238,9 @@
 | [TD-287](../tracker/todo/TD-287.md) | Upgrade offer: a soft-deleted own rule holding a new default's key shows key_in_use forever | T-0036 | reviewer |
 | [TD-330](../tracker/todo/TD-330.md) | scripts/pr_suggestions.py rebuild fails in cloud sessions: gh api --paginate follows numeric-ID repository Link URLs that the agent proxy rejects (HTTP 403); paginate with explicit repos/{owner}/{repo} page params | — | coordinator |
 | [TD-339](../tracker/todo/TD-339.md) | jobs LoopDispatcher.drain can spin forever when the commit ran on the loop's own thread (finished tasks stay in the set until their done callbacks run) | T-0058 | implementer |
+| [TD-375](../tracker/todo/TD-375.md) | mypy 2.3.1 (local toolchain) reports var-annotated in app/core/audit/guard.py:66 and app/modules/admin/service.py:122 on untouched dev code | T-0052 | implementer |
 
-## risk (28)
+## risk (29)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -265,6 +272,7 @@
 | [TD-349](../tracker/todo/TD-349.md) | T-0073: census read policy on auth_project_membership is opened by the app.team_link_census setting | T-0073 | implementer |
 | [TD-353](../tracker/todo/TD-353.md) | 0026 holds ACCESS EXCLUSIVE on every tenant-scoped table during the tenants backfill (FORCE RLS toggle); revisit before any populated deployment | T-0079 | implementer |
 | [TD-355](../tracker/todo/TD-355.md) | Magic-link eligibility ignores project soft-delete unless memberships were revoked with it (core cannot read the projects table) | T-0057 | implementer |
+| [TD-372](../tracker/todo/TD-372.md) | Invite preview/accept refusals are audited per attempt without a per-user throttle (ledger growth by a signed-in user) | T-0052 | implementer |
 
 ## Closed
 

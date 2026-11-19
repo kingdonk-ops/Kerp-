@@ -5,6 +5,10 @@ App Link verification file.
   password always available).
 * ``GET /api/v1/auth/sso/entra/start``: state + nonce + PKCE, the pre-auth cookie, and a
   redirect to the tenant-pinned authority.
+* ``POST /api/v1/auth/sso/entra/start`` (a top-level **form post**): the same, carrying an
+  ``invite_token`` in the form body, so the token is never in a URL (T-0052, diff §4.1). Only
+  its reference is kept with the ``state``; after the sign-in the post-authentication hook
+  accepts the invite and the landing gets ``joined_project_id`` or ``invite_error``.
 * ``GET /api/v1/auth/sso/entra/callback``: the one redirect URI of the app registration.
   Web: sets the refresh cookie (the same KERP session as a password sign-in) and redirects
   to the SPA's landing; no token in the URL. Native: a single-use exchange code through the
@@ -19,11 +23,13 @@ from __future__ import annotations
 
 import hmac
 import logging
+import re
 import uuid
 from typing import Annotated, Any, Final
-from urllib.parse import urlencode, urlsplit
+from urllib.parse import parse_qs, urlencode, urlsplit
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Query, Request, Response, status
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy import select
 
@@ -31,6 +37,7 @@ from app.core.auth import entra, sso
 from app.core.auth.deps import get_auth_service
 from app.core.auth.device_signal import DeviceRevokedError, device_revoked_response
 from app.core.auth.models import User
+from app.core.auth.post_auth import invite_reference
 from app.core.auth.revocation import RevocationUnavailableError
 from app.core.auth.router import (
     PREFIX,
@@ -41,6 +48,7 @@ from app.core.auth.router import (
 )
 from app.core.auth.runtime import AuthRuntime, EntraSso, get_auth_runtime
 from app.core.auth.schemas import (
+    INVITE_TOKEN_MAX_LENGTH,
     PKCE_CHALLENGE_PATTERN,
     AuthConfigResponse,
     SsoExchangeRequest,
@@ -66,7 +74,8 @@ WEB_RETURN_PATH: Final = "/login/sso-return"
 SIGNED_IN: Final = "signed_in"
 MAX_STATE_LENGTH: Final = 128
 MAX_CODE_LENGTH: Final = 4096
-MAX_INVITE_TOKEN_LENGTH: Final = 512
+FORM_CONTENT_TYPE: Final = "application/x-www-form-urlencoded"
+MAX_START_FORM_BYTES: Final = 2048
 WEB: Final = "web"
 NATIVE: Final = "native"
 # Exchange refusals: the reasons logged/audited (the client always gets the same 401).
@@ -143,7 +152,6 @@ def auth_config(settings: SettingsDep, response: Response) -> AuthConfigResponse
 def sso_start(
     runtime: RuntimeDep,
     request: Request,
-    invite_token: Annotated[str | None, Query(max_length=MAX_INVITE_TOKEN_LENGTH)] = None,
     device_id: Annotated[
         uuid.UUID | None, Query(description="The enrolling field client's device id")
     ] = None,
@@ -158,7 +166,94 @@ def sso_start(
         ),
     ] = None,
 ) -> RedirectResponse:
-    """Start an Entra ID sign-in: a redirect to the company tenant's authority."""
+    """Start an Entra ID sign-in: a redirect to the company tenant's authority.
+
+    An invite is never carried here (a query string is a server-visible URL): a sign-in that
+    accepts an invite starts with the form post of the same path."""
+    return _start(runtime, request, None, device_id, app_challenge, status.HTTP_302_FOUND)
+
+
+_START_FORM: Final[dict[str, Any]] = {
+    "requestBody": {
+        "required": False,
+        "content": {
+            FORM_CONTENT_TYPE: {
+                "schema": {
+                    "type": "object",
+                    "properties": {
+                        "invite_token": {"type": "string", "maxLength": INVITE_TOKEN_MAX_LENGTH},
+                        "device_id": {"type": "string", "format": "uuid"},
+                        "app_challenge": {"type": "string", "pattern": PKCE_CHALLENGE_PATTERN},
+                    },
+                }
+            }
+        },
+    }
+}
+
+
+def _form_field(fields: dict[str, list[str]], name: str) -> str | None:
+    values = fields.get(name, [])
+    if len(values) > 1:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, f"{name} given twice")
+    return values[0] if values else None
+
+
+@router.post(
+    START_PATH,
+    status_code=status.HTTP_303_SEE_OTHER,
+    response_class=RedirectResponse,
+    responses={404: {"description": "SSO is not offered by this deployment"}},
+    openapi_extra=_START_FORM,
+)
+async def sso_start_form(runtime: RuntimeDep, request: Request) -> RedirectResponse:
+    """Start an Entra ID sign-in that accepts a project invite afterwards (T-0052).
+
+    A top-level HTML form post (`application/x-www-form-urlencoded`: `invite_token`,
+    optional `device_id` and `app_challenge` as on the `GET`), so the invite token travels in
+    the body, never in a URL. Only its reference is stored with the `state`."""
+    _enabled(runtime)
+    content_type = request.headers.get("content-type", "").partition(";")[0].strip().lower()
+    if content_type != FORM_CONTENT_TYPE:
+        raise HTTPException(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, "Unsupported Media Type")
+    raw = await request.body()
+    if len(raw) > MAX_START_FORM_BYTES:
+        raise HTTPException(status.HTTP_413_CONTENT_TOO_LARGE, "Content Too Large")
+    try:
+        fields = parse_qs(raw.decode("ascii"), keep_blank_values=False, strict_parsing=bool(raw))
+    except ValueError:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Malformed form") from None
+    invite_token = _form_field(fields, "invite_token")
+    if invite_token is not None and len(invite_token) > INVITE_TOKEN_MAX_LENGTH:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "invite_token too long")
+    app_challenge = _form_field(fields, "app_challenge")
+    if app_challenge is not None and re.fullmatch(PKCE_CHALLENGE_PATTERN, app_challenge) is None:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "app_challenge malformed")
+    try:
+        device = _form_field(fields, "device_id")
+        device_id = uuid.UUID(device) if device is not None else None
+    except ValueError:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "device_id malformed") from None
+    # The store is a blocking client: off the event loop, like every sync endpoint.
+    return await run_in_threadpool(
+        _start,
+        runtime,
+        request,
+        invite_reference(invite_token),
+        device_id,
+        app_challenge,
+        status.HTTP_303_SEE_OTHER,
+    )
+
+
+def _start(
+    runtime: AuthRuntime,
+    request: Request,
+    invite_ref: str | None,
+    device_id: uuid.UUID | None,
+    app_challenge: str | None,
+    redirect_status: int,
+) -> RedirectResponse:
     entra_sso, _tenant = _enabled(runtime)
     if app_challenge is not None and device_id is None:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "app_challenge needs device_id")
@@ -170,7 +265,7 @@ def sso_start(
         verifier=verifier,
         cookie_hash=sso.digest(cookie),
         redirect_uri=redirect_uri,
-        invite_token=invite_token,
+        invite_ref=invite_ref,
         device_id=str(device_id) if device_id is not None else None,
         app_challenge=app_challenge,
     )
@@ -191,7 +286,7 @@ def sso_start(
             "code_challenge_method": "S256",
         }
     )
-    response = RedirectResponse(f"{config.authorize_url}?{query}", status.HTTP_302_FOUND)
+    response = RedirectResponse(f"{config.authorize_url}?{query}", redirect_status)
     _no_store(response)
     response.set_cookie(
         PREAUTH_COOKIE,
@@ -299,6 +394,7 @@ def _complete(
                 tenant_id=str(tenant),
                 device_id=entry.device_id,
                 app_challenge=entry.app_challenge,
+                invite_ref=entry.invite_ref,
             ),
         )
         sso.audit_event(session, "sso_verified", flow=flow, user_id=user.id)
@@ -308,9 +404,17 @@ def _complete(
         refuse_revoked_device(session, entry.device_uuid)
     except DeviceRevokedError:
         raise entra.SsoRefusedError(DEVICE_REVOKED_REASON, user_id=user.id) from None
-    pair = service.start_session(session, user, device_id=entry.device_uuid)
+    pair = service.start_session(
+        session, user, device_id=entry.device_uuid, invite_ref=entry.invite_ref
+    )
     sso.audit_event(session, "sso_signed_in", flow=flow, user_id=user.id)
-    response = _redirect(_landing(runtime, deployment, entry), {"status": SIGNED_IN})
+    # The invite's outcome (T-0052): a project id or an error code, never the token.
+    params = {"status": SIGNED_IN}
+    if pair.invite.joined_project_id is not None:
+        params["joined_project_id"] = str(pair.invite.joined_project_id)
+    if pair.invite.invite_error is not None:
+        params["invite_error"] = pair.invite.invite_error
+    response = _redirect(_landing(runtime, deployment, entry), params)
     set_refresh_cookie(response, pair)
     return response
 
@@ -412,7 +516,9 @@ def sso_exchange(
                 session, "sso_refused", flow=NATIVE, reason=DEVICE_REVOKED_REASON, user_id=user.id
             )
             return device_revoked_response()
-        pair = service.start_session(session, user, device_id=body.device_id)
+        pair = service.start_session(
+            session, user, device_id=body.device_id, invite_ref=grant.invite_ref
+        )
     except RevocationUnavailableError as exc:
         raise _unavailable() from exc
     sso.audit_event(session, "sso_signed_in", flow=NATIVE, user_id=user.id)

@@ -48,6 +48,7 @@ hardcoded config, no `.env` file is read).
 | `KERP_STORAGE_BUCKET`, `KERP_S3_ENDPOINT_URL`, `KERP_S3_PUBLIC_ENDPOINT_URL`, `KERP_S3_ACCESS_KEY_ID`, `KERP_S3_SECRET_ACCESS_KEY`, `KERP_UPLOAD_*`, `KERP_DOWNLOAD_URL_SECONDS` | see `app/modules/uploads/README.md` | Object storage (S3 / MinIO) and upload limits |
 | `KERP_FIRST_ADMIN_EMAIL` | unset | Only read by the first-run command (`app/modules/onboarding/README.md`): the first System admin's e-mail when `--admin-email` is not given |
 | `KERP_ACCESS_REQUEST_COOLDOWN_HOURS` | `24` | Hours after a rejected access request before the same user may ask for the same project again (409 `ACCESS_REQUEST_COOLDOWN` before that); `0` disables the cooldown (`app/modules/access_requests/README.md`, diff §4.1) |
+| `KERP_INVITE_TTL_HOURS` | `168` | Lifetime of a project invite in hours, from creation or the latest re-send (1 to 2160; `app/modules/admin/README.md`, diff §4.1 Invites) |
 | `KERP_S3_REGION` | `ap-southeast-2` | S3 region, set per deployment (TD-171 decision 13a, diff §4.4); MinIO ignores it |
 | `KERP_AWS_REGION` | `ap-southeast-2` | The deployment region (diff §4.4): the SES client and the SNS certificate host check read it |
 | `KERP_MAIL_TRANSPORT`, `KERP_MAIL_FROM_ADDRESS`, `KERP_MAIL_SES_CONFIGURATION_SET`, `KERP_MAIL_SNS_TOPIC_ARN`, `KERP_MAIL_DEFAULT_LOCALE` | see `app/core/mail/README.md` | Outbound e-mail (T-0058): SES in production (required: startup fails without it), the log transport in development; bounce/complaint topic; deployment steps in `docs/deploy/outbound-email.md` |
@@ -70,7 +71,9 @@ no HSTS preload, and the API docs are hidden in production (T-0030).
   `status`, `duration_ms`. Request headers (Authorization, cookies) are never logged.
   uvicorn's own access log is disabled (it prints query strings); its other logs go through the JSON handler.
   `httpx` and `httpcore` are capped at `WARNING`: their INFO lines carry full outbound URLs, whose
-  query strings can hold tokens (TD-024). Lines are ASCII-only JSON (non-ASCII is `\uXXXX`-escaped),
+  query strings can hold tokens (TD-024). Fields named `invite_token` or `setup_token` are
+  scrubbed from every line (`extra=` values at any depth, and `invite_token=...` inside a
+  message or traceback; T-0052). Lines are ASCII-only JSON (non-ASCII is `\uXXXX`-escaped),
   so a non-UTF-8 console cannot fail to write them.
 - **Client disconnects**: a request cancelled because the client went away
   (`asyncio.CancelledError`) is logged by `kerp.access` with status `499` and `disconnected: true`,

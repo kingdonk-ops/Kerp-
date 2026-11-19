@@ -41,6 +41,11 @@ instead (T-0014, TD-053, edge spec §6 amendments), declared on the model's tabl
   (``app.admin_project_ids``) and by ``app.is_system_admin`` sessions; nobody else. The owner
   inserts their own rows only; updates need the exact scope and visibility; nobody deletes
   (decided and withdrawn rows are history).
+* ``project_invite`` (T-0052, edge spec §6 amendments): a row is readable by the PER-09 holders
+  of the project it names (``app.admin_project_ids``) and by ``app.is_system_admin`` sessions;
+  nobody else, the invitee included (an invite is accepted by its token through the admin
+  module's narrow system path). Inserts and updates need the exact scope and that same
+  visibility; nobody deletes (accepted and revoked rows are history).
 * ``team`` (T-0013, ADR 0008): the teams module's team, member and project-link tables. A row
   is readable when its team is *visible*: the team has a live link to a project the session
   describes (bound, ``app.allowed_project_ids`` or ``app.member_project_ids``, as for a
@@ -135,6 +140,11 @@ ACCESS_REQUEST_POLICY_NAMES: Final = (
     "access_request_insert_policy",
     "access_request_update_policy",
 )
+PROJECT_INVITE_POLICY_NAMES: Final = (
+    "project_invite_read_policy",
+    "project_invite_insert_policy",
+    "project_invite_update_policy",
+)
 SESSION_INFO_KEY: Final = "kerp_tenancy"
 RLS_INFO_KEY: Final = "kerp_rls"
 
@@ -179,6 +189,9 @@ class RlsPolicy:
     * ``kind="access_request"`` (T-0050): readable by the owner (``owner_column``), by the
       administrators (PER-09) of the project in ``project_column`` and by ``system_admin``
       sessions; only the owner inserts; updates need visibility; nobody deletes.
+    * ``kind="project_invite"`` (T-0052): readable and writable only by the administrators
+      (PER-09) of the project in ``project_column`` and by ``system_admin`` sessions; nobody
+      deletes.
     * ``kind="team"`` (T-0013): ``team_column`` names the row's team (``id`` on the team table,
       ``team_id`` elsewhere). The team is visible when ``link_table`` (columns ``team_id``,
       ``linked_project_id``) has a live row linking it to a described project, or
@@ -189,7 +202,7 @@ class RlsPolicy:
     are written by ``system_admin`` sessions only.
     """
 
-    kind: Literal["membership", "admin_grant", "access_request", "team"]
+    kind: Literal["membership", "admin_grant", "access_request", "team", "project_invite"]
     owner_column: str | None = None
     project_column: str | None = None
     source_column: str | None = None
@@ -262,6 +275,27 @@ def _access_request_policy_sql(table: str, policy: RlsPolicy) -> list[str]:
     return [
         f"CREATE POLICY {read} ON {table} FOR SELECT USING ({visible})",
         f"CREATE POLICY {insert} ON {table} FOR INSERT WITH CHECK ({own})",
+        f"CREATE POLICY {update} ON {table} FOR UPDATE USING ({guarded}) WITH CHECK ({guarded})",
+    ]
+
+
+def project_invite_visible_sql(project_column: str) -> str:
+    """Read rule of a ``project_invite`` table: the PER-09 holders of the named project, or a
+    System admin (edge spec §6 amendments, T-0052). Never the invitee."""
+    administered = f"{project_column} = ANY({_id_list_sql(ADMIN_PROJECTS_SETTING)})"
+    return f"tenant_id = {_TENANT_EXPR} AND ({administered} OR {SYSTEM_ADMIN_SQL})"
+
+
+def _project_invite_policy_sql(table: str, policy: RlsPolicy) -> list[str]:
+    if policy.project_column is None:
+        raise ValueError(f"{table}: a project_invite policy needs project_column")
+    read, insert, update = PROJECT_INVITE_POLICY_NAMES
+    visible = project_invite_visible_sql(policy.project_column)
+    guarded = f"{SCOPE_ROW_SQL} AND {visible}"
+    # No DELETE policy: nobody deletes an invite (accepted and revoked rows are history).
+    return [
+        f"CREATE POLICY {read} ON {table} FOR SELECT USING ({visible})",
+        f"CREATE POLICY {insert} ON {table} FOR INSERT WITH CHECK ({guarded})",
         f"CREATE POLICY {update} ON {table} FOR UPDATE USING ({guarded}) WITH CHECK ({guarded})",
     ]
 
@@ -347,6 +381,9 @@ def _special_policy_sql(table: str, policy: RlsPolicy) -> list[str]:
     elif policy.kind == "access_request":
         names = ACCESS_REQUEST_POLICY_NAMES
         creates = _access_request_policy_sql(table, policy)
+    elif policy.kind == "project_invite":
+        names = PROJECT_INVITE_POLICY_NAMES
+        creates = _project_invite_policy_sql(table, policy)
     elif policy.kind == "membership":
         if policy.project_column is None:
             raise ValueError(f"{table}: a membership policy needs project_column")
@@ -401,6 +438,8 @@ def expected_policy_names(table: Table) -> tuple[str, ...]:
         return POLICY_NAMES
     if policy.kind == "access_request":
         return ACCESS_REQUEST_POLICY_NAMES
+    if policy.kind == "project_invite":
+        return PROJECT_INVITE_POLICY_NAMES
     if policy.kind == "team":
         return TEAM_POLICY_NAMES
     if policy.kind == "membership":

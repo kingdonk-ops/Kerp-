@@ -10,8 +10,9 @@ tenant-level grants are not personas and cannot be assigned here.
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 from enum import StrEnum
-from typing import Annotated, Final, Self
+from typing import Annotated, Final, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
@@ -179,3 +180,90 @@ class AdminGrantRead(BaseModel):
     email: str
     display_name: str
     grant: AdminGrantKind
+
+
+# --- project invites (T-0052) ---------------------------------------------------------------
+
+INVITE_TOKEN_MAX: Final = 512
+
+
+class InviteCreate(BaseModel):
+    """``POST /admin/projects/{p}/invites``: invite an e-mail address with persona(s) and site
+    scope. ``confirm_sod`` confirms a PER-09 + hold-authority combination (else 409)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    email: Email
+    grants: list[GrantIn] = Field(min_length=1, max_length=MAX_GRANTS)
+    confirm_sod: bool = False
+
+    @model_validator(mode="after")
+    def _distinct(self) -> Self:
+        keys = [(g.persona, g.site_node_id) for g in self.grants]
+        if len(set(keys)) != len(keys):
+            raise ValueError("grants must not repeat")
+        return self
+
+
+class InviteRead(BaseModel):
+    """An open invite of a project, as its administrators see it. Never the token."""
+
+    id: uuid.UUID
+    email: str
+    grants: list[GrantRead]
+    status: Literal["pending", "expired"] = Field(
+        description="expired: past `expires_at` and never accepted (it can be re-sent)"
+    )
+    expires_at: datetime
+    last_sent_at: datetime
+    resend_available_at: datetime | None = Field(
+        description=(
+            "When the send cap of this project + e-mail allows the next re-send (1 per 60 s "
+            "and 5 per 24 h, counting creations and re-sends); null: allowed now"
+        )
+    )
+
+
+class InviteSent(InviteRead):
+    """An invite right after a send (creation or re-send), with the copyable link. Shown
+    once: the server keeps only a hash of the token. The link carries the `invite_token`
+    only, so it can never set a password (diff §4.1)."""
+
+    invite_token: str = Field(description="The single-use token of the link; shown once")
+    invite_link: str = Field(description="`<web origin>/invite#<invite_token>` (URL fragment)")
+
+
+class InviteCreated(InviteSent):
+    sod_warning: bool = Field(
+        description="PER-09 together with a hold-authority persona (confirmed with confirm_sod)"
+    )
+
+
+class InviteTokenIn(BaseModel):
+    """The invite token of the link's fragment: always in the body, never in a URL."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    invite_token: str = Field(min_length=16, max_length=INVITE_TOKEN_MAX, repr=False)
+
+
+class InvitePreview(BaseModel):
+    """What the "Join project" confirmation shows the invitee."""
+
+    project_id: uuid.UUID
+    project_code: str
+    project_name: str
+    inviter_name: str
+
+
+class InviteAccepted(BaseModel):
+    joined_project_id: uuid.UUID
+
+
+class InviteRefusal(BaseModel):
+    """A refused invite: ``code`` says what the client shows (the message is neutral)."""
+
+    detail: str
+    code: Literal[
+        "INVITE_WRONG_USER", "INVITE_GONE", "INVITE_CONFLICT", "INVITE_NOT_RESENDABLE"
+    ]

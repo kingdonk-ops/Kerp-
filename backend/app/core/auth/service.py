@@ -72,6 +72,7 @@ from app.core.auth.magic_link import (
 )
 from app.core.auth.models import DEVICE_REVOKED, Device, User, normalize_email
 from app.core.auth.passwords import hash_password, verify_password
+from app.core.auth.post_auth import NO_INVITE, PostAuthOutcome, run_post_authentication
 from app.core.auth.providers import AuthProvider, LocalPasswordProvider, PasswordCredentials
 from app.core.auth.runtime import AuthRuntime
 from app.core.auth.tokens import InvalidTokenError, IssuedToken, TokenClaims
@@ -92,6 +93,9 @@ class AuthenticationError(Exception):
 class TokenPair:
     access: IssuedToken
     refresh: IssuedToken
+    # What the post-authentication hook did with the sign-in's invite, if it carried one
+    # (T-0052): never set by a refresh or a PIN unlock.
+    invite: PostAuthOutcome = NO_INVITE
 
 
 def email_domain_is_internal(email: str, domains: Collection[str]) -> bool:
@@ -271,9 +275,11 @@ class AuthService:
         credentials: PasswordCredentials,
         client: str | None = None,
         device_id: uuid.UUID | None = None,
+        invite_ref: str | None = None,
     ) -> TokenPair:
         """``client`` is the caller's address (``request.client.host``), the lockout key.
-        ``device_id`` is the device the client says it is (``X-KERP-Device-Id``)."""
+        ``device_id`` is the device the client says it is (``X-KERP-Device-Id``).
+        ``invite_ref``: the reference of an invite to accept once signed in (``post_auth``)."""
         tenant = self.runtime.settings.default_tenant_id
         if tenant is None:
             raise AuthenticationError("no tenant")
@@ -294,7 +300,7 @@ class AuthService:
         # Credentials first (T-0080, TD-291): only a caller who proved the account learns
         # that the device it names is revoked (and is told to wipe).
         refuse_revoked_device(session, device_id)
-        return self.start_session(session, user, device_id=device_id)
+        return self.start_session(session, user, device_id=device_id, invite_ref=invite_ref)
 
     def refresh(
         self, session: Session, refresh_token: str, *, device_id: uuid.UUID | None = None
@@ -309,19 +315,23 @@ class AuthService:
             raise PinGateError(PIN_REQUIRED)
         return self._rotate(session, claims, device_id=bound)
 
-    def request_magic_link(self, *, email: str) -> MagicLinkJob | None:
+    def request_magic_link(
+        self, *, email: str, invite_ref: str | None = None
+    ) -> MagicLinkJob | None:
         """The request half of a magic-link request: count it (the per-mailbox lockout,
         ``LockedOutError`` when locked) and return the job to run after the response.
 
         Nothing here depends on the address: unknown, inactive, ineligible and eligible
         accounts get the same work and the same job (diff §4.2 *no timing oracle*, T-0057).
         ``None`` only without a deployment tenant (the same for every address).
+        ``invite_ref`` (the reference of an invite to accept at redeem, ``post_auth``) rides
+        on the job and is kept next to the hashed link record, never in the link (T-0052).
         """
         tenant = self.runtime.settings.default_tenant_id
         if tenant is None:
             return None
         self.magic_link_lockout.begin(_subject(tenant, email))
-        return MagicLinkJob(tenant_id=tenant, email=normalize_email(email))
+        return MagicLinkJob(tenant_id=tenant, email=normalize_email(email), invite_ref=invite_ref)
 
     def issue_magic_link(self, database: Database, job: MagicLinkJob) -> None:
         """The deferred half (after the response, own unit of work): issue and send a link to
@@ -359,7 +369,10 @@ class AuthService:
             )
             return
         token = new_magic_link_token()
-        payload = json.dumps({"uid": str(user_id), "tid": str(job.tenant_id)}).encode()
+        record = {"uid": str(user_id), "tid": str(job.tenant_id)}
+        if job.invite_ref is not None:
+            record["inv"] = job.invite_ref  # the reference only; the link never carries it
+        payload = json.dumps(record).encode()
         self.runtime.store.put_magic_link(magic_link_digest(token), payload, MAGIC_LINK_TTL)
         self.runtime.magic_links.send(
             session,
@@ -406,20 +419,32 @@ class AuthService:
         if not magic_link_eligible(session, candidate):  # PER-14 lost since the request
             log_refusal(user_id, "redeem")
             raise AuthenticationError("not eligible for a magic link")
-        return self.start_session(session, user, device_id=device_id)
+        invite_ref = data.get("inv")
+        return self.start_session(session, user, device_id=device_id, invite_ref=invite_ref)
 
     def start_session(
-        self, session: Session, user: User, *, device_id: uuid.UUID | None = None
+        self,
+        session: Session,
+        user: User,
+        *,
+        device_id: uuid.UUID | None = None,
+        invite_ref: str | None = None,
     ) -> TokenPair:
         """A new KERP session for ``user``, whose identity a provider has just proved
         (password, magic link, Entra ID SSO: T-0054): the internal flag is recomputed, the
         session is bound to ``device_id`` when that is an active device the user enrolled,
         and the same 15-minute access + 12-hour refresh pair is issued. The caller has
-        already refused a revoked device (credentials first, T-0080)."""
+        already refused a revoked device (credentials first, T-0080).
+
+        With ``invite_ref`` the post-authentication hook then accepts that invite in the same
+        request (T-0052): its outcome rides on the pair and never fails the sign-in."""
         self._signed_in(user)
         session_id = uuid.uuid4()
         bound = self._bind_sign_in_device(session, user.id, user.tenant_id, session_id, device_id)
-        return self._issue_pair(user.id, user.tenant_id, session_id, device_id=bound)
+        pair = self._issue_pair(user.id, user.tenant_id, session_id, device_id=bound)
+        if invite_ref is None:
+            return pair
+        return replace(pair, invite=run_post_authentication(session, user, invite_ref))
 
     def unlock(
         self,
