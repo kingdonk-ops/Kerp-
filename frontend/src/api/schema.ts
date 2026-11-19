@@ -81,6 +81,8 @@ export interface paths {
          *     Always ``202`` (unknown, inactive, non-Field-Worker and other-tenant addresses included),
          *     so the answer reveals no accounts or personas. The request only counts the attempt; the
          *     lookup, the eligibility check, the link and its e-mail run after the response (T-0057).
+         *     With `invite_token` (a pending invite naming PER-14 also makes its invitee eligible) the
+         *     invite is accepted when the link is redeemed; the link itself never carries it (T-0052).
          */
         post: operations["request_magic_link_api_v1_auth_magic_link_post"];
         delete?: never;
@@ -278,10 +280,21 @@ export interface paths {
         /**
          * Sso Start
          * @description Start an Entra ID sign-in: a redirect to the company tenant's authority.
+         *
+         *     An invite is never carried here (a query string is a server-visible URL): a sign-in that
+         *     accepts an invite starts with the form post of the same path.
          */
         get: operations["sso_start_api_v1_auth_sso_entra_start_get"];
         put?: never;
-        post?: never;
+        /**
+         * Sso Start Form
+         * @description Start an Entra ID sign-in that accepts a project invite afterwards (T-0052).
+         *
+         *     A top-level HTML form post (`application/x-www-form-urlencoded`: `invite_token`,
+         *     optional `device_id` and `app_challenge` as on the `GET`), so the invite token travels in
+         *     the body, never in a URL. Only its reference is stored with the `state`.
+         */
+        post: operations["sso_start_form_api_v1_auth_sso_entra_start_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1055,6 +1068,116 @@ export interface paths {
         post?: never;
         /** Revoke */
         delete: operations["revoke_api_v1_admin_grants__user_id___grant__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/projects/{project_id}/invites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Invites
+         * @description The project's open invites: pending, and expired never accepted. Accepted and revoked
+         *     invites are not listed.
+         */
+        get: operations["list_invites_api_v1_admin_projects__project_id__invites_get"];
+        put?: never;
+        /**
+         * Create Invite
+         * @description Invite an e-mail address to the project. The account is created without credentials if
+         *     none exists; an earlier open invite of the same address is revoked; no membership exists
+         *     until the invite is accepted. The response carries the copyable link once.
+         */
+        post: operations["create_invite_api_v1_admin_projects__project_id__invites_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/projects/{project_id}/invites/{invite_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Revoke Invite
+         * @description Revoke an open invite: its link stops working at once.
+         */
+        delete: operations["revoke_invite_api_v1_admin_projects__project_id__invites__invite_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/projects/{project_id}/invites/{invite_id}/resend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resend Invite
+         * @description Re-send a pending or expired (never accepted) invite: a fresh token and expiry, the old
+         *     link is gone at once. The response carries the new copyable link once.
+         */
+        post: operations["resend_invite_api_v1_admin_projects__project_id__invites__invite_id__resend_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/invites/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview Invite
+         * @description What the "Join project" confirmation shows: project code and name, the inviter's name.
+         *     Only for the invited account; nothing is granted.
+         */
+        post: operations["preview_invite_api_v1_admin_invites_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/invites/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Accept Invite
+         * @description Join the project: the membership and the invite's `accepted` mark in one transaction.
+         *     Single use, also under concurrency.
+         */
+        post: operations["accept_invite_api_v1_admin_invites_accept_post"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -2417,6 +2540,200 @@ export interface components {
              */
             warnings?: string[] | null;
         };
+        /** InviteAccepted */
+        InviteAccepted: {
+            /**
+             * Joined Project Id
+             * Format: uuid
+             */
+            joined_project_id: string;
+        };
+        /**
+         * InviteCreate
+         * @description ``POST /admin/projects/{p}/invites``: invite an e-mail address with persona(s) and site
+         *     scope. ``confirm_sod`` confirms a PER-09 + hold-authority combination (else 409).
+         */
+        InviteCreate: {
+            /** Email */
+            email: string;
+            /** Grants */
+            grants: components["schemas"]["GrantIn"][];
+            /**
+             * Confirm Sod
+             * @default false
+             */
+            confirm_sod: boolean;
+        };
+        /** InviteCreated */
+        InviteCreated: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Email */
+            email: string;
+            /** Grants */
+            grants: components["schemas"]["GrantRead"][];
+            /**
+             * Status
+             * @description expired: past `expires_at` and never accepted (it can be re-sent)
+             * @enum {string}
+             */
+            status: "pending" | "expired";
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /**
+             * Last Sent At
+             * Format: date-time
+             */
+            last_sent_at: string;
+            /**
+             * Resend Available At
+             * @description When the send cap of this project + e-mail allows the next re-send (1 per 60 s and 5 per 24 h, counting creations and re-sends); null: allowed now
+             */
+            resend_available_at: string | null;
+            /**
+             * Invite Token
+             * @description The single-use token of the link; shown once
+             */
+            invite_token: string;
+            /**
+             * Invite Link
+             * @description `<web origin>/invite#<invite_token>` (URL fragment)
+             */
+            invite_link: string;
+            /**
+             * Sod Warning
+             * @description PER-09 together with a hold-authority persona (confirmed with confirm_sod)
+             */
+            sod_warning: boolean;
+        };
+        /**
+         * InvitePreview
+         * @description What the "Join project" confirmation shows the invitee.
+         */
+        InvitePreview: {
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /** Project Code */
+            project_code: string;
+            /** Project Name */
+            project_name: string;
+            /** Inviter Name */
+            inviter_name: string;
+        };
+        /**
+         * InviteRead
+         * @description An open invite of a project, as its administrators see it. Never the token.
+         */
+        InviteRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Email */
+            email: string;
+            /** Grants */
+            grants: components["schemas"]["GrantRead"][];
+            /**
+             * Status
+             * @description expired: past `expires_at` and never accepted (it can be re-sent)
+             * @enum {string}
+             */
+            status: "pending" | "expired";
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /**
+             * Last Sent At
+             * Format: date-time
+             */
+            last_sent_at: string;
+            /**
+             * Resend Available At
+             * @description When the send cap of this project + e-mail allows the next re-send (1 per 60 s and 5 per 24 h, counting creations and re-sends); null: allowed now
+             */
+            resend_available_at: string | null;
+        };
+        /**
+         * InviteRefusal
+         * @description A refused invite: ``code`` says what the client shows (the message is neutral).
+         */
+        InviteRefusal: {
+            /** Detail */
+            detail: string;
+            /**
+             * Code
+             * @enum {string}
+             */
+            code: "INVITE_WRONG_USER" | "INVITE_GONE" | "INVITE_CONFLICT" | "INVITE_NOT_RESENDABLE";
+        };
+        /**
+         * InviteSent
+         * @description An invite right after a send (creation or re-send), with the copyable link. Shown
+         *     once: the server keeps only a hash of the token. The link carries the `invite_token`
+         *     only, so it can never set a password (diff §4.1).
+         */
+        InviteSent: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Email */
+            email: string;
+            /** Grants */
+            grants: components["schemas"]["GrantRead"][];
+            /**
+             * Status
+             * @description expired: past `expires_at` and never accepted (it can be re-sent)
+             * @enum {string}
+             */
+            status: "pending" | "expired";
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /**
+             * Last Sent At
+             * Format: date-time
+             */
+            last_sent_at: string;
+            /**
+             * Resend Available At
+             * @description When the send cap of this project + e-mail allows the next re-send (1 per 60 s and 5 per 24 h, counting creations and re-sends); null: allowed now
+             */
+            resend_available_at: string | null;
+            /**
+             * Invite Token
+             * @description The single-use token of the link; shown once
+             */
+            invite_token: string;
+            /**
+             * Invite Link
+             * @description `<web origin>/invite#<invite_token>` (URL fragment)
+             */
+            invite_link: string;
+        };
+        /**
+         * InviteTokenIn
+         * @description The invite token of the link's fragment: always in the body, never in a URL.
+         */
+        InviteTokenIn: {
+            /** Invite Token */
+            invite_token: string;
+        };
         /**
          * JobCreate
          * @description ``POST /jobs``: a kind registered with ``api=True`` and its payload.
@@ -2599,6 +2916,11 @@ export interface components {
             email: string;
             /** Password */
             password: string;
+            /**
+             * Invite Token
+             * @description Optional project invite token (from the `/invite#<token>` link): accepted right after a successful sign-in. The token response then carries `joined_project_id`, or `invite_error`; a bad token never fails the sign-in
+             */
+            invite_token?: string | null;
         };
         /**
          * MagicLinkRedeemRequest
@@ -2612,6 +2934,11 @@ export interface components {
         MagicLinkRequest: {
             /** Email */
             email: string;
+            /**
+             * Invite Token
+             * @description Optional project invite token (from the `/invite#<token>` link): accepted right after a successful sign-in. The token response then carries `joined_project_id`, or `invite_error`; a bad token never fails the sign-in
+             */
+            invite_token?: string | null;
         };
         /** MailSendRead */
         MailSendRead: {
@@ -3794,6 +4121,16 @@ export interface components {
              * @description Native app only (`Origin` on `KERP_NATIVE_APP_ORIGINS`): the refresh token, kept in the device keystore. Absent for every other caller (cookie transport)
              */
             refresh_token?: string | null;
+            /**
+             * Joined Project Id
+             * @description The project joined by the `invite_token` this sign-in carried (T-0052): open it. Absent without an invite
+             */
+            joined_project_id?: string | null;
+            /**
+             * Invite Error
+             * @description Why the sign-in's `invite_token` was not accepted (the sign-in itself succeeded): `INVITE_WRONG_USER`, `INVITE_GONE` (expired, revoked or used), `INVITE_CONFLICT` or `INVITE_UNAVAILABLE`
+             */
+            invite_error?: string | null;
         };
         /** TryError */
         TryError: {
@@ -4447,7 +4784,6 @@ export interface operations {
     sso_start_api_v1_auth_sso_entra_start_get: {
         parameters: {
             query?: {
-                invite_token?: string | null;
                 /** @description The enrolling field client's device id */
                 device_id?: string | null;
                 /** @description Native app only: S256 hash of its own verifier (with `device_id`); the callback then hands off through the App Link with a single-use code */
@@ -4481,6 +4817,40 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+        };
+    };
+    sso_start_form_api_v1_auth_sso_entra_start_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/x-www-form-urlencoded": {
+                    invite_token?: string;
+                    /** Format: uuid */
+                    device_id?: string;
+                    app_challenge?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            303: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description SSO is not offered by this deployment */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -6376,6 +6746,340 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_invites_api_v1_admin_projects__project_id__invites_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InviteRead"][];
+                };
+            };
+            /** @description A member of the project without PER-09 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not a member of the project, or no such invite */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_invite_api_v1_admin_projects__project_id__invites_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InviteCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InviteCreated"];
+                };
+            };
+            /** @description A member of the project without PER-09 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not a member of the project, or no such invite */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `detail.code: sod_confirmation_required` (send `confirm_sod`), or `code: INVITE_CONFLICT` (a concurrent request changed the invite: retry) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description The send cap of this project + e-mail is reached (1 per 60 s, 5 per 24 h, creations and re-sends together): retry after `Retry-After` seconds. Nothing was created or revoked */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    revoke_invite_api_v1_admin_projects__project_id__invites__invite_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                invite_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description A member of the project without PER-09 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not a member of the project, or no such invite */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `INVITE_NOT_RESENDABLE` (accepted or revoked) or `INVITE_CONFLICT` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InviteRefusal"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resend_invite_api_v1_admin_projects__project_id__invites__invite_id__resend_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                invite_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InviteSent"];
+                };
+            };
+            /** @description A member of the project without PER-09 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not a member of the project, or no such invite */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `INVITE_NOT_RESENDABLE` (accepted or revoked) or `INVITE_CONFLICT` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InviteRefusal"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description The send cap of this project + e-mail is reached (1 per 60 s, 5 per 24 h, creations and re-sends together): retry after `Retry-After` seconds. Nothing was created or revoked */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    preview_invite_api_v1_admin_invites_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InviteTokenIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvitePreview"];
+                };
+            };
+            /** @description `INVITE_WRONG_USER`: the session's e-mail is not the invited one */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InviteRefusal"];
+                };
+            };
+            /** @description `INVITE_GONE`: expired, revoked, used or unknown (one neutral message) */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InviteRefusal"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    accept_invite_api_v1_admin_invites_accept_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InviteTokenIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InviteAccepted"];
+                };
+            };
+            /** @description `INVITE_WRONG_USER`: the session's e-mail is not the invited one */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InviteRefusal"];
+                };
+            };
+            /** @description `INVITE_CONFLICT`: a parallel request accepted it first */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InviteRefusal"];
+                };
+            };
+            /** @description `INVITE_GONE`: expired, revoked, used or unknown (one neutral message) */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InviteRefusal"];
+                };
             };
             /** @description Validation Error */
             422: {

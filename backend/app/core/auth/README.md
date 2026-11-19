@@ -24,6 +24,7 @@ rewritten (HS256 → RS256/EdDSA + JWKS + `jti` revocation in Redis).
 | `service.py` | `AuthService` login / refresh / logout / magic link / PIN unlock; `start_session` (the one way any provider's sign-in becomes a KERP session); `create_user`, `set_password`, `set_user_password` (the one way a password is set, under the policy: T-0077); user reads for the admin module (`list_users`, `get_user`, `users_by_id`, `find_user_by_email`, T-0014); internal staff rule (`is_internal_user`, T-0049) |
 | `field.py` | Magic-link tokens + delivery seam, PIN rules and the `PIN_REQUIRED` / `PIN_INVALID` / `PIN_EXHAUSTED` answers (T-0009, T-0038) |
 | `magic_link.py` | Magic links for Field Workers only (T-0057): `magic_link_eligible` (PER-14 via `load_grants`, plus registered providers), the eligibility extension point (`register_magic_link_eligibility`), `MagicLinkJob` (the post-response half of a request), refusal reason `magic_link_not_field_worker` |
+| `post_auth.py` | The post-authentication hook (T-0052): what a sign-in does with an `invite_token`. Empty by default; the module owning invites registers it (*Post-authentication hook*) |
 | `lockout.py` | `ProgressiveLockout` + policies, Redis-backed (T-0009); offline failures counted with `extra` (T-0038) |
 | `models.py` | `auth_user` table (tenant-level rows, RLS) — migration `0003`, internal staff flag + Entra link in `0013` (T-0049, ADR 0009); `auth_project_membership` (T-0010) — migration `0006`, persona CHECK widened for PER-16 in `0012` (T-0076), membership-based RLS in `0015` (T-0014), grant sources (`source_type`, `source_id`) in `0025` (T-0073, ADR 0008); `oe_identity_device` (T-0043) — migration `0016`, `wipe_secret_hash` in `0018` (T-0080), `pin_hash` + `pin_set_at` in `0019` (T-0038) |
 | `memberships.py` | The membership store's write side for **individual** (`direct`) rows (`project_grants`, `set_user_grants`, `revoke_project`; revoke = soft delete, re-grant revives) and the member list with sources (`project_member_grants`), used by the admin module (T-0014) and the projects module (creator PER-09, revoke on delete; T-0039) |
@@ -39,16 +40,17 @@ rewritten (HS256 → RS256/EdDSA + JWKS + `jti` revocation in Redis).
 | Method + path | Auth | Result |
 |---|---|---|
 | `GET /.well-known/jwks.json` | none | `{"keys": [...]}` public JWKs (active + retired), `Cache-Control: public, max-age=300` |
-| `POST /api/v1/auth/login` | none | `{email, password}` → `TokenResponse` (`no-store`) + refresh cookie (native app: token in the body); a `tenant_id` field is `422`; `429` when locked |
+| `POST /api/v1/auth/login` | none | `{email, password, invite_token?}` → `TokenResponse` (`no-store`) + refresh cookie (native app: token in the body); a `tenant_id` field is `422`; `429` when locked |
 | `POST /api/v1/auth/refresh` | refresh cookie + Origin (native app: `{refresh_token}` body) | new `TokenResponse` + cookie (rotation); `401 {code: PIN_REQUIRED}` for a session of a device with a PIN idle `KERP_PIN_IDLE_MINUTES` or longer (token not spent); `401` for ended sessions; `403` cross-origin |
 | `POST /api/v1/auth/logout` | bearer | `204`; revokes the token and its whole login session; clears the refresh cookie |
 | `GET /api/v1/auth/me` | bearer | `{id, tenant_id, email, display_name, is_internal}` (`is_internal` read-only, below) |
 | `GET /api/v1/auth/config` | none | `{password: {available: true}, sso: {provider: "entra", preferred: true, start_url} \| null}` (*Entra ID SSO*) |
-| `GET /api/v1/auth/sso/entra/start` | none | `?invite_token&device_id&app_challenge` → `302` to the tenant's authorize endpoint + pre-auth cookie; `404` without SSO |
+| `GET /api/v1/auth/sso/entra/start` | none | `?device_id&app_challenge` → `302` to the tenant's authorize endpoint + pre-auth cookie; `404` without SSO. An `invite_token` in the query is ignored (never in a URL) |
+| `POST /api/v1/auth/sso/entra/start` | none | a top-level form post (`application/x-www-form-urlencoded`: `invite_token`, `device_id?`, `app_challenge?`) → `303` to the authorize endpoint + pre-auth cookie; the sign-in then accepts the invite (T-0052); `415` other content types, `422` malformed fields |
 | `GET /api/v1/auth/sso/entra/callback` | pre-auth cookie | `303` to the web landing (refresh cookie set) or the App Link (exchange code); refusals `?error=<code>` |
 | `POST /api/v1/auth/sso/entra/exchange` | native origin | `{code, verifier, device_id}` → `TokenResponse` with `refresh_token` (native body); `401` uniform; `401 {code: DEVICE_REVOKED}`; `403` other origins |
 | `GET /.well-known/assetlinks.json` | none | Digital Asset Links of the Android app (from configuration); `404` unconfigured |
-| `POST /api/v1/auth/magic-link` | none | `{email}` → always the same `202`; after the response, sends a 15-min one-time link to an active **Field Worker** (PER-14) only (*Magic links for Field Workers only*); `429` when throttled |
+| `POST /api/v1/auth/magic-link` | none | `{email, invite_token?}` → always the same `202`; after the response, sends a 15-min one-time link to an active **Field Worker** (PER-14) only (*Magic links for Field Workers only*); `429` when throttled |
 | `POST /api/v1/auth/magic-link/redeem` | none | `{token}` → `TokenResponse` + cookie of a new session (on an enrolled device: bound to it, PIN kept); eligibility re-checked, else the neutral `401` |
 | `POST /api/v1/auth/password-reset/request` | none | `{email}` → always the same `202` (unknown, deactivated and active accounts alike); after the response, e-mails an active account the single-use link `/reset-password#<token>` (*Self-service password reset*); `429` + `Retry-After` when the client or the mailbox is throttled |
 | `POST /api/v1/auth/password-reset/confirm` | none | `{token, new_password}` → `200 {status: "password_changed"}` (no tokens, nobody signed in; every session of the user revoked); `410 {code: RESET_LINK_INVALID}` for any dead link; `422 {detail, code, min_length, max_length}` when the policy refuses the password (link still usable); `429` when throttled |
@@ -67,7 +69,8 @@ body carries the refresh token (below), except for an allow-listed native app
 (`refresh_token`, *Native app origins*). Every token endpoint and every authenticated request
 reads `X-KERP-Device-Id`; a revoked device is `401` with `code: DEVICE_REVOKED` (*Devices*).
 Sign-in (login, magic-link redeem) checks the credentials first: only then is the device
-checked (T-0080, *Device hardening*).
+checked (T-0080, *Device hardening*). A sign-in that carried an `invite_token` adds
+`joined_project_id` or `invite_error` (*Post-authentication hook*).
 
 **One hidden tenant (T-0037, diff §4.1, TD-120).** A deployment serves one tenant,
 `KERP_DEFAULT_TENANT_ID`; login and magic-link requests carry no tenant field and nothing
@@ -138,9 +141,13 @@ start-up warning naming the required optional claims.
    works for every active account with a password, internal and Entra-linked ones included.
 2. `GET /api/v1/auth/sso/entra/start` (top-level navigation) creates `state`, `nonce` and a
    PKCE S256 verifier (256 random bits each) and stores them in Redis under
-   `sha256(state)` for 10 minutes, single use, with the optional `invite_token` (accepted by
-   T-0052), the enrolling `device_id` and, for the native app, its `app_challenge` (the S256
-   hash of the app's own verifier). It sets the random pre-auth cookie `kerp_sso_preauth`
+   `sha256(state)` for 10 minutes, single use, with the enrolling `device_id` and, for the
+   native app, its `app_challenge` (the S256 hash of the app's own verifier). A sign-in that
+   accepts a project invite starts with a **form post** of the same path instead, so the
+   `invite_token` travels in the body and never in a URL (T-0052); the state entry then also
+   holds the invite's reference (never the token), and after the sign-in the landing gets
+   `joined_project_id` or `invite_error` next to `status=signed_in` (the native app: in the
+   exchange's token response). It sets the random pre-auth cookie `kerp_sso_preauth`
    (`HttpOnly; Secure; SameSite=Lax; Path=/api/v1/auth/sso; Max-Age=600`), whose SHA-256 is
    in the state entry, and redirects (`302`) to the tenant's authorize endpoint
    (`response_type=code`, `response_mode=query`, `code_challenge_method=S256`).
@@ -479,8 +486,9 @@ account, an unknown address) signs in by password or, for internal staff, Entra 
   deleted project never counts) contain PER-14, **or** a registered eligibility provider says
   yes. Providers are the extension point for reasons core does not own: the module that owns
   invites registers one at start-up (`register_magic_link_eligibility`, T-0052: a valid
-  pending invite naming PER-14 for the account's e-mail). None is registered by default. Core
-  reads no module table and never imports `app.modules`.
+  pending invite naming PER-14 for the account's e-mail; the admin module's
+  `invites.invited_field_worker`). Core itself registers none. Core reads no module table
+  and never imports `app.modules`.
 - **Neutral answer.** `POST /auth/magic-link` answers the same `202`, with the same (empty)
   body and headers, for an eligible account, an ineligible or deactivated one, an unknown
   address and another tenant's address. For anyone but an eligible account no link is stored
@@ -562,6 +570,10 @@ after the credential check and holds it until the tokens exist:
   `password_changed_at` changed since the row was read, i.e. while scrypt was running. An SSO
   sign-in does not depend on the password, so it only takes the lock.
 - Refresh and PIN unlock (`_rotate`) run `load_active_user(..., for_update=True)`.
+- The post-authentication hook (T-0052, *Post-authentication hook*) commits mid-request,
+  which releases the lock. It runs only after the tokens were issued, and never for a
+  sign-in refused here, so an invite is not accepted off an old-password sign-in that lost
+  against a reset.
 
 So a token is either issued before the stamp (older `iat`: revoked by it) or after the change
 committed (the issuing path saw the new row and refused or is a legitimate later sign-in). No
@@ -629,6 +641,32 @@ The stamp and `iat` come from the hosts' clocks: API hosts must be time-synchron
   redacts credential-named fields and `token=...` / `"new_password": "..."` pairs
   (`app/core/logging.py`); `scrub_sentry_event` is the matching `before_send` hook for an
   error tracker (none is wired in yet).
+
+## Post-authentication hook (T-0052, diff §4.1 Invites)
+
+`post_auth.py`. `POST /auth/login`, `POST /auth/magic-link` and the form-posted
+`/auth/sso/entra/start` accept an optional `invite_token` (body only, at most 512
+characters). Invites belong to the admin module and core never imports `app.modules`
+(`tests/test_auth_magic_link_field_workers.py` checks every file here), so acceptance runs
+through a hook the admin module registers at start-up
+(`register_post_authentication_hook`), like the magic-link eligibility provider:
+
+- `reference(invite_token)` gives the opaque reference core carries instead of the token (the
+  admin module: the token's SHA-256). Core computes it the moment the token arrives. The
+  magic-link record (`inv`, next to `uid` / `tid` under the hashed link), the SSO `state`
+  entry and the native exchange code hold the reference only; the magic-link URL holds
+  neither.
+- `after_authentication(session, user, reference)` runs in `AuthService.start_session`, the
+  one place every sign-in (password, magic-link redeem, SSO callback, native exchange) becomes
+  a session, right after the tokens are issued. Its outcome rides on the `TokenPair` and
+  becomes `joined_project_id` or `invite_error` in the token response (the web SSO landing:
+  query parameters).
+
+**Empty by default**: with no hook registered a sign-in works as before and `invite_token` is
+ignored. **An invite never blocks a sign-in**: a refused token is an `invite_error`; a hook
+that raises is logged without the token or the reference, its work is rolled back (the
+sign-in's own writes are committed before the hook runs) and the response carries
+`invite_error: INVITE_UNAVAILABLE`. A refresh or a PIN unlock never runs the hook.
 
 ## Tokens
 

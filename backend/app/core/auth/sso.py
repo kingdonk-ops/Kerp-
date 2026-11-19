@@ -3,11 +3,14 @@ native exchange codes, the ``acct_claim_missing`` health marker, and the audit t
 
 * **State** (``/start`` → ``/callback``): ``state``, ``nonce`` and the PKCE verifier live in
   the store for at most ``STATE_TTL`` and are taken exactly once (``GETDEL``), together with
-  the optional ``invite_token``, the enrolling ``device_id``, the native app's verifier hash
+  the optional invite reference (``post_auth.invite_reference`` of the ``invite_token`` the
+  form-posted ``/start`` received, T-0052: never the token itself), the enrolling
+  ``device_id``, the native app's verifier hash
   and the SHA-256 of the random pre-auth cookie that binds the flow to the browser that
   started it (login-CSRF). The key is the SHA-256 of ``state``.
 * **Exchange codes** (native handoff): random, stored only as a SHA-256, single use, at most
-  ``EXCHANGE_CODE_TTL``, bound to the user, the ``device_id`` and the app verifier hash. A
+  ``EXCHANGE_CODE_TTL``, bound to the user, the ``device_id`` and the app verifier hash
+  (and carrying the invite reference to the exchange, where the native session starts). A
   spent code leaves a marker for ``SPENT_MARKER_TTL``, so a reuse attempt is recognised
   and audited.
 * **Audit.** Link, sign-in and every refusal of a verified Entra identity go to the
@@ -71,7 +74,8 @@ class SsoState:
     verifier: str
     cookie_hash: str
     redirect_uri: str
-    invite_token: str | None = None
+    # The reference of the invite to accept after the sign-in (``post_auth``), not the token.
+    invite_ref: str | None = None
     device_id: str | None = None
     app_challenge: str | None = None
 
@@ -107,6 +111,7 @@ class ExchangeGrant:
     tenant_id: str
     device_id: str
     app_challenge: str
+    invite_ref: str | None = None
 
 
 def put_exchange_code(store: RevocationStore, grant: ExchangeGrant) -> str:

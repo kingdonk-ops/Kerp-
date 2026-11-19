@@ -142,6 +142,10 @@ class Settings(BaseSettings):
     # Self-service password reset: lifetime of the e-mailed single-use link.
     password_reset_ttl_minutes: int = Field(default=60, ge=5, le=24 * 60)
 
+    # Lifetime of a project invite (T-0052, diff §4.1 Invites): hours from creation, or from
+    # the latest re-send, until its token expires. Default 168 = 7 days (planner default).
+    invite_ttl_hours: int = Field(default=168, ge=1, le=24 * 90)
+
     # Entra ID SSO, identity only (T-0054, diff §4.5). Enabled only when both the tenant id
     # and the client id are set; both are GUIDs, so the authority can only ever be the
     # company tenant (never ``common`` / ``organizations``). The client secret comes from

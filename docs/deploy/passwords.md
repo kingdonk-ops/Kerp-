@@ -24,6 +24,10 @@ There is no setting for composition rules or password expiry: the policy has nei
 - **`KERP_REDIS_URL`**: reset tokens (as SHA-256 only) and the rate-limit counters live in the
   same Redis as token revocation. Flushing that Redis kills outstanding reset links (users
   ask again) and signs nobody out.
+- **Synchronised clocks.** A password change ends every earlier session by comparing its
+  time with each token's issue time, both taken from the API hosts' clocks. Keep all API
+  hosts time-synchronised (NTP / chrony); a host whose clock runs ahead could issue tokens
+  that survive a reset made shortly afterwards.
 - **Client address behind a proxy.** Two rate limits are keyed by the client address. Behind a
   TLS-terminating proxy or load balancer, trust it with `FORWARDED_ALLOW_IPS` (as for the
   login lockout); otherwise every user shares the proxy's address and its limit.

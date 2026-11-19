@@ -26,7 +26,9 @@ same on SQLite (where it is the only filter) and on PostgreSQL (where RLS backs 
   written by ``is_system_admin`` sessions only. An ``access_request`` row (T-0050) is
   visible to its requester, to the PER-09 holders of its project
   (``TenancyContext.admin_project_ids``) and to ``is_system_admin`` sessions; only the
-  requester inserts one and nobody deletes one. A ``team`` row (T-0013) is visible when its
+  requester inserts one and nobody deletes one. A ``project_invite`` row (T-0052) is visible
+  and writable only for the PER-09 holders of its project (``admin_project_ids``) and
+  ``is_system_admin`` sessions, and nobody deletes one. A ``team`` row (T-0013) is visible when its
   team has a live link to a project in ``described_project_ids`` or the caller is a live
   member of it (an ``EXISTS`` on the policy's link and member tables, read as plain tables so
   no criteria recurse), or the session is ``is_system_admin``; only ``is_system_admin``
@@ -124,7 +126,7 @@ def _policy_allows(context: TenancyContext, record: object) -> bool:
     if policy.kind == "admin_grant" or policy.project_column is None:
         return False
     project = getattr(record, policy.project_column)
-    if policy.kind == "access_request":
+    if policy.kind in ("access_request", "project_invite"):
         return project in context.admin_project_ids
     return project in context.described_project_ids
 
@@ -196,7 +198,7 @@ def _policy_criteria(
         described = sorted(context.described_project_ids)
         if described:
             clauses.append(getattr(cls, policy.project_column).in_(described))
-    if policy.kind == "access_request" and policy.project_column is not None:
+    if policy.kind in ("access_request", "project_invite") and policy.project_column is not None:
         administered = sorted(context.admin_project_ids)
         if administered:
             clauses.append(getattr(cls, policy.project_column).in_(administered))
@@ -326,5 +328,11 @@ def _guard_writes(session: Session, flush_context: UOWTransaction, instances: ob
             )
             if (obj in session.new and not own) or obj in session.deleted:
                 raise OutOfScopeError(f"{type(obj).__name__} not found")
+        if policy.kind == "project_invite" and (
+            obj in session.deleted or not _policy_allows(context, obj)
+        ):
+            # Only the project's administrators write an invite, new rows included; nobody
+            # deletes one (mirrors RLS, T-0052).
+            raise OutOfScopeError(f"{type(obj).__name__} not found")
         if obj not in session.new and not _policy_allows(context, obj):
             raise OutOfScopeError(f"{type(obj).__name__} not found")

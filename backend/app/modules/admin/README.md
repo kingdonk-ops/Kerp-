@@ -1,4 +1,4 @@
-# admin — users, project memberships, admin grants (T-0014, T-0039)
+# admin — users, project memberships, admin grants (T-0014, T-0039), project invites (T-0052)
 
 The administration surface of the access model (diff §4.1; TD-120, TD-184, TD-151). The tenant
 stays in code and RLS but is never taken or returned by this API.
@@ -9,6 +9,7 @@ stays in code and RLS but is never taken or returned by this API.
 | `schemas.py` | `UserCreate` / `UserUpdate` / `UserRead`, `UserLookupRequest` / `UserSummary`, `GrantIn` / `MemberAssign` / `MemberRead` / `MemberAssigned`, `AdminGrantKind` / `AdminGrantIn` / `AdminGrantRead` |
 | `service.py` | `own_admin_grants` (registered as core's admin-grant lookup), `list_grants` / `grant` / `revoke`, `create_user` / `update_user` / `lookup_user`, `project_members` / `assign_member` / `remove_member` |
 | `router.py` | `/api/v1/admin/...` (below) |
+| `invites.py`, `invites_router.py` | Project invites (T-0052, *Project invites* below): `oe_admin_project_invite` (`ProjectInvite` in `models.py`, own `project_invite` RLS policy; migration `0030`), the invite service, the post-authentication hook and the magic-link eligibility provider registered with core auth, and the invite endpoints |
 
 ## Admin grants
 
@@ -79,7 +80,7 @@ T-0044), which the projects module depends on.
 tenant): exact, case-insensitive match only; inactive accounts are not found; per-caller
 rate limit (`LOOKUP_POLICY`: 20 back to back, then 1 min doubling to 15 min, per hour; 429
 with `Retry-After`); every lookup, hit or miss, is audited with the e-mail as a SHA-256
-digest. Invites by e-mail are T-0052. Access requests (a user asks, a PER-09 approves or rejects) are the
+digest. Invites by e-mail: *Project invites* below. Access requests (a user asks, a PER-09 approves or rejects) are the
 `access_requests` module (T-0050); approving one calls `assign_member` with the request's
 personas added to the requester's direct grants, so the SoD rule below applies there too.
 
@@ -99,13 +100,113 @@ counts the user's team-derived grants on the project too (T-0073, ADR 0008): ind
 for a user with a team-derived PER-02/06/07/11 needs the same confirmation. Assigning PER-09 never adds hold or signing
 capability: capabilities stay those of each persona (`access.PERSONAS`).
 
+## Project invites (T-0052, diff §4.1 Invites)
+
+A PER-09 of a project (or a System admin) invites an e-mail address to the project with
+persona(s) and site scope. The account is created **without credentials** if none exists
+(`service.create_user`); **the membership is created only when the invite is accepted**.
+Existing users join with one click; a user who is not signed in joins right after
+authentication, in the same request, without the lobby.
+
+| Endpoint (`/api/v1/admin`) | Who | What |
+|---|---|---|
+| `POST /projects/{p}/invites` | PER-09 of `p`, `system_admin` | `{email, grants: [{persona, site_node_id?}], confirm_sod?}` → `201` with the invite and, **once**, `invite_token` + `invite_link` (`<KERP_WEB_ORIGIN>/invite#<token>`); creates the account if needed; revokes every earlier open invite of that e-mail on `p`; `409 sod_confirmation_required` (the PER-09 + hold-authority rule of T-0014, counted over the invited personas and the grants the account already holds on `p`); `429` + `Retry-After` at the send cap (nothing created or revoked); `409 INVITE_CONFLICT` when a concurrent request changed the same invite |
+| `GET /projects/{p}/invites` | PER-09 of `p`, `system_admin` | the open invites: `pending`, and `expired` never accepted, each with `email`, `grants`, `status`, `expires_at`, `last_sent_at`, `resend_available_at` (from the send cap; `null`: a re-send is allowed now). Accepted and revoked invites are not listed. Never a token |
+| `DELETE /projects/{p}/invites/{id}` | PER-09 of `p`, `system_admin` | revoke an open invite: `204`; `409 INVITE_NOT_RESENDABLE` for an accepted or revoked one |
+| `POST /projects/{p}/invites/{id}/resend` | PER-09 of `p`, `system_admin` (any of them, not only the inviter) | for a `pending` or `expired` (never accepted) invite: a fresh token (the old link gets the neutral `410` at once), `expires_at` = now + `KERP_INVITE_TTL_HOURS`, `last_sent_at` = now, status `pending`; e-mail, persona(s) and site scope are kept; the response carries the new `invite_token` + `invite_link` once; `409 INVITE_NOT_RESENDABLE` (accepted or revoked); `429` + `Retry-After` at the send cap |
+| `POST /invites/preview` | any signed-in user | `{invite_token}` → `{project_id, project_code, project_name, inviter_name}` for the "Join project" confirmation; grants nothing |
+| `POST /invites/accept` | any signed-in user | `{invite_token}` → `{joined_project_id}`: the direct membership (added to any direct grants the user holds there) and the invite's `accepted` mark in one transaction |
+
+A non-member of `p` (PER-09 of another project included) gets `404`, a member without PER-09
+`403`: the rule of the member endpoints. Preview and accept answer `403 {code:
+INVITE_WRONG_USER}` when the session's e-mail is not the invited one (checked first, so a
+stranger learns nothing about the invite's state), `410 {code: INVITE_GONE}` with one neutral
+message for an expired, revoked, used or unknown token or a deleted project, and the loser of
+two parallel accepts `409 {code: INVITE_CONFLICT}`. Every refusal is audited and grants
+nothing (a per-user throttle on refusals: TD-372). Accepting never asks for `confirm_sod`:
+the inviter confirmed at creation, and the accept is audited with `sod_warning` (TD-373).
+
+**Paths.** The spec names `/api/v1/projects/{id}/invites` and `/api/v1/invites/...`; the module
+loader mounts every module under `/api/v1/<module>`, so the endpoints live under
+`/api/v1/admin`, next to the member endpoints (TD-368).
+
+**The token** is `secrets.token_urlsafe(32)` (256 random bits). Only its SHA-256 is stored
+(`token_hash`); the token is returned once to the inviter and is never logged or audited. It
+travels in the link's URL **fragment** and in POST bodies only: no endpoint takes it in a path
+or query (`GET /auth/sso/entra/start` ignores an `invite_token` query parameter; the form post
+of the same path carries it, TD-369), and `app/core/logging.py` scrubs `invite_token` / `setup_token`
+fields from log lines (an error reporter must do the same once one exists, TD-371). Expiry: `KERP_INVITE_TTL_HOURS` (default 168 = 7 days) from creation
+or the latest re-send. `expired` is stored lazily: a pending row past `expires_at` already
+counts as expired.
+
+**Single use, atomic.** Accept, revoke, re-send and the lazy `expired` mark are each one
+conditional `UPDATE ... WHERE id AND token_hash AND status IN (...)`
+(`invites._transition`). Of two racing statements the database lets exactly one match: two
+parallel accepts give one `200` and one `409`; a re-send racing an accept with the old token
+has exactly one winner, and once the rotation has committed the old token never matches again
+(`410`).
+
+**Send cap** per project + normalised invited e-mail, counting invite creations and re-sends
+together: 1 per 60 s and 5 per 24 h (`429` with `Retry-After`). It is counted from the
+`sent_at` log of *every* row of that project and e-mail (accepted and revoked rows are kept),
+so revoking and re-creating cannot reset it.
+
+**Row-level security.** `oe_admin_project_invite` is tenant-level (it names its project in
+`invited_project_id`) and is visible only to the PER-09 holders of that project
+(`app.admin_project_ids`) and to `app.is_system_admin` sessions; they are also the only ones
+who insert and update, and nobody deletes (`app/core/tenancy/README.md`). **The invitee never
+reads the table.** Preview, accept, the post-authentication hook and the eligibility provider
+run on a narrow system path (`invites._SystemPath`): the session is re-bound with
+`is_system_admin` for exactly the lookup by token hash (eligibility: by the caller's own
+e-mail), the checks (hash, expiry, single use, bound e-mail) and the writes, and bound back.
+
+**Not signed in: the carry-through.** `POST /auth/login`, the magic-link request and the
+Entra ID SSO start (form post) accept an optional `invite_token`. After a successful
+authentication core auth runs the **post-authentication hook** this module registers at
+start-up (`invites.HOOK`, `app.core.auth.post_auth`): the invite is accepted in the same
+request and the token response (the SSO landing: the query) carries `joined_project_id`, or
+`invite_error` (`INVITE_WRONG_USER`, `INVITE_GONE`, `INVITE_CONFLICT`, `INVITE_UNAVAILABLE`);
+a bad token never blocks the sign-in. Where a sign-in spans two requests (the magic-link
+record, the SSO `state`, the native exchange code) core keeps only the invite's *reference*
+(the token's SHA-256, `InviteHook.reference`), never the token; the magic-link URL never
+carries either. Core never imports this module or reads its table.
+
+**Magic links only for Field Worker invites** (diff §4.2, TD-136). The module registers
+`invites.invited_field_worker` as an eligibility provider (the T-0057 extension point): an
+account with a valid pending invite for its e-mail that names PER-14, on a live project, may
+sign in by magic link and join. An invite naming only other personas gets the neutral `202`
+and no link; that invitee joins through password login or, for company members, Entra ID SSO.
+The provider gets the account, not the request's token, so eligibility is by e-mail: a
+request without `invite_token` gets a link too and the user joins from the invite link
+after signing in (TD-370).
+
+**External invitees never use SSO** (product owner, 2026-11-14; diff §4.1, §4.5). Clients,
+subcontractors and other externals are not on the company Entra tenant. A brand-new invitee
+without credentials sets their first password at acceptance from the **e-mailed** link, which
+carries the `invite_token` and a second secret, the `setup_token`; that half (the invite
+e-mail, the `setup_token`, accept-with-password) is T-0059. This task stores the invite so
+T-0059 can add the `setup_token` to it. The copyable link in the create and re-send responses
+carries the **`invite_token` only**: it can never set a password, so an inviter who copies the
+link cannot take over the invitee's account. The invite e-mail itself is sent by T-0059
+through the outbound e-mail service (T-0058).
+
+**Team links need no invite or user action** (ADR 0008). A System admin linking a team to a
+project, or adding a user to a linked team, grants access directly; nobody is invited and
+nobody accepts anything.
+
 ## Audit
 
 Tenant-level chains: `admin-user:<user>` (create, update), `admin-user-lookup:<caller>` (every
 lookup), `project-members:<project>` (`assign` with added / removed / grants / `sod_warning`,
-`remove`), `admin-grant:<user>` (grant, revoke).
+`remove`), `admin-grant:<user>` (grant, revoke), `project-invites:<project>` (`create`,
+`resend`, `revoke`, `accept` and `refuse` with stage and reason; the invitee by account id)
+and `project-invites` (`refuse` of a token that matches no invite). Invite entries never
+carry a token, a hash or an e-mail address. An accepted invite also writes the usual
+`assign` entry on `project-members:<project>`.
 
 ## Tests
 
 `tests/test_admin.py` (SQLite and PostgreSQL), `tests/test_rls_admin.py` (PostgreSQL as
-`kerp_app`: grant visibility and writes, client-portal user vs. System admin on projects).
+`kerp_app`: grant visibility and writes, client-portal user vs. System admin on projects),
+`tests/test_invites.py` (SQLite and PostgreSQL: the whole invite life cycle, carry-through,
+send cap, races, log scrubbing), `tests/test_rls_invites.py` (PostgreSQL as `kerp_app`).

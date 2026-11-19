@@ -4,11 +4,13 @@ Every line has ``timestamp`` (UTC, ISO 8601), ``level``, ``logger``, ``message``
 ``request_id`` (from the record, else the current request context, else ``null``).
 Fields passed via ``extra=`` are added as top-level keys.
 
-**Secrets are scrubbed** (T-0077, diff §4.2): the value of any field named like a credential
-(``SENSITIVE_FIELDS``: ``token``, ``new_password``, ``password``, ...) is replaced by
-``[redacted]`` wherever it sits in ``extra=`` (nested dicts and lists included), and
-``token=...`` / ``"new_password": "..."`` pairs (also ``password_hash``, as in a SQL parameter
-dump) and ``Bearer <token>`` inside the message or a traceback are redacted too.
+**Secrets are scrubbed** (T-0077, diff §4.2; T-0052, diff §4.1 Invites): the value of any
+field named like a credential (``SENSITIVE_FIELDS``: ``token``, ``new_password``, ``password``,
+``invite_token``, ``setup_token``, ...) is replaced by ``[redacted]`` wherever it sits in
+``extra=`` (nested dicts and lists included), and ``token=...`` / ``"new_password": "..."``
+pairs (also ``password_hash``, as in a SQL parameter dump) and ``Bearer <token>`` inside the
+message or a traceback are redacted too. The request log never contains bodies or query
+strings in the first place (``request_context``); this is the second line of defence.
 ``scrub_sentry_event`` applies the same rule to a Sentry event (``before_send``), for the day
 an error tracker is wired in.
 """
@@ -57,15 +59,21 @@ SENSITIVE_FIELDS: Final = frozenset(
         "set_cookie",
     }
 )
+# The name T-0052 introduced for the same set.
+SCRUBBED_FIELDS: Final = SENSITIVE_FIELDS
 _MAX_SCRUB_DEPTH: Final = 8
-# ``token=abc``, ``token: abc``, ``"new_password": "abc"``, ``'token': 'abc'`` in free text.
-# A quoted value runs to its closing quote; an unquoted one to the next separator.
+# ``token=abc``, ``token: abc``, ``"new_password": "abc"``, ``'token': 'abc'`` and the
+# backslash-escaped ``\"invite_token\": \"abc\"`` (JSON inside a JSON string) in free text.
+# A quoted value runs to its closing quote (which is kept), an unterminated one to the end of
+# the line, an unquoted one to the next separator.
 _TEXT_SECRET: Final = re.compile(
     r"""(?P<key>(?<![A-Za-z0-9])(?:new_password|current_password|password_hash|password|
-        refresh_token|
-        access_token|id_token|reset_token|invite_token|setup_token|wipe_secret|client_secret|
-        token)["']?\s*[:=]\s*)
-        (?:"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|[^\s,;&)}\]]+)""",
+        refresh_token|access_token|id_token|reset_token|invite_token|setup_token|wipe_secret|
+        client_secret|token)\\?["']?\s*[:=]\s*)
+        (?:(?P<quote>["'])(?:(?!(?P=quote))[^\\]|\\.)*(?P=quote)
+          |(?P<escaped>\\["'])(?:(?!(?P=escaped)).)*(?P=escaped)
+          |\\?["'][^\n]*
+          |[^\s"'\\,;&)}\]]+)""",
     re.IGNORECASE | re.VERBOSE,
 )
 # ``Authorization: Bearer <token>`` in free text: the scheme stays, the token goes. Only a
@@ -77,10 +85,15 @@ def is_sensitive_field(name: object) -> bool:
     return isinstance(name, str) and name.lower().replace("-", "_") in SENSITIVE_FIELDS
 
 
+def _redact_pair(match: re.Match[str]) -> str:
+    quote = match.group("quote") or match.group("escaped") or ""
+    return f"{match.group('key')}{quote}{REDACTED}{quote}"
+
+
 def scrub_text(text: str) -> str:
     """``text`` with the value of every ``token=...`` / ``"new_password": "..."`` pair
     replaced by ``[redacted]``."""
-    text = _TEXT_SECRET.sub(lambda match: f"{match.group('key')}{REDACTED}", text)
+    text = _TEXT_SECRET.sub(_redact_pair, text)
     return _BEARER.sub(lambda match: f"{match.group('scheme')}{REDACTED}", text)
 
 

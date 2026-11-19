@@ -308,7 +308,11 @@ def test_bearer_tokens_and_password_hashes_in_free_text_are_redacted() -> None:
     header = "upstream said: Authorization: Bearer eyJhbGciOiJFZERTQSJ9.c3ludGhldGlj.sig-SYNTHETIC"
     assert scrub_text(header) == f"upstream said: Authorization: Bearer {REDACTED}"
     dump = "[parameters: {'password_hash': 'scrypt$synthetic$hash', 'id': 7}]"
-    assert scrub_text(dump) == f"[parameters: {{'password_hash': {REDACTED}, 'id': 7}}]"
+    assert scrub_text(dump) == f"[parameters: {{'password_hash': '{REDACTED}', 'id': 7}}]"
+    nested = r'body="{\"new_password\": \"synthetic pass 7\", \"n\": 1}" token="unterminated a b'
+    assert scrub_text(nested) == (
+        rf'body="{{\"new_password\": \"{REDACTED}\", \"n\": 1}}" token={REDACTED}'
+    )
     assert scrub_text("password_hash=scrypt$synthetic done") == f"password_hash={REDACTED} done"
 
 

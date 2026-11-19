@@ -17,6 +17,9 @@ bound with, loaded from the grants table at authentication, never from the reque
   appoint and remove System admins and Project Admins (``create_projects``); the last System
   admin cannot be removed (409). Every grant and revoke is audited (T-0039, diff §4.1).
 
+* Project invites (``invites_router.py``, T-0052): ``/projects/{p}/invites`` for a PER-09 of
+  ``p`` or a ``system_admin``; ``/invites/preview`` and ``/invites/accept`` for the invitee.
+
 No endpoint takes or returns a tenant id. Tenant-level grants are not personas: they are
 never assignable through the membership endpoints.
 """
@@ -47,6 +50,7 @@ from app.core.auth.models import User
 from app.core.auth.runtime import AuthRuntime, get_auth_runtime
 from app.core.db import DbSession
 from app.modules.admin import service
+from app.modules.admin.invites_router import router as invites_router
 from app.modules.admin.schemas import (
     AdminGrantIn,
     AdminGrantKind,
@@ -330,3 +334,8 @@ def revoke(
     if not revoked:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Not Found")
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# --- project invites (T-0052): ``invites_router.py`` ------------------------------------------
+
+router.include_router(invites_router)

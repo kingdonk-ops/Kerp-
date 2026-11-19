@@ -21,7 +21,7 @@ from sqlalchemy import select, update
 
 from app.core.audit.service import chain_entries, verify_chain
 from app.core.auth import password_reset as reset_module
-from app.core.auth import providers
+from app.core.auth import post_auth, providers
 from app.core.auth import service as auth_service
 from app.core.auth.field import MagicLink, magic_link_digest
 from app.core.auth.lockout import LockedOutError
@@ -33,6 +33,7 @@ from app.core.auth.password_reset import (
     reset_digest,
 )
 from app.core.auth.passwords import hash_password, verify_password
+from app.core.auth.post_auth import PostAuthOutcome
 from app.core.auth.revocation import InMemoryRevocationStore
 from app.core.auth.router import REFRESH_COOKIE
 from app.core.auth.runtime import AuthRuntime
@@ -841,6 +842,19 @@ def test_a_magic_link_redeemed_while_the_reset_commits_is_refused(
     assert "set-cookie" not in out["response"].headers
 
 
+def _announce_lock(monkeypatch: pytest.MonkeyPatch) -> threading.Event:
+    """Set once ``lock_user`` is called from now on (the caller then waits for the row)."""
+    locking = threading.Event()
+    real_lock = auth_service.lock_user
+
+    def announced(*args: Any, **kwargs: Any) -> Any:
+        locking.set()
+        return real_lock(*args, **kwargs)
+
+    monkeypatch.setattr(auth_service, "lock_user", announced)
+    return locking
+
+
 def test_a_refresh_racing_the_reset_waits_for_it_and_is_refused(
     h: Harness, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -857,23 +871,22 @@ def test_a_refresh_racing_the_reset_waits_for_it_and_is_refused(
             assert commit.wait(30)
 
     monkeypatch.setattr(PasswordResetService, "_queue_mail", held)
-    locking = threading.Event()
-    real_lock = auth_service.lock_user
-
-    def announced(*args: Any, **kwargs: Any) -> Any:
-        locking.set()
-        return real_lock(*args, **kwargs)
-
     confirming, confirmed = _in_thread(lambda: h.confirm(token))
-    assert stamped.wait(30)
-    monkeypatch.setattr(auth_service, "lock_user", announced)
-    refreshing, refreshed = _in_thread(lambda: refresh(h.client, tokens["refresh_token"], WEB))
-    assert locking.wait(30)
-    refreshing.join(0.5)
-    assert refreshing.is_alive()  # it waits for the row; it has not issued anything
-    commit.set()
-    confirming.join(60)
-    refreshing.join(60)
+    threads = [confirming]
+    try:
+        assert stamped.wait(30)
+        locking = _announce_lock(monkeypatch)
+        refreshing, refreshed = _in_thread(
+            lambda: refresh(h.client, tokens["refresh_token"], WEB)
+        )
+        threads.append(refreshing)
+        assert locking.wait(30)
+        refreshing.join(0.5)
+        assert refreshing.is_alive()  # it waits for the row; it has not issued anything
+    finally:  # a regression fails, it does not hang
+        commit.set()
+        for thread in threads:
+            thread.join(60)
     assert confirmed["response"].status_code == 200
     assert refreshed["response"].status_code == 401
     assert "access_token" not in refreshed["response"].text
@@ -888,17 +901,106 @@ def test_a_sign_in_that_issued_its_tokens_first_makes_the_reset_wait_and_is_revo
     # The login holds the row lock and has issued its tokens; it has not committed yet.
     issued, go = _gate_once(monkeypatch, auth_service.AuthService, "_issue_pair")
     logging_in, logged_in = _in_thread(lambda: h.login(ACTIVE, PASSWORD))
-    assert issued.wait(30)
-    confirming, confirmed = _in_thread(lambda: h.confirm(token))
-    confirming.join(0.5)
-    assert confirming.is_alive()  # the stamp waits for the sign-in
-    go.set()
-    logging_in.join(60)
-    confirming.join(60)
+    threads = [logging_in]
+    try:
+        assert issued.wait(30)
+        locking = _announce_lock(monkeypatch)
+        confirming, confirmed = _in_thread(lambda: h.confirm(token))
+        threads.append(confirming)
+        assert locking.wait(30)  # the confirm has reached the row lock ...
+        confirming.join(0.5)
+        assert confirming.is_alive()  # ... and its stamp waits for the sign-in
+    finally:  # a regression fails, it does not hang
+        go.set()
+        for thread in threads:
+            thread.join(60)
     assert confirmed["response"].status_code == 200
     tokens = token_body(logged_in["response"])  # issued before the stamp ...
     bearer = {"Authorization": f"Bearer {tokens['access_token']}"}
     assert h.client.get(ME, headers=bearer).status_code == 401  # ... so revoked by it
+    assert refresh(h.client, tokens["refresh_token"], WEB).status_code == 401
+
+
+class _RecordingInviteHook:
+    """A post-authentication hook (T-0052) that records what it is asked to accept."""
+
+    def __init__(self) -> None:
+        self.accepted: list[tuple[Any, str]] = []
+
+    def reference(self, invite_token: str) -> str:
+        return f"ref:{invite_token}"
+
+    def after_authentication(self, session: Any, user: User, reference: str) -> PostAuthOutcome:
+        self.accepted.append((user.id, reference))
+        return PostAuthOutcome()
+
+
+@pytest.fixture
+def invite_hook(monkeypatch: pytest.MonkeyPatch) -> _RecordingInviteHook:
+    """Installed for one test; the hook registered before (the admin module's) comes back."""
+    hook = _RecordingInviteHook()
+    monkeypatch.setattr(post_auth, "_hooks", [hook])
+    return hook
+
+
+def test_an_invite_is_not_accepted_off_a_sign_in_the_reset_refused(
+    h: Harness, monkeypatch: pytest.MonkeyPatch, invite_hook: _RecordingInviteHook
+) -> None:
+    token = h.link(ACTIVE)
+    verified, go = _gate_once(monkeypatch, providers, "verify_password")
+    body = {"email": ACTIVE, "password": PASSWORD, "invite_token": "synthetic-invite"}
+    thread, out = _in_thread(lambda: h.client.post(LOGIN, json=body))
+    try:
+        assert verified.wait(30)
+        assert h.confirm(token).status_code == 200
+    finally:
+        go.set()
+        thread.join(60)
+    assert out["response"].status_code == 401
+    assert invite_hook.accepted == []  # the sign-in failed before the hook ran
+    # The same invite with the new password: accepted, by a session the reset did not revoke.
+    fresh = h.client.post(LOGIN, json={**body, "password": NEW_PASSWORD})
+    assert invite_hook.accepted == [(h.users[ACTIVE], "ref:synthetic-invite")]
+    bearer = {"Authorization": f"Bearer {token_body(fresh)['access_token']}"}
+    assert h.client.get(ME, headers=bearer).status_code == 200
+
+
+def test_the_invite_hook_runs_only_after_the_tokens_exist_and_a_reset_then_revokes_them(
+    h: Harness, monkeypatch: pytest.MonkeyPatch, invite_hook: _RecordingInviteHook
+) -> None:
+    """The hook commits mid-request, which releases the row lock: by then the tokens must
+    have been issued, so a reset that was waiting for the row stamps after their ``iat``."""
+    token = h.link(ACTIVE)
+    order: list[str] = []
+    real_issue = auth_service.AuthService._issue_pair
+    real_run = auth_service.run_post_authentication
+    in_hook, go = threading.Event(), threading.Event()
+
+    def issuing(self: Any, *args: Any, **kwargs: Any) -> Any:
+        order.append("issue")
+        return real_issue(self, *args, **kwargs)
+
+    def running(*args: Any, **kwargs: Any) -> Any:
+        order.append("hook")
+        result = real_run(*args, **kwargs)  # commits: the row lock is released here
+        in_hook.set()
+        assert go.wait(30)
+        return result
+
+    monkeypatch.setattr(auth_service.AuthService, "_issue_pair", issuing)
+    monkeypatch.setattr(auth_service, "run_post_authentication", running)
+    body = {"email": ACTIVE, "password": PASSWORD, "invite_token": "synthetic-invite"}
+    thread, out = _in_thread(lambda: h.client.post(LOGIN, json=body))
+    try:
+        assert in_hook.wait(30)
+        assert order == ["issue", "hook"]
+        assert h.confirm(token).status_code == 200  # not blocked: the hook's commit freed the row
+    finally:
+        go.set()
+        thread.join(60)
+    tokens = token_body(out["response"])
+    bearer = {"Authorization": f"Bearer {tokens['access_token']}"}
+    assert h.client.get(ME, headers=bearer).status_code == 401
     assert refresh(h.client, tokens["refresh_token"], WEB).status_code == 401
 
 
