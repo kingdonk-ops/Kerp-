@@ -71,11 +71,12 @@ from app.core.auth.magic_link import (
     magic_link_eligible,
 )
 from app.core.auth.models import DEVICE_REVOKED, Device, User, normalize_email
+from app.core.auth.password_policy import BreachCheck, check_password
 from app.core.auth.passwords import hash_password, verify_password
 from app.core.auth.providers import AuthProvider, LocalPasswordProvider, PasswordCredentials
 from app.core.auth.runtime import AuthRuntime
 from app.core.auth.tokens import InvalidTokenError, IssuedToken, TokenClaims
-from app.core.config import get_settings
+from app.core.config import Settings, get_settings
 from app.core.db import Database, utcnow
 from app.core.tenancy.context import TenancyContext
 from app.core.tenancy.rls import bind_tenancy
@@ -132,14 +133,19 @@ def create_user(
     display_name: str = "",
     source: str = "api",
     internal_domains: Collection[str] | None = None,
+    settings: Settings | None = None,
 ) -> User:
     """Add a tenant-level user (admin/onboarding tasks build on this). Caller commits.
 
     ``is_internal`` is derived here from ``internal_domains`` (default: the deployment's
-    ``KERP_INTERNAL_EMAIL_DOMAINS``), never taken from the caller.
+    ``KERP_INTERNAL_EMAIL_DOMAINS``), never taken from the caller. A ``password`` is checked
+    against the deployment's password policy (T-0077, ``PasswordPolicyError``) and stored
+    NFKC-normalised, like every other password set.
     """
     if internal_domains is None:
-        internal_domains = get_settings().internal_email_domains
+        internal_domains = (settings or get_settings()).internal_email_domains
+    if password is not None:
+        password = check_password(password, email=normalize_email(email), settings=settings)
     user = User(
         tenant_id=tenant_id,
         project_id=None,
@@ -193,10 +199,55 @@ def find_user_by_email(session: Session, email: str) -> User | None:
     return session.scalars(query).one_or_none()
 
 
-def set_password(user: User, password: str) -> None:
-    """Replace the password; every token issued before now stops working."""
-    user.password_hash = hash_password(password)
+def set_password(
+    user: User,
+    password: str,
+    *,
+    settings: Settings | None = None,
+    breach_check: BreachCheck | None = None,
+) -> None:
+    """Replace the password under the deployment's password policy (T-0077, diff §4.2).
+
+    Raises ``PasswordPolicyError`` (nothing is changed then). The password is stored as the
+    scrypt hash of its NFKC form. Every access and refresh token issued before now stops
+    working (``token_predates_password_change``, exact to the microsecond: T-0037 / T-0061),
+    on every device, and so does every magic link issued before now. Device enrolment and
+    the device PIN are not touched.
+    """
+    normalised = check_password(
+        password, email=user.email, settings=settings, breach_check=breach_check
+    )
+    apply_checked_password(user, normalised)
+
+
+def apply_checked_password(user: User, normalised: str) -> None:
+    """Store a password that ``check_password`` has just returned for this user. Core auth
+    only (the reset checks the policy before it spends its token); everyone else calls
+    ``set_password`` / ``set_user_password``."""
+    user.password_hash = hash_password(normalised)
     user.password_changed_at = utcnow()
+
+
+def set_user_password(
+    session: Session,
+    user_id: uuid.UUID,
+    password: str,
+    *,
+    settings: Settings | None = None,
+    breach_check: BreachCheck | None = None,
+) -> User:
+    """The one way a module sets an account's password (reset, first password at invite
+    acceptance: T-0059, change, admin-created accounts): no module hashes a password or
+    writes the users table itself (CLAUDE.md §6).
+
+    ``session`` is bound to the account's tenant. ``OutOfScopeError`` (404) for an account
+    that is not a live one of that tenant; ``PasswordPolicyError`` when the policy refuses
+    the password. See ``set_password`` for what it revokes. Caller commits.
+    """
+    user = get_user(session, user_id)
+    set_password(user, password, settings=settings, breach_check=breach_check)
+    session.flush()
+    return user
 
 
 def _aware(moment: datetime) -> datetime:
@@ -211,6 +262,21 @@ def token_predates_password_change(user: User, claims: TokenClaims) -> bool:
     if user.password_changed_at is None:
         return False
     return claims.issued_at < _aware(user.password_changed_at)
+
+
+def magic_link_predates_password_change(user: User, issued_at: object) -> bool:
+    """Whether a magic link issued at ``issued_at`` (epoch seconds from its stored payload)
+    is older than the account's last password change: a password set or reset invalidates
+    the user's outstanding magic links (T-0077, diff §4.2). A payload without a usable
+    ``iat`` (a link stored before T-0077) counts as issued at the earliest moment a live
+    link can have been issued, now minus the link lifetime."""
+    if user.password_changed_at is None:
+        return False
+    if isinstance(issued_at, int | float) and not isinstance(issued_at, bool):
+        issued = datetime.fromtimestamp(issued_at, tz=UTC)
+    else:
+        issued = utcnow() - MAGIC_LINK_TTL
+    return issued < _aware(user.password_changed_at)
 
 
 def load_active_user(session: Session, claims: TokenClaims) -> User:
@@ -359,7 +425,9 @@ class AuthService:
             )
             return
         token = new_magic_link_token()
-        payload = json.dumps({"uid": str(user_id), "tid": str(job.tenant_id)}).encode()
+        payload = json.dumps(
+            {"uid": str(user_id), "tid": str(job.tenant_id), "iat": utcnow().timestamp()}
+        ).encode()
         self.runtime.store.put_magic_link(magic_link_digest(token), payload, MAGIC_LINK_TTL)
         self.runtime.magic_links.send(
             session,
@@ -402,6 +470,9 @@ class AuthService:
         ).one_or_none()
         if user is None or not user.is_active:
             raise AuthenticationError("user not active")
+        if magic_link_predates_password_change(user, data.get("iat")):
+            # A password set or reset invalidates the links issued before it (T-0077).
+            raise AuthenticationError("magic link issued before the password change")
         candidate = MagicLinkCandidate(tenant_id=tenant_id, user_id=user_id, email=user.email)
         if not magic_link_eligible(session, candidate):  # PER-14 lost since the request
             log_refusal(user_id, "redeem")

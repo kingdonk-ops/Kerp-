@@ -16,6 +16,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.auth.models import User, normalize_email
+from app.core.auth.password_policy import normalize_password
 from app.core.auth.passwords import burn_password_check, verify_password
 
 
@@ -42,6 +43,13 @@ class AuthProvider[C](Protocol):
     ) -> User | None: ...
 
 
+def password_candidates(password: str) -> tuple[str, ...]:
+    """What a typed password is checked as: its NFKC form (how every password is stored
+    since T-0077, diff §4.2) and, when that differs, exactly as typed (a password stored
+    before the policy normalised)."""
+    return tuple(dict.fromkeys((normalize_password(password), password)))
+
+
 class LocalPasswordProvider:
     """Email + scrypt password stored on ``auth_user``."""
 
@@ -55,9 +63,14 @@ class LocalPasswordProvider:
                 User.tenant_id == tenant_id, User.email == normalize_email(credentials.email)
             )
         ).one_or_none()
+        candidates = password_candidates(credentials.password)
         if user is None:
-            burn_password_check(credentials.password)
+            for candidate in candidates:
+                burn_password_check(candidate)
             return None
-        if not verify_password(credentials.password, user.password_hash):
+        # Every candidate is checked (no short-circuit), so an unknown account, a wrong
+        # password and a right one cost the same number of scrypt rounds.
+        matches = [verify_password(candidate, user.password_hash) for candidate in candidates]
+        if not any(matches):
             return None
         return user if user.is_active else None

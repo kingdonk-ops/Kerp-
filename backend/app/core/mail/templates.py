@@ -133,6 +133,19 @@ MAGIC_LINK = register_template(
 )
 
 
+# Self-service password reset (T-0077, diff §4.2): the link ``/reset-password#<token>`` and
+# the notice sent to the account's address once its password was changed.
+PASSWORD_RESET = register_template(
+    MailTemplate(
+        "auth.password_reset",
+        params=("expires_minutes",),
+        link_path="/reset-password",
+        secret="token",
+    )
+)
+PASSWORD_CHANGED = register_template(MailTemplate("auth.password_changed"))
+
+
 def render(
     template: MailTemplate,
     context: Mapping[str, ContextValue],

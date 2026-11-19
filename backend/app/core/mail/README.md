@@ -21,6 +21,8 @@ production, always asynchronous, i18n templates, a send log, and bounce/complain
 from app.core.mail.service import send_mail
 
 send_mail(session, "auth.magic_link", user.email, {"token": token, "expires_minutes": 15})
+# Core templates: auth.magic_link, auth.password_reset (link /reset-password#<token>),
+# auth.password_changed (the notice after a reset; no parameters) - T-0077.
 ```
 
 - Call it inside the caller's unit of work. It checks the template and the address, adds a

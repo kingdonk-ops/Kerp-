@@ -26,6 +26,49 @@ class MagicLinkRequest(BaseModel):
     email: str = Field(min_length=3, max_length=320)
 
 
+class PasswordResetRequest(BaseModel):
+    """Ask for a password-reset link (T-0077). No tenant field: the deployment's tenant."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    email: str = Field(min_length=3, max_length=320)
+
+
+class PasswordResetConfirm(BaseModel):
+    """Spend a reset link: the token from the link fragment and the new password."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    # Loose bounds on purpose: any wrong token gets the neutral 410, not a 422.
+    token: str = Field(min_length=1, max_length=512)
+    # Bounded so a huge body cannot make scrypt hash megabytes; the policy (minimum length,
+    # at most 256 characters, blocklist) answers with a ``code``.
+    new_password: str = Field(min_length=1, max_length=1024)
+
+
+class PasswordResetDone(BaseModel):
+    """The password was changed. Nobody is signed in: sign in with the new password."""
+
+    status: Literal["password_changed"] = "password_changed"
+
+
+class PasswordResetRefusal(BaseModel):
+    """``410``: the link is unknown, used, expired or superseded (`RESET_LINK_INVALID`).
+    ``422``: the password policy refused the new password (`PASSWORD_TOO_SHORT`,
+    `PASSWORD_TOO_LONG`, `PASSWORD_TOO_COMMON`); the link is still usable."""
+
+    detail: str
+    code: Literal[
+        "RESET_LINK_INVALID", "PASSWORD_TOO_SHORT", "PASSWORD_TOO_LONG", "PASSWORD_TOO_COMMON"
+    ]
+    min_length: int | None = Field(
+        default=None, description="Policy refusals: the deployment's minimum password length"
+    )
+    max_length: int | None = Field(
+        default=None, description="Policy refusals: the longest accepted password"
+    )
+
+
 def _strong_pin(pin: str) -> str:
     if is_weak_pin(pin):
         raise ValueError("PIN is too easy to guess")

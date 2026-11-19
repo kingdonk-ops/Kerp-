@@ -1,4 +1,4 @@
-# app/core/auth — users, asymmetric JWTs, JWKS, revocation (T-0008), field-worker auth (T-0009, T-0038), device registry (T-0043), Entra ID SSO (T-0054)
+# app/core/auth — users, asymmetric JWTs, JWKS, revocation (T-0008), field-worker auth (T-0009, T-0038), device registry (T-0043), Entra ID SSO (T-0054), password policy + self-service reset (T-0077)
 
 This is the identity module (`module: identity` in the tracker): it lives in `app/core/` because
 every request's authentication depends on it (T-0008, T-0010 notes).
@@ -10,6 +10,8 @@ rewritten (HS256 → RS256/EdDSA + JWKS + `jti` revocation in Redis).
 | File | What |
 |---|---|
 | `passwords.py` | scrypt hash/verify (stdlib, constant-time, parameters stored in the hash) |
+| `password_policy.py`, `data/common_passwords.txt` | The one password policy (T-0077): `check_password` (minimum length, NFKC, bundled blocklist + patterns + context words, optional breach lookup), codes `PASSWORD_TOO_SHORT` / `PASSWORD_TOO_LONG` / `PASSWORD_TOO_COMMON` (*Passwords*) |
+| `password_reset.py`, `password_reset_router.py` | Self-service password reset by e-mail (T-0077): `PasswordResetService` (neutral request, post-response issue, single-use hashed token, confirm), endpoints `/auth/password-reset/{request,confirm}` (*Self-service password reset*) |
 | `keys.py` | Ed25519 / RSA signing key, retired verification keys, RFC 7638 `kid`, JWKS document |
 | `tokens.py` | `TokenService`: issue/verify access (15 min) and refresh tokens |
 | `revocation.py` | `RevocationStore`: Redis (prod) / in-memory (dev, tests) — `jti` + session blacklist, one-time refresh tokens |
@@ -19,7 +21,7 @@ rewritten (HS256 → RS256/EdDSA + JWKS + `jti` revocation in Redis).
 | `providers.py` | `AuthProvider` seam (generic over the credentials) + `LocalPasswordProvider` |
 | `entra.py` | `EntraOidcProvider` (the second provider, T-0054): tenant-pinned config, ID-token verification, `EntraJwks` (cached, rate-limited refetch), member rule, verified-e-mail matching + `oid` link, `HttpEntraTransport` (stdlib HTTPS), refusal reasons → client codes |
 | `sso.py`, `sso_router.py` | SSO flow state in the store (`state` entries, native exchange codes, `acct_claim_missing` marker), the `auth:sso:entra` audit chain; endpoints `/auth/config`, `/auth/sso/entra/{start,callback,exchange}`, `/.well-known/assetlinks.json` (T-0054) |
-| `service.py` | `AuthService` login / refresh / logout / magic link / PIN unlock; `start_session` (the one way any provider's sign-in becomes a KERP session); `create_user`, `set_password`; user reads for the admin module (`list_users`, `get_user`, `users_by_id`, `find_user_by_email`, T-0014); internal staff rule (`is_internal_user`, T-0049) |
+| `service.py` | `AuthService` login / refresh / logout / magic link / PIN unlock; `start_session` (the one way any provider's sign-in becomes a KERP session); `create_user`, `set_password`, `set_user_password` (the one way a password is set, under the policy: T-0077); user reads for the admin module (`list_users`, `get_user`, `users_by_id`, `find_user_by_email`, T-0014); internal staff rule (`is_internal_user`, T-0049) |
 | `field.py` | Magic-link tokens + delivery seam, PIN rules and the `PIN_REQUIRED` / `PIN_INVALID` / `PIN_EXHAUSTED` answers (T-0009, T-0038) |
 | `magic_link.py` | Magic links for Field Workers only (T-0057): `magic_link_eligible` (PER-14 via `load_grants`, plus registered providers), the eligibility extension point (`register_magic_link_eligibility`), `MagicLinkJob` (the post-response half of a request), refusal reason `magic_link_not_field_worker` |
 | `lockout.py` | `ProgressiveLockout` + policies, Redis-backed (T-0009); offline failures counted with `extra` (T-0038) |
@@ -48,6 +50,8 @@ rewritten (HS256 → RS256/EdDSA + JWKS + `jti` revocation in Redis).
 | `GET /.well-known/assetlinks.json` | none | Digital Asset Links of the Android app (from configuration); `404` unconfigured |
 | `POST /api/v1/auth/magic-link` | none | `{email}` → always the same `202`; after the response, sends a 15-min one-time link to an active **Field Worker** (PER-14) only (*Magic links for Field Workers only*); `429` when throttled |
 | `POST /api/v1/auth/magic-link/redeem` | none | `{token}` → `TokenResponse` + cookie of a new session (on an enrolled device: bound to it, PIN kept); eligibility re-checked, else the neutral `401` |
+| `POST /api/v1/auth/password-reset/request` | none | `{email}` → always the same `202` (unknown, deactivated and active accounts alike); after the response, e-mails an active account the single-use link `/reset-password#<token>` (*Self-service password reset*); `429` + `Retry-After` when the client or the mailbox is throttled |
+| `POST /api/v1/auth/password-reset/confirm` | none | `{token, new_password}` → `200 {status: "password_changed"}` (no tokens, nobody signed in; every session of the user revoked); `410 {code: RESET_LINK_INVALID}` for any dead link; `422 {detail, code, min_length, max_length}` when the policy refuses the password (link still usable); `429` when throttled |
 | `POST /api/v1/auth/pin/unlock` | refresh cookie + Origin (native app: `refresh_token` in the body) | `{pin, failed_offline?}` → rotated `TokenResponse` + cookie; `401 {code: PIN_INVALID \| PIN_EXHAUSTED}`; `429` when locked; `403` cross-origin |
 | `POST /api/v1/devices/enrol` | bearer | `{device_id, platform, os_version, app_version, pin?}` → device + `wipe_secret`; `201` new (the only response carrying the secret), `200` known (`wipe_secret: null`); binds the session to the device; sets the PIN once; `409` another account's id, a session already bound elsewhere, or `code: PIN_ALREADY_SET` |
 | `PUT /api/v1/devices/{device_id}/pin` | bearer (a session bound to the device) | `{pin}` → `204`; a new device PIN (the old one is not needed); `403` another session, `404` not the caller's active device |
@@ -499,6 +503,116 @@ account, an unknown address) signs in by password or, for internal staff, Entra 
   link answer (`401`, as for a garbage link) once the last PER-14 grant was removed, the
   project deleted, or the account deactivated.
 
+## Passwords (T-0077, diff §4.2 *Local passwords*)
+
+One policy for every password that is set: reset, first password at invite acceptance
+(T-0059), change, and accounts created with a password. NIST SP 800-63B rev. 4 style,
+product-owner decision 2026-11-14.
+
+- **Length only.** At least `KERP_PASSWORD_MIN_LENGTH` characters (default **8**; the settings
+  refuse a value below 8, so the app does not start), at most 256. Every printable character,
+  spaces and Unicode are allowed. No composition rules, no expiry, no hints or questions.
+- **NFKC.** The password is NFKC-normalised before it is checked and before it is hashed
+  (scrypt, unchanged), so composed / decomposed accents and full-width forms are one password.
+  Length counts normalised characters. Sign-in checks the NFKC form of what was typed and,
+  when that differs, also the text exactly as typed (a password stored before T-0077); an
+  unknown account burns the same number of scrypt rounds.
+- **Blocklist.** `data/common_passwords.txt` (bundled; generic, publicly known weak
+  passwords), obvious patterns (one character or a unit of up to 4 repeated; counting and
+  keyboard runs in either direction) and **context words**: the account's e-mail, its local
+  part (also without separators), `kerp` and the deployment name (`KERP_APP_NAME`). A listed
+  or context word with up to 6 leading / trailing digits or symbols (`Password1!`,
+  `kerp2026`, `Summer2026!`) is refused too; a listed word inside a longer passphrase is fine.
+- **Optional breach lookup.** `KERP_PASSWORD_BREACH_CHECK=true` asks the k-anonymity range API
+  (`api.pwnedpasswords.com/range/<first 5 hex of the SHA-1>`, with response padding; stdlib
+  HTTPS, 3 s timeout) whether the password is in a known breach. Only those 5 characters
+  leave the deployment. Any failure (network, timeout, malformed answer) is logged and
+  **never blocks** the password. Off by default; needs outbound HTTPS to that host.
+- **Rejections say why**: `PasswordPolicyError.code` is `PASSWORD_TOO_SHORT`,
+  `PASSWORD_TOO_LONG` (over 256) or `PASSWORD_TOO_COMMON` (blocklist, pattern, context word,
+  breached); the message never contains the password. Endpoints answer `422 {detail, code,
+  min_length, max_length}`; the client translates by `code` (screens: T-0078).
+
+**Public API.** Modules never hash a password or write `auth_user` (CLAUDE.md §6):
+
+```python
+from app.core.auth.password_policy import PasswordPolicyError, check_password
+from app.core.auth.service import set_user_password
+
+check_password(password, email=email)            # validate only → the normalised password
+set_user_password(session, user_id, password)    # validate + scrypt + password_changed_at
+```
+
+`set_user_password` (and `set_password(user, ...)` for code that already holds the `User`)
+raises `PasswordPolicyError` and changes nothing when the policy refuses; `OutOfScopeError`
+for an account outside the session's tenant. `create_user(..., password=...)` applies the same
+policy. Setting a password stamps `password_changed_at`: every access and refresh token
+issued before it stops working at its next use (all devices; exact to the microsecond,
+T-0037 / T-0061) and so does every magic link issued before it. Device enrolment and the
+device PIN are not touched.
+
+## Self-service password reset (T-0077, diff §4.2)
+
+`password_reset.py`, `password_reset_router.py`.
+
+- **Neutral request, no timing oracle.** `POST /auth/password-reset/request` answers the same
+  `202` (empty body, same headers) for an unknown, a deactivated and an active account, and
+  for another tenant's address. Inside the request it only counts the attempt in two
+  lockouts (per client address, then per tenant + e-mail) and schedules one
+  `PasswordResetJob` (tenant + normalised e-mail), identical on every path. Everything that
+  differs runs in `PasswordResetService.issue` **after the response has been sent** (a FastAPI
+  post-response task, its own unit of work, like magic links): the account lookup, the
+  token, its store writes, the `auth.password_reset` e-mail (a send-log row; the SAQ
+  interactive queue delivers it after that unit of work commits, T-0058) and the audit entry.
+  Nothing is ever sent from a request. A failure there is logged, never raised. A crash of
+  the API process between the response and the task loses that one request; the user asks
+  again.
+- **Who gets a link.** Every **active** account of the deployment's tenant, with or without
+  a password (a brand-new invitee or an SSO-only account sets its first password this way).
+  Unknown and deactivated addresses get nothing.
+- **Token.** `secrets.token_urlsafe(32)` (256 random bits), only ever in the fragment of
+  `<KERP_WEB_ORIGIN>/reset-password#<token>`. The store (Redis; in memory outside
+  production) holds its SHA-256 only, TTL `KERP_PASSWORD_RESET_TTL_MINUTES` (default 60):
+  `pwreset:token:<sha256>` → `{uid, tid}` and `pwreset:user:<tid>:<uid>` → the digest of the
+  account's **one** live token. A new request overwrites the pointer and deletes the earlier
+  token, so the earlier link is dead; a token the pointer does not name is dead whatever
+  order concurrent requests ran in. The token is never in the send log, the audit ledger, a
+  log line or the SAQ job arguments.
+- **Confirm.** `POST /auth/password-reset/confirm {token, new_password}` looks the token up
+  without spending it, checks the password against the policy (a refused password answers
+  `422` with its `code` and **keeps the link usable**), then takes the token atomically
+  (`GETDEL`: of concurrent confirmations exactly one gets `200`, the others `410`) and sets
+  the password in the request's unit of work. That revokes **every session and refresh
+  token** of the user on all devices and every outstanding magic link (*Passwords*), and
+  deletes the pointer (no other reset link survives). Device enrolment and PIN stay; a device
+  that is offline keeps unlocking locally within its offline grace (diff §4.2), and its old
+  session is refused at its next server contact (`/auth/refresh`, `/auth/pin/unlock`: plain
+  `401`, never `DEVICE_REVOKED`). The response is `200 {"status": "password_changed"}`,
+  `Cache-Control: no-store`, **no tokens and no cookie**: the user signs in with the new
+  password. An `auth.password_changed` notice is queued to the account's address.
+- **One neutral `410`** (`{"detail": ..., "code": "RESET_LINK_INVALID"}`) for an unknown,
+  used, expired or superseded token, a token of an account deactivated meanwhile, and a
+  token whose attempts are used up; decided before the password is looked at.
+- **Rate limits** (`lockout.py`; `429` + `Retry-After`, decided before any lookup):
+  requests per tenant + e-mail with `MAGIC_LINK_REQUEST_POLICY` (the same per-mailbox cap as
+  magic links, T-0068 / TD-224: 4 back to back, then 1 min doubling to 15 min over 1 h) on
+  its own counter; requests per client address with `PASSWORD_RESET_CLIENT_POLICY` (20 back
+  to back, then 30 s doubling to 15 min over 1 h); confirmations per client address with
+  `PASSWORD_RESET_CONFIRM_CLIENT_POLICY` (11 back to back, then the same escalation; every
+  refusal is audited, as for wipe confirmations); confirm attempts **per token** with
+  `PASSWORD_RESET_TOKEN_POLICY` (only attempts with a live token count: 5 refused passwords
+  back to back, then 30 s doubling; the 10th refused attempt kills the link).
+- **Audit** on the tenant's `auth:password-reset` chain: `password_reset_requested`
+  (`user_id`), `password_reset_confirmed` (`user_id`, `first_password`) and
+  `password_reset_refused` with `stage` (`request` / `confirm`) and `reason`
+  (`unknown_account`, `account_inactive`, `invalid_token`, `attempts_exhausted`, or the policy
+  code), plus `user_id` when one is known. Never the token, the password or the e-mail
+  address. A throttled call (`429`) is refused before any database work and is not audited.
+- **Logs.** `kerp.auth.password_reset` logs user ids and reasons only. The JSON log formatter
+  redacts credential-named fields and `token=...` / `"new_password": "..."` pairs
+  (`app/core/logging.py`); `scrub_sentry_event` is the matching `before_send` hook for an
+  error tracker (none is wired in yet).
+
 ## Tokens
 
 Claims: `iss`, `aud`, `sub` (user), `tid` (tenant), `sid` (login session), `jti`, `type`
@@ -674,6 +788,9 @@ columns and drops the function.
 | `KERP_REFRESH_TOKEN_HOURS` | `12` | 1–24; session length from sign-in |
 | `KERP_PIN_IDLE_MINUTES` | `30` | 1–1440 and at least `KERP_ACCESS_TOKEN_MINUTES` (else startup fails); a session of a device with a PIN idle this long needs the PIN to renew (*Field workers*) |
 | `KERP_DEFAULT_TENANT_ID` | unset | The deployment's one tenant (TD-120); required in production |
+| `KERP_PASSWORD_MIN_LENGTH` | `8` | 8–64: minimum length of every new password (*Passwords*); a value below 8 refuses startup |
+| `KERP_PASSWORD_BREACH_CHECK` | `false` | `true`: also refuse passwords found by the k-anonymity breach range lookup (outbound HTTPS to `api.pwnedpasswords.com`; a failed lookup never blocks) |
+| `KERP_PASSWORD_RESET_TTL_MINUTES` | `60` | 5–1440: lifetime of an e-mailed password-reset link |
 | `KERP_INTERNAL_EMAIL_DOMAINS` | empty | Comma-separated e-mail domains of internal staff (exact match, no wildcards; see *Internal staff*); a malformed entry refuses startup |
 | `KERP_WEB_ORIGIN` | unset | Web SPA origin allowed on the cookie endpoints; unset = the API's own origin as the request sees it (behind a TLS-terminating proxy set this, or trust the proxy with `FORWARDED_ALLOW_IPS`); required with `KERP_NATIVE_APP_ORIGINS` |
 | `KERP_NATIVE_APP_ORIGINS` | empty | Native-app origins that get the refresh token in the body, and the API's CORS allow-list (*API CORS and the native-origin allow-list*) |

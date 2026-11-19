@@ -21,6 +21,7 @@ from app.core.auth.device_signal import (
     invalid_device_header_handler,
 )
 from app.core.auth.field import PinGateError, pin_gate_handler
+from app.core.auth.password_reset_router import router as password_reset_router
 from app.core.auth.router import router as auth_router
 from app.core.auth.runtime import check_startup_config, close_auth_runtime
 from app.core.auth.sso_router import router as sso_router
@@ -139,6 +140,7 @@ def create_app(
 
     app.include_router(health_router)
     app.include_router(auth_router)  # core auth + JWKS (T-0008)
+    app.include_router(password_reset_router)  # self-service password reset (T-0077)
     app.include_router(sso_router)  # Entra ID SSO, auth config, assetlinks (T-0054)
     app.include_router(device_router)  # device registry (T-0043)
     app.include_router(mail_router)  # outbound e-mail admin + SES bounce endpoint (T-0058)
