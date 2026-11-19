@@ -314,6 +314,13 @@ def _aware(moment: datetime) -> datetime:
     return moment if moment.tzinfo is not None else moment.replace(tzinfo=UTC)
 
 
+def _credential_state(user: User) -> tuple[str | None, datetime | None]:
+    """What a password change changes, comparable before and after a re-read: the stamp is
+    made aware, since SQLite hands back naive what was written aware in the same session."""
+    changed = user.password_changed_at
+    return user.password_hash, _aware(changed) if changed is not None else None
+
+
 def token_predates_password_change(user: User, claims: TokenClaims) -> bool:
     """Exact, with no fail-closed window (T-0061): ``iat`` and ``password_changed_at`` both
     carry microseconds, so a token issued before the change is rejected and one issued after
@@ -583,12 +590,10 @@ class AuthService:
 
         With ``invite_ref`` the post-authentication hook then accepts that invite in the same
         request (T-0052): its outcome rides on the pair and never fails the sign-in."""
-        seen = (user.password_hash, user.password_changed_at)
+        seen = _credential_state(user)
         locked = lock_user(session, user.id, user.tenant_id)
         if credential_bound and (
-            locked is None
-            or not locked.is_active
-            or (locked.password_hash, locked.password_changed_at) != seen
+            locked is None or not locked.is_active or _credential_state(locked) != seen
         ):
             raise AuthenticationError("account changed during sign-in")
         self._signed_in(user)
@@ -636,8 +641,7 @@ class AuthService:
         user.password_hash = password_hash
         user.password_changed_at = utcnow()
         session.flush()
-        # The row is locked and was checked above: nothing can have changed it since.
-        return self.start_session(session, user, device_id=device_id)
+        return self.start_session(session, user, device_id=device_id, credential_bound=True)
 
     def unlock(
         self,

@@ -41,7 +41,7 @@ from app.core.auth.access import (
 )
 from app.core.auth.bearer import AUTH_UNAVAILABLE
 from app.core.auth.deps import CurrentPrincipal, get_auth_service
-from app.core.auth.device_signal import request_device_id
+from app.core.auth.device_signal import DEVICE_HEADER, request_device_id
 from app.core.auth.password_policy import PasswordPolicyError
 from app.core.auth.post_auth import PostAuthOutcome
 from app.core.auth.revocation import RevocationUnavailableError
@@ -406,6 +406,13 @@ def setup_preview(
     response_model_exclude_none=True,
     responses={
         **_GONE_RESPONSE,
+        status.HTTP_401_UNAUTHORIZED: {
+            "description": (
+                f"`code: DEVICE_REVOKED`: `{DEVICE_HEADER}` names a revoked device (wipe its "
+                "local data). Answered only for valid tokens and an acceptable password; "
+                "nothing was changed and the invite stays pending"
+            ),
+        },
         status.HTTP_409_CONFLICT: {
             "model": InviteRefusal,
             "description": (

@@ -117,7 +117,7 @@ authentication, in the same request, without the lobby.
 | `POST /invites/preview` | any signed-in user | `{invite_token}` → `{project_id, project_code, project_name, inviter_name}` for the "Join project" confirmation; grants nothing |
 | `POST /invites/accept` | any signed-in user | `{invite_token}` → `{joined_project_id}`: the direct membership (added to any direct grants the user holds there) and the invite's `accepted` mark in one transaction |
 | `POST /invites/setup-preview` | **not signed in** (T-0059) | `{invite_token, setup_token}` (both from the e-mailed link) → `{can_set_password: true, project_code, project_name}` for an account without credentials; `{can_set_password: false}` (nothing about the project) for an account that has credentials: sign in; `410 INVITE_GONE` for any token problem; grants nothing |
-| `POST /invites/accept-with-password` | **not signed in** (T-0059) | `{invite_token, setup_token, new_password}` → the normal token response of a sign-in (refresh cookie, or `refresh_token` in the body for a native app; `session_expires_at`, `joined_project_id`): first password, membership and session in one transaction; `410 INVITE_GONE` (any token problem, a deactivated account, the loser of two parallel calls); `409 INVITE_SIGN_IN_REQUIRED` (the account has credentials); `422 {detail, code, min_length, max_length}` when the password policy refuses (the invite stays pending) |
+| `POST /invites/accept-with-password` | **not signed in** (T-0059) | `{invite_token, setup_token, new_password}` → the normal token response of a sign-in (refresh cookie, or `refresh_token` in the body for a native app; `session_expires_at`, `joined_project_id`): first password, membership and session in one transaction; `410 INVITE_GONE` (any token problem, a deactivated account, the loser of two parallel calls); `409 INVITE_SIGN_IN_REQUIRED` (the account has credentials); `422 {detail, code, min_length, max_length}` when the password policy refuses (the invite stays pending); `401 {code: DEVICE_REVOKED}` when `X-KERP-Device-Id` names a revoked device (only after the tokens and the password passed; nothing is written) |
 
 A non-member of `p` (PER-09 of another project included) gets `404`, a member without PER-09
 `403`: the rule of the member endpoints. Preview and accept answer `403 {code:
@@ -197,7 +197,11 @@ the commit, a rolled-back request sends nothing, and nothing is ever sent from t
 It names the project (code and name), the sender and the expiry, and its one link is
 `<KERP_WEB_ORIGIN>/invite#<invite_token>.<setup_token>` (both tokens in the fragment, joined
 by a dot; neither token contains one). The audit entry of the send carries `email_queued`
-(`false` when the mail service refuses the address; the copyable link is the fallback).
+(`false` when the mail service refuses the address or a text, e.g. one that is too long: the
+invite still stands and the copyable link is the fallback; a mail problem never fails an
+invite). Project and sender names are put on one line first (they may hold line breaks, a
+mail text may not); a sender whose account row is gone is named "A project administrator".
+The mail context key of the two tokens is `link_token`, a scrubbed field name.
 
 **The `setup_token`** is a second `secrets.token_urlsafe(32)` (256 random bits). Only its
 SHA-256 is stored (`setup_token_hash`, migration `0031`). It exists in clear only inside

@@ -51,6 +51,8 @@ SENSITIVE_FIELDS: Final = frozenset(
         "reset_token",
         "invite_token",
         "setup_token",
+        # The invite e-mail's ``<invite_token>.<setup_token>`` in a mail context (T-0059).
+        "link_token",
         "wipe_secret",
         "client_secret",
         "pin",

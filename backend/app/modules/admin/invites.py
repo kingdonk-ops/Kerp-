@@ -77,7 +77,7 @@ from app.core.auth.post_auth import PostAuthOutcome, register_post_authenticatio
 from app.core.db import utcnow
 from app.core.mail.addresses import InvalidAddressError
 from app.core.mail.service import send_mail
-from app.core.mail.templates import MailTemplate, register_template
+from app.core.mail.templates import MailTemplate, TemplateError, register_template
 from app.core.tenancy.context import TenancyContext
 from app.core.tenancy.rls import SESSION_INFO_KEY, bind_tenancy, session_tenancy
 from app.core.tenancy.scope import OutOfScopeError
@@ -142,16 +142,19 @@ INVITE_NOT_RESENDABLE: Final = "INVITE_NOT_RESENDABLE"  # 409: accepted or revok
 # 409: the account already has credentials; it signs in (and joins through the carry-through).
 INVITE_SIGN_IN_REQUIRED: Final = "INVITE_SIGN_IN_REQUIRED"
 
-# The invite e-mail (T-0059). ``link``: ``<invite_token>.<setup_token>``, the fragment of
+# The invite e-mail (T-0059). ``link_token``: ``<invite_token>.<setup_token>``, the fragment of
 # ``/invite``; the mail service puts it nowhere else.
 INVITE_TEMPLATE: Final = register_template(
     MailTemplate(
         "admin.project_invite",
         params=("project_code", "project_name", "inviter_name", "expires_at"),
         link_path="/invite",
-        secret="link",
+        secret="link_token",
     )
 )
+
+# The sender's name in the e-mail when the account row is gone or has no name.
+UNKNOWN_INVITER: Final = "A project administrator"
 
 _logger = logging.getLogger("kerp.admin.invites")
 
@@ -357,23 +360,34 @@ def _queue_invite_mail(
     session: Session, invite: ProjectInvite, token: str, setup_token: str, sender_id: uuid.UUID
 ) -> bool:
     """Queue the invite e-mail in the caller's unit of work (sent by the worker after the
-    commit; a rollback drops it). The only place the ``setup_token`` goes. ``False`` when
-    the mail service cannot send to the address (the copyable link is the fallback)."""
+    commit; a rollback drops it). The only place the ``setup_token`` goes.
+
+    ``False`` when the mail service cannot take it: an address it does not send to, or a
+    text it refuses (too long). The invite itself stands and the copyable link is the
+    fallback; a mail problem never fails an invite. Names are put on one line first (a
+    project or display name may hold line breaks, which a mail text may not)."""
     project = projects.get_project(session, invite.invited_project_id)
     sender = users.users_by_id(session, [sender_id])
+    name = "".join(u.display_name or u.email for u in sender.values())
     context = {
         "project_code": project.code,
-        "project_name": project.name,
-        "inviter_name": "".join(u.display_name or u.email for u in sender.values()),
+        "project_name": _one_line(project.name),
+        "inviter_name": _one_line(name) or UNKNOWN_INVITER,
         "expires_at": _aware(invite.expires_at).strftime("%Y-%m-%d %H:%M UTC"),
-        "link": f"{token}.{setup_token}",
+        "link_token": f"{token}.{setup_token}",
     }
     try:
         send_mail(session, INVITE_TEMPLATE.key, invite.invited_email, context)
-    except InvalidAddressError:
-        _logger.warning("invite e-mail of invite %s not queued: invalid address", invite.id)
+    except (InvalidAddressError, TemplateError) as exc:
+        # Only the type: the message of neither names a token, but nothing is left to chance.
+        _logger.warning("invite e-mail of invite %s not queued: %s", invite.id, type(exc).__name__)
         return False
     return True
+
+
+def _one_line(text: str) -> str:
+    """``text`` with every run of whitespace (line breaks included) as one space."""
+    return " ".join(text.split())
 
 
 # --- the administrators' side ---------------------------------------------------------------

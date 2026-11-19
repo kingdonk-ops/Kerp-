@@ -7242,6 +7242,13 @@ export interface operations {
                     "application/json": components["schemas"]["TokenResponse"];
                 };
             };
+            /** @description `code: DEVICE_REVOKED`: `X-KERP-Device-Id` names a revoked device (wipe its local data). Answered only for valid tokens and an acceptable password; nothing was changed and the invite stays pending */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description `INVITE_SIGN_IN_REQUIRED`: the account already has credentials. Sign in instead (with the `invite_token`); nothing was changed */
             409: {
                 headers: {

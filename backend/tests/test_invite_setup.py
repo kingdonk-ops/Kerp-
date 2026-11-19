@@ -17,7 +17,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.core.auth import service as auth_service
-from app.core.auth.models import User
+from app.core.auth.device_signal import DEVICE_HEADER
+from app.core.auth.models import DEVICE_REVOKED, Device, User
 from app.core.auth.password_policy import PasswordPolicyError
 from app.core.auth.revocation import RevocationUnavailableError
 from app.core.auth.router import REFRESH_COOKIE
@@ -25,6 +26,7 @@ from app.core.auth.runtime import app_auth_runtime
 from app.core.auth.service import AuthenticationError, AuthService, CredentialsExistError
 from app.core.db import utcnow
 from app.core.logging import REDACTED, JsonFormatter, scrub_sentry_event, scrub_text
+from app.core.mail import templates as mail_templates
 from app.core.mail.queue import QueuedMail, mail_enqueuer, set_mail_enqueuer
 from app.core.mail.templates import TEMPLATES, render
 from app.core.tenancy.context import TenancyContext
@@ -77,7 +79,9 @@ class Outbox:
 
     def link(self, index: int = -1) -> tuple[str, str]:
         """``(invite_token, setup_token)`` of an invite e-mail's link."""
-        invite_token, _, setup_token = str(self.invites()[index].context["link"]).partition(".")
+        invite_token, _, setup_token = str(self.invites()[index].context["link_token"]).partition(
+            "."
+        )
         return invite_token, setup_token
 
 
@@ -124,7 +128,7 @@ def test_creating_an_invite_queues_the_e_mail_with_both_tokens(api: Api, outbox:
     assert invite_token == created["invite_token"]
     assert len(setup_token) >= 43
     assert setup_token != invite_token
-    assert {k: v for k, v in mail.context.items() if k != "link"} == {
+    assert {k: v for k, v in mail.context.items() if k != "link_token"} == {
         "project_code": "P1",
         "project_name": "Synthetic one",
         "inviter_name": "Pam",
@@ -428,6 +432,95 @@ def test_an_address_the_mail_service_refuses_still_gets_the_copyable_link(
     assert api.audit()[-1]["email_queued"] is False
 
 
+def test_names_with_line_breaks_never_fail_an_invite(api: Api, outbox: Outbox) -> None:
+    """A project name or display name may hold line breaks; a mail text may not. The names
+    go on one line, so the invite is created and re-sent and its e-mail queued."""
+    with api.db.unit_of_work(ROOT) as s:
+        project = projects.create_project(
+            s, ProjectCreate(code="BRK", name="Synthetic\nbroken \r\n\t name")
+        ).id
+        root = s.get(User, api.users[ROOT_ADMIN])
+        assert root is not None
+        root.display_name = "Root\nAdmin"
+    created = api.invite(NEW, by=ROOT_ADMIN, project=project)
+    assert created.status_code == 201, created.text
+    api.age(NEW)
+    resent = api.resend(created.json()["id"], by=ROOT_ADMIN, project=project)
+    assert resent.status_code == 200, resent.text
+    assert len(outbox.invites()) == 2
+    for mail in outbox.invites():
+        assert mail.context["project_name"] == "Synthetic broken name"
+        assert mail.context["inviter_name"] == "Root Admin"
+    assert [e["email_queued"] for e in api.audit(project)] == [True, True]
+    assert _accept(api, *outbox.link()).json()["joined_project_id"] == str(project)
+
+
+def test_a_text_the_mail_service_refuses_still_leaves_the_invite(
+    api: Api, outbox: Outbox, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    monkeypatch.setattr(mail_templates, "MAX_CONTEXT_VALUE", 5)  # every name is too long now
+    with caplog.at_level(logging.WARNING, logger="kerp.admin.invites"):
+        created = api.invite(NEW)
+        assert created.status_code == 201, created.text
+        api.age(NEW)
+        resent = api.resend(created.json()["id"])
+        assert resent.status_code == 200, resent.text
+    assert outbox.invites() == []
+    assert [e["email_queued"] for e in api.audit()] == [False, False]
+    assert api.rows(NEW)[0].status == "pending"
+    messages = [r.getMessage() for r in caplog.records]
+    assert len(messages) == 2
+    assert all(m.endswith("not queued: TemplateError") for m in messages)
+    for token in (created.json()["invite_token"], resent.json()["invite_token"]):
+        assert token not in repr(messages)
+    # The copyable link is the fallback: the invitee joins after signing in.
+    monkeypatch.undo()
+    assert api.accept(EXT, resent.json()["invite_token"]).status_code == 403  # bound to NEW
+
+
+def test_a_missing_inviter_gets_a_neutral_name(
+    api: Api, outbox: Outbox, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(auth_service, "users_by_id", lambda *_a, **_k: {})
+    api.invited(NEW)
+    assert outbox.invites()[-1].context["inviter_name"] == invites.UNKNOWN_INVITER
+
+
+def test_a_revoked_device_is_told_to_wipe_and_nothing_is_written(api: Api, outbox: Outbox) -> None:
+    api.invited(NEW)
+    link = outbox.link()
+    device, now = uuid.uuid4(), utcnow()
+    with api.db.unit_of_work(TenancyContext(tenant_id=T1)) as s:
+        s.add(
+            Device(
+                tenant_id=T1,
+                project_id=None,
+                user_id=api.users[EXT],
+                device_id=device,
+                platform="android",
+                enrolled_at=now,
+                last_seen_at=now,
+                status=DEVICE_REVOKED,
+                revoked_at=now,
+                created_by=api.users[EXT],
+            )
+        )
+    headers = {DEVICE_HEADER: str(device)}
+    # Tokens and password first: a wrong link learns nothing about the device.
+    assert _accept(api, link[0], "wrong-setup-token", headers=headers).status_code == 410
+    assert _accept(api, *link, "short", headers=headers).status_code == 422
+    refused = _accept(api, *link, headers=headers)
+    assert refused.status_code == 401, refused.text
+    assert refused.json()["code"] == "DEVICE_REVOKED"
+    assert REFRESH_COOKIE not in refused.cookies
+    assert _password_hash(api, NEW) is None
+    assert api.personas(NEW) == set()
+    [row] = api.rows(NEW)
+    assert (row.status, row.setup_token_hash) == ("pending", _digest(link[1]))
+    assert "first_password_set" not in api.actions()
+    assert _accept(api, *link).status_code == 200  # from another device the link still works
+
+
 # --- single use under concurrency ---------------------------------------------------------------
 
 
@@ -458,6 +551,7 @@ def test_two_parallel_accepts_with_password_one_200_one_410(
     ("change", "status_code", "code", "reason"),
     [
         ({"password_hash": "scrypt$synthetic"}, 409, "INVITE_SIGN_IN_REQUIRED", "has_credentials"),
+        ({"entra_oid": "synthetic-oid"}, 409, "INVITE_SIGN_IN_REQUIRED", "has_credentials"),
         ({"is_active": False}, 410, "INVITE_GONE", "account_inactive"),
     ],
 )
@@ -470,8 +564,9 @@ def test_an_account_that_changed_while_the_invite_was_read_is_refused_by_core(
     code: str,
     reason: str,
 ) -> None:
-    """The account gets credentials (a password reset) or is deactivated after the request
-    checked it: core auth re-reads the row under its lock and refuses; nothing is written."""
+    """The account gets credentials (a password reset, an SSO link) or is deactivated after
+    the request checked it: core auth re-reads the row under its lock and refuses; nothing
+    is written."""
     api.invited(NEW)
     link = outbox.link()
 
@@ -520,6 +615,30 @@ def test_core_sets_a_first_password_only_on_an_active_account_without_credential
     assert api.login(NEW, password=NEW_PASSWORD).status_code == 200
     with pytest.raises(CredentialsExistError):  # single use: never over an existing password
         start(fresh, "walnut 73 Lantern-sky")
+
+
+def test_a_credential_bound_start_right_after_a_password_set_in_the_same_session(
+    api: Api,
+) -> None:
+    """The stamp written in this session is aware; SQLite reads it back naive. The
+    "account changed during sign-in" comparison must not take that for a change."""
+    service = AuthService(app_auth_runtime(api.client.app))  # type: ignore[arg-type]
+    fresh = seed_user(api.db, T1, NEW, password=None)
+    with api.db.unit_of_work(TenancyContext(tenant_id=T1)) as s:
+        user = s.get(User, fresh)
+        assert user is not None
+        auth_service.set_password(user, NEW_PASSWORD)
+        s.flush()
+        pair = service.start_session(s, user, credential_bound=True)
+        assert pair.access.claims.user_id == fresh
+    # A real change between the read and the lock is still refused.
+    with api.db.unit_of_work(TenancyContext(tenant_id=T1)) as s:
+        user = s.get(User, fresh)
+        assert user is not None
+        stale = User(id=user.id, tenant_id=user.tenant_id, email=user.email)
+        stale.password_hash, stale.password_changed_at = user.password_hash, None
+        with pytest.raises(AuthenticationError):
+            service.start_session(s, stale, credential_bound=True)
 
 
 # --- the narrow system path always restores the caller's context --------------------------------
@@ -582,12 +701,50 @@ def test_the_system_path_restores_the_session_context(
 # --- never in a log line or an error report -----------------------------------------------------
 
 
-def test_no_log_record_contains_a_setup_token_or_a_password(
-    api: Api, outbox: Outbox, caplog: pytest.LogCaptureFixture
-) -> None:
+class _Captured(logging.Handler):
+    """Collects the records of the named loggers through a handler attached to each of them
+    directly, at the given level. Unlike ``caplog`` on the root logger it does not depend
+    on the process's logging state (a level, ``disabled`` or ``propagate`` an earlier test
+    or ``configure_logging`` left behind) or on which HTTP client library logs requests."""
+
+    def __init__(self, levels: dict[str, int]) -> None:
+        super().__init__(logging.DEBUG)
+        self.records: list[logging.LogRecord] = []
+        self._levels = levels
+        self._saved: dict[str, tuple[int, bool]] = {}
+
+    def emit(self, record: logging.LogRecord) -> None:
+        self.records.append(record)
+
+    def __enter__(self) -> "_Captured":
+        for name, level in self._levels.items():
+            logger = logging.getLogger(name)
+            self._saved[name] = (logger.level, logger.disabled)
+            logger.setLevel(level)
+            logger.disabled = False
+            logger.addHandler(self)
+        return self
+
+    def __exit__(self, *_exc: object) -> None:
+        for name, (level, disabled) in self._saved.items():
+            logger = logging.getLogger(name)
+            logger.removeHandler(self)
+            logger.setLevel(level)
+            logger.disabled = disabled
+
+    def of(self, name: str) -> list[logging.LogRecord]:
+        return [r for r in self.records if r.name == name or r.name.startswith(f"{name}.")]
+
+
+# The request log, every KERP logger (auth, mail, audit, the invites module) and every SQL
+# statement with its parameters.
+_LOGGERS = {"kerp": logging.DEBUG, "sqlalchemy.engine": logging.INFO}
+
+
+def test_no_log_record_contains_a_setup_token_or_a_password(api: Api, outbox: Outbox) -> None:
     api.headers(PAM)
     formatter = JsonFormatter()
-    with caplog.at_level(logging.DEBUG):
+    with _Captured(_LOGGERS) as captured:
         invite = api.invited(NEW)
         old = outbox.link()
         api.age(NEW)
@@ -598,10 +755,24 @@ def test_no_log_record_contains_a_setup_token_or_a_password(
         assert _accept(api, *new, "short").status_code == 422
         assert _preview(api, *new).status_code == 200
         assert _accept(api, *new).status_code == 200
-    access = [r for r in caplog.records if r.name == "kerp.access"]
-    assert {SETUP_PREVIEW, ACCEPT_WITH_PASSWORD} <= {r.__dict__["path"] for r in access}
-    assert len(caplog.records) > len(access)  # other loggers were captured too
-    for record in caplog.records:
+    # The capture saw every request ...
+    access = [(r.__dict__["path"], r.__dict__["status"]) for r in captured.of("kerp.access")]
+    assert access[-5:] == [
+        (SETUP_PREVIEW, 410),
+        (ACCEPT_WITH_PASSWORD, 410),
+        (ACCEPT_WITH_PASSWORD, 422),
+        (SETUP_PREVIEW, 200),
+        (ACCEPT_WITH_PASSWORD, 200),
+    ]
+    # ... and the SQL behind them with its parameters: the hashes are there, in the invite
+    # row and in the account row, so a token or a password in clear would be there too.
+    sql = "\n".join(r.getMessage() for r in captured.of("sqlalchemy.engine"))
+    assert "UPDATE oe_admin_project_invite" in sql
+    assert "UPDATE auth_user" in sql
+    assert _digest(new[1]) in sql
+    assert _digest(new[0]) in sql
+    assert str(_password_hash(api, NEW)) in sql
+    for record in captured.records:
         rendered = formatter.format(record) + record.getMessage() + repr(record.__dict__)
         for secret in (old[1], new[1], NEW_PASSWORD):
             assert secret not in rendered, record.name
@@ -621,6 +792,12 @@ def test_setup_tokens_are_scrubbed_from_logs_and_error_reports() -> None:
     assert secret not in repr(scrubbed)
     assert scrubbed["request"]["data"]["setup_token"] == REDACTED
     assert scrubbed["extra"]["note"] == f"setup_token={REDACTED}&next=1"
+    # The mail context carries both tokens under ``link_token`` (a failed queue job's kwargs).
+    queued = scrub_sentry_event(
+        {"extra": {"context": {"project_code": "P1", "link_token": secret}}}
+    )
+    assert queued["extra"]["context"] == {"project_code": "P1", "link_token": REDACTED}
+    assert scrub_text(f"link_token={secret}.{secret} x") == f"link_token={REDACTED} x"
     record = logging.LogRecord("kerp.test", logging.INFO, __file__, 1, "x", (), None)
     record.__dict__.update(setup_token=secret, body=body)
     assert secret not in JsonFormatter().format(record)
