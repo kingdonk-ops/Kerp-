@@ -108,7 +108,15 @@ policies show and let a session write only its own tenant's row. The tenant is h
 `provision.ensure_tenant(db, tenant_id, display_name)` is the one runtime writer: idempotent,
 in a tenant-level unit of work bound to that tenant. The API start-up runs it for
 `KERP_DEFAULT_TENANT_ID` (`ensure_default_tenant`); `python -m app.core.tenancy.provision` does
-the same by hand; T-0023's first-run command uses it. Migrations `0026` (table, backfill, FKs
+the same by hand; T-0023's first-run command (`app/modules/onboarding`) uses it.
+
+**Census (T-0023, ADR 0012).** To refuse a second tenant in a deployment, the first-run command
+counts the directory with `provision.tenant_directory_count(db)`: on PostgreSQL the `SECURITY
+DEFINER` function `kerp_tenant_directory_count()` of migration `0029`, which returns only the
+number of rows (soft-deleted ones included) of every tenant. It raises `app.tenant_census`
+transaction-locally for its own read, which the extra policy `tenant_directory_census_policy`
+(`FOR SELECT`) honours, and restores the caller's value; `rls_coverage_problems` expects that
+policy on `tenants`. `provision.tenant_exists(db, tenant_id)` checks one tenant's own row. Migrations `0026` (table, backfill, FKs
 `NOT VALID`) and `0027` (`VALIDATE CONSTRAINT`): provisioning order and upgrade steps in
 `docs/deploy/tenants.md`. `tenant_fk_problems(connection)` lists tables whose `tenant_id` lacks
 the (validated) FK; `tests/test_tenants.py` runs it at head. Test fixtures create their tenant

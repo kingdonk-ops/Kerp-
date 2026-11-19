@@ -8,9 +8,12 @@ ADR 0011). A deployment has one hidden tenant (diff §4.1), `KERP_DEFAULT_TENANT
 1. **Migrate** as the schema owner (`KERP_MIGRATION_DATABASE_URL`): `alembic upgrade head`.
    Set `KERP_DEFAULT_TENANT_ID` in the migration environment too: migration `0026` then inserts
    its directory row along with one for every tenant id already stored.
-2. **Provision** (optional, idempotent): `python -m app.core.tenancy.provision` creates the
-   `KERP_DEFAULT_TENANT_ID` row if it is missing and does nothing otherwise. T-0023's first-run
-   command writes the deployment tenant through the same path.
+2. **Provision.** On a new deployment run the first-run command
+   (`python -m app.modules.onboarding.first_run`, T-0023, [first-run.md](first-run.md)): it
+   creates the tenant (refusing a second one), the deployment settings and the first System
+   admin, and prints the `KERP_DEFAULT_TENANT_ID` to configure. It writes the tenant through
+   the same path as `python -m app.core.tenancy.provision`, which (optional, idempotent) only
+   creates the `KERP_DEFAULT_TENANT_ID` row if it is missing and does nothing otherwise.
 3. **Start** the API. Its start-up runs the same idempotent step before serving, so the
    deployment tenant's row exists before any tenant-scoped insert. On a database not yet
    migrated to `0026` it logs `tenant provisioning skipped` and creates nothing: migrate first.

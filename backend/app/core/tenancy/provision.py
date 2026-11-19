@@ -7,9 +7,11 @@ primary-key conflict with a row that appeared meanwhile counts as "present". It 
 tenant-level unit of work bound to that tenant, so it works under ``FORCE ROW LEVEL
 SECURITY`` as the runtime role. Callers: the API start-up (``ensure_default_tenant``, for
 ``KERP_DEFAULT_TENANT_ID``), this module's command line
-(``python -m app.core.tenancy.provision``) and T-0023's first-run command. Migration ``0026``
-inserts the configured default tenant too, and a directory row for every tenant id already in
-use.
+(``python -m app.core.tenancy.provision``) and T-0023's first-run command
+(``app/modules/onboarding``), which first counts the directory (``tenant_directory_count``,
+through the census function of migration ``0029``) to refuse a second tenant in a deployment.
+Migration ``0026`` inserts the configured default tenant too, and a directory row for every
+tenant id already in use.
 """
 
 from __future__ import annotations
@@ -19,7 +21,7 @@ import sys
 import uuid
 from typing import Final
 
-from sqlalchemy import inspect, select
+from sqlalchemy import func, inspect, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -27,6 +29,7 @@ from app.core.config import Settings, get_settings
 from app.core.db import TENANTS_TABLE, Database
 from app.core.tenancy.context import TenancyContext
 from app.core.tenancy.models import Tenant
+from app.core.tenancy.rls import TENANT_CENSUS_FUNCTION
 
 DEFAULT_DISPLAY_NAME: Final = "Default tenant"
 
@@ -60,6 +63,27 @@ def _exists(session: Session, tenant_id: uuid.UUID) -> bool:
         select(Tenant.id).where(Tenant.id == tenant_id).execution_options(include_deleted=True)
     ).first()
     return found is not None
+
+
+def tenant_directory_count(database: Database) -> int:
+    """How many directory rows exist, of any tenant, soft-deleted ones included (T-0023).
+
+    Only a number, never an id or a name. On PostgreSQL through the ``SECURITY DEFINER``
+    census function of migration ``0029`` (the runtime role sees only its own tenant's row
+    under RLS); on SQLite, which has no RLS, straight from the table.
+    """
+    with database.engine.connect() as connection:
+        if connection.dialect.name == "postgresql":
+            census = text(f"SELECT {TENANT_CENSUS_FUNCTION}()")
+            return int(connection.execute(census).scalar_one())
+        query = select(func.count()).select_from(Tenant.__table__)
+        return int(connection.execute(query).scalar_one())
+
+
+def tenant_exists(database: Database, tenant_id: uuid.UUID) -> bool:
+    """True if ``tenant_id`` has a directory row, soft-deleted or not (T-0023)."""
+    with database.unit_of_work(TenancyContext(tenant_id=tenant_id)) as session:
+        return _exists(session, tenant_id)
 
 
 def ensure_default_tenant(database: Database | None, settings: Settings) -> bool:
