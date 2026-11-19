@@ -73,7 +73,7 @@ _TEXT_SECRET: Final = re.compile(
         (?:(?P<quote>["'])(?:(?!(?P=quote))[^\\]|\\.)*(?P=quote)
           |(?P<escaped>\\["'])(?:(?!(?P=escaped)).)*(?P=escaped)
           |\\?["'][^\n]*
-          |[^\s"'\\,;&)}\]]+)""",
+          |[^\s,;&)}\]]+)""",
     re.IGNORECASE | re.VERBOSE,
 )
 # ``Authorization: Bearer <token>`` in free text: the scheme stays, the token goes. Only a

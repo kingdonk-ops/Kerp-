@@ -86,6 +86,11 @@ from app.core.tenancy.scope import get_or_404
 _logger = logging.getLogger("kerp.auth")
 
 
+class CredentialsExistError(Exception):
+    """The account already has a way to sign in (``has_credentials``): a first password is
+    never set over it (T-0059). Nothing was changed."""
+
+
 class AuthenticationError(Exception):
     """Credentials or token rejected. Deliberately carries no reason for the client."""
 
@@ -201,6 +206,13 @@ def find_user_by_email(session: Session, email: str) -> User | None:
     """The live account with exactly this e-mail (case-insensitive, trimmed), if any."""
     query = select(User).where(User.email == normalize_email(email))
     return session.scalars(query).one_or_none()
+
+
+def has_credentials(user: User) -> bool:
+    """Whether the account can already sign in on its own: a local password, or a linked
+    company Entra ID identity (T-0054). Such an account signs in; it never sets a *first*
+    password (T-0059, diff §4.1)."""
+    return user.password_hash is not None or user.entra_oid is not None
 
 
 def set_password(
@@ -586,6 +598,46 @@ class AuthService:
         if invite_ref is None:
             return pair
         return replace(pair, invite=run_post_authentication(session, user, invite_ref))
+
+    def start_session_with_first_password(
+        self,
+        session: Session,
+        user_id: uuid.UUID,
+        password: str,
+        *,
+        device_id: uuid.UUID | None = None,
+        breach_check: BreachCheck | None = None,
+    ) -> TokenPair:
+        """Set the **first** password of an account without credentials and sign it in, in
+        the caller's unit of work (T-0059, diff §4.1: a brand-new invitee accepting the
+        e-mailed invite). The caller has proved that the request comes from the account's
+        mailbox; this is the only way a module sets a first password and gets a session.
+
+        ``session`` is bound to the account's tenant. The T-0077 policy is checked first
+        (``PasswordPolicyError``: nothing changed). The row is then locked and read again
+        (``lock_user``): ``AuthenticationError`` when the account is gone or deactivated,
+        ``CredentialsExistError`` when it has credentials by now (of two concurrent calls
+        the second finds the first one's password), ``DeviceRevokedError`` for a revoked
+        ``device_id``. Only then is the hash stored and the normal session issued
+        (``start_session``). Caller commits."""
+        user = session.scalars(select(User).where(User.id == user_id)).one_or_none()
+        if user is None:
+            raise AuthenticationError("user not active")
+        normalised = check_password(
+            password, email=user.email, settings=self.runtime.settings, breach_check=breach_check
+        )
+        password_hash = hash_password(normalised)
+        locked = lock_user(session, user.id, user.tenant_id)
+        if locked is None or not locked.is_active:
+            raise AuthenticationError("user not active")
+        if has_credentials(locked):
+            raise CredentialsExistError("the account already has credentials")
+        refuse_revoked_device(session, device_id)
+        user.password_hash = password_hash
+        user.password_changed_at = utcnow()
+        session.flush()
+        # The row is locked and was checked above: nothing can have changed it since.
+        return self.start_session(session, user, device_id=device_id)
 
     def unlock(
         self,

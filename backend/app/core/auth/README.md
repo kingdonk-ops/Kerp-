@@ -551,6 +551,21 @@ check_password(password, email=email)            # validate only → the normali
 set_user_password(session, user_id, password)    # validate + scrypt + password_changed_at
 ```
 
+**First password + session (T-0059, diff §4.1).** A module that has proved a request comes
+from an account's mailbox (the admin module: both tokens of the e-mailed invite) calls
+
+```python
+pair = AuthService(runtime).start_session_with_first_password(session, user_id, password)
+```
+
+in its own unit of work. Core checks the policy (`PasswordPolicyError`: nothing changed),
+hashes, locks the account row and reads it again (`lock_user`), refuses a gone or
+deactivated account (`AuthenticationError`), an account that already has credentials
+(`CredentialsExistError`; `has_credentials(user)`: a password or a linked Entra ID identity)
+and a revoked `device_id` (`DeviceRevokedError`), and only then stores the hash and issues
+the normal session (`start_session`). A first password is never set over existing
+credentials, so two concurrent calls cannot both succeed.
+
 `set_user_password` (and `set_password(user, ...)` for code that already holds the `User`)
 raises `PasswordPolicyError` and changes nothing when the policy refuses; `OutOfScopeError`
 for an account outside the session's tenant. `create_user(..., password=...)` applies the same

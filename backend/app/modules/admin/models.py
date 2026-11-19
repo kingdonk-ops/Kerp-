@@ -78,6 +78,10 @@ class ProjectInvite(Base, BaseRecordMixin):
       (``[{"persona": "PER-14", "site_node_id": null}, ...]``).
     * ``token_hash``: SHA-256 (hex) of the random ``invite_token``. The token itself is never
       stored or logged; a re-send replaces the hash, which ends the old link.
+    * ``setup_token_hash`` (T-0059): SHA-256 (hex) of the ``setup_token`` that only the invite
+      e-mail carries; with the ``invite_token`` it lets a brand-new invitee set a first
+      password. Never stored in clear; replaced by a re-send, cleared (``NULL``) once the
+      invite is accepted or revoked. Same expiry as the invite.
     * ``expires_at``: creation or latest re-send + ``KERP_INVITE_TTL_HOURS``.
     * ``last_sent_at`` / ``sent_at``: the latest send, and every send of this row (creation
       and re-sends, ISO 8601 UTC) inside the rate-limit window. The send cap is counted over
@@ -120,6 +124,7 @@ class ProjectInvite(Base, BaseRecordMixin):
         GUID(), ForeignKey("auth_user.id"), nullable=False
     )
     token_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    setup_token_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     last_sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     sent_at: Mapped[list[str]] = mapped_column(JSONType(), nullable=False)
