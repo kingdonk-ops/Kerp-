@@ -259,8 +259,14 @@ class PasswordResetService:
         if self.runtime.store.take_value(_token_key(digest)) is None:
             return self._invalid(session, INVALID_TOKEN, user_id)
         first_password = user.password_hash is None
-        apply_checked_password(user, normalised)
+        # Stamped under the row lock (``service.lock_user``): a sign-in or refresh racing
+        # this either issued its tokens before the stamp (revoked by it) or sees the change.
+        if not apply_checked_password(user, normalised, require_active=True):
+            self.runtime.store.take_value(_user_key(tenant, user_id))
+            return self._invalid(session, ACCOUNT_INACTIVE, user_id)  # deactivated meanwhile
         session.flush()
+        # A request racing this confirmation may just have written a newer pointer: deleting
+        # it kills that newly mailed link too. That fails closed (the user asks again).
         self.runtime.store.take_value(_user_key(tenant, user_id))
         self.token_lockout.succeeded(digest)
         audit.append(

@@ -304,8 +304,23 @@ def test_token_and_password_pairs_in_messages_and_tracebacks_are_redacted() -> N
     assert "tok-SYNTHETIC-6" not in str(_format(record)["stack_info"])
 
 
+def test_bearer_tokens_and_password_hashes_in_free_text_are_redacted() -> None:
+    header = "upstream said: Authorization: Bearer eyJhbGciOiJFZERTQSJ9.c3ludGhldGlj.sig-SYNTHETIC"
+    assert scrub_text(header) == f"upstream said: Authorization: Bearer {REDACTED}"
+    dump = "[parameters: {'password_hash': 'scrypt$synthetic$hash', 'id': 7}]"
+    assert scrub_text(dump) == f"[parameters: {{'password_hash': {REDACTED}, 'id': 7}}]"
+    assert scrub_text("password_hash=scrypt$synthetic done") == f"password_hash={REDACTED} done"
+
+
 def test_ordinary_text_about_tokens_and_passwords_is_left_alone() -> None:
-    for text in ("3 tokens issued", "the password was changed", "retoken=5", "broken=1"):
+    for text in (
+        "3 tokens issued",
+        "the password was changed",
+        "retoken=5",
+        "broken=1",
+        "a bearer token is expected",
+        'WWW-Authenticate: Bearer error="invalid_token"',
+    ):
         assert scrub_text(text) == text
     assert scrub({"count": 3, "items": ("a", 1)}) == {"count": 3, "items": ["a", 1]}
     assert is_sensitive_field("Authorization")

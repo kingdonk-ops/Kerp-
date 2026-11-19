@@ -21,6 +21,8 @@ from sqlalchemy import select, update
 
 from app.core.audit.service import chain_entries, verify_chain
 from app.core.auth import password_reset as reset_module
+from app.core.auth import providers
+from app.core.auth import service as auth_service
 from app.core.auth.field import MagicLink, magic_link_digest
 from app.core.auth.lockout import LockedOutError
 from app.core.auth.models import Device, User
@@ -771,6 +773,152 @@ def test_the_breach_lookup_is_used_only_when_switched_on(
         set_mail_enqueuer(None)
     assert looked_up == [NEW_PASSWORD, OTHER_PASSWORD]
 
+
+
+# --- confirm racing a sign-in or a refresh (PR #125 review) ---------------------------------
+
+
+def _in_thread(call: Callable[[], Any]) -> tuple[threading.Thread, dict[str, Any]]:
+    out: dict[str, Any] = {}
+    thread = threading.Thread(target=lambda: out.update(response=call()))
+    thread.start()
+    return thread, out
+
+
+def _gate_once(
+    monkeypatch: pytest.MonkeyPatch, module: Any, name: str
+) -> tuple[threading.Event, threading.Event]:
+    """The first call of ``module.name`` runs, then waits: ``reached`` is set once it has
+    returned its value to nobody yet, ``go`` lets it return."""
+    reached, go = threading.Event(), threading.Event()
+    real = getattr(module, name)
+    first = [True]
+
+    def gated(*args: Any, **kwargs: Any) -> Any:
+        result = real(*args, **kwargs)
+        if first[0]:
+            first[0] = False
+            reached.set()
+            assert go.wait(30)
+        return result
+
+    monkeypatch.setattr(module, name, gated)
+    return reached, go
+
+
+def test_an_old_password_login_in_flight_while_the_reset_commits_is_refused(
+    h: Harness, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    token = h.link(ACTIVE)
+    # The login has read the row and verified the OLD password; it has no tokens yet.
+    verified, go = _gate_once(monkeypatch, providers, "verify_password")
+    thread, out = _in_thread(lambda: h.login(ACTIVE, PASSWORD))
+    assert verified.wait(30)
+    assert h.confirm(token).status_code == 200  # the reset commits meanwhile
+    go.set()
+    thread.join(60)
+    assert out["response"].status_code == 401
+    assert "set-cookie" not in out["response"].headers
+    assert h.login(ACTIVE, PASSWORD).status_code == 401
+    assert h.login(ACTIVE, NEW_PASSWORD).status_code == 200
+
+
+def test_a_magic_link_redeemed_while_the_reset_commits_is_refused(
+    h: Harness, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    assert h.client.post("/api/v1/auth/magic-link", json={"email": WORKER}).status_code == 202
+    [link] = h.magic.sent
+    token = h.link(WORKER)
+    # The redeem has spent the link and read the row; it has no tokens yet.
+    checked, go = _gate_once(monkeypatch, auth_service, "magic_link_eligible")
+    redeem = "/api/v1/auth/magic-link/redeem"
+    thread, out = _in_thread(lambda: h.client.post(redeem, json={"token": link.token}))
+    assert checked.wait(30)
+    assert h.confirm(token).status_code == 200
+    go.set()
+    thread.join(60)
+    assert out["response"].status_code == 401
+    assert "set-cookie" not in out["response"].headers
+
+
+def test_a_refresh_racing_the_reset_waits_for_it_and_is_refused(
+    h: Harness, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    tokens = token_body(h.login(ACTIVE, PASSWORD))
+    token = h.link(ACTIVE)
+    # The confirm has stamped the change under the row lock and has not committed yet.
+    stamped, commit = threading.Event(), threading.Event()
+    real_queue = PasswordResetService._queue_mail
+
+    def held(self: Any, session: Any, template: str, *args: Any) -> None:
+        real_queue(self, session, template, *args)
+        if template == "auth.password_changed":
+            stamped.set()
+            assert commit.wait(30)
+
+    monkeypatch.setattr(PasswordResetService, "_queue_mail", held)
+    locking = threading.Event()
+    real_lock = auth_service.lock_user
+
+    def announced(*args: Any, **kwargs: Any) -> Any:
+        locking.set()
+        return real_lock(*args, **kwargs)
+
+    confirming, confirmed = _in_thread(lambda: h.confirm(token))
+    assert stamped.wait(30)
+    monkeypatch.setattr(auth_service, "lock_user", announced)
+    refreshing, refreshed = _in_thread(lambda: refresh(h.client, tokens["refresh_token"], WEB))
+    assert locking.wait(30)
+    refreshing.join(0.5)
+    assert refreshing.is_alive()  # it waits for the row; it has not issued anything
+    commit.set()
+    confirming.join(60)
+    refreshing.join(60)
+    assert confirmed["response"].status_code == 200
+    assert refreshed["response"].status_code == 401
+    assert "access_token" not in refreshed["response"].text
+    bearer = {"Authorization": f"Bearer {tokens['access_token']}"}
+    assert h.client.get(ME, headers=bearer).status_code == 401
+
+
+def test_a_sign_in_that_issued_its_tokens_first_makes_the_reset_wait_and_is_revoked(
+    h: Harness, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    token = h.link(ACTIVE)
+    # The login holds the row lock and has issued its tokens; it has not committed yet.
+    issued, go = _gate_once(monkeypatch, auth_service.AuthService, "_issue_pair")
+    logging_in, logged_in = _in_thread(lambda: h.login(ACTIVE, PASSWORD))
+    assert issued.wait(30)
+    confirming, confirmed = _in_thread(lambda: h.confirm(token))
+    confirming.join(0.5)
+    assert confirming.is_alive()  # the stamp waits for the sign-in
+    go.set()
+    logging_in.join(60)
+    confirming.join(60)
+    assert confirmed["response"].status_code == 200
+    tokens = token_body(logged_in["response"])  # issued before the stamp ...
+    bearer = {"Authorization": f"Bearer {tokens['access_token']}"}
+    assert h.client.get(ME, headers=bearer).status_code == 401  # ... so revoked by it
+    assert refresh(h.client, tokens["refresh_token"], WEB).status_code == 401
+
+
+def test_an_account_deactivated_while_confirm_runs_keeps_its_password(
+    h: Harness, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    token = h.link(ACTIVE)
+    before = h.user(ACTIVE).password_hash
+    real_hash = auth_service.hash_password
+
+    def deactivating(password: str) -> str:
+        with h.db.unit_of_work(SCOPE) as session:
+            session.execute(update(User).where(User.id == h.users[ACTIVE]).values(is_active=False))
+        return real_hash(password)
+
+    monkeypatch.setattr(auth_service, "hash_password", deactivating)
+    assert h.confirm(token).status_code == 410
+    assert h.user(ACTIVE).password_hash == before
+    assert h.audit()[-1]["reason"] == "account_inactive"
+    assert h.outbox.of("auth.password_changed") == []
 
 # --- rate limits --------------------------------------------------------------------------------
 

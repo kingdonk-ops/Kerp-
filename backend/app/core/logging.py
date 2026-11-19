@@ -7,9 +7,10 @@ Fields passed via ``extra=`` are added as top-level keys.
 **Secrets are scrubbed** (T-0077, diff §4.2): the value of any field named like a credential
 (``SENSITIVE_FIELDS``: ``token``, ``new_password``, ``password``, ...) is replaced by
 ``[redacted]`` wherever it sits in ``extra=`` (nested dicts and lists included), and
-``token=...`` / ``"new_password": "..."`` pairs inside the message or a traceback are
-redacted too. ``scrub_sentry_event`` applies the same rule to a Sentry event
-(``before_send``), for the day an error tracker is wired in.
+``token=...`` / ``"new_password": "..."`` pairs (also ``password_hash``, as in a SQL parameter
+dump) and ``Bearer <token>`` inside the message or a traceback are redacted too.
+``scrub_sentry_event`` applies the same rule to a Sentry event (``before_send``), for the day
+an error tracker is wired in.
 """
 
 import json
@@ -60,12 +61,16 @@ _MAX_SCRUB_DEPTH: Final = 8
 # ``token=abc``, ``token: abc``, ``"new_password": "abc"``, ``'token': 'abc'`` in free text.
 # A quoted value runs to its closing quote; an unquoted one to the next separator.
 _TEXT_SECRET: Final = re.compile(
-    r"""(?P<key>(?<![A-Za-z0-9])(?:new_password|current_password|password|refresh_token|
+    r"""(?P<key>(?<![A-Za-z0-9])(?:new_password|current_password|password_hash|password|
+        refresh_token|
         access_token|id_token|reset_token|invite_token|setup_token|wipe_secret|client_secret|
         token)["']?\s*[:=]\s*)
         (?:"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|[^\s,;&)}\]]+)""",
     re.IGNORECASE | re.VERBOSE,
 )
+# ``Authorization: Bearer <token>`` in free text: the scheme stays, the token goes. Only a
+# token-like run (16+ URL-safe characters), so prose such as "bearer token expected" stays.
+_BEARER: Final = re.compile(r"(?P<scheme>\bbearer\s+)[A-Za-z0-9._~+/=-]{16,}", re.IGNORECASE)
 
 
 def is_sensitive_field(name: object) -> bool:
@@ -75,7 +80,8 @@ def is_sensitive_field(name: object) -> bool:
 def scrub_text(text: str) -> str:
     """``text`` with the value of every ``token=...`` / ``"new_password": "..."`` pair
     replaced by ``[redacted]``."""
-    return _TEXT_SECRET.sub(lambda match: f"{match.group('key')}{REDACTED}", text)
+    text = _TEXT_SECRET.sub(lambda match: f"{match.group('key')}{REDACTED}", text)
+    return _BEARER.sub(lambda match: f"{match.group('scheme')}{REDACTED}", text)
 
 
 def scrub(value: object, *, _depth: int = 0) -> object:

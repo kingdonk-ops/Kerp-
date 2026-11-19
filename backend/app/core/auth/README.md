@@ -551,6 +551,23 @@ issued before it stops working at its next use (all devices; exact to the micros
 T-0037 / T-0061) and so does every magic link issued before it. Device enrolment and the
 device PIN are not touched.
 
+**A password change and token issuing are ordered by a row lock** (`service.lock_user`, PR #125
+review). The change stamps `password_changed_at` while holding the user's row
+(`SELECT ... FOR NO KEY UPDATE`; on SQLite, which has no row locks, a no-op write takes the
+database's write lock). Every path that issues tokens reads the row again under the same lock
+after the credential check and holds it until the tokens exist:
+
+- `start_session` (password, magic link, SSO) locks and re-reads. For a password or magic-link
+  sign-in it refuses (`401`) when the account was deactivated or `password_hash` /
+  `password_changed_at` changed since the row was read, i.e. while scrypt was running. An SSO
+  sign-in does not depend on the password, so it only takes the lock.
+- Refresh and PIN unlock (`_rotate`) run `load_active_user(..., for_update=True)`.
+
+So a token is either issued before the stamp (older `iat`: revoked by it) or after the change
+committed (the issuing path saw the new row and refused or is a legitimate later sign-in). No
+session started with the old password survives the change, however the requests interleave.
+The stamp and `iat` come from the hosts' clocks: API hosts must be time-synchronised.
+
 ## Self-service password reset (T-0077, diff §4.2)
 
 `password_reset.py`, `password_reset_router.py`.
