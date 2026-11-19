@@ -356,7 +356,10 @@ def test_the_state_entry_is_server_side_short_lived_and_holds_only_a_cookie_hash
     assert raw is not None
     assert cookie.encode() not in raw
     assert sso.digest(cookie).encode() in raw
-    assert b"synthetic-invite" in raw
+    # An invite token is never taken from the query string (T-0052): a sign-in that accepts
+    # an invite starts with the form post, and the state keeps only the invite's reference
+    # (tests/test_invites.py).
+    assert b"synthetic-invite" not in raw
     assert str(device).encode() in raw
     assert challenge.encode() in raw
 

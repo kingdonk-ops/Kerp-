@@ -130,6 +130,10 @@ class Settings(BaseSettings):
     # rejection before the user may ask for the same project again. 0 disables it.
     access_request_cooldown_hours: int = Field(default=24, ge=0, le=24 * 365)
 
+    # Lifetime of a project invite (T-0052, diff §4.1 Invites): hours from creation, or from
+    # the latest re-send, until its token expires. Default 168 = 7 days (planner default).
+    invite_ttl_hours: int = Field(default=168, ge=1, le=24 * 90)
+
     # Entra ID SSO, identity only (T-0054, diff §4.5). Enabled only when both the tenant id
     # and the client id are set; both are GUIDs, so the authority can only ever be the
     # company tenant (never ``common`` / ``organizations``). The client secret comes from

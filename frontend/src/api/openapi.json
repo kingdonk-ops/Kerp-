@@ -108,7 +108,7 @@
           "auth"
         ],
         "summary": "Request Magic Link",
-        "description": "Send a one-time sign-in link (15 min) to a Field Worker's e-mail (PER-14, diff §4.2).\n\nAlways ``202`` (unknown, inactive, non-Field-Worker and other-tenant addresses included),\nso the answer reveals no accounts or personas. The request only counts the attempt; the\nlookup, the eligibility check, the link and its e-mail run after the response (T-0057).",
+        "description": "Send a one-time sign-in link (15 min) to a Field Worker's e-mail (PER-14, diff §4.2).\n\nAlways ``202`` (unknown, inactive, non-Field-Worker and other-tenant addresses included),\nso the answer reveals no accounts or personas. The request only counts the attempt; the\nlookup, the eligibility check, the link and its e-mail run after the response (T-0057).\nWith `invite_token` (a pending invite naming PER-14 also makes its invitee eligible) the\ninvite is accepted when the link is redeemed; the link itself never carries it (T-0052).",
         "operationId": "request_magic_link_api_v1_auth_magic_link_post",
         "requestBody": {
           "content": {
@@ -425,26 +425,9 @@
           "auth"
         ],
         "summary": "Sso Start",
-        "description": "Start an Entra ID sign-in: a redirect to the company tenant's authority.",
+        "description": "Start an Entra ID sign-in: a redirect to the company tenant's authority.\n\nAn invite is never carried here (a query string is a server-visible URL): a sign-in that\naccepts an invite starts with the form post of the same path.",
         "operationId": "sso_start_api_v1_auth_sso_entra_start_get",
         "parameters": [
-          {
-            "name": "invite_token",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string",
-                  "maxLength": 512
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Invite Token"
-            }
-          },
           {
             "name": "device_id",
             "in": "query",
@@ -497,6 +480,46 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Sso Start Form",
+        "description": "Start an Entra ID sign-in that accepts a project invite afterwards (T-0052).\n\nA top-level HTML form post (`application/x-www-form-urlencoded`: `invite_token`,\noptional `device_id` and `app_challenge` as on the `GET`), so the invite token travels in\nthe body, never in a URL. Only its reference is stored with the `state`.",
+        "operationId": "sso_start_form_api_v1_auth_sso_entra_start_post",
+        "responses": {
+          "303": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "SSO is not offered by this deployment"
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "invite_token": {
+                    "type": "string",
+                    "maxLength": 512
+                  },
+                  "device_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "app_challenge": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9_-]{43}$"
+                  }
                 }
               }
             }
@@ -3503,6 +3526,430 @@
             }
           }
         }
+      }
+    },
+    "/api/v1/admin/projects/{project_id}/invites": {
+      "post": {
+        "tags": [
+          "admin",
+          "admin"
+        ],
+        "summary": "Create Invite",
+        "description": "Invite an e-mail address to the project. The account is created without credentials if\nnone exists; an earlier open invite of the same address is revoked; no membership exists\nuntil the invite is accepted. The response carries the copyable link once.",
+        "operationId": "create_invite_api_v1_admin_projects__project_id__invites_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Project Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InviteCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InviteCreated"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "A member of the project without PER-09"
+          },
+          "404": {
+            "description": "Not a member of the project, or no such invite"
+          },
+          "429": {
+            "description": "The send cap of this project + e-mail is reached (1 per 60 s, 5 per 24 h, creations and re-sends together): retry after `Retry-After` seconds. Nothing was created or revoked"
+          },
+          "409": {
+            "description": "`detail.code: sod_confirmation_required` (send `confirm_sod`), or `code: INVITE_CONFLICT` (a concurrent request changed the invite: retry)"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "admin",
+          "admin"
+        ],
+        "summary": "List Invites",
+        "description": "The project's open invites: pending, and expired never accepted. Accepted and revoked\ninvites are not listed.",
+        "operationId": "list_invites_api_v1_admin_projects__project_id__invites_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Project Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/InviteRead"
+                  },
+                  "title": "Response List Invites Api V1 Admin Projects  Project Id  Invites Get"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "A member of the project without PER-09"
+          },
+          "404": {
+            "description": "Not a member of the project, or no such invite"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/projects/{project_id}/invites/{invite_id}": {
+      "delete": {
+        "tags": [
+          "admin",
+          "admin"
+        ],
+        "summary": "Revoke Invite",
+        "description": "Revoke an open invite: its link stops working at once.",
+        "operationId": "revoke_invite_api_v1_admin_projects__project_id__invites__invite_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "invite_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Invite Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "403": {
+            "description": "A member of the project without PER-09"
+          },
+          "404": {
+            "description": "Not a member of the project, or no such invite"
+          },
+          "409": {
+            "description": "`INVITE_NOT_RESENDABLE` (accepted or revoked) or `INVITE_CONFLICT`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InviteRefusal"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/projects/{project_id}/invites/{invite_id}/resend": {
+      "post": {
+        "tags": [
+          "admin",
+          "admin"
+        ],
+        "summary": "Resend Invite",
+        "description": "Re-send a pending or expired (never accepted) invite: a fresh token and expiry, the old\nlink is gone at once. The response carries the new copyable link once.",
+        "operationId": "resend_invite_api_v1_admin_projects__project_id__invites__invite_id__resend_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "invite_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Invite Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InviteSent"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "A member of the project without PER-09"
+          },
+          "404": {
+            "description": "Not a member of the project, or no such invite"
+          },
+          "429": {
+            "description": "The send cap of this project + e-mail is reached (1 per 60 s, 5 per 24 h, creations and re-sends together): retry after `Retry-After` seconds. Nothing was created or revoked"
+          },
+          "409": {
+            "description": "`INVITE_NOT_RESENDABLE` (accepted or revoked) or `INVITE_CONFLICT`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InviteRefusal"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/invites/preview": {
+      "post": {
+        "tags": [
+          "admin",
+          "admin"
+        ],
+        "summary": "Preview Invite",
+        "description": "What the \"Join project\" confirmation shows: project code and name, the inviter's name.\nOnly for the invited account; nothing is granted.",
+        "operationId": "preview_invite_api_v1_admin_invites_preview_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InviteTokenIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvitePreview"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`INVITE_WRONG_USER`: the session's e-mail is not the invited one",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InviteRefusal"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "`INVITE_GONE`: expired, revoked, used or unknown (one neutral message)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InviteRefusal"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/invites/accept": {
+      "post": {
+        "tags": [
+          "admin",
+          "admin"
+        ],
+        "summary": "Accept Invite",
+        "description": "Join the project: the membership and the invite's `accepted` mark in one transaction.\nSingle use, also under concurrency.",
+        "operationId": "accept_invite_api_v1_admin_invites_accept_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InviteTokenIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InviteAccepted"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`INVITE_WRONG_USER`: the session's e-mail is not the invited one",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InviteRefusal"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "`INVITE_GONE`: expired, revoked, used or unknown (one neutral message)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InviteRefusal"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`INVITE_CONFLICT`: a parallel request accepted it first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InviteRefusal"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/uploads/projects/{project_id}/files": {
@@ -7576,6 +8023,346 @@
         ],
         "title": "HealthResponse"
       },
+      "InviteAccepted": {
+        "properties": {
+          "joined_project_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Joined Project Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "joined_project_id"
+        ],
+        "title": "InviteAccepted"
+      },
+      "InviteCreate": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "maxLength": 320,
+            "minLength": 3,
+            "pattern": "^[^@\\s]+@[^@\\s]+$",
+            "title": "Email"
+          },
+          "grants": {
+            "items": {
+              "$ref": "#/components/schemas/GrantIn"
+            },
+            "type": "array",
+            "maxItems": 16,
+            "minItems": 1,
+            "title": "Grants"
+          },
+          "confirm_sod": {
+            "type": "boolean",
+            "title": "Confirm Sod",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "email",
+          "grants"
+        ],
+        "title": "InviteCreate",
+        "description": "``POST /admin/projects/{p}/invites``: invite an e-mail address with persona(s) and site\nscope. ``confirm_sod`` confirms a PER-09 + hold-authority combination (else 409)."
+      },
+      "InviteCreated": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "grants": {
+            "items": {
+              "$ref": "#/components/schemas/GrantRead"
+            },
+            "type": "array",
+            "title": "Grants"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "expired"
+            ],
+            "title": "Status",
+            "description": "expired: past `expires_at` and never accepted (it can be re-sent)"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          },
+          "last_sent_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Last Sent At"
+          },
+          "resend_available_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resend Available At",
+            "description": "When the send cap of this project + e-mail allows the next re-send (1 per 60 s and 5 per 24 h, counting creations and re-sends); null: allowed now"
+          },
+          "invite_token": {
+            "type": "string",
+            "title": "Invite Token",
+            "description": "The single-use token of the link; shown once"
+          },
+          "invite_link": {
+            "type": "string",
+            "title": "Invite Link",
+            "description": "`<web origin>/invite#<invite_token>` (URL fragment)"
+          },
+          "sod_warning": {
+            "type": "boolean",
+            "title": "Sod Warning",
+            "description": "PER-09 together with a hold-authority persona (confirmed with confirm_sod)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "email",
+          "grants",
+          "status",
+          "expires_at",
+          "last_sent_at",
+          "resend_available_at",
+          "invite_token",
+          "invite_link",
+          "sod_warning"
+        ],
+        "title": "InviteCreated"
+      },
+      "InvitePreview": {
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Project Id"
+          },
+          "project_code": {
+            "type": "string",
+            "title": "Project Code"
+          },
+          "project_name": {
+            "type": "string",
+            "title": "Project Name"
+          },
+          "inviter_name": {
+            "type": "string",
+            "title": "Inviter Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "project_id",
+          "project_code",
+          "project_name",
+          "inviter_name"
+        ],
+        "title": "InvitePreview",
+        "description": "What the \"Join project\" confirmation shows the invitee."
+      },
+      "InviteRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "grants": {
+            "items": {
+              "$ref": "#/components/schemas/GrantRead"
+            },
+            "type": "array",
+            "title": "Grants"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "expired"
+            ],
+            "title": "Status",
+            "description": "expired: past `expires_at` and never accepted (it can be re-sent)"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          },
+          "last_sent_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Last Sent At"
+          },
+          "resend_available_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resend Available At",
+            "description": "When the send cap of this project + e-mail allows the next re-send (1 per 60 s and 5 per 24 h, counting creations and re-sends); null: allowed now"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "email",
+          "grants",
+          "status",
+          "expires_at",
+          "last_sent_at",
+          "resend_available_at"
+        ],
+        "title": "InviteRead",
+        "description": "An open invite of a project, as its administrators see it. Never the token."
+      },
+      "InviteRefusal": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "code": {
+            "type": "string",
+            "enum": [
+              "INVITE_WRONG_USER",
+              "INVITE_GONE",
+              "INVITE_CONFLICT",
+              "INVITE_NOT_RESENDABLE"
+            ],
+            "title": "Code"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail",
+          "code"
+        ],
+        "title": "InviteRefusal",
+        "description": "A refused invite: ``code`` says what the client shows (the message is neutral)."
+      },
+      "InviteSent": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "grants": {
+            "items": {
+              "$ref": "#/components/schemas/GrantRead"
+            },
+            "type": "array",
+            "title": "Grants"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "expired"
+            ],
+            "title": "Status",
+            "description": "expired: past `expires_at` and never accepted (it can be re-sent)"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          },
+          "last_sent_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Last Sent At"
+          },
+          "resend_available_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resend Available At",
+            "description": "When the send cap of this project + e-mail allows the next re-send (1 per 60 s and 5 per 24 h, counting creations and re-sends); null: allowed now"
+          },
+          "invite_token": {
+            "type": "string",
+            "title": "Invite Token",
+            "description": "The single-use token of the link; shown once"
+          },
+          "invite_link": {
+            "type": "string",
+            "title": "Invite Link",
+            "description": "`<web origin>/invite#<invite_token>` (URL fragment)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "email",
+          "grants",
+          "status",
+          "expires_at",
+          "last_sent_at",
+          "resend_available_at",
+          "invite_token",
+          "invite_link"
+        ],
+        "title": "InviteSent",
+        "description": "An invite right after a send (creation or re-send), with the copyable link. Shown\nonce: the server keeps only a hash of the token. The link carries the `invite_token`\nonly, so it can never set a password (diff §4.1)."
+      },
+      "InviteTokenIn": {
+        "properties": {
+          "invite_token": {
+            "type": "string",
+            "maxLength": 512,
+            "minLength": 16,
+            "title": "Invite Token"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "invite_token"
+        ],
+        "title": "InviteTokenIn",
+        "description": "The invite token of the link's fragment: always in the body, never in a URL."
+      },
       "JobCreate": {
         "properties": {
           "kind": {
@@ -7968,6 +8755,20 @@
             "maxLength": 1024,
             "minLength": 1,
             "title": "Password"
+          },
+          "invite_token": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 512,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invite Token",
+            "description": "Optional project invite token (from the `/invite#<token>` link): accepted right after a successful sign-in. The token response then carries `joined_project_id`, or `invite_error`; a bad token never fails the sign-in"
           }
         },
         "additionalProperties": false,
@@ -8002,6 +8803,20 @@
             "maxLength": 320,
             "minLength": 3,
             "title": "Email"
+          },
+          "invite_token": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 512,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invite Token",
+            "description": "Optional project invite token (from the `/invite#<token>` link): accepted right after a successful sign-in. The token response then carries `joined_project_id`, or `invite_error`; a bad token never fails the sign-in"
           }
         },
         "additionalProperties": false,
@@ -10701,6 +11516,31 @@
             ],
             "title": "Refresh Token",
             "description": "Native app only (`Origin` on `KERP_NATIVE_APP_ORIGINS`): the refresh token, kept in the device keystore. Absent for every other caller (cookie transport)"
+          },
+          "joined_project_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Joined Project Id",
+            "description": "The project joined by the `invite_token` this sign-in carried (T-0052): open it. Absent without an invite"
+          },
+          "invite_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invite Error",
+            "description": "Why the sign-in's `invite_token` was not accepted (the sign-in itself succeeded): `INVITE_WRONG_USER`, `INVITE_GONE` (expired, revoked or used), `INVITE_CONFLICT` or `INVITE_UNAVAILABLE`"
           }
         },
         "type": "object",

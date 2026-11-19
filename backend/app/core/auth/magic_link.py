@@ -93,8 +93,11 @@ class MagicLinkJob:
 
     tenant_id: uuid.UUID
     email: str  # normalised
+    # The reference of the invite to accept at redeem (``post_auth``, T-0052): stored next to
+    # the hashed link record, never in the link. Not the invite token.
+    invite_ref: str | None = None
 
-    def __repr__(self) -> str:  # never the address
+    def __repr__(self) -> str:  # never the address or the invite reference
         return f"MagicLinkJob(tenant_id={self.tenant_id})"
 
 

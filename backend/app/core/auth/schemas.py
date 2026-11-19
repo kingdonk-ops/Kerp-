@@ -10,6 +10,24 @@ from pydantic import AfterValidator, BaseModel, ConfigDict, Field, field_validat
 
 from app.core.auth.field import MAX_OFFLINE_FAILURES, PIN_LENGTH, PIN_PATTERN, is_weak_pin
 
+INVITE_TOKEN_MAX_LENGTH: Final = 512
+
+# An invite to accept right after this sign-in (T-0052, diff §4.1 Invites). Body only: never a
+# URL path or query. Kept out of ``repr`` so a logged model never shows it.
+InviteToken = Annotated[
+    str | None,
+    Field(
+        min_length=1,
+        max_length=INVITE_TOKEN_MAX_LENGTH,
+        repr=False,
+        description=(
+            "Optional project invite token (from the `/invite#<token>` link): accepted right "
+            "after a successful sign-in. The token response then carries `joined_project_id`, "
+            "or `invite_error`; a bad token never fails the sign-in"
+        ),
+    ),
+]
+
 
 class LoginRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -18,12 +36,14 @@ class LoginRequest(BaseModel):
     # Bounded so a huge body cannot make scrypt hash megabytes.
     password: str = Field(min_length=1, max_length=1024)
     # No tenant field (diff §4.1): the deployment's hidden tenant; ``tenant_id`` is a 422.
+    invite_token: InviteToken = None
 
 
 class MagicLinkRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     email: str = Field(min_length=3, max_length=320)
+    invite_token: InviteToken = None
 
 
 def _strong_pin(pin: str) -> str:
@@ -113,6 +133,21 @@ class TokenResponse(BaseModel):
         description=(
             "Native app only (`Origin` on `KERP_NATIVE_APP_ORIGINS`): the refresh token, kept "
             "in the device keystore. Absent for every other caller (cookie transport)"
+        ),
+    )
+    joined_project_id: uuid.UUID | None = Field(
+        default=None,
+        description=(
+            "The project joined by the `invite_token` this sign-in carried (T-0052): open it. "
+            "Absent without an invite"
+        ),
+    )
+    invite_error: str | None = Field(
+        default=None,
+        description=(
+            "Why the sign-in's `invite_token` was not accepted (the sign-in itself succeeded): "
+            "`INVITE_WRONG_USER`, `INVITE_GONE` (expired, revoked or used), `INVITE_CONFLICT` "
+            "or `INVITE_UNAVAILABLE`"
         ),
     )
 

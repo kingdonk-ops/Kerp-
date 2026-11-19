@@ -40,6 +40,7 @@ from app.core.auth.bearer import AUTH_UNAVAILABLE
 from app.core.auth.deps import CurrentPrincipal, get_auth_service, unauthorized
 from app.core.auth.device_signal import DEVICE_HEADER, request_device_id
 from app.core.auth.lockout import LockedOutError
+from app.core.auth.post_auth import invite_reference
 from app.core.auth.providers import PasswordCredentials
 from app.core.auth.revocation import RevocationUnavailableError
 from app.core.auth.runtime import AuthRuntime, get_auth_runtime
@@ -119,6 +120,8 @@ def token_response(pair: TokenPair, response: Response, *, native: bool) -> Toke
         refresh_expires_in=refresh_seconds,
         session_expires_at=refresh.expires_at,
         refresh_token=pair.refresh.token if native else None,
+        joined_project_id=pair.invite.joined_project_id,
+        invite_error=pair.invite.invite_error,
     )
 
 
@@ -243,6 +246,7 @@ def login(
             credentials=credentials,
             client=client,
             device_id=request_device_id(request),
+            invite_ref=invite_reference(body.invite_token),
         )
     except AuthenticationError as exc:
         raise unauthorized() from exc
@@ -266,10 +270,14 @@ def request_magic_link(
     Always ``202`` (unknown, inactive, non-Field-Worker and other-tenant addresses included),
     so the answer reveals no accounts or personas. The request only counts the attempt; the
     lookup, the eligibility check, the link and its e-mail run after the response (T-0057).
+    With `invite_token` (a pending invite naming PER-14 also makes its invitee eligible) the
+    invite is accepted when the link is redeemed; the link itself never carries it (T-0052).
     """
     database = _database(request)
     try:
-        job = service.request_magic_link(email=body.email)
+        job = service.request_magic_link(
+            email=body.email, invite_ref=invite_reference(body.invite_token)
+        )
     except LockedOutError as exc:
         raise _locked(exc) from exc
     except RevocationUnavailableError as exc:
