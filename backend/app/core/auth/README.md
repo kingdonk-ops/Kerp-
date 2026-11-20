@@ -803,8 +803,8 @@ refuse other sessions' writes to derived rows as well):
 
 | Function | What |
 |---|---|
-| `sync_team_link_grants(session, *, link_id, project_id, persona, site_node_id, user_ids, confirm_sod=False) -> None` | The live rows of `link_id` become exactly one per user in `user_ids` with that project, persona and site. Rows that are gone or carry an old project, persona or site are soft-deleted first (flushed), then new ones inserted or matching soft-deleted ones restored; unchanged rows are not rewritten. `user_ids` is stored as given, never filtered by account status (pass every non-deleted team member) |
-| `revoke_team_link_grants(session, *, link_id) -> None` | Soft-deletes every live row of the link |
+| `sync_team_link_grants(session, *, link_id, project_id, persona, site_node_id, user_ids, confirm_sod=False, reason=None) -> None` | The live rows of `link_id` become exactly one per user in `user_ids` with that project, persona and site. Rows that are gone or carry an old project, persona or site are soft-deleted first (flushed), then new ones inserted or matching soft-deleted ones restored; unchanged rows are not rewritten. `user_ids` is stored as given, never filtered by account status (pass every non-deleted team member) |
+| `revoke_team_link_grants(session, *, link_id, reason=None) -> None` | Soft-deletes every live row of the link |
 | `team_link_grants(session) -> Mapping[UUID, frozenset[(user_id, project_id, persona, site_node_id)]]` | Every link id with live derived rows in the tenant, including ids the teams tables no longer know (orphans, for reconcile, T-0075) |
 
 - **Link roles** (TD-251): PER-01 to PER-14 except PER-09, and PER-16 (`LINK_PERSONAS`). PER-09
@@ -820,7 +820,8 @@ refuse other sessions' writes to derived rows as well):
 - **Audit.** Each call that changes rows appends one entry per affected project on chain
   `membership:<project_id>`: `action` (`team_link_sync` | `team_link_revoke`), `link_id`,
   `added` / `removed` user ids (a re-role lists the user in both), the persona and site, and
-  `sod_warning` (with `sod_user_ids` when confirmed); the actor is the session user. A no-op
+  `sod_warning` (with `sod_user_ids` when confirmed), and `reason` when the caller gives one
+  (`"reconcile"` from `teams reconcile`, T-0075); the actor is the session user. A no-op
   writes nothing.
 - **Deactivated users** keep their derived rows: a deactivated account cannot authenticate, so
   the rows grant nothing, and reactivation restores team access with no re-sync.

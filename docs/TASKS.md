@@ -3,11 +3,11 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 69/172 tasks done (40%) · **ready now:** 17 · **epics awaiting breakdown:** 47
+**Overall:** 70/172 tasks done (41%) · **ready now:** 16 · **epics awaiting breakdown:** 47
 
 | Phase | Tasks done | Progress |
 |---|---|---|
-| 0 · Platform foundations | 69/88 | `███████░░░` 78% |
+| 0 · Platform foundations | 70/88 | `████████░░` 80% |
 | 1 · Asset & Quality backbone | 0/75 (+1 epics) | `░░░░░░░░░░` 0% |
 | 2 · Welding quality | 0/9 | `░░░░░░░░░░` 0% |
 | 3 · Logistics | 0/0 (+7 epics) | `░░░░░░░░░░` 0% |
@@ -55,7 +55,7 @@
 | ✅ | [T-0079](../tracker/tasks/T-0079.md) | Tenants directory table + tenant_id FK on every table (ADR) | platform | M | T-0014 | #121 |
 | ✅ | [T-0013](../tracker/tasks/T-0013.md) | teams module: tenant-level teams, team membership, team-project links with a role, team service contract | teams | M | T-0010, T-0011, T-0012, T-0014, T-0073 | #123 |
 | ✅ | [T-0015](../tracker/tasks/T-0015.md) | SAQ worker + Redis + jobs module (enqueue/status/poll), interactive+batch priority queues | jobs | M | T-0003, T-0011 | #40 |
-| ▶ | [T-0075](../tracker/tasks/T-0075.md) | teams reconcile: full-tuple comparison of team-derived grants against the teams tables, orphan link ids, --fix | teams | S | T-0013, T-0073 |  |
+| ✅ | [T-0075](../tracker/tasks/T-0075.md) | teams reconcile: full-tuple comparison of team-derived grants against the teams tables, orphan link ids, --fix | teams | S | T-0013, T-0073 | #130 |
 | ✅ | [T-0016](../tracker/tasks/T-0016.md) | Storage service + presigned uploads (presign/complete, sha256 verify, scan stub, orphan sweep) | uploads | M | T-0015 | #49 |
 | ✅ | [T-0017](../tracker/tasks/T-0017.md) | CEL runtime substrate: celpy (server) + JS CEL (client) + shared conformance_fixtures.json harness | platform | M | T-0001, T-0002 | #15 |
 | ✅ | [T-0018](../tracker/tasks/T-0018.md) | Verification engine shell + single rule store: run_checks(context, rule_set), oe_validation_rule_set/rule (kinds, engines), compile-on-save, findings log | validation | M | T-0006, T-0017 | #36 |
