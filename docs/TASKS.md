@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 71/172 tasks done (41%) · **ready now:** 16 · **epics awaiting breakdown:** 47
+**Overall:** 71/172 tasks done (41%) · **ready now:** 15 · **epics awaiting breakdown:** 47
 
 | Phase | Tasks done | Progress |
 |---|---|---|
@@ -83,8 +83,8 @@
 | ▶ | [T-0026](../tracker/tasks/T-0026.md) | Admin UI: System admin grants (appoint Project Admins), user manager, project creation, persona + site scope assignment with SoD warning | frontend | M | T-0024, T-0014, T-0039 |  |
 | ⬜ | [T-0041](../tracker/tasks/T-0041.md) | Lobby screens: lobby list (internal users), project-code entry, Active requests panel with status chips, rejection reason and Request again after cooldown | frontend | M | T-0040, T-0050, T-0051, T-0042 |  |
 | ✅ | [T-0042](../tracker/tasks/T-0042.md) | Top-bar project picker wired to memberships + post-login landing (one project -> in, several -> last used, none -> lobby) | frontend | S | T-0014, T-0024 | #108 |
-| ▶ | [T-0048](../tracker/tasks/T-0048.md) | Devices screen: list enrolled devices, revoke with wipe warning (admin and own devices) | frontend | S | T-0043, T-0024 |  |
-| ▶ | [T-0051](../tracker/tasks/T-0051.md) | Admin access-request inbox screen: pending requests for the user's PER-09 projects, approve with persona/site scope, reject with optional reason | frontend | S | T-0050, T-0042 |  |
+| ⚫ | [T-0048](../tracker/tasks/T-0048.md) | Devices screen: list enrolled devices, revoke with wipe warning (admin and own devices) | frontend | S | T-0043, T-0024 |  |
+| ▶ | [T-0051](../tracker/tasks/T-0051.md) | Admin access-request inbox and devices screens: pending requests for the user's PER-09 projects (approve with persona/site scope, reject with optional reason); enrolled devices list and revoke with wipe warning (admin and own devices) | frontend | M | T-0050, T-0042, T-0043, T-0024 |  |
 | ⬜ | [T-0053](../tracker/tasks/T-0053.md) | Invite link screens: one-click 'Join project' for signed-in users, invite token carried through sign-in, land in the project (lobby skipped) | frontend | S | T-0052, T-0042, T-0055, T-0026 |  |
 | ▶ | [T-0055](../tracker/tasks/T-0055.md) | Web sign-in with Microsoft (Entra ID SSO): button when enabled, callback landing, translated refusals | frontend | S | T-0054, T-0042 |  |
 | ▶ | [T-0027](../tracker/tasks/T-0027.md) | Playwright setup + Phase 0 exit journey | e2e | S | T-0023, T-0024, T-0018 |  |
@@ -188,7 +188,7 @@
 | ⬜ | [T-0166](../tracker/tasks/T-0166.md) | sync: P6 re-import during a field checkout — tests 10 and 12 and checked-out records on the change-impact report (split from T-0133) | sync | S | T-0133, T-0104 |  |
 | 🧩 | [E-01-01](../tracker/tasks/E-01-01.md) | register views: column catalogue (level/item-type fields, ancestors, rollups, cross-module providers), filter AST, shared saved views, grouped totals, bulk actions | saved_views | L | T-0020, T-0025, T-0102 |  |
 | ⬜ | [T-0161](../tracker/tasks/T-0161.md) | e2e: Pilot-0 journey — download, inspect offline with annotated photo, sign and sync, return, resubmit, approve, PDF; scan-to-locate | e2e | S | T-0149, T-0153, T-0155, T-0157, T-0159, T-0160, T-0143, T-0027, T-0164, T-0165, T-0170, T-0171, T-0172, T-0175, T-0176 |  |
-| ⬜ | [T-0146](../tracker/tasks/T-0146.md) | [Pilot-0] readiness gate: NFR budgets become hard CI gates; pilot scope checklist green | platform | S | T-0045, T-0145, T-0046, T-0142, T-0143, T-0144, T-0111, T-0119, T-0126, T-0127, T-0048, T-0037, T-0038, T-0039, T-0040, T-0041, T-0042, T-0049, T-0050, T-0051, T-0052, T-0053, T-0054, T-0055, T-0057, T-0058, T-0059, T-0077, T-0078, T-0043, T-0044, T-0047, T-0147, T-0148, T-0149, T-0150, T-0151, T-0152, T-0153, T-0154, T-0155, T-0156, T-0157, T-0158, T-0159, T-0160, T-0161, T-0130, T-0162, T-0163, T-0164, T-0165, T-0167, T-0168, T-0169, T-0170, T-0171, T-0172, T-0107, T-0173, T-0174, T-0175, T-0176, T-0177 |  |
+| ⬜ | [T-0146](../tracker/tasks/T-0146.md) | [Pilot-0] readiness gate: NFR budgets become hard CI gates; pilot scope checklist green | platform | S | T-0045, T-0145, T-0046, T-0142, T-0143, T-0144, T-0111, T-0119, T-0126, T-0127, T-0037, T-0038, T-0039, T-0040, T-0041, T-0042, T-0049, T-0050, T-0051, T-0052, T-0053, T-0054, T-0055, T-0057, T-0058, T-0059, T-0077, T-0078, T-0043, T-0044, T-0047, T-0147, T-0148, T-0149, T-0150, T-0151, T-0152, T-0153, T-0154, T-0155, T-0156, T-0157, T-0158, T-0159, T-0160, T-0161, T-0130, T-0162, T-0163, T-0164, T-0165, T-0167, T-0168, T-0169, T-0170, T-0171, T-0172, T-0107, T-0173, T-0174, T-0175, T-0176, T-0177 |  |
 | ⬜ | [T-0131](../tracker/tasks/T-0131.md) | [M1] Phase 1 backbone-freeze contract gate: freeze core tables, level-def shape + role names, rule-store shape, override record, field ownership, seam sigs; CEL parity | platform | M | T-0005, T-0016, T-0018, T-0101, T-0103, T-0110, T-0111, T-0112, T-0124, T-0132, T-0035, T-0139 |  |
 
 ## Phase 2 — Welding quality
