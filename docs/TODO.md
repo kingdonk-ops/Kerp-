@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 245 · **Closed:** 130
+**Open:** 247 · **Closed:** 130
 
 ## decision (10)
 
@@ -124,7 +124,7 @@
 | [TD-360](../tracker/todo/TD-360.md) | First-run: one-time password link for the first System admin once T-0077 ships | T-0023 | implementer |
 | [TD-365](../tracker/todo/TD-365.md) | Frontend translations of the password policy codes and the password policy in /auth/config | T-0077 | implementer |
 
-## later (109)
+## later (111)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -237,6 +237,8 @@
 | [TD-371](../tracker/todo/TD-371.md) | Error reporting (Sentry): pass events through app.core.logging.scrub in before_send so invite_token/setup_token never leave the process | T-0052 | implementer |
 | [TD-374](../tracker/todo/TD-374.md) | Invite housekeeping: credential-less accounts of invites never accepted, and a scheduled expired mark | T-0052 | implementer |
 | [TD-380](../tracker/todo/TD-380.md) | Invite e-mail: recipient locale and local-time expiry (sent in the deployment default locale, expiry shown in UTC) | T-0059 | implementer |
+| [TD-381](../tracker/todo/TD-381.md) | saved_views: drop the deprecated oe_saved_view.team_id column (destructive, needs an ADR) | T-0074 | implementer |
+| [TD-382](../tracker/todo/TD-382.md) | frontend: team picker for sharing a saved view with several teams (team_ids) | T-0074 | implementer |
 
 ## bug (6)
 
