@@ -3,9 +3,9 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 247 · **Closed:** 131
+**Open:** 250 · **Closed:** 131
 
-## decision (10)
+## decision (11)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -19,8 +19,9 @@
 | [TD-348](../tracker/todo/TD-348.md) | T-0073: deleting a project with team-derived members answers 409 (unlink teams first); T-0013 to confirm or cascade | T-0073 | implementer |
 | [TD-373](../tracker/todo/TD-373.md) | Invite acceptance and SoD: accept proceeds (audited sod_warning) when the invitee gained a conflicting persona after the inviter confirmed | T-0052 | implementer |
 | [TD-378](../tracker/todo/TD-378.md) | First password at invite acceptance: should an internal-domain account without credentials (company member who never signed in through Entra ID) be refused? | T-0059 | implementer |
+| [TD-385](../tracker/todo/TD-385.md) | T-0075 reconcile: a live link to a deleted project expects no derived rows (rows it holds are excess, --fix revokes) | T-0075 | implementer |
 
-## spec-gap (46)
+## spec-gap (47)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -70,6 +71,7 @@
 | [TD-369](../tracker/todo/TD-369.md) | SSO start with an invite: spec §4.5 has GET /start keep the invite_token, but a token must never be in a URL query; T-0052 added a form POST | T-0052 | implementer |
 | [TD-370](../tracker/todo/TD-370.md) | Magic-link eligibility by invite: by the account's e-mail (spec §4.2) or only when the request presents that invite_token (T-0052 wording)? | T-0052 | implementer |
 | [TD-379](../tracker/todo/TD-379.md) | Invite setup-preview: shape of the 'neutral answer telling the client to sign in' for an account that already has credentials | T-0059 | implementer |
+| [TD-384](../tracker/todo/TD-384.md) | T-0075 SoD fix: 'plus their existing rows' cannot keep a sod_pending user's stale row of the link | T-0075 | implementer |
 
 ## missed (7)
 
@@ -124,7 +126,7 @@
 | [TD-360](../tracker/todo/TD-360.md) | First-run: one-time password link for the first System admin once T-0077 ships | T-0023 | implementer |
 | [TD-365](../tracker/todo/TD-365.md) | Frontend translations of the password policy codes and the password policy in /auth/config | T-0077 | implementer |
 
-## later (111)
+## later (112)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -239,6 +241,7 @@
 | [TD-380](../tracker/todo/TD-380.md) | Invite e-mail: recipient locale and local-time expiry (sent in the deployment default locale, expiry shown in UTC) | T-0059 | implementer |
 | [TD-381](../tracker/todo/TD-381.md) | saved_views: drop the deprecated oe_saved_view.team_id column (destructive, needs an ADR) | T-0074 | implementer |
 | [TD-382](../tracker/todo/TD-382.md) | frontend: team picker for sharing a saved view with several teams (team_ids) | T-0074 | implementer |
+| [TD-383](../tracker/todo/TD-383.md) | Schedule teams reconcile (report-only) as a nightly SAQ batch job and alert on drift | T-0075 | implementer |
 
 ## bug (6)
 

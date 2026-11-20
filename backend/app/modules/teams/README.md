@@ -141,7 +141,7 @@ session of `--tenant-id` (default `KERP_DEFAULT_TENANT_ID`). Exit codes: `0` no 
 **When to run it**: after a restore or a manual database repair, after an incident in which a
 team change may have committed without its sync, before disabling the teams module, and
 whenever access looks wrong. A report-only run writes nothing. Scheduling it (a nightly batch
-job) is TD-381.
+job) is TD-383.
 
 ## Audit
 
