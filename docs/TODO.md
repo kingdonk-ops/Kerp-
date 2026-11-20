@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 247 · **Closed:** 130
+**Open:** 247 · **Closed:** 131
 
 ## decision (10)
 
@@ -421,3 +421,4 @@
 | ✅ | [TD-295](../tracker/todo/TD-295.md) | T-0044 says module admin but the route /api/v1/settings/deployment and the projects->settings dependency need a separate settings module | Product owner, 2026-11-16: separate settings module (projects depends_on settings) confirmed |
 | ✅ | [TD-298](../tracker/todo/TD-298.md) | Rate-limit the unauthenticated wipe-confirmed endpoint (every refusal appends an audit entry) |  |
 | ✅ | [TD-300](../tracker/todo/TD-300.md) | Field PIN idle is measured from the session's last renewal (refresh token iat), not from its last authenticated request | Product owner, 2026-11-16: idle measured from the refresh token iat (as built in T-0038); early prompt of up to one access-token lifetime accepted |
+| ✅ | [TD-386](../tracker/todo/TD-386.md) | audit ledger: concurrent appends to one chain race on SQLite (seq unique violation → 500) | on SQLite _lock_chain takes the database write lock (a no-op UPDATE on audit_ledger) before the tail read, so a second appender waits for the first to commit and links to it (fix/audit-ledger-sqlite-race) |

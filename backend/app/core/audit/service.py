@@ -43,14 +43,35 @@ def _context(session: Session) -> TenancyContext:
     return context
 
 
+# SQLite has no advisory or row locks. A write that matches no row still makes the driver
+# open the transaction and takes the database's write lock (RESERVED), held until commit.
+_SQLITE_WRITE_LOCK = text(f"UPDATE {AuditEntry.__tablename__} SET seq = seq WHERE 0")
+
+
 def _lock_chain(session: Session, context: TenancyContext, chain_key: str) -> None:
-    """Serialise appends to one chain until the transaction ends (PostgreSQL only).
+    """Serialise appends to one chain until the transaction ends.
 
     Without it two writers would read the same tail; the unique ``(tenant_id, scope_id,
     chain_key, seq)`` constraint would then reject one of them. With it the second waits and
-    links to the first. SQLite serialises writers itself.
+    links to the first.
+
+    PostgreSQL: a transaction-scoped advisory lock per chain.
+
+    SQLite: the database write lock, taken *before* the tail is read. SQLite does serialise
+    writers, but only from their first write: the driver opens the transaction lazily (a
+    plain deferred ``BEGIN`` before the first DML), so the tail ``SELECT`` runs under no lock,
+    two writers can read the same tail, queue on the INSERT, and the second violates the
+    unique ``seq`` (a 500 in the concurrent password-reset confirm, T-0077). A no-op write is
+    the minimal fix that also works mid-transaction: ``BEGIN IMMEDIATE`` cannot be issued once
+    the caller's unit of work has begun, and a process-level lock would neither cover other
+    processes nor be released at commit. It locks the whole database, which on SQLite (dev
+    and tests only) any write does anyway.
     """
-    if session.get_bind().dialect.name != "postgresql":
+    dialect = session.get_bind().dialect.name
+    if dialect == "sqlite":
+        session.execute(_SQLITE_WRITE_LOCK)
+        return
+    if dialect != "postgresql":
         return
     scope = scope_of(context.project_id)
     digest = hashlib.sha256(f"audit_ledger|{context.tenant_id}|{scope}|{chain_key}".encode())
