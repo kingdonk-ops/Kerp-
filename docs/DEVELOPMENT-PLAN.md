@@ -381,6 +381,11 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
   TD-437 (SCIM), TD-438 (machine credentials), TD-439 (feature flags), TD-440 (later: in-app IP
   rules).
 
+- **2026-11-20 — Phase 0 bundling (user request), bundle 3:** T-0063 absorbs T-0056 (projects
+  follow-ups + access-request decision e-mails; both small backend follow-ups on merged modules).
+  T-0056 is `dropped` (body kept); its acceptance criteria live on in T-0063. The decision e-mails
+  stay outside the Pilot-0 gate.
+
 ## Key engineering decisions (baked into the spec — see consolidation diff)
 
 | Area | Decision |

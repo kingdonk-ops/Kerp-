@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 75/278 tasks done (27%) · **ready now:** 26 · **epics awaiting breakdown:** 48
+**Overall:** 75/278 tasks done (27%) · **ready now:** 25 · **epics awaiting breakdown:** 48
 
 | Phase | Tasks done | Progress |
 |---|---|---|
@@ -88,7 +88,7 @@
 | ⬜ | [T-0053](../tracker/tasks/T-0053.md) | Invite link screens: one-click 'Join project' for signed-in users, invite token carried through sign-in, land in the project (lobby skipped) | frontend | S | T-0052, T-0042, T-0055, T-0026 |  |
 | ▶ | [T-0055](../tracker/tasks/T-0055.md) | Web sign-in with Microsoft (Entra ID SSO): button when enabled, callback landing, translated refusals | frontend | S | T-0054, T-0042 |  |
 | ▶ | [T-0027](../tracker/tasks/T-0027.md) | Playwright setup + Phase 0 exit journey | e2e | S | T-0023, T-0024, T-0018 |  |
-| ▶ | [T-0056](../tracker/tasks/T-0056.md) | Transactional e-mails for access-request decisions (approve / reject) via the outbound e-mail service | admin | S | T-0050, T-0058 |  |
+| ⚫ | [T-0056](../tracker/tasks/T-0056.md) | Transactional e-mails for access-request decisions (approve / reject) via the outbound e-mail service | admin | S | T-0050, T-0058 |  |
 | ⬜ | [T-0078](../tracker/tasks/T-0078.md) | Screens: create your password at invite acceptance, forgot password and reset password (web and Android) | frontend | S | T-0053, T-0059, T-0077 |  |
 | ✅ | [T-0028](../tracker/tasks/T-0028.md) | CI hardening: detect in ci-gate needs, least-privilege GHCR publish, SHA-pinned actions, base image digest + Renovate, drop empty postgres extra | platform | S | T-0004 | #18 |
 | ▶ | [T-0032](../tracker/tasks/T-0032.md) | CI hardening 2: weekly uv lock refresh PR, SHA-pinned promote/review-gate actions, digest-pinned service images, publish the smoke-tested image by digest | platform | S | T-0028 |  |
@@ -99,7 +99,7 @@
 | ✅ | [T-0060](../tracker/tasks/T-0060.md) | Request size bounds + jobs hardening: app-wide body limit, spatial_bounds cap, jobs payload cap, list-safe job result, jobs scope tests, real SAQ-worker RLS binding test | platform | M | T-0012, T-0015 | #67 |
 | ⚫ | [T-0061](../tracker/tasks/T-0061.md) | Auth: reject tokens issued in the same second as a password change (sub-second iat vs password_changed_at) | identity | S | T-0008 |  |
 | ⚫ | [T-0062](../tracker/tasks/T-0062.md) | UI shells hardening: hidden-all-columns guard, encoded storage keys, required_if a11y, tab keyboard/aria, reserved audit tab id check | frontend | S | T-0025 |  |
-| ▶ | [T-0063](../tracker/tasks/T-0063.md) | Projects follow-ups: constraint-name duplicate detection, missing authorisation tests, GeoJSON precision, DB-side defaults | projects | S | T-0012 |  |
+| ▶ | [T-0063](../tracker/tasks/T-0063.md) | Projects follow-ups (constraint-name duplicate detection, missing authorisation tests, GeoJSON precision, DB-side defaults) + transactional e-mails for access-request decisions (approve / reject) | projects | M | T-0012, T-0050, T-0058 |  |
 | ⚫ | [T-0064](../tracker/tasks/T-0064.md) | Logging and config safety: ASCII-safe JSON logs, client disconnect not logged as 500, refuse debug in production | platform | S | T-0021 |  |
 | ⚫ | [T-0065](../tracker/tasks/T-0065.md) | Worker RLS binding test uses the real asyncio/SAQ worker path instead of threading.Thread | jobs | S | T-0015 |  |
 | ⚫ | [T-0066](../tracker/tasks/T-0066.md) | tracker.py set --note: do not double the date when the note already starts with one; clean existing doubled notes | platform | S | — |  |
