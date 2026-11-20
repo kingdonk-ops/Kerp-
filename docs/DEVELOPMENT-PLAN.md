@@ -245,6 +245,9 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
   T-0056 is `dropped` (body kept); its acceptance criteria live on in T-0063. The decision e-mails
   stay outside the Pilot-0 gate.
 
+- **2026-11-20 — Phase 0 bundling (user request), bundle 2:** T-0033 absorbs T-0032 (frozen
+  migration DDL + CI hardening 2; both platform hardening on disjoint files; size M). T-0032 is
+  `dropped` (body kept); its acceptance criteria live on in T-0033.
 - **2026-11-21 — admin operations, communications, runtime settings, project archive and the
   user directory (user-supplied spec + addendum; planner pass):** spec added as diff §4.7
   (system console, legal hold, communications, runtime settings registry), §4.8 (account state,
