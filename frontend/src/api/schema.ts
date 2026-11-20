@@ -787,63 +787,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/saved-views/projects/{project_id}/views": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Views */
-        get: operations["list_views_api_v1_saved_views_projects__project_id__views_get"];
-        put?: never;
-        /** Create View */
-        post: operations["create_view_api_v1_saved_views_projects__project_id__views_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/saved-views/projects/{project_id}/views/default": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Default View
-         * @description The caller's default view of the register, else the project default, else ``null``.
-         */
-        get: operations["default_view_api_v1_saved_views_projects__project_id__views_default_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/saved-views/projects/{project_id}/views/{view_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Read View */
-        get: operations["read_view_api_v1_saved_views_projects__project_id__views__view_id__get"];
-        put?: never;
-        post?: never;
-        /** Delete View */
-        delete: operations["delete_view_api_v1_saved_views_projects__project_id__views__view_id__delete"];
-        options?: never;
-        head?: never;
-        /** Update View */
-        patch: operations["update_view_api_v1_saved_views_projects__project_id__views__view_id__patch"];
-        trace?: never;
-    };
     "/api/v1/teams/projects/{project_id}/teams": {
         parameters: {
             query?: never;
@@ -1229,6 +1172,63 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/saved-views/projects/{project_id}/views": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Views */
+        get: operations["list_views_api_v1_saved_views_projects__project_id__views_get"];
+        put?: never;
+        /** Create View */
+        post: operations["create_view_api_v1_saved_views_projects__project_id__views_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/saved-views/projects/{project_id}/views/default": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Default View
+         * @description The caller's default view of the register, else the project default, else ``null``.
+         */
+        get: operations["default_view_api_v1_saved_views_projects__project_id__views_default_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/saved-views/projects/{project_id}/views/{view_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read View */
+        get: operations["read_view_api_v1_saved_views_projects__project_id__views__view_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete View */
+        delete: operations["delete_view_api_v1_saved_views_projects__project_id__views__view_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update View */
+        patch: operations["update_view_api_v1_saved_views_projects__project_id__views__view_id__patch"];
         trace?: never;
     };
     "/api/v1/uploads/projects/{project_id}/files": {
@@ -3890,9 +3890,10 @@ export interface components {
          * SavedViewCreate
          * @description ``POST .../views`` (also "save as"). The owner is the caller; the project is the path's.
          *
-         *     ``team_id`` names the team of a ``team`` view and is given for no other visibility.
-         *     ``is_default`` is allowed on ``private`` (the caller's default) and ``project`` (the
-         *     project default, Project Administrator only) views.
+         *     ``team_ids`` names the teams of a ``team`` view (one or more, each linked to the project)
+         *     and is empty for any other visibility (T-0074). ``is_default`` is allowed on ``private``
+         *     (the caller's default) and ``project`` (the project default, Project Administrator only)
+         *     views.
          */
         SavedViewCreate: {
             /** Columns */
@@ -3920,8 +3921,8 @@ export interface components {
              * @enum {string}
              */
             visibility: "private" | "team" | "project" | "portal";
-            /** Team Id */
-            team_id?: string | null;
+            /** Team Ids */
+            team_ids?: string[];
             /**
              * Is Default
              * @default false
@@ -3934,7 +3935,8 @@ export interface components {
          *
          *     ``missing_columns`` lists every id (from columns, filter, sort, group-by) the register's
          *     catalogue no longer has; the register skips them. It is empty when the register has
-         *     no catalogue registered (nothing can be checked).
+         *     no catalogue registered (nothing can be checked). ``team_ids``: the teams of a ``team``
+         *     view that are still linked to the project (empty for any other visibility).
          */
         SavedViewRead: {
             /**
@@ -3961,8 +3963,8 @@ export interface components {
              * @enum {string}
              */
             visibility: "private" | "team" | "project" | "portal";
-            /** Team Id */
-            team_id: string | null;
+            /** Team Ids */
+            team_ids: string[];
             /** Is Default */
             is_default: boolean;
             /** Columns */
@@ -4000,16 +4002,17 @@ export interface components {
          * SavedViewUpdate
          * @description ``PATCH .../views/{id}``: edit, rename, share, make default; only given fields change.
          *
-         *     ``filter``, ``group_by`` and ``team_id`` may be ``null`` (clears them). The register
-         *     of a view never changes.
+         *     ``filter`` and ``group_by`` may be ``null`` (clears them). ``team_ids`` replaces the
+         *     view's teams; a change of ``visibility`` away from ``team`` without it drops them. The
+         *     register of a view never changes.
          */
         SavedViewUpdate: {
             /** Name */
             name?: string | null;
             /** Visibility */
             visibility?: ("private" | "team" | "project" | "portal") | null;
-            /** Team Id */
-            team_id?: string | null;
+            /** Team Ids */
+            team_ids?: string[] | null;
             /** Is Default */
             is_default?: boolean | null;
             /** Columns */
@@ -5956,205 +5959,6 @@ export interface operations {
             };
         };
     };
-    list_views_api_v1_saved_views_projects__project_id__views_get: {
-        parameters: {
-            query: {
-                register_key: string;
-            };
-            header?: never;
-            path: {
-                project_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SavedViewRead"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    create_view_api_v1_saved_views_projects__project_id__views_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                project_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SavedViewCreate"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SavedViewRead"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    default_view_api_v1_saved_views_projects__project_id__views_default_get: {
-        parameters: {
-            query: {
-                register_key: string;
-            };
-            header?: never;
-            path: {
-                project_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SavedViewRead"] | null;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    read_view_api_v1_saved_views_projects__project_id__views__view_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                project_id: string;
-                view_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SavedViewRead"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    delete_view_api_v1_saved_views_projects__project_id__views__view_id__delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                project_id: string;
-                view_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    update_view_api_v1_saved_views_projects__project_id__views__view_id__patch: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                project_id: string;
-                view_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SavedViewUpdate"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SavedViewRead"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     project_teams_api_v1_teams_projects__project_id__teams_get: {
         parameters: {
             query?: never;
@@ -7273,6 +7077,205 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    list_views_api_v1_saved_views_projects__project_id__views_get: {
+        parameters: {
+            query: {
+                register_key: string;
+            };
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedViewRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_view_api_v1_saved_views_projects__project_id__views_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SavedViewCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedViewRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    default_view_api_v1_saved_views_projects__project_id__views_default_get: {
+        parameters: {
+            query: {
+                register_key: string;
+            };
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedViewRead"] | null;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_view_api_v1_saved_views_projects__project_id__views__view_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                view_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedViewRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_view_api_v1_saved_views_projects__project_id__views__view_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                view_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_view_api_v1_saved_views_projects__project_id__views__view_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                view_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SavedViewUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedViewRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
             };
         };
     };
