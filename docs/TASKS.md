@@ -3,11 +3,11 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 68/172 tasks done (40%) · **ready now:** 18 · **epics awaiting breakdown:** 47
+**Overall:** 69/172 tasks done (40%) · **ready now:** 17 · **epics awaiting breakdown:** 47
 
 | Phase | Tasks done | Progress |
 |---|---|---|
-| 0 · Platform foundations | 68/88 | `███████░░░` 77% |
+| 0 · Platform foundations | 69/88 | `███████░░░` 78% |
 | 1 · Asset & Quality backbone | 0/75 (+1 epics) | `░░░░░░░░░░` 0% |
 | 2 · Welding quality | 0/9 | `░░░░░░░░░░` 0% |
 | 3 · Logistics | 0/0 (+7 epics) | `░░░░░░░░░░` 0% |
@@ -69,7 +69,7 @@
 | ✅ | [T-0020](../tracker/tasks/T-0020.md) | saved_views module | saved_views | S | T-0012 | #65 |
 | ✅ | [T-0052](../tracker/tasks/T-0052.md) | Project invites API: single-use expiring invite_token bound to the invited e-mail, one-click join, membership granted right after first sign-in (password, SSO; magic link for PER-14 invites) | admin | M | T-0014, T-0054, T-0057 | #126 |
 | ✅ | [T-0057](../tracker/tasks/T-0057.md) | Magic-link sign-in limited to Field Workers (PER-14): neutral 202 and no link for anyone else, eligibility re-checked on redeem | identity | S | T-0014, T-0073 | #122 |
-| ▶ | [T-0074](../tracker/tasks/T-0074.md) | saved_views: share a team view with several teams linked to the project (view-team link table, migrate team_id, wire teams contract) | saved_views | S | T-0013, T-0020 |  |
+| ✅ | [T-0074](../tracker/tasks/T-0074.md) | saved_views: share a team view with several teams linked to the project (view-team link table, migrate team_id, wire teams contract) | saved_views | S | T-0013, T-0020 | #129 |
 | ✅ | [T-0077](../tracker/tasks/T-0077.md) | Local password policy (NIST 800-63B style, minimum 8) and self-service password reset by e-mail: neutral 202, single-use expiring link, sessions revoked | identity | M | T-0037, T-0058, T-0068 | #125 |
 | ✅ | [T-0021](../tracker/tasks/T-0021.md) | Observability + security headers (request id, structured logs, CSP/HSTS) | platform | S | T-0001 | #9 |
 | 🟪 | [T-0059](../tracker/tasks/T-0059.md) | Invite e-mail with setup_token and first-password set at invite acceptance for external invitees (one request: set password, accept, sign in) | admin | S | T-0052, T-0058, T-0077 | #127 |
