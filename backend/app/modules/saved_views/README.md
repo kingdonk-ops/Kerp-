@@ -7,9 +7,9 @@ are epic E-01-01; the `RegisterPage` shell is T-0025.
 
 | File | What |
 |---|---|
-| `models.py` | `oe_saved_view` (`BaseRecordMixin`, project RLS, migration `0011`) |
+| `models.py` | `oe_saved_view` (`BaseRecordMixin`, project RLS, migration `0011`); `oe_saved_view_team` (the teams of a `team` view, same RLS, migration `0032`, T-0074) |
 | `schemas.py` | `ViewConfig` (columns, §2 filter AST, sort, group-by, conditional format, density), `SavedViewCreate` / `SavedViewUpdate` / `SavedViewRead` |
-| `service.py` | `Viewer`, `create_view`, `get_view`, `list_views`, `default_view`, `update_view`, `delete_view`, `present`, `load_config`, `register_catalogue`, `known_columns` |
+| `service.py` | `Viewer`, `view_team_ids`, `create_view`, `get_view`, `list_views`, `default_view`, `update_view`, `delete_view`, `present`, `load_config`, `register_catalogue`, `known_columns` |
 | `router.py` | `/api/v1/saved-views/projects/{project_id}/views...` |
 
 ## Record
@@ -19,8 +19,8 @@ are epic E-01-01; the `RegisterPage` shell is T-0025.
 | `register_key` | the register, e.g. `asset_management.work_anchor` (`[a-z][a-z0-9_.]{1,63}`); never changes |
 | `name` | 1-120 chars; rename with `PATCH` |
 | `owner_user_id` | the creator; never changes |
-| `visibility` | `private`, `team` (+ `team_id`), `project`, `portal` |
-| `team_id` | set exactly when `visibility = team` (CHECK; TD-244) |
+| `visibility` | `private`, `team` (+ `team_ids`), `project`, `portal` |
+| `team_id` | **deprecated** (T-0074): the single team of T-0020, copied into `oe_saved_view_team` by `0032`; never read, cleared on the next write, `NULL` on new rows. CHECK (relaxed): only a `team` view may carry one. Dropping it is destructive and needs an ADR (TD-381) |
 | `is_default` | owner's default on a `private` view; the project default on a `project` view (CHECK; TD-244) |
 | `columns` | ordered `{id, width (24-2000 or null), pinned (left/right/null), visible}`, ids unique |
 | `filter` | the §2 AST or `null`: `{op: and|or, conditions: [...]}` / `{column, op, value}` |
@@ -42,8 +42,9 @@ The router builds the `Viewer` from the caller's grants in the path's project: a
 (`V`) saves private views; `C` may share (`team` / `project` / `portal`); `admin` (PER-09)
 is the Project Administrator.
 
-- **See**: private — owner; team — owner + members of `team_id`; project — every member;
-  portal — owner + Project Administrators (portal layouts: TD-243). Anything else is 404.
+- **See**: private — owner; team — owner + Project Administrators + members of any of the
+  view's teams still linked to the project; project — every member; portal — owner +
+  Project Administrators (portal layouts: TD-243). Anything else is 404.
 - **Edit / delete**: owner; a shared view also a Project Administrator (403 otherwise).
 - **Defaults**: one per owner and register among private views, one project default per
   register; setting one clears the previous (service-enforced, TD-245). Setting, removing
@@ -54,9 +55,26 @@ is the Project Administrator.
 - `GET .../views/default?register_key=` returns the caller's default, else the project
   default, else `null`.
 
-**Teams** (T-0013) do not exist yet: the caller's `team_ids` are empty, so a team view is
-visible to its owner only and only a Project Administrator can create one; `team_id` is not
-checked against a teams table (TD-242).
+## Teams (T-0074, ADR 0008)
+
+A `team` view names **one or more teams** (`team_ids` on create / update / read), stored as
+`oe_saved_view_team` rows (`saved_view_id`, `team_id`; `BaseRecordMixin`, project RLS, one
+live row per view and team). `team_id` has no foreign key: the team belongs to the teams
+module, reached only through its service contract (CLAUDE.md §6):
+
+- **Sharing**: `team_ids` is required and non-empty for `visibility = team` and must be empty
+  for any other visibility (422). Every id must be in `teams.project_team_ids(project)`;
+  an unknown, other-project or other-tenant id gets the same 422 body. Repeats count once.
+  Anyone who may share (`C`) may name any team linked to the project, member or not.
+  `PATCH` with `team_ids` replaces the set; changing `visibility` away from `team` drops the
+  teams, and coming back needs `team_ids` again.
+- **Seeing**: the router passes `teams.user_team_ids(session, user)` (the caller's teams
+  linked to the bound project) into the `Viewer`. A team that is deleted or unlinked stops
+  seeing the view; with no named team left the view is the owner's and PER-09's only (no
+  error). Responses list only `team_ids` still linked to the project.
+- **Without the teams module** (not loaded, or off for the project) the caller has no teams
+  and making a view a `team` view answers 422 (`team views need the teams module`). The
+  manifest depends on `teams`.
 
 ## Missing columns
 
@@ -80,4 +98,6 @@ config = views.load_config(view) if view else None  # ViewConfig
 ## Tests
 
 `tests/test_saved_views.py` (shape, round trip, missing columns, visibility, defaults, API;
-SQLite and PostgreSQL).
+SQLite and PostgreSQL). `tests/test_saved_view_teams.py` (T-0074: several teams, unlink /
+delete, linked-teams-only 422, teams module availability, migration `0032` with legacy
+`team_id` rows and its downgrade).

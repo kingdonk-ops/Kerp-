@@ -3,12 +3,18 @@
 Every call works on a session bound to the view's project; the router has checked the
 caller's membership. Who sees and edits which view is decided here from a ``Viewer``:
 
-* ``private``: the owner only. ``team``: the owner and members of ``team_id``.
-  ``project``: every project member. ``portal``: the owner and Project Administrators;
-  client portal layouts read portal views once they exist (TD-243).
+* ``private``: the owner only. ``team``: the owner, Project Administrators and the members of
+  any of the view's teams (``oe_saved_view_team``, T-0074) that is still linked to the
+  project; a deleted or unlinked team stops seeing it. ``project``: every project member.
+  ``portal``: the owner and Project Administrators; client portal layouts read portal
+  views once they exist (TD-243).
 * Edit / delete: the owner; a shared (non-private) view also a Project Administrator.
 * Publishing a shared view needs ``can_share`` (the ``C`` capability); making a view the
   project default, or un-making it, needs ``is_admin`` (PER-09).
+* A ``team`` view names one or more teams (``team_ids``), each linked to the project
+  (``teams.service.project_team_ids``); no other visibility names any. The sharer need not
+  be a member of them. Without the teams module (``Viewer.teams_available``) no view can be
+  made a ``team`` view. Teams are reached through ``teams.service`` only (CLAUDE.md §6).
 * At most one default per owner and register among private views, and one project default
   per register: setting a default clears the previous one. Changing a view's visibility
   without an explicit ``is_default`` drops its default flag (the two kinds never convert).
@@ -30,7 +36,7 @@ from sqlalchemy.orm import Session
 
 from app.core.tenancy.rls import session_tenancy
 from app.core.tenancy.scope import OutOfScopeError, get_or_404
-from app.modules.saved_views.models import DEFAULT_VISIBILITIES, SavedView
+from app.modules.saved_views.models import DEFAULT_VISIBILITIES, SavedView, SavedViewTeam
 from app.modules.saved_views.schemas import (
     SCHEMA_VERSION,
     ResolvedColumn,
@@ -39,6 +45,7 @@ from app.modules.saved_views.schemas import (
     SavedViewUpdate,
     ViewConfig,
 )
+from app.modules.teams import service as teams
 
 __all__ = [
     "InvalidViewError",
@@ -54,11 +61,14 @@ __all__ = [
     "present",
     "register_catalogue",
     "update_view",
+    "view_team_ids",
 ]
 
 ColumnCatalogue = Callable[[Session], Collection[str]]
 _CATALOGUES: Final[dict[str, ColumnCatalogue]] = {}
 SHARED: Final = frozenset({"team", "project", "portal"})
+NOT_LINKED: Final = "every team must be a team linked to this project"
+NO_TEAMS_MODULE: Final = "team views need the teams module"
 
 
 class ViewPermissionError(PermissionError):
@@ -73,16 +83,20 @@ class InvalidViewError(ValueError):
 class Viewer:
     """Who is asking, in the bound project.
 
-    * ``team_ids``: the caller's teams in this project (from the teams module, T-0013).
+    * ``team_ids``: the caller's teams linked to this project
+      (``teams.service.user_team_ids``, T-0013).
     * ``can_share``: may publish ``team`` / ``project`` / ``portal`` views (``C``).
-    * ``is_admin``: Project Administrator (PER-09): edits any shared view, sets the
-      project default, sees portal views.
+    * ``is_admin``: Project Administrator (PER-09): sees and edits any shared view, sets
+      the project default.
+    * ``teams_available``: the teams module is loaded and on for the project; without it a
+      view cannot become a ``team`` view (422).
     """
 
     user_id: uuid.UUID
     team_ids: frozenset[uuid.UUID] = field(default_factory=frozenset)
     can_share: bool = False
     is_admin: bool = False
+    teams_available: bool = True
 
 
 # --- column catalogue -------------------------------------------------------------------------
@@ -117,13 +131,32 @@ def _project_id(session: Session) -> uuid.UUID:
     return context.project_id
 
 
-def can_see(viewer: Viewer, view: SavedView) -> bool:
+def view_team_ids(
+    session: Session, view_ids: Collection[uuid.UUID]
+) -> dict[uuid.UUID, frozenset[uuid.UUID]]:
+    """The teams each view names (its live link rows), whether or not still linked."""
+    found: dict[uuid.UUID, set[uuid.UUID]] = {v: set() for v in view_ids}
+    if view_ids:
+        query = select(SavedViewTeam.saved_view_id, SavedViewTeam.team_id).where(
+            SavedViewTeam.saved_view_id.in_(list(view_ids))
+        )
+        for view_id, team_id in session.execute(query):
+            found[view_id].add(team_id)
+    return {v: frozenset(t) for v, t in found.items()}
+
+
+def can_see(viewer: Viewer, view: SavedView, team_ids: Collection[uuid.UUID] = ()) -> bool:
+    """Whether ``viewer`` sees ``view``; ``team_ids``: the teams the view names.
+
+    ``viewer.team_ids`` holds only teams linked to the project (teams contract), so a team
+    that was deleted or unlinked no longer matches.
+    """
     if view.owner_user_id == viewer.user_id:
         return True
     if view.visibility == "project":
         return True
     if view.visibility == "team":
-        return view.team_id in viewer.team_ids
+        return viewer.is_admin or not viewer.team_ids.isdisjoint(team_ids)
     if view.visibility == "portal":
         return viewer.is_admin
     return False
@@ -136,7 +169,9 @@ def _can_edit(viewer: Viewer, view: SavedView) -> bool:
 def get_view(session: Session, viewer: Viewer, view_id: uuid.UUID) -> SavedView:
     """The view if it is in the bound project and ``viewer`` may see it, else 404."""
     view = get_or_404(session, SavedView, view_id)
-    if view.project_id != _project_id(session) or not can_see(viewer, view):
+    if view.project_id != _project_id(session):
+        raise OutOfScopeError("SavedView not found")
+    if not can_see(viewer, view, view_team_ids(session, [view.id])[view.id]):
         raise OutOfScopeError("SavedView not found")
     return view
 
@@ -153,7 +188,9 @@ def _register_views(session: Session, register_key: str) -> list[SavedView]:
 
 def list_views(session: Session, viewer: Viewer, register_key: str) -> list[SavedView]:
     """The register's views ``viewer`` may see in the bound project, by name."""
-    return [v for v in _register_views(session, register_key) if can_see(viewer, v)]
+    views = _register_views(session, register_key)
+    named = view_team_ids(session, [v.id for v in views if v.visibility == "team"])
+    return [v for v in views if can_see(viewer, v, named.get(v.id, frozenset()))]
 
 
 def default_view(session: Session, viewer: Viewer, register_key: str) -> SavedView | None:
@@ -190,6 +227,12 @@ def present(session: Session, view: SavedView) -> SavedViewRead:
     missing = [] if known is None else [c for c in config.referenced_columns() if c not in known]
     columns = [ResolvedColumn(**c.model_dump(), missing=c.id in missing) for c in config.columns]
     assert view.project_id is not None
+    team_ids: list[uuid.UUID] = []
+    if view.visibility == "team":
+        named = view_team_ids(session, [view.id])[view.id]
+        if named:  # only teams still linked to the project
+            linked = named & teams.project_team_ids(session, view.project_id)
+            team_ids = sorted(linked, key=str)
     return SavedViewRead(
         id=view.id,
         project_id=view.project_id,
@@ -197,7 +240,7 @@ def present(session: Session, view: SavedView) -> SavedViewRead:
         name=view.name,
         owner_user_id=view.owner_user_id,
         visibility=view.visibility,  # type: ignore[arg-type]  # CHECK constraint
-        team_id=view.team_id,
+        team_ids=team_ids,
         is_default=view.is_default,
         columns=columns,
         filter=config.filter,
@@ -228,16 +271,53 @@ def _store_config(view: SavedView, config: ViewConfig) -> None:
 
 
 def _check_sharing(
-    viewer: Viewer, visibility: str, team_id: uuid.UUID | None, is_default: bool
+    session: Session,
+    viewer: Viewer,
+    visibility: str,
+    team_ids: Collection[uuid.UUID],
+    is_default: bool,
 ) -> None:
-    if (visibility == "team") != (team_id is not None):
-        raise InvalidViewError("a team view needs team_id, and only a team view has one")
+    if visibility == "team" and not viewer.teams_available:
+        raise InvalidViewError(NO_TEAMS_MODULE)
+    if (visibility == "team") != bool(team_ids):
+        raise InvalidViewError("a team view needs team_ids, and only a team view has any")
     if is_default and visibility not in DEFAULT_VISIBILITIES:
         raise InvalidViewError("only a private or a project view can be a default")
-    if visibility == "team" and team_id not in viewer.team_ids and not viewer.is_admin:
-        raise ViewPermissionError("you can only share a view with a team you belong to")
     if visibility in SHARED and not viewer.can_share:
         raise ViewPermissionError("you may not share views in this project")
+    # Any sharer may name any team linked to the project; membership is not needed. One
+    # answer for unknown, other-project and other-tenant ids.
+    if team_ids and not set(team_ids) <= teams.project_team_ids(session, _project_id(session)):
+        raise InvalidViewError(NOT_LINKED)
+
+
+def _set_teams(
+    session: Session, view: SavedView, team_ids: Collection[uuid.UUID], actor_id: uuid.UUID
+) -> None:
+    """Make ``team_ids`` the view's live teams: retire the others, add the new ones."""
+    wanted = set(team_ids)
+    current = session.scalars(
+        select(SavedViewTeam).where(SavedViewTeam.saved_view_id == view.id)
+    ).all()
+    for link in current:
+        if link.team_id in wanted:
+            wanted.discard(link.team_id)
+        else:
+            link.soft_delete()
+            link.updated_by = actor_id
+    session.flush()  # retired rows leave the live unique index before a team is re-added
+    for team_id in sorted(wanted, key=str):
+        session.add(
+            SavedViewTeam(
+                id=uuid.uuid4(),
+                tenant_id=view.tenant_id,
+                project_id=view.project_id,
+                saved_view_id=view.id,
+                team_id=team_id,
+                created_by=actor_id,
+                updated_by=actor_id,
+            )
+        )
 
 
 def _clear_other_defaults(session: Session, view: SavedView, actor_id: uuid.UUID) -> None:
@@ -256,7 +336,7 @@ def _clear_other_defaults(session: Session, view: SavedView, actor_id: uuid.UUID
 
 def create_view(session: Session, viewer: Viewer, data: SavedViewCreate) -> SavedView:
     """Save a new view owned by ``viewer`` in the bound project."""
-    _check_sharing(viewer, data.visibility, data.team_id, data.is_default)
+    _check_sharing(session, viewer, data.visibility, data.team_ids, data.is_default)
     if data.is_default and data.visibility == "project" and not viewer.is_admin:
         raise ViewPermissionError("only a Project Administrator sets the project default")
     context = session_tenancy(session)
@@ -269,7 +349,7 @@ def create_view(session: Session, viewer: Viewer, data: SavedViewCreate) -> Save
         name=data.name,
         owner_user_id=viewer.user_id,
         visibility=data.visibility,
-        team_id=data.team_id,
+        team_id=None,  # deprecated (T-0074): the teams are link rows
         is_default=data.is_default,
         created_by=viewer.user_id,
         updated_by=viewer.user_id,
@@ -279,6 +359,9 @@ def create_view(session: Session, viewer: Viewer, data: SavedViewCreate) -> Save
         _clear_other_defaults(session, view, viewer.user_id)
     session.add(view)
     session.flush()
+    if data.team_ids:
+        _set_teams(session, view, data.team_ids, viewer.user_id)
+        session.flush()
     return view
 
 
@@ -291,7 +374,14 @@ def update_view(
         raise ViewPermissionError("only the owner or a Project Administrator edits this view")
     given = data.model_fields_set
     visibility = data.visibility if "visibility" in given else view.visibility
-    team_id = data.team_id if "team_id" in given else view.team_id
+    teams_change = "team_ids" in given or visibility != view.visibility
+    if "team_ids" in given:
+        assert data.team_ids is not None
+        team_ids: frozenset[uuid.UUID] = frozenset(data.team_ids)
+    elif visibility == "team":
+        team_ids = view_team_ids(session, [view.id])[view.id]
+    else:
+        team_ids = frozenset()  # leaving ``team`` drops the teams
     if "is_default" in given:
         is_default = data.is_default
     else:
@@ -301,8 +391,8 @@ def update_view(
         is_default = view.is_default and visibility == view.visibility
     assert visibility is not None
     assert is_default is not None
-    if visibility != view.visibility or team_id != view.team_id:
-        _check_sharing(viewer, visibility, team_id, is_default)
+    if teams_change:
+        _check_sharing(session, viewer, visibility, team_ids, is_default)
     elif is_default and visibility not in DEFAULT_VISIBILITIES:
         raise InvalidViewError("only a private or a project view can be a default")
     was_project_default = view.is_project_default
@@ -320,7 +410,10 @@ def update_view(
     if "name" in given:
         assert data.name is not None
         view.name = data.name
-    view.visibility, view.team_id, view.is_default = visibility, team_id, is_default
+    view.visibility, view.is_default = visibility, is_default
+    view.team_id = None  # deprecated (T-0074): a legacy value lives on as a link row
+    if teams_change:
+        _set_teams(session, view, team_ids, viewer.user_id)
     view.updated_by = viewer.user_id
     if view.is_default:
         _clear_other_defaults(session, view, viewer.user_id)
@@ -335,6 +428,7 @@ def delete_view(session: Session, viewer: Viewer, view_id: uuid.UUID) -> None:
         raise ViewPermissionError("only the owner or a Project Administrator deletes this view")
     if view.is_project_default and not viewer.is_admin:
         raise ViewPermissionError("only a Project Administrator removes the project default")
+    _set_teams(session, view, (), viewer.user_id)
     view.soft_delete()
     view.updated_by = viewer.user_id
     session.flush()

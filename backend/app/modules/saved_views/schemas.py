@@ -41,6 +41,7 @@ MAX_FILTER_NODES: Final = 200
 MAX_GROUP_CONDITIONS: Final = 50
 MAX_LIST_VALUES: Final = 500
 MAX_CONDITION_LENGTH: Final = 1000
+MAX_TEAMS: Final = 50
 
 # Catalogue ids: ``code``, ``custom_fields.budget_hrs``, ``ancestor.site.code``, ...
 ColumnId = Annotated[str, StringConstraints(pattern=r"^[A-Za-z_][A-Za-z0-9_.:-]{0,127}$")]
@@ -71,6 +72,14 @@ FilterOp = Literal[
     "subtree_of",
 ]
 _DURATION: Final = re.compile(r"^[1-9][0-9]{0,3}[hdwm]$")  # within_next: 7d, 12h, 2w, 3m
+
+
+def _unique_teams(team_ids: list[uuid.UUID]) -> list[uuid.UUID]:
+    """Each team once, in the given order."""
+    return list(dict.fromkeys(team_ids))
+
+
+TeamIds = Annotated[list[uuid.UUID], Field(max_length=MAX_TEAMS), AfterValidator(_unique_teams)]
 
 
 def _is_scalar(value: object) -> bool:
@@ -270,34 +279,36 @@ class ViewConfig(BaseModel):
 class SavedViewCreate(ViewConfig):
     """``POST .../views`` (also "save as"). The owner is the caller; the project is the path's.
 
-    ``team_id`` names the team of a ``team`` view and is given for no other visibility.
-    ``is_default`` is allowed on ``private`` (the caller's default) and ``project`` (the
-    project default, Project Administrator only) views.
+    ``team_ids`` names the teams of a ``team`` view (one or more, each linked to the project)
+    and is empty for any other visibility (T-0074). ``is_default`` is allowed on ``private``
+    (the caller's default) and ``project`` (the project default, Project Administrator only)
+    views.
     """
 
     register_key: RegisterKey
     name: Name
     visibility: Visibility = "private"
-    team_id: uuid.UUID | None = None
+    team_ids: TeamIds = Field(default_factory=list)
     is_default: bool = False
 
 
 _CONFIG_FIELDS: Final = frozenset(ViewConfig.model_fields)
-_NULLABLE: Final = frozenset({"filter", "group_by", "team_id"})
+_NULLABLE: Final = frozenset({"filter", "group_by"})
 
 
 class SavedViewUpdate(BaseModel):
     """``PATCH .../views/{id}``: edit, rename, share, make default; only given fields change.
 
-    ``filter``, ``group_by`` and ``team_id`` may be ``null`` (clears them). The register
-    of a view never changes.
+    ``filter`` and ``group_by`` may be ``null`` (clears them). ``team_ids`` replaces the
+    view's teams; a change of ``visibility`` away from ``team`` without it drops them. The
+    register of a view never changes.
     """
 
     model_config = ConfigDict(extra="forbid")
 
     name: Name | None = None
     visibility: Visibility | None = None
-    team_id: uuid.UUID | None = None
+    team_ids: TeamIds | None = None
     is_default: bool | None = None
     columns: list[ViewColumn] | None = Field(default=None, max_length=MAX_COLUMNS)
     filter: FilterNode | None = None
@@ -331,7 +342,8 @@ class SavedViewRead(BaseModel):
 
     ``missing_columns`` lists every id (from columns, filter, sort, group-by) the register's
     catalogue no longer has; the register skips them. It is empty when the register has
-    no catalogue registered (nothing can be checked).
+    no catalogue registered (nothing can be checked). ``team_ids``: the teams of a ``team``
+    view that are still linked to the project (empty for any other visibility).
     """
 
     id: uuid.UUID
@@ -340,7 +352,7 @@ class SavedViewRead(BaseModel):
     name: str
     owner_user_id: uuid.UUID
     visibility: Visibility
-    team_id: uuid.UUID | None
+    team_ids: list[uuid.UUID]
     is_default: bool
     columns: list[ResolvedColumn]
     filter: FilterNode | None
