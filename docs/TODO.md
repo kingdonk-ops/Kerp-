@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 250 · **Closed:** 131
+**Open:** 255 · **Closed:** 131
 
 ## decision (11)
 
@@ -73,7 +73,7 @@
 | [TD-379](../tracker/todo/TD-379.md) | Invite setup-preview: shape of the 'neutral answer telling the client to sign in' for an account that already has credentials | T-0059 | implementer |
 | [TD-384](../tracker/todo/TD-384.md) | T-0075 SoD fix: 'plus their existing rows' cannot keep a sod_pending user's stale row of the link | T-0075 | implementer |
 
-## missed (7)
+## missed (8)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -84,6 +84,7 @@
 | [TD-297](../tracker/todo/TD-297.md) | Admin UI screen for deployment settings (Admin > System) is not planned in any task | T-0044 | implementer |
 | [TD-327](../tracker/todo/TD-327.md) | Frontend i18n key notifications.kind.access_requests.requested for the inbox (needed when the access-request UI lands) | T-0050 | reviewer |
 | [TD-337](../tracker/todo/TD-337.md) | Web/Android route /magic-link#<token> that redeems the e-mailed sign-in link (POST /auth/magic-link/redeem); the e-mail now links there | T-0058 | implementer |
+| [TD-388](../tracker/todo/TD-388.md) | saved_views: wire the my_teams filter op | T-0074 | reviewer |
 
 ## deferred (36)
 
@@ -126,7 +127,7 @@
 | [TD-360](../tracker/todo/TD-360.md) | First-run: one-time password link for the first System admin once T-0077 ships | T-0023 | implementer |
 | [TD-365](../tracker/todo/TD-365.md) | Frontend translations of the password policy codes and the password policy in /auth/config | T-0077 | implementer |
 
-## later (112)
+## later (116)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -242,6 +243,10 @@
 | [TD-381](../tracker/todo/TD-381.md) | saved_views: drop the deprecated oe_saved_view.team_id column (destructive, needs an ADR) | T-0074 | implementer |
 | [TD-382](../tracker/todo/TD-382.md) | frontend: team picker for sharing a saved view with several teams (team_ids) | T-0074 | implementer |
 | [TD-383](../tracker/todo/TD-383.md) | Schedule teams reconcile (report-only) as a nightly SAQ batch job and alert on drift | T-0075 | implementer |
+| [TD-387](../tracker/todo/TD-387.md) | saved_views present(): batch the team-link lookups (N+1 per view) | T-0074 | reviewer |
+| [TD-389](../tracker/todo/TD-389.md) | teams reconcile _repair: pass confirm_sod only when the drift has pending SoD items | T-0075 | reviewer |
+| [TD-390](../tracker/todo/TD-390.md) | teams reconcile CLI: distinct exit code for unexpected exceptions | T-0075 | reviewer |
+| [TD-391](../tracker/todo/TD-391.md) | audit ledger: rename _SQLITE_WRITE_LOCK and document the race-test barrier timeout | T-0077 | reviewer |
 
 ## bug (6)
 
