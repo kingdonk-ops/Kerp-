@@ -14,6 +14,7 @@ access to the project.
 | `schemas.py` | `TeamCreate`, `TeamUpdate`, `MemberPut`, `LinkPut`, `TeamRead`, `TeamDetail`, `TeamLinkRead`, `ProjectTeamRead`, `SodWarning` |
 | `service.py` | writes (`create_team`, `update_team`, `delete_team`, `add_member`, `remove_member`, `set_link`, `unlink`), reads, and the **public read contract** (below) |
 | `router.py` | `/api/v1/teams/...` |
+| `reconcile.py` | the command line: `python -m app.modules.teams.reconcile [--fix [--confirm-sod]]` (T-0075) |
 
 ## Not toggleable per project
 
@@ -98,6 +99,50 @@ reads cannot tell a deleted project from one the caller may not see (a member se
 of their team), so they do not filter by project. Removing such links at project delete is
 TD-358.
 
+## Reconcile (T-0075)
+
+The in-transaction sync keeps the derived rows in step; `teams reconcile` is the safety net
+that **proves** it (ADR 0008, "Reconciliation"). It compares full tuples, so it also catches a
+wrong persona, site or project, not just a wrong user list.
+
+```bash
+python -m app.modules.teams.reconcile                      # report only
+python -m app.modules.teams.reconcile --fix                # repair (never confirms SoD)
+python -m app.modules.teams.reconcile --fix --confirm-sod  # also re-add sod_pending grants
+```
+
+The command runs as the runtime role (`KERP_DATABASE_URL`) in a tenant-level `system_admin`
+session of `--tenant-id` (default `KERP_DEFAULT_TENANT_ID`). Exit codes: `0` no drift left,
+`1` drift found and not (fully) fixed, `2` bad usage or configuration. In code:
+`teams.reconcile(session, *, fix=False, confirm_sod=False) -> ReconcileReport` (a tenant-level
+`system_admin` session only: `NotSystemAdminError` otherwise).
+
+- **Expected**: for every live link of a live team, `(user_id, linked_project_id, persona,
+  site_node_id)` over the team's live members, **deactivated accounts included** (the same
+  input the sync gets, so a deactivated member's row is never excess). A link to a deleted
+  project expects nothing (it confers nothing; see "Links to a deleted project").
+- **Actual**: core's `team_grants.team_link_grants(session)` (every link id with live derived
+  rows). The teams tables are read only here, the core store only through the T-0073 API.
+- **Report** (`ReconcileReport.links`, one `LinkDrift` per drifting link id): `missing`
+  (expected, not stored), `excess` (stored, not expected: a removed member, or a stale persona,
+  site or project, which is excess + missing), `orphan` (live rows whose link is unknown or
+  deleted in the teams tables, or whose team is deleted) and `sod_pending`.
+- **`--fix`**: a drifting live link is re-synced to the expected state; an orphan (or a link
+  that should hold nothing) is revoked. Core audits each on `membership:<project>` with
+  `reason: "reconcile"`. `added` / `removed` say what was repaired.
+- **SoD**: a missing tuple whose re-adding would combine a hold-authority persona with an
+  individual PER-09 on that project is `sod_pending`: the individual PER-09 may have been
+  granted while the derived row was missing, so nobody confirmed the combination. `--fix`
+  repairs the rest of the link (the sync gets the expected users minus the pending ones; their
+  stale rows of that link, if any, are excess and go) and exits `1`. `--fix --confirm-sod`
+  re-adds them, audited `sod_warning: true`.
+- **Idempotent**: running it twice gives the same report, and a second `--fix` finds nothing.
+
+**When to run it**: after a restore or a manual database repair, after an incident in which a
+team change may have committed without its sync, before disabling the teams module, and
+whenever access looks wrong. A report-only run writes nothing. Scheduling it (a nightly batch
+job) is TD-381.
+
 ## Audit
 
 Chain `team:<id>`, with the actor: `create`, `update` (`fields`), `delete`
@@ -132,4 +177,6 @@ teams.link_team_names(session, link_ids)       # {link_id: team name} (T-0014 me
 
 `tests/test_teams.py` (SQLite and PostgreSQL: contract, API role matrix, derived access,
 deactivation, SoD, audit, read contract with a test-only consumer model),
-`tests/test_rls_teams.py` (PostgreSQL as `kerp_app`: raw-SQL policy checks).
+`tests/test_rls_teams.py` (PostgreSQL as `kerp_app`: raw-SQL policy checks),
+`tests/test_teams_reconcile.py` (reconcile: drift kinds, fix, SoD pending, deactivated
+members, idempotence, the command).

@@ -28,14 +28,18 @@ It answers what the session may see (RLS / ORM scope):
 * ``is_member(session, team_id, user_id)``, ``team_member_ids(session, team_id)``,
   ``team_exists(session, team_id)``.
 * ``link_team_names(session, link_ids)``: team names of link ids (the T-0014 member list).
+
+**Reconciliation** (T-0075): ``reconcile(session, fix=False, confirm_sod=False)`` compares the
+expected derived tuples of every live link with core's ``team_link_grants`` and reports
+missing, excess and orphan drift; ``fix`` repairs it (see ``reconcile``).
 """
 
 from __future__ import annotations
 
 import uuid
 from collections.abc import Collection, Iterable
-from dataclasses import dataclass
-from typing import Any
+from dataclasses import dataclass, replace
+from typing import Any, Final
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -554,10 +558,171 @@ def unlink(
     return True
 
 
+# --- reconciliation (T-0075, ADR 0008 "Reconciliation") ---------------------------------------
+
+RECONCILE_REASON: Final = "reconcile"
+DerivedTuple = team_grants.DerivedTuple  # (user_id, project_id, persona, site_node_id)
+
+
+@dataclass(frozen=True, slots=True)
+class LinkDrift:
+    """The drift of one link id. ``orphan``: live derived rows whose link is unknown or
+    deleted in the teams tables (or whose team is deleted). ``sod_pending``: the missing
+    tuples a fix re-adds only with ``confirm_sod``. ``added`` / ``removed``: what the fix
+    did (``repaired``)."""
+
+    link_id: uuid.UUID
+    orphan: bool
+    missing: frozenset[DerivedTuple]
+    excess: frozenset[DerivedTuple]
+    sod_pending: frozenset[DerivedTuple]
+    repaired: bool = False
+    added: frozenset[DerivedTuple] = frozenset()
+    removed: frozenset[DerivedTuple] = frozenset()
+
+    @property
+    def remaining(self) -> frozenset[DerivedTuple]:
+        """The drift left after this run (all of it when nothing was repaired)."""
+        return (self.missing - self.added) | (self.excess - self.removed)
+
+
+@dataclass(frozen=True, slots=True)
+class ReconcileReport:
+    """Every link id with drift, by id; empty when the store matches the teams tables."""
+
+    links: tuple[LinkDrift, ...]
+    fixed: bool
+
+    @property
+    def drift(self) -> bool:
+        return bool(self.links)
+
+    @property
+    def orphan_link_ids(self) -> tuple[uuid.UUID, ...]:
+        return tuple(d.link_id for d in self.links if d.orphan)
+
+    @property
+    def unresolved(self) -> bool:
+        """Whether drift is left: anything when not fixed, else unconfirmed ``sod_pending``."""
+        return any(d.remaining for d in self.links)
+
+
+def _require_system_admin(session: Session) -> None:
+    context = session_tenancy(session)
+    if context is None or context.project_id is not None:
+        raise RuntimeError("reconcile needs a tenant-level bound session")
+    if not context.is_system_admin:
+        raise team_grants.NotSystemAdminError("reconcile is run by system admins only")
+
+
+def _expected_grants(
+    session: Session,
+) -> tuple[dict[uuid.UUID, TeamProjectLink], dict[uuid.UUID, frozenset[DerivedTuple]]]:
+    """The live links of live teams, and the tuples each should hold: its team's live
+    members whatever their account status (the sync input) on a live project; nothing for a
+    link to a deleted project (it confers nothing, like ``_sync_links``)."""
+    query = (
+        select(TeamProjectLink)
+        .join(Team, Team.id == TeamProjectLink.team_id)
+        .where(Team.deleted_at.is_(None), TeamProjectLink.deleted_at.is_(None))
+    )
+    links = {link.id: link for link in session.scalars(query)}
+    live = {link.id for link in _live_project_links(session, list(links.values()))}
+    members = _live_members(session, {link.team_id for link in links.values()})
+    accounts = set(users.users_by_id(session, set().union(*members.values())))
+    expected: dict[uuid.UUID, frozenset[DerivedTuple]] = {}
+    for link in links.values():
+        holders = members[link.team_id] & accounts if link.id in live else set()
+        expected[link.id] = frozenset(
+            (user_id, link.linked_project_id, link.persona, link.site_node_id)
+            for user_id in holders
+        )
+    return links, expected
+
+
+def _sod_pending(
+    session: Session, link: TeamProjectLink, missing: frozenset[DerivedTuple]
+) -> frozenset[DerivedTuple]:
+    """Missing tuples that would give a hold-authority persona to a user with individual
+    PER-09 on the project: nobody confirmed that combination (T-0014's check could not fire
+    while the derived row was missing)."""
+    if not missing or not _is_hold(link.persona):
+        return frozenset()
+    admins = _individual_admins(session, link.linked_project_id)
+    return frozenset(t for t in missing if t[0] in admins)
+
+
+def _repair(
+    session: Session,
+    drift: LinkDrift,
+    link: TeamProjectLink | None,
+    expected: frozenset[DerivedTuple],
+    *,
+    confirm_sod: bool,
+) -> LinkDrift:
+    """Repair one link through the T-0073 API, audited with ``reason: reconcile``."""
+    if link is None or not expected:
+        # An orphan, or a link that should hold nothing (e.g. its project was deleted).
+        team_grants.revoke_team_link_grants(session, link_id=drift.link_id, reason=RECONCILE_REASON)
+        return replace(drift, repaired=True, removed=drift.excess)
+    held_back = frozenset() if confirm_sod else drift.sod_pending
+    team_grants.sync_team_link_grants(
+        session,
+        link_id=link.id,
+        project_id=link.linked_project_id,
+        persona=link.persona,
+        site_node_id=link.site_node_id,
+        user_ids={t[0] for t in expected - held_back},
+        confirm_sod=confirm_sod,
+        reason=RECONCILE_REASON,
+    )
+    return replace(drift, repaired=True, added=drift.missing - held_back, removed=drift.excess)
+
+
+def reconcile(session: Session, *, fix: bool = False, confirm_sod: bool = False) -> ReconcileReport:
+    """Compare the team-derived grants in the core membership store with the teams tables
+    (ADR 0008, Reconciliation); a tenant-level ``system_admin`` session only
+    (``NotSystemAdminError`` otherwise).
+
+    Expected: for every live link of a live team, ``(user, linked project, persona, site)``
+    over the team's live members, deactivated accounts included. Actual: core's
+    ``team_link_grants`` (every link id with live derived rows). Per link id the report lists
+    the **missing** and **excess** tuples (a wrong persona, site or project is both) and
+    whether it is an **orphan** (its link is unknown or deleted in the teams tables).
+
+    ``fix=True`` re-syncs each drifting live link to the expected state and revokes orphans,
+    audited by core with ``reason: reconcile``. A missing tuple whose re-adding would combine
+    a hold-authority persona with an individual PER-09 is ``sod_pending``: the sync gets the
+    expected users minus those (their stale rows of the link are excess and go), unless
+    ``confirm_sod`` (then audited ``sod_warning: true``). ``confirm_sod`` alone changes
+    nothing. Idempotent: a second ``fix`` run reports no drift.
+    """
+    _require_system_admin(session)
+    links, expected = _expected_grants(session)
+    actual = team_grants.team_link_grants(session)
+    found: list[LinkDrift] = []
+    for link_id in sorted({*links, *actual}, key=str):
+        link = links.get(link_id)
+        wanted = expected.get(link_id, frozenset())
+        held = actual.get(link_id, frozenset())
+        missing, excess = wanted - held, held - wanted
+        if not missing and not excess:
+            continue
+        pending = _sod_pending(session, link, missing) if link is not None else frozenset()
+        drift = LinkDrift(link_id, link is None, missing, excess, pending)
+        if fix:
+            drift = _repair(session, drift, link, wanted, confirm_sod=confirm_sod)
+        found.append(drift)
+    return ReconcileReport(tuple(found), fix)
+
+
 __all__ = [
+    "RECONCILE_REASON",
     "DuplicateTeamNameError",
     "InvalidMemberError",
+    "LinkDrift",
     "ProjectTeam",
+    "ReconcileReport",
     "SodConfirmationError",
     "TeamDetail",
     "TeamSummary",
@@ -570,6 +735,7 @@ __all__ = [
     "list_teams",
     "project_team_ids",
     "project_teams",
+    "reconcile",
     "remove_member",
     "set_link",
     "team_detail",
