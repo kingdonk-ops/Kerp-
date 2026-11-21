@@ -1,8 +1,9 @@
 """Breakdown levels and the node tree (T-0101, ADR 0003). Other modules call this, never the tables.
 
 Every call works on a session **bound to a project** and touches only that project: each
-query filters ``project_id`` explicitly, because a bound session may *read* further projects
-(the allowed list, a System admin) and "visible" is not "mine".
+query and statement filters ``project_id`` explicitly: a bound session may *read* further
+projects (the allowed list), a System admin session reads and writes every project of its
+tenant (ADR 0016), and "visible" is not "mine".
 
 Invariants, on every create and move (asset-and-tagging.md §Anchor invariants):
 

@@ -1,6 +1,6 @@
 """Breakdown levels ``oe_asset_level_def`` and the node tree ``oe_asset_node`` (T-0101).
 
-Both are project-scoped under the standard project RLS (migration ``0035``). ADR 0003 as
+Both are project-scoped under the standard project RLS (migration ``0036``). ADR 0003 as
 amended: the levels of a project's breakdown are configuration; rules bind to a level's
 **roles**, never its name. There is no BOQ column or foreign key on either table.
 

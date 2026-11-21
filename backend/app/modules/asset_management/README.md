@@ -7,7 +7,7 @@ later tasks (T-0102, T-0103, T-0134, T-0135, T-0136, T-0108).
 
 | File | What |
 |---|---|
-| `models.py` | `oe_asset_level_def`, `oe_asset_node` (`BaseRecordMixin`, project RLS, migration `0035`) |
+| `models.py` | `oe_asset_level_def`, `oe_asset_node` (`BaseRecordMixin`, project RLS, migration `0036`) |
 | `tree.py` | `LtreePath` column type and the path expressions `within` / `contains` / `rebased` (ltree operators on PostgreSQL, text prefixes on SQLite) |
 | `schemas.py` | `LevelDefCreate` / `LevelDefUpdate` / `LevelDefRead`, `NodeCreate` / `NodeMove` / `NodeRead`, `PointZGeoJSON` |
 | `service.py` | `create_level_def`, `update_level_def`, `list_level_defs`, `create_node`, `get_node`, `list_nodes`, `move_node`, **`work_anchor_for`**; errors `TreeRuleError`, `DuplicateCodeError`, `LevelInUseError`, `NoWorkAnchor` |
@@ -105,7 +105,8 @@ its readers (TD-483).
 
 ### "Visible" is not "mine"
 
-A bound session may *read* other projects (the allowed list). Every query here filters
+A bound session may *read* other projects (the allowed list) and a System admin session
+reads **and writes** every project of its tenant (ADR 0016). Every query and statement here filters
 `project_id` to the session's bound project, so a node or level id of another project is never
 resolved: 404 in a path, 422 (`unknown ...`) in a body. A session without a bound project is a
 programming error (`RuntimeError`).

@@ -475,15 +475,21 @@ def test_display_code_follows_the_template_through_a_move(tree: Tree) -> None:
 # --- "visible" is not "mine" ------------------------------------------------------------------
 
 
+@pytest.mark.parametrize("system_admin", [False, True])
 def test_a_session_reading_another_project_never_resolves_its_rows(
-    db: Database, home: TenancyContext
+    db: Database, home: TenancyContext, system_admin: bool
 ) -> None:
+    """An allowed-list session reads the other project; a System admin session (no membership
+    needed, ADR 0016) could even write it. Neither resolves or changes its nodes here."""
     away = project(db, "AWAY")
     with db.unit_of_work(away) as s:
         foreign_site, foreign_asset, foreign_rsw = Tree(s, seed_levels(s)).remediation()
     assert away.project_id is not None
     wide = TenancyContext(
-        tenant_id=T1, project_id=home.project_id, allowed_project_ids=frozenset({away.project_id})
+        tenant_id=T1,
+        project_id=home.project_id,
+        allowed_project_ids=frozenset() if system_admin else frozenset({away.project_id}),
+        is_system_admin=system_admin,
     )
     with db.unit_of_work(wide) as s:
         mine = Tree(s, seed_levels(s))
@@ -501,6 +507,14 @@ def test_a_session_reading_another_project_never_resolves_its_rows(
         with pytest.raises(service.TreeRuleError, match="unknown level_def_id"):
             service.create_node(s, NodeCreate(level_def_id=foreign_rsw.level_def_id, code="X"))
         assert service.list_nodes(s, parent_id=foreign_site.id) == []
+        assert len(service.list_level_defs(s)) == len(PACKS)
+    with db.unit_of_work(away) as s:  # untouched by the wide session
+        rows = service.list_nodes(s, subtree_of=foreign_site.id)
+        assert [(n.code, n.parent_id, n.revision) for n in rows] == [
+            ("SI-001", None, 1),
+            ("101", foreign_site.id, 1),
+            ("101.1", foreign_asset.id, 1),
+        ]
         assert len(service.list_level_defs(s)) == len(PACKS)
     with db.unit_of_work(TenancyContext(tenant_id=T1)) as s, pytest.raises(RuntimeError):
         service.list_level_defs(s)

@@ -1,7 +1,8 @@
 """Asset hierarchy: ``oe_asset_level_def`` and the ltree tree ``oe_asset_node`` (T-0101, ADR 0003).
 
 Additive: two new project-scoped tables with the ``BaseRecordMixin`` columns, the ``tenants``
-FK and the standard project RLS policies on PostgreSQL.
+FK and the standard project RLS policies on PostgreSQL (as of ADR 0016, migration ``0035``:
+a System admin session reads and writes every project of its own tenant).
 
 * ``CREATE EXTENSION IF NOT EXISTS ltree`` (PostgreSQL; a trusted extension, already created by
   ``infra/postgres/initdb/20-kerp-app.sql``). PostGIS must exist already, as for ``0008``.
@@ -12,8 +13,8 @@ FK and the standard project RLS policies on PostgreSQL.
 
 The downgrade drops both tables; the extension stays (other objects may use it).
 
-Revision ID: 0035
-Revises: 0034
+Revision ID: 0036
+Revises: 0035
 Create Date: 2026-11-21
 """
 
@@ -26,8 +27,8 @@ from sqlalchemy.types import UserDefinedType
 from app.core.db import GUID, JSONType
 from app.core.geo import GeoJSONGeometry
 
-revision: str = "0035"
-down_revision: str | None = "0034"
+revision: str = "0036"
+down_revision: str | None = "0035"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
@@ -38,7 +39,11 @@ LIVE = "deleted_at IS NULL"
 _TENANT = "NULLIF(current_setting('app.current_tenant_id', true), '')::uuid"
 _PROJECT = "NULLIF(current_setting('app.current_project_id', true), '')::uuid"
 _ALLOWED = "string_to_array(NULLIF(current_setting('app.allowed_project_ids', true), ''), ',')"
-_EXACT = f"tenant_id = {_TENANT} AND project_id IS NOT DISTINCT FROM {_PROJECT}"
+_ADMIN = "COALESCE(NULLIF(current_setting('app.is_system_admin', true), '')::boolean, false)"
+_WRITE = (
+    f"tenant_id = {_TENANT} AND (project_id IS NOT DISTINCT FROM {_PROJECT}"
+    f" OR (project_id IS NOT NULL AND {_ADMIN}))"
+)
 
 
 def _standard_rls(table: str) -> tuple[str, ...]:
@@ -46,8 +51,8 @@ def _standard_rls(table: str) -> tuple[str, ...]:
         f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY",
         f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY",
         f"DROP POLICY IF EXISTS project_isolation_policy ON {table}",
-        f"CREATE POLICY project_isolation_policy ON {table} FOR ALL USING ({_EXACT})"
-        f" WITH CHECK ({_EXACT})",
+        f"CREATE POLICY project_isolation_policy ON {table} FOR ALL USING ({_WRITE})"
+        f" WITH CHECK ({_WRITE})",
         f"DROP POLICY IF EXISTS tenant_level_read_policy ON {table}",
         f"CREATE POLICY tenant_level_read_policy ON {table} FOR SELECT USING"
         f" (tenant_id = {_TENANT} AND project_id IS NULL)",
