@@ -1,4 +1,11 @@
-"""The deployment (tenant) settings record ``oe_settings_deployment`` (T-0044, diff §4.4).
+"""Settings tables: ``oe_settings_value`` (T-0230) and the legacy ``oe_settings_deployment``.
+
+``oe_settings_value`` (diff §4.7): one live row per tenant and registry key, the value as
+JSON; no row means the entry's code default. Tenant-level, standard RLS policy.
+
+``oe_settings_deployment`` (T-0044, diff §4.4) is **read-only since T-0230**: migration
+``0037`` copied its rows into ``oe_settings_value`` and nothing reads or writes it any more;
+the table stays until an ADR drops it. What follows describes it as it was used.
 
 At most one live row per tenant (the deployment's hidden tenant, diff §4.1); tenant-level
 (``project_id IS NULL``), standard RLS policy (T-0007): every session of the tenant reads it,
@@ -17,10 +24,13 @@ from typing import Any, Final
 from sqlalchemy import CheckConstraint, Index, Integer, String, text
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.core.db import Base, BaseRecordMixin
+from app.core.db import Base, BaseRecordMixin, JSONType
 
 TABLE: Final = "oe_settings_deployment"
 LIVE_INDEX: Final = "uq_oe_settings_deployment_live"
+VALUE_TABLE: Final = "oe_settings_value"
+VALUE_LIVE_INDEX: Final = "uq_oe_settings_value_live"
+KEY_LENGTH: Final = 64
 _LIVE: Final = "deleted_at IS NULL"
 
 # Project status values (master spec §4.1 amendment); equal to the projects module's (tested).
@@ -101,3 +111,23 @@ class DeploymentSettings(Base, BaseRecordMixin):
 
     def values(self) -> DeploymentSettingsValues:
         return DeploymentSettingsValues(**{name: getattr(self, name) for name in FIELDS})
+
+
+class SettingValue(Base, BaseRecordMixin):
+    """A tenant's stored value of one registry entry (``app.modules.settings.registry``)."""
+
+    __tablename__ = VALUE_TABLE
+    __table_args__ = (
+        CheckConstraint("project_id IS NULL", name="tenant_level"),
+        Index(
+            VALUE_LIVE_INDEX,
+            "tenant_id",
+            "key",
+            unique=True,
+            postgresql_where=text(_LIVE),
+            sqlite_where=text(_LIVE),
+        ),
+    )
+
+    key: Mapped[str] = mapped_column(String(KEY_LENGTH), nullable=False)
+    value: Mapped[Any] = mapped_column(JSONType(), nullable=False)

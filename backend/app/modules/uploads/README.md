@@ -12,14 +12,17 @@ the bytes; it signs, checks and records. Helpers adapted from Inspection-ERP
 | `models.py` | `oe_uploads_file` (`BaseRecordMixin`, project RLS, migration `0009`; `scan_signature`, migration `0034`) |
 | `service.py` | `presign_upload`, `complete_upload`, `get_file`, `download_request`, `verify_upload`, `sweep_orphans`, `schedule_sweep`; quarantine monitor: `quarantine_files`, `quarantine_counts`, `recheck_upload`, `queue_project_sweep` (T-0221) |
 | `jobs.py` | `uploads.verify` (interactive), `uploads.verify_large` (batch; both retried with back-off while the scanner is unavailable) and `uploads.sweep_orphans` (batch; queued hourly per project) |
+| `setting_defs.py` | the module's runtime settings (category `uploads_media`, T-0230): `max_upload_size_mb`, `presigned_url_ttl_minutes` and the four image-derivative entries T-0247 reads; see `app/modules/settings/README.md` |
 | `router.py`, `schemas.py` | `/api/v1/uploads/projects/{project_id}/files...`; the monitor's shapes (`Quarantine*`), served by `admin/system_uploads_router.py` |
 
 ## Flow
 
 1. `POST .../files` `{module, filename, content_type, size_bytes, sha256}` (capability `C`):
    a `pending` row and a presigned `PUT` to `staging/{tenant}/{project}/{file_id}`. Content
-   type and length are **signed**, so storage refuses any other size; `upload_max_bytes`
-   is checked first (413). Only types in the magic-byte allowlist can be declared.
+   type and length are **signed**, so storage refuses any other size; the size limit
+   is checked first (413). The limit and the URL lifetime are the runtime settings
+   `max_upload_size_mb` and `presigned_url_ttl_minutes` (`service.upload_limits`, T-0230),
+   never above the deployment's `KERP_UPLOAD_MAX_BYTES` and `KERP_UPLOAD_URL_SECONDS`. Only types in the magic-byte allowlist can be declared.
 2. The client `PUT`s the bytes with the returned headers.
 3. `POST .../files/{id}/complete` (`C`, and only the uploader, else 403): `HEAD` the
    object (409 if absent, the row stays `pending`), compare the size, sniff the first 512

@@ -472,14 +472,20 @@ def _legacy_view(
 
 @pytest.fixture
 def legacy(tmp_path: Path) -> Iterator[tuple[Config, World, uuid.UUID]]:
-    """A database at 0031 with a legacy team view (``team_id`` = X), then upgraded to head."""
+    """A database at 0031 with a legacy team view (``team_id`` = X), then upgraded to head.
+
+    The world is built at head, because the services need today's schema (creating a project
+    reads ``oe_settings_value``, revision 0037; T-0230), and the database is then taken back
+    to 0031 for the legacy rows.
+    """
     cfg = Config(str(ALEMBIC_INI))
     cfg.attributes.update(url=database_url(tmp_path), configure_logger=False)
-    command.upgrade(cfg, "0031")
+    command.upgrade(cfg, "head")
     db = Database(database_url(tmp_path))
     try:
         seed_tenants(db, *FIXTURE_TENANTS)
         world = _world(db)
+        command.downgrade(cfg, "0031")
         view_id = _legacy_view(db, world.home, "Legacy", world.x)
         _legacy_view(db, world.home, "Legacy private", None)
         command.upgrade(cfg, "head")

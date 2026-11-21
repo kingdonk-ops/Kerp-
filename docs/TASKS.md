@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 92/310 tasks done (30%) · **ready now:** 24 · **epics awaiting breakdown:** 49
+**Overall:** 92/310 tasks done (30%) · **ready now:** 23 · **epics awaiting breakdown:** 49
 
 | Phase | Tasks done | Progress |
 |---|---|---|
@@ -124,7 +124,7 @@
 | ▶ | [T-0223](../tracker/tasks/T-0223.md) | projects: per-project legal hold (flag + reason, System admin only, audited) blocking soft delete with 409 LEGAL_HOLD_ACTIVE (ADR) | projects | S | T-0012, T-0039 |  |
 | ▶ | [T-0226](../tracker/tasks/T-0226.md) | core mail: delivery ledger — delivered status from SES delivery events, recipient_user_id/project_id/broadcast_id, stats and searchable history (ADR) | platform | M | T-0058 |  |
 | ▶ | [T-0227](../tracker/tasks/T-0227.md) | core mail: automated template overrides — per template + locale subject/text blocks with revisions, preview, test send to self, reset to shipped default | platform | M | T-0058, T-0039 |  |
-| ▶ | [T-0230](../tracker/tasks/T-0230.md) | settings: typed runtime settings registry extending T-0044 (code-declared entries, per-key storage, Redis cache + pub/sub invalidation, bounds 422, audit, no secrets) | settings | M | T-0044, T-0039, T-0006 |  |
+| 🟦 | [T-0230](../tracker/tasks/T-0230.md) | settings: typed runtime settings registry extending T-0044 (code-declared entries, per-key storage, Redis cache + pub/sub invalidation, bounds 422, audit, no secrets) | settings | M | T-0044, T-0039, T-0006 |  |
 | ⬜ | [T-0228](../tracker/tasks/T-0228.md) | notifications: broadcast e-mail — server-side audience resolution (System admin tenant-wide, PER-09 own projects), batch dispatch, broadcast opt-out, per-broadcast stats | notifications | M | T-0019, T-0058, T-0226, T-0014, T-0049 |  |
 | ⬜ | [T-0231](../tracker/tasks/T-0231.md) | settings: client bootstrap config API GET /api/v1/settings/client (client-visible entries only) | settings | S | T-0230 |  |
 | ⬜ | [T-0224](../tracker/tasks/T-0224.md) | Frontend: Admin → System console — deployment stats + health, queue monitor, upload quarantine | frontend | M | T-0026, T-0219, T-0218, T-0221 |  |

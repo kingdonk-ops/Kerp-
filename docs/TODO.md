@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 340 · **Closed:** 148
+**Open:** 344 · **Closed:** 148
 
 ## decision (39)
 
@@ -49,7 +49,7 @@
 | [TD-484](../tracker/todo/TD-484.md) | RFI notification e-mail: may it carry the date/time/location, the RFI PDF attachment and an .ics invite, and go to client distribution addresses without a KERP account? | T-0335 | planner |
 | [TD-486](../tracker/todo/TD-486.md) | RFI witness check: may an unmet hold-point (H) witness requirement be overridden per record (ADR 0004 Amendment A), or is it non-overridable? | T-0333 | planner |
 
-## spec-gap (67)
+## spec-gap (68)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -120,6 +120,7 @@
 | [TD-488](../tracker/todo/TD-488.md) | Quarantine re-check: AC says 'staging object still exists', but a stuck file's bytes may be only in the quarantine copy (scanner outage, T-0218); implemented as staging OR quarantine copy exists, else 409 OBJECT_GONE | T-0221 | implementer |
 | [TD-494](../tracker/todo/TD-494.md) | Audit explorer: which verifications are audited console actions (single-chain verify, verify-all request and outcome) | T-0222 | implementer |
 | [TD-500](../tracker/todo/TD-500.md) | GET /me/projects does not return per-project capabilities; the frontend mirrors the backend persona matrix to gate A/S actions (projects/capabilities.tsx) | T-0276 | implementer |
+| [TD-505](../tracker/todo/TD-505.md) | Runtime settings registry: categories, the unit and ceiling of max_upload_size_mb, and client-visible flags are implementer readings | T-0230 | implementer |
 
 ## missed (9)
 
@@ -135,7 +136,7 @@
 | [TD-463](../tracker/todo/TD-463.md) | Server: refuse self-deactivation on PATCH /admin/users/{id} (Admin → Users only hides the button) | T-0331, T-0085 | implementer |
 | [TD-487](../tracker/todo/TD-487.md) | Frontend: Admin -> System grants page needs the SoD confirm step for system_admin on a hold-authority holder (POST /admin/grants 409 sod_confirmation_required, confirm_sod), plus the same warning for hold personas on system_admins in member/invite/team UIs | T-0275 | implementer |
 
-## deferred (48)
+## deferred (49)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -187,8 +188,9 @@
 | [TD-482](../tracker/todo/TD-482.md) | asset_management: node edit (code / name / attributes, with display_path and display_code rewrite of the subtree), node delete and level def delete are not built in T-0101 | T-0101 | implementer |
 | [TD-495](../tracker/todo/TD-495.md) | Audit explorer at scale: no ledger index for the explorer filters; verify-all is one pass (1 h timeout, no progress or resume) | T-0222 | implementer |
 | [TD-501](../tracker/todo/TD-501.md) | Playwright journey for T-0276 (system_admin without membership opens project B; non-admin sees only its projects) once the e2e harness exists (T-0027) | T-0276 | implementer |
+| [TD-502](../tracker/todo/TD-502.md) | Deployment-config view lacks the mail reply-to of diff §4.7: Settings has no reply-to field yet | T-0230 | implementer |
 
-## later (136)
+## later (138)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -328,6 +330,8 @@
 | [TD-493](../tracker/todo/TD-493.md) | fields/form engine polish from the #156 review | T-0110 | reviewer |
 | [TD-498](../tracker/todo/TD-498.md) | Unskip the T-0027 module-toggle step when the first toggleable module merges | T-0027 | planner |
 | [TD-499](../tracker/todo/TD-499.md) | All-Projects for a system_admin who is a member of every project and holds no portfolio persona: /me/projects has no system_admin flag, so the picker cannot offer the scope | T-0276 | implementer |
+| [TD-503](../tracker/todo/TD-503.md) | Drop the read-only oe_settings_deployment table (destructive migration, needs an ADR) | T-0230 | implementer |
+| [TD-504](../tracker/todo/TD-504.md) | Registry: reset an entry to its code default (delete the stored row) for the Settings screen T-0232 | T-0230 | implementer |
 
 ## bug (8)
 

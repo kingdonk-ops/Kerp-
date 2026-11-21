@@ -19,12 +19,14 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.audit import service as audit
+from app.core.config import Settings
 from app.core.db import Database, utcnow
 from app.core.tenancy.context import TenancyContext
 from app.core.tenancy.rls import session_tenancy
 from app.core.tenancy.scope import OutOfScopeError, get_or_404
 from app.modules.jobs.service import CONSOLE_CHAIN, JOB_REGISTRY, create_job, job_status
 from app.modules.projects import service as projects
+from app.modules.settings import service as runtime_settings
 from app.modules.uploads.models import UploadedFile, quarantine_prefix, staging_prefix
 from app.modules.uploads.scan import (
     Scanner,
@@ -33,6 +35,7 @@ from app.modules.uploads.scan import (
     outcome,
 )
 from app.modules.uploads.schemas import UploadCreate
+from app.modules.uploads.setting_defs import MAX_UPLOAD_SIZE_MB, MIB, PRESIGNED_URL_TTL_MINUTES
 from app.modules.uploads.storage import (
     MAGIC_SNIFF_BYTES,
     PresignedRequest,
@@ -70,6 +73,7 @@ __all__ = [
     "recheck_upload",
     "schedule_sweep",
     "sweep_orphans",
+    "upload_limits",
     "verify_upload",
 ]
 
@@ -124,6 +128,18 @@ def _project_id(session: Session) -> uuid.UUID:
 def _job_kind(kind: str) -> JobKind:
     importlib.import_module("app.modules.uploads.jobs")  # registers the handlers
     return JOB_REGISTRY.get(kind)
+
+
+def upload_limits(session: Session, config: Settings) -> tuple[int, int]:
+    """``(max_bytes, url_seconds)`` of a new upload: the runtime settings
+    ``max_upload_size_mb`` and ``presigned_url_ttl_minutes`` (T-0230, diff §4.7), never above
+    the deployment's ``KERP_UPLOAD_MAX_BYTES`` and ``KERP_UPLOAD_URL_SECONDS``."""
+    megabytes = runtime_settings.get_int(session, MAX_UPLOAD_SIZE_MB.key, config=config)
+    minutes = runtime_settings.get_int(session, PRESIGNED_URL_TTL_MINUTES.key, config=config)
+    return (
+        min(megabytes * MIB, config.upload_max_bytes),
+        min(minutes * 60, config.upload_url_seconds),
+    )
 
 
 def presign_upload(
