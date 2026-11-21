@@ -963,7 +963,7 @@ inspections, qms, asset_management and identity only through their `service.py`.
 | `required_notice_hours`, `notice_given_at`, `notice_met` | snapshot of the notice rule at the last issue or reschedule (§6) |
 | `reschedule_count` | number of reschedules |
 | `confirmed_by_user_id`, `confirmed_at`, `confirmed_via` (`witness_account \| recorded_on_behalf`), `confirmation_ref` | last confirmation; cleared by a reschedule |
-| `outcome_by_user_id`, `outcome_occurred_at`, `outcome_reason_code`, `outcome_note`, `waiver_ref` | the outcome (§4) |
+| `outcome_by_user_id`, `outcome_occurred_at`, `outcome_reason_code`, `outcome_note` | the outcome (§4); a waiver's reference is per party (`slot_party.waiver_ref`) |
 | `reminder_sent_at` | set by the reminder job (§9); cleared by a reschedule |
 | `version` | optimistic concurrency |
 
@@ -987,7 +987,8 @@ evidences may sit on the same slot.
 none`), `point_source` (`itp \| manual`), `witness_user_id` (optional named witness; a project
 member who may witness for that party: PER-15 for `client`, the TD-435 persona for
 `third_party`, an internal member for `contractor`, any project member for `principal`), `attendance` (`pending \|
-attended \| absent \| waived`), `attendance_by_user_id`, `attendance_at`. One row per party.
+attended \| absent \| waived`), `attendance_by_user_id`, `attendance_at`, `waiver_ref` (the
+party's written waiver, set by the waive-a-party action; also in its event). One row per party.
 Points default from the linked ITP line(s) through `qms.service` (per-party points, §ITP
 authoring): with several lines, the strongest point per party (`H` > `W` > `R` > `S` > `M` >
 `none`). A changed point is `manual`, needs a reason (event payload) and, when it differs from the
@@ -1010,7 +1011,8 @@ are copied to a project on first use (T-0115); a client pack may later seed them
 PER-06 or PER-09 edit them through T-0340. A code that has been used on an issued request
 cannot be changed or deleted (only deactivated).
 
-**`oe_inspection_requests_counter`**: `project_id`, `key` (`rfi`), `last_value`; unique
+**`oe_inspection_requests_counter`**: `project_id`, `key` (`rfi \| rfi:<discipline>`, by
+`counter_scope`, §8), `last_value`; unique
 `(project_id, key)` (§8).
 
 **`oe_inspection_requests_delay`** and **`oe_inspection_requests_reason_code`**: §7.
@@ -1056,7 +1058,7 @@ table keeps every earlier time.
 | `draft → requested` (**issue**, request-level: all draft slots at once) | creators | every slot has type, future `scheduled_start`, ≥ 1 linked record in `PENDING` or `RE_INSPECT` (else 409 `INSPECTION_NOT_REQUESTABLE`), party rows; `run_checks(context, "inspection_request.issue")` passes | RFI no. allocated on first issue (§8); notice computed (§6); linked records → `INSPECTION_REQUESTED` (§5); call-out notifications (§9); PDF rendered (§10) |
 | `requested → confirmed` | named witness or PER-15 of the client party; PER-06/PER-07 recording on behalf (`confirmation_ref` required) | before an outcome | requester notified |
 | `requested \| confirmed \| no_show \| failed → requested` (**reschedule**) | creators; PER-15 of the client party (cause `client` set automatically) | new `scheduled_start` in the future; `reason` (non-blank) and `cause_party` required | `reschedule_count` + 1; old and new times in the event; confirmation, attendance and `reminder_sent_at` cleared; notice recomputed from now (§6); delay entry (§7); notifications; PDF re-rendered |
-| **waive a party** (no slot transition) | PER-15 of that party (any point); PER-06 for a `W` point only, with `waiver_ref` (the party's written waiver) | slot `requested`/`confirmed`; the party is an external H/W party | that party's `attendance = waived` (`attendance_by_user_id`, `waiver_ref` in the event); when every external H/W party is now `waived` the slot moves to `waived` in the same action |
+| **waive a party** (no slot transition) | PER-15 of that party (any point); PER-06 for a `W` point only, with `waiver_ref` (the party's written waiver) | slot `requested`/`confirmed`; the party is an external H/W party | that party's `attendance = waived` (`attendance_by_user_id`; `waiver_ref` on the party row and in the event); when every external H/W party is now `waived` the slot moves to `waived` in the same action |
 | `requested \| confirmed → witnessed` | PER-06, PER-07 (site scope) | **no external H/W party `pending`**; every one `attended` or `waived`, at least one `attended` | witness requirement satisfied (§5) |
 | `requested \| confirmed → waived` | automatic, by the last **waive a party** action | every external H/W party `waived` | witness requirement satisfied |
 | `requested \| confirmed → no_show` | PER-06, PER-07 | `outcome_occurred_at` ≥ `scheduled_start` + `inspection_request.no_show_grace_minutes` (default 30); **no external H/W party `pending`**; ≥ 1 `absent` | satisfied only if every absent party's point is `W` and `notice_met` (§5); delay entry (§7) |
@@ -1096,16 +1098,23 @@ Called through `inspections.service` (the inspections module owns its lifecycle 
 | `cancelled` | back to `prior_status` if the record is still `INSPECTION_REQUESTED` and on no other live slot; a record that has moved on (submitted, returned, approved) is not touched |
 
 **Witness check on submit (T-0333).** `inspection_requests.service.witness_status(inspection_id)`
-returns `not_required | none | pending | satisfied | not_satisfied`. It looks at the most recently
-issued slot that links **the record itself or, for an ITR
+returns `not_required | none | pending | satisfied | not_satisfied` overall **and per external
+party**. It looks at the most recently issued slot that links **the record itself or, for an ITR
 (`kind = inspection`), the ITP line it evidences** (`kind = itp` record, resolved through
 `inspections.service`). The usual flow raises the request on the ITP line and fills the ITR in
-later, so a slot that links only the line counts for the ITR. `construction_control` adds two
-locked system-default `check` rules (ADR 0004 §5) to `inspection.submit` (§Review and return),
-evaluated from the ITP line's external H/W points: `WITNESS_REQUIREMENT_HOLD` (some external
-party has `H`) and `WITNESS_REQUIREMENT_WITNESS` (only `W`). Findings: `RFI_REQUIRED` (no slot
-ever issued), `WITNESS_PENDING` (slot `requested`/`confirmed`), `WITNESS_NOT_SATISFIED`
-(`no_show` on an H point or after short notice, or `failed`). An offline submit is checked at
+later, so a slot that links only the line counts for the ITR, **provided the slot's anchors cover
+the ITR's anchor** (the ITR's node or Item is a slot anchor or lies in the subtree of one);
+otherwise that slot does not count for the ITR. Per party, the requirement is met when its
+attendance is `attended` or `waived`, or `absent` on a `W` point with `notice_met`; it is unmet
+when no slot was issued, the slot is `requested`/`confirmed`, the party was absent on an `H`
+point or after short notice, or the slot `failed`. `construction_control` adds two locked
+system-default `check` rules (ADR 0004 §5) to `inspection.submit` (§Review and return),
+evaluated from the ITP line's external points: `WITNESS_REQUIREMENT_HOLD` fails only for unmet
+parties whose point is `H`, and `WITNESS_REQUIREMENT_WITNESS` only for unmet parties whose point
+is `W`, so a line with a client `W` and a principal `H` yields separate findings and the `W`
+finding stays overridable. Findings: `RFI_REQUIRED` (no slot ever issued), `WITNESS_PENDING`
+(slot `requested`/`confirmed`), `WITNESS_NOT_SATISFIED` (absent on an H point or after short
+notice, or `failed`), each naming the parties concerned. An offline submit is checked at
 sync like every other submit check.
 
 **Override (decision TD-486, planner default applied).** A per-record override (ADR 0004
@@ -1185,6 +1194,11 @@ decimals, set when ended), `status` (`open \| closed`), `cause_changed_by`, `cau
   through the project-settings API, like any other setting), parsed with a whitelist of placeholders: `{project}`
   (project code), `{discipline}` (discipline code), `{seq:N}` (zero-padded to at least N digits,
   growing past 9999). Unknown placeholders are refused when the pattern is saved.
+- **Pattern validity (no duplicate numbers):** a pattern must contain **exactly one**
+  `{seq:N}`, and must contain `{discipline}` whenever `counter_scope = discipline` (otherwise two
+  disciplines' counters would print the same string). Saving a pattern, or switching
+  `counter_scope`, so that this no longer holds returns 422 `NUMBER_PATTERN_INVALID`; the unique
+  index on `(project_id, rfi_no)` is the last line of defence.
 - **Discipline code mapping:** mechanical `M`, coating `C`, civil `CV` (defaults, §10.2); a
   project may add disciplines with their own codes.
 - **Counter scope:** project setting `inspection_request.counter_scope` = `project` (default:
