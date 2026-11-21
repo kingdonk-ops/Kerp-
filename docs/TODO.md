@@ -3,9 +3,9 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 255 · **Closed:** 131
+**Open:** 266 · **Closed:** 132
 
-## decision (11)
+## decision (19)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -20,8 +20,16 @@
 | [TD-373](../tracker/todo/TD-373.md) | Invite acceptance and SoD: accept proceeds (audited sod_warning) when the invitee gained a conflicting persona after the inviter confirmed | T-0052 | implementer |
 | [TD-378](../tracker/todo/TD-378.md) | First password at invite acceptance: should an internal-domain account without credentials (company member who never signed in through Entra ID) be refused? | T-0059 | implementer |
 | [TD-385](../tracker/todo/TD-385.md) | T-0075 reconcile: a live link to a deleted project expects no derived rows (rows it holds are excess, --fix revokes) | T-0075 | implementer |
+| [TD-396](../tracker/todo/TD-396.md) | System console: may a System admin see project-scoped records (upload quarantine rows, audit entries) of projects where they hold no membership? | T-0221, T-0222 | planner |
+| [TD-397](../tracker/todo/TD-397.md) | Upload quarantine: keep the bytes of rejected (infected) uploads for re-scan and purge, or keep deleting them at rejection (T-0016)? | T-0218, T-0221 | planner |
+| [TD-398](../tracker/todo/TD-398.md) | Runtime settings: auth/security values from the 2026-11-21 paste (refresh hours, PIN idle, PIN lockout, scanner on/off, region, mail sender, AI provider) stay read-only deployment configuration? | T-0230 | planner |
+| [TD-399](../tracker/todo/TD-399.md) | Broadcast e-mail: may a System admin e-mail all users / any project's users, given diff §4.1 'only a project's PER-09 may send a notification through the API'? | T-0228 | planner |
+| [TD-400](../tracker/todo/TD-400.md) | E-mail template editor: text overrides of the i18n blocks (planner default) or full HTML body editing? | T-0227 | planner |
+| [TD-401](../tracker/todo/TD-401.md) | Project restore: audit chains when restoring as a new project (hash covers tenant/project ids), and hard deletion of projects (not in the spec) | T-0239, T-0240 | planner |
+| [TD-404](../tracker/todo/TD-404.md) | Pilot-0: is the ClamAV scanner (T-0218) required live in the pilot deployment, or is the stub with KERP_UPLOAD_SCANNER_ALLOW_STUB accepted for the pilot? | T-0218, T-0146 | planner |
+| [TD-407](../tracker/todo/TD-407.md) | Admin 'Resend invite' for an invited user: re-send the user's pending project invites (T-0052) or a password-setup e-mail, never a magic link for non-Field-Workers; via core mail, not notifications | T-0244 | planner |
 
-## spec-gap (47)
+## spec-gap (50)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -72,8 +80,11 @@
 | [TD-370](../tracker/todo/TD-370.md) | Magic-link eligibility by invite: by the account's e-mail (spec §4.2) or only when the request presents that invite_token (T-0052 wording)? | T-0052 | implementer |
 | [TD-379](../tracker/todo/TD-379.md) | Invite setup-preview: shape of the 'neutral answer telling the client to sign in' for an account that already has credentials | T-0059 | implementer |
 | [TD-384](../tracker/todo/TD-384.md) | T-0075 SoD fix: 'plus their existing rows' cannot keep a sod_pending user's stale row of the link | T-0075 | implementer |
+| [TD-402](../tracker/todo/TD-402.md) | Audit ledger has no event-type field: explorer filters by chain-key prefix plus an optional payload 'event' key | T-0222 | planner |
+| [TD-405](../tracker/todo/TD-405.md) | Archive file layout: files/assets/<asset_code>/<work_anchor_code>/ assumes a fixed two-level tree; the breakdown is configurable (ADR 0003) | T-0235, T-0236 | planner |
+| [TD-406](../tracker/todo/TD-406.md) | User account status: derive invited/active/deactivated from is_active + first_login_at instead of a stored status column; backfill of first_login_at for existing accounts | T-0243 | planner |
 
-## missed (8)
+## missed (7)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -81,7 +92,6 @@
 | [TD-125](../tracker/todo/TD-125.md) | Booking modules must call work_anchor_for and return 422 when the path has no work anchor (progress, time lines against a work anchor, completion gate) | T-0101, T-0116, T-0124, E-04-03, E-04-05 | reviewer |
 | [TD-131](../tracker/todo/TD-131.md) | Add a root .env.example for the dev stack (the implementer agent's permission rules block writing .env* files) | T-0003 | implementer |
 | [TD-208](../tracker/todo/TD-208.md) | Uploads infra: provision the kerp-vault bucket (CORS for browser PUT/GET, lifecycle on staging/), wire KERP_S3_* in compose, add MinIO to CI for the gated round-trip test | T-0016 | implementer |
-| [TD-297](../tracker/todo/TD-297.md) | Admin UI screen for deployment settings (Admin > System) is not planned in any task | T-0044 | implementer |
 | [TD-327](../tracker/todo/TD-327.md) | Frontend i18n key notifications.kind.access_requests.requested for the inbox (needed when the access-request UI lands) | T-0050 | reviewer |
 | [TD-337](../tracker/todo/TD-337.md) | Web/Android route /magic-link#<token> that redeems the e-mailed sign-in link (POST /auth/magic-link/redeem); the e-mail now links there | T-0058 | implementer |
 | [TD-388](../tracker/todo/TD-388.md) | saved_views: wire the my_teams filter op | T-0074 | reviewer |
@@ -127,7 +137,7 @@
 | [TD-360](../tracker/todo/TD-360.md) | First-run: one-time password link for the first System admin once T-0077 ships | T-0023 | implementer |
 | [TD-365](../tracker/todo/TD-365.md) | Frontend translations of the password policy codes and the password policy in /auth/config | T-0077 | implementer |
 
-## later (116)
+## later (117)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -162,7 +172,7 @@
 | [TD-153](../tracker/todo/TD-153.md) | Membership lookup adds a DB round-trip per authenticated request | T-0010 | implementer |
 | [TD-157](../tracker/todo/TD-157.md) | Jobs worker: liveness healthcheck for the worker container, and re-queue (not fail) jobs interrupted by a worker shutdown | T-0015 | implementer |
 | [TD-160](../tracker/todo/TD-160.md) | Test that revoking (soft-deleting) a project membership removes that project from the resolved scope; extend TD-150 to bulk ORM update/delete | T-0010 | reviewer |
-| [TD-175](../tracker/todo/TD-175.md) | Record retention rules + legal hold per project | — | clean-room-gap-analysis |
+| [TD-175](../tracker/todo/TD-175.md) | Record retention rules + legal hold per project | T-0223, E-01-02 | clean-room-gap-analysis |
 | [TD-177](../tracker/todo/TD-177.md) | Form renderer: adopt the T-0110 shared field-type registry + dual-runtime parity | T-0025 | implementer |
 | [TD-186](../tracker/todo/TD-186.md) | spatial_bounds: GiST index and ST_IsValid check (self-intersecting polygons are accepted today); project code stays taken after soft delete | T-0012 | implementer |
 | [TD-189](../tracker/todo/TD-189.md) | Set a psycopg connect_timeout on the worker's DB engine so _settle/_start are bounded when the DB is unreachable | T-0015 | reviewer |
@@ -179,7 +189,7 @@
 | [TD-204](../tracker/todo/TD-204.md) | After Pilot-0: biometric unlock, certificate pinning (Capacitor) and per-device sync-health views | T-0043 | planner |
 | [TD-207](../tracker/todo/TD-207.md) | Local PIN unlock for the web PWA build (no platform keystore): e.g. a non-extractable WebCrypto key wrapping the IndexedDB data key | T-0143 | planner |
 | [TD-210](../tracker/todo/TD-210.md) | Native Android app: normal login system and offline-window expiry behaviour (replaces the TD-206 interim rule) | T-0143 | user |
-| [TD-211](../tracker/todo/TD-211.md) | Uploads: replace the always-clean StubScanner with a real malware scanner (e.g. ClamAV/clamd in the worker) | T-0016, T-0213 | implementer |
+| [TD-211](../tracker/todo/TD-211.md) | Uploads: replace the always-clean StubScanner with a real malware scanner (e.g. ClamAV/clamd in the worker) | T-0016, T-0213, T-0218 | implementer |
 | [TD-215](../tracker/todo/TD-215.md) | Optional chain-of-custody hash for offline records: SHA-256(prev_hash + payload + monotonic_ms) per device clock session | T-0148 | planner |
 | [TD-226](../tracker/todo/TD-226.md) | Key the per-client login lockout on the IPv6 /64, not the full address (clients can rotate within their prefix) | T-0068 | reviewer |
 | [TD-227](../tracker/todo/TD-227.md) | Task board totals count dropped tasks: leave status dropped out of the Overall and per-phase denominators in scripts/tracker.py render | T-0029 | planner |
@@ -247,6 +257,7 @@
 | [TD-389](../tracker/todo/TD-389.md) | teams reconcile _repair: pass confirm_sod only when the drift has pending SoD items | T-0075 | reviewer |
 | [TD-390](../tracker/todo/TD-390.md) | teams reconcile CLI: distinct exit code for unexpected exceptions | T-0075 | reviewer |
 | [TD-391](../tracker/todo/TD-391.md) | audit ledger: rename _SQLITE_WRITE_LOCK and document the race-test barrier timeout | T-0077 | reviewer |
+| [TD-403](../tracker/todo/TD-403.md) | Stats and export providers for modules that land later: NCR, punch, equipment, credentials, materials/MTR, MDR, welding | T-0219, T-0235 | planner |
 
 ## bug (6)
 
@@ -427,6 +438,7 @@
 | ✅ | [TD-286](../tracker/todo/TD-286.md) | wipe-confirmed is unauthenticated: anyone who knows a revoked device_id can set its wipe time | Fixed by T-0080 (PR #94): per-device wipe secret issued once at enrolment, stored as SHA-256; wipe-confirmed requires it, uniform 404 for every refusal |
 | ✅ | [TD-291](../tracker/todo/TD-291.md) | Revoked-device oracle: refuse_revoked_device on login and wipe-confirmed answer for any device id | Fixed by T-0080 (PR #94): sign-in checks credentials before the device; wipe-confirmed answers uniformly |
 | ✅ | [TD-295](../tracker/todo/TD-295.md) | T-0044 says module admin but the route /api/v1/settings/deployment and the projects->settings dependency need a separate settings module | Product owner, 2026-11-16: separate settings module (projects depends_on settings) confirmed |
+| ✅ | [TD-297](../tracker/todo/TD-297.md) | Admin UI screen for deployment settings (Admin > System) is not planned in any task | Planner, 2026-11-21: task T-0232 created (per the 2026-11-16 product-owner decision) |
 | ✅ | [TD-298](../tracker/todo/TD-298.md) | Rate-limit the unauthenticated wipe-confirmed endpoint (every refusal appends an audit entry) |  |
 | ✅ | [TD-300](../tracker/todo/TD-300.md) | Field PIN idle is measured from the session's last renewal (refresh token iat), not from its last authenticated request | Product owner, 2026-11-16: idle measured from the refresh token iat (as built in T-0038); early prompt of up to one access-token lifetime accepted |
 | ✅ | [TD-386](../tracker/todo/TD-386.md) | audit ledger: concurrent appends to one chain race on SQLite (seq unique violation → 500) | on SQLite _lock_chain takes the database write lock (a no-op UPDATE on audit_ledger) before the tail read, so a second appender waits for the first to commit and links to it (fix/audit-ledger-sqlite-race) |

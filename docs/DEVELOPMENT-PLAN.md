@@ -127,6 +127,10 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
 - **M2 — MVP cut line (next milestone after Pilot-0):** Phase 0 + 1 + 2 + **Documents-Lite**
   (VFS tree, presigned uploads, batch inspection PDF export) + **P6 schedule round-trip**
   (~85–95 tasks).
+  Since 2026-11-21 also the admin operations of diff §4.7 (system console T-0218–T-0225,
+  communications T-0226–T-0229, runtime settings T-0230–T-0232), the user directory of
+  diff §4.8 (T-0243–T-0246) and the project archive epic E-01-02 (T-0233–T-0242). None of
+  them is in the Pilot-0 gate (T-0146; TD-404 asks about the ClamAV scanner).
 
 ## Plan changes
 
@@ -226,6 +230,24 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
   oracle are accepted for development and fixed before pilot go-live (TD-286, TD-291; diff §4.3).
   New: T-0080 (identity, S, phase 0, order 10). Updated: T-0143 (per-account store, depends on
   T-0080). Raised: TD-293 (decision, ask the pilot team).
+
+- **2026-11-21 — admin operations, communications, runtime settings, project archive and the
+  user directory (user-supplied spec + addendum; planner pass):** spec added as diff §4.7
+  (system console, legal hold, communications, runtime settings registry), §4.8 (account state,
+  presence, force sign-out, resend invite, memberships across projects), §6.5 (admin screens),
+  the §6.1 Admin row, and `modules/documents-and-mdr.md` §Project Export & Retention Archive.
+  The paste's ids T-0073/T-0074/T-0075 were already used by done tasks and T-0178 was size L,
+  so the work got new ids above T-0217: pasted T-0073 → T-0218–T-0225 (phase 0), T-0074 →
+  T-0226–T-0229 (phase 0), T-0075 → T-0230–T-0232 (phase 0, extends T-0044), T-0178 → epic
+  E-01-02 with T-0233–T-0242 (phase 1); the addendum to T-0014 (done) and T-0026 → T-0243–T-0246
+  (phase 1, user 2026-11-21: Pilot-0 and T-0026 do not need them; T-0026 unchanged). Where the
+  paste disagreed with the spec, the spec won: send log, not a second e-mail ledger (§4.6);
+  hashed recipients; text-only template overrides; count-only `SECURITY DEFINER` stats with an
+  ADR; System admins read no project record without a membership; auth/security values stay
+  deployment config; no magic links outside PER-14; derived user status over `is_active`; real
+  table names (`auth_user`, `oe_projects_project`, `mail_send_log`); ADRs for every core-table
+  change. Raised: TD-396–TD-407. Updated: T-0026, T-0146 (notes only), T-0140, T-0156, T-0162,
+  T-0167, T-0169, T-0174 (registry entries), TD-046, TD-175, TD-211, TD-297 (resolved by T-0232).
 
 ## Key engineering decisions (baked into the spec — see consolidation diff)
 
