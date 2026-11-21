@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 76/278 tasks done (27%) · **ready now:** 23 · **epics awaiting breakdown:** 48
+**Overall:** 76/278 tasks done (27%) · **ready now:** 22 · **epics awaiting breakdown:** 48
 
 | Phase | Tasks done | Progress |
 |---|---|---|
@@ -92,7 +92,7 @@
 | ⬜ | [T-0078](../tracker/tasks/T-0078.md) | Screens: create your password at invite acceptance, forgot password and reset password (web and Android) | frontend | S | T-0053, T-0059, T-0077 |  |
 | ✅ | [T-0028](../tracker/tasks/T-0028.md) | CI hardening: detect in ci-gate needs, least-privilege GHCR publish, SHA-pinned actions, base image digest + Renovate, drop empty postgres extra | platform | S | T-0004 | #18 |
 | ⚫ | [T-0032](../tracker/tasks/T-0032.md) | CI hardening 2: weekly uv lock refresh PR, SHA-pinned promote/review-gate actions, digest-pinned service images, publish the smoke-tested image by digest | platform | S | T-0028 |  |
-| ▶ | [T-0033](../tracker/tasks/T-0033.md) | Platform hardening: migrations inline frozen RLS/ledger DDL per revision (+ drift test against the live helpers); CI hardening 2 (weekly uv lock refresh PR, SHA-pinned promote/review-gate actions, digest-pinned service images, publish the smoke-tested image by digest) | platform | M | T-0006, T-0007, T-0028 |  |
+| 🟦 | [T-0033](../tracker/tasks/T-0033.md) | Platform hardening: migrations inline frozen RLS/ledger DDL per revision (+ drift test against the live helpers); CI hardening 2 (weekly uv lock refresh PR, SHA-pinned promote/review-gate actions, digest-pinned service images, publish the smoke-tested image by digest) | platform | M | T-0006, T-0007, T-0028 |  |
 | ✅ | [T-0029](../tracker/tasks/T-0029.md) | Pipeline tooling: tracker-aware review-gate patch-id + `tracker.py set --note` date fix | platform | S | — | #62 |
 | ✅ | [T-0030](../tracker/tasks/T-0030.md) | Backend runtime hardening: quiet httpx/httpcore logs, API docs hidden in production, ASCII-safe JSON logs, client disconnect as 499, refuse debug in production | platform | M | T-0021 | #68 |
 | ✅ | [T-0031](../tracker/tasks/T-0031.md) | Frontend hardening: ESLint gate (typescript-eslint, react-hooks) + UI shell fixes (hidden-all-columns guard, encoded storage keys, required_if a11y, tab keyboard/aria, reserved audit tab id) | platform | M | T-0002, T-0025 | #63 |
