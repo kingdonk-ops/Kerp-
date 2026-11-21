@@ -48,15 +48,17 @@ export async function fetchMine(api: ApiClient): Promise<MyRequest[]> {
 }
 
 /**
- * Outcome of filing a request. `cooldown` carries when a new request becomes allowed;
- * `notFound` is a 404 (unknown project, or the lookup ticket expired: look the code up again).
+ * Outcome of filing a request. `cooldown` carries when a new request becomes allowed. A 404 is
+ * `expired` when a lookup ticket was sent (look the code up again), else `unavailable` (the
+ * project left the lobby or was deleted).
  */
 export type FileResult =
   | { kind: "ok" }
   | { kind: "cooldown"; retryAfter: string | null }
   | { kind: "pending" }
   | { kind: "member" }
-  | { kind: "notFound" };
+  | { kind: "expired" }
+  | { kind: "unavailable" };
 
 export interface FileRequest {
   projectId: string;
@@ -75,7 +77,7 @@ export async function fileRequest(api: ApiClient, req: FileRequest): Promise<Fil
     },
   });
   if (data) return { kind: "ok" };
-  if (response.status === 404) return { kind: "notFound" };
+  if (response.status === 404) return req.lookupTicket ? { kind: "expired" } : { kind: "unavailable" };
   if (response.status === 409) {
     const body = error as { code?: unknown; retry_after?: unknown } | undefined;
     if (body?.code === "ACCESS_REQUEST_COOLDOWN") {

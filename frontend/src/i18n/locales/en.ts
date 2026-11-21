@@ -125,6 +125,7 @@ export const en = {
     sent: "Request sent. Its status is shown under Active requests.",
     actionError: "That did not work. Please try again.",
     loadError: "Could not load this list. Please try again later.",
+    unavailable: "This project is no longer available.",
     list: {
       title: "Projects in the lobby",
       empty: "No projects are listed in the lobby.",

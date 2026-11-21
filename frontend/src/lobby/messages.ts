@@ -32,8 +32,10 @@ export function useResultMessage(): (result: FileResult) => string {
           return t("lobby.requests.alreadyPending");
         case "member":
           return t("lobby.requests.alreadyMember");
-        case "notFound":
+        case "expired":
           return t("lobby.code.expired");
+        case "unavailable":
+          return t("lobby.unavailable");
         case "ok":
           return t("lobby.sent");
       }
@@ -42,9 +44,13 @@ export function useResultMessage(): (result: FileResult) => string {
   );
 }
 
-/** `true` once `iso` has passed (or when it is absent); re-renders at that moment. */
+/**
+ * `true` once `iso` has passed (or when it is absent or not a valid time: the server still
+ * enforces the cooldown with a 409); re-renders at that moment.
+ */
 export function useHasPassed(iso: string | null): boolean {
-  const until = iso ? new Date(iso).getTime() : 0;
+  const parsed = iso ? new Date(iso).getTime() : 0;
+  const until = Number.isFinite(parsed) ? parsed : 0;
   const [now, setNow] = useState(() => Date.now());
   const passed = now >= until;
   useEffect(() => {

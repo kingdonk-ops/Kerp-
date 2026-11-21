@@ -170,6 +170,78 @@ describe("lobby list and code entry", () => {
     fireEvent.click(button(i18n.t("lobby.send"), found));
     expect(await screen.findByText(i18n.t("lobby.requests.alreadyPending"))).toBeInTheDocument();
   });
+
+  it("on a 404 for a code-found project asks for the code again; a new look-up sends the new ticket", async () => {
+    let lookups = 0;
+    let posts = 0;
+    const calls = renderAdmin(
+      "/lobby",
+      {
+        "GET /api/v1/auth/me": me(false),
+        [`GET ${BY_CODE}/SYN-TANK`]: () =>
+          json({ ...MATCH, lookup_ticket: `synthetic-ticket-${String(++lookups)}` }),
+        "GET /api/v1/access-requests/mine": () => json([]),
+        "POST /api/v1/access-requests": () =>
+          ++posts === 1 ? json({ detail: "Not Found" }, 404) : json(req(), 201),
+      },
+      { projects: [] },
+    );
+    await lookUp("SYN-TANK");
+    let found = await screen.findByRole("listitem", { name: label(TANK) });
+    fireEvent.click(button(i18n.t("lobby.requestAccess"), found));
+    fireEvent.click(button(i18n.t("lobby.send"), found));
+    expect(await within(found).findByText(i18n.t("lobby.code.expired"))).toBeInTheDocument();
+
+    fireEvent.click(button(i18n.t("lobby.code.find")));
+    await waitFor(() => {
+      expect(screen.queryByText(i18n.t("lobby.code.expired"))).not.toBeInTheDocument();
+    });
+    found = await screen.findByRole("listitem", { name: label(TANK) });
+    fireEvent.click(button(i18n.t("lobby.requestAccess"), found));
+    fireEvent.click(button(i18n.t("lobby.send"), found));
+    expect(await screen.findByText(i18n.t("lobby.sent"))).toBeInTheDocument();
+    const bodies = calls
+      .filter((c) => c.method === "POST" && c.path === "/api/v1/access-requests")
+      .map((c) => c.body);
+    expect(bodies).toEqual([
+      { project_id: TANK.id, lookup_ticket: "synthetic-ticket-1" },
+      { project_id: TANK.id, lookup_ticket: "synthetic-ticket-2" },
+    ]);
+  });
+
+  it("tells a user who already has access so (409 ACCESS_REQUEST_ALREADY_MEMBER)", async () => {
+    renderAdmin(
+      "/lobby",
+      {
+        "GET /api/v1/auth/me": me(false),
+        [`GET ${BY_CODE}/SYN-TANK`]: () => json(MATCH),
+        "GET /api/v1/access-requests/mine": () => json([]),
+        "POST /api/v1/access-requests": () =>
+          json({ detail: "member", code: "ACCESS_REQUEST_ALREADY_MEMBER" }, 409),
+      },
+      { projects: [] },
+    );
+    await lookUp("SYN-TANK");
+    const found = await screen.findByRole("listitem", { name: label(TANK) });
+    fireEvent.click(button(i18n.t("lobby.requestAccess"), found));
+    fireEvent.click(button(i18n.t("lobby.send"), found));
+    expect(await within(found).findByText(i18n.t("lobby.requests.alreadyMember"))).toBeInTheDocument();
+    expect(screen.queryByText(i18n.t("lobby.requests.alreadyPending"))).not.toBeInTheDocument();
+  });
+
+  it("says a lobby project is no longer available on a 404 without a ticket", async () => {
+    renderAdmin("/lobby", {
+      "GET /api/v1/auth/me": me(true),
+      "GET /api/v1/lobby/projects": () => json([TANK]),
+      "GET /api/v1/access-requests/mine": () => json([]),
+      "POST /api/v1/access-requests": () => json({ detail: "Not Found" }, 404),
+    });
+    const tank = await screen.findByRole("listitem", { name: label(TANK) });
+    fireEvent.click(button(i18n.t("lobby.requestAccess"), tank));
+    fireEvent.click(button(i18n.t("lobby.send"), tank));
+    expect(await within(tank).findByText(i18n.t("lobby.unavailable"))).toBeInTheDocument();
+    expect(screen.queryByText(i18n.t("lobby.code.expired"))).not.toBeInTheDocument();
+  });
 });
 
 describe("Active requests panel", () => {
@@ -212,6 +284,45 @@ describe("Active requests panel", () => {
     expect(await screen.findByTestId("scope-indicator")).toHaveTextContent(
       i18n.t("scope.projectOption", { code: JETTY.code, name: JETTY.name }),
     );
+  });
+
+  it("reloads the picker once for an approval it does not list, not on every panel refresh", async () => {
+    let n = 0;
+    const calls = renderAdmin(
+      "/lobby",
+      {
+        "GET /api/v1/auth/me": me(false),
+        // Each answer is a new object, so every refresh re-runs the panel's effects.
+        "GET /api/v1/access-requests/mine": () =>
+          json([req({ status: "approved", message: `refresh ${String(++n)}` })]),
+      },
+      { projects: [] },
+    );
+    await waitFor(() => {
+      expect(count(calls, "GET", "/api/v1/me/projects")).toBe(2);
+    });
+    const mine = count(calls, "GET", "/api/v1/access-requests/mine");
+    fireEvent.focus(window);
+    await waitFor(() => {
+      expect(count(calls, "GET", "/api/v1/access-requests/mine")).toBe(mine + 1);
+    });
+    // Give a reload loop the chance to show itself.
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    expect(count(calls, "GET", "/api/v1/me/projects")).toBe(2);
+  });
+
+  it("enables Request again when request_again_at is not a valid time (the server still enforces it)", async () => {
+    renderAdmin(
+      "/lobby",
+      {
+        "GET /api/v1/auth/me": me(false),
+        "GET /api/v1/access-requests/mine": () =>
+          json([req({ status: "rejected", request_again_at: "not-a-time" })]),
+      },
+      { projects: [] },
+    );
+    const card = await within(await requestsPanel()).findByRole("listitem", { name: label(TANK) });
+    expect(button(i18n.t("lobby.requests.requestAgain"), card)).toBeEnabled();
   });
 
   it("refreshes when the lobby opens and when the window regains focus", async () => {
@@ -288,6 +399,7 @@ describe("Active requests panel", () => {
     const requestAgain = button(i18n.t("lobby.requests.requestAgain"), card);
     expect(requestAgain).toBeDisabled();
     expect(card).toHaveTextContent(availableFrom(again));
+    expect(requestAgain).toHaveAccessibleDescription(availableFrom(again));
 
     // 3. The cooldown passes (fake clock): Request again is enabled and sends no ticket.
     act(() => {

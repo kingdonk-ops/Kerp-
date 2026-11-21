@@ -24,13 +24,16 @@ it from the picker's **"Browse / join another project"**. The admin side (inbox,
 - **Project code.** Every user. The trimmed code is looked up exactly
   (`GET /lobby/projects/by-code/{code}`); a hit offers **Request access**, which sends the
   lookup ticket of that lookup (T-0050; a code never grants access, TD-202), or **Open** for a
-  member. Unknown code: a neutral "not found". 429: a "too many look-ups" message. A 404 on the
-  request (e.g. the 15-minute ticket expired) asks the user to enter the code again.
+  member. Unknown code: a neutral "not found". 429: a "too many look-ups" message. A 404 on a
+  request that carried a ticket (e.g. the 15-minute ticket expired) asks the user to enter the
+  code again; a 404 without a ticket (the project left the lobby or was deleted) says the
+  project is no longer available.
 - **Active requests.** Every request from `mine` with code, name and a status chip
   (`pending`, `approved`, `rejected`, `withdrawn`). Pending → **Withdraw**; approved →
   **Open project**; rejected → the decider's reason when given and **Request again**, disabled
   with "Request again is available from <local time>" until `request_again_at`; a timer
-  enables it at that moment. Request again files a new request **without a ticket** (an
+  enables it at that moment (an unparsable time counts as passed; the server still answers
+  409), and the button is described by the "available from" text (`aria-describedby`). Request again files a new request **without a ticket** (an
   earlier rejected or withdrawn request makes one unnecessary, T-0050); a 409
   `ACCESS_REQUEST_COOLDOWN` shows the same message with its `retry_after`. A withdrawn request
   has no cooldown, so it offers Request again at once. 409 "already pending" / "already a

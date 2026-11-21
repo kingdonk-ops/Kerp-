@@ -111,6 +111,7 @@ function Actions({ request, notify }: { request: MyRequest; notify: (message: st
   const describe = useResultMessage();
   const availableFrom = useAvailableFrom();
   const [refusal, setRefusal] = useState<string | null>(null);
+  const availableId = useId();
   // Withdrawn requests have no cooldown (`request_again_at` is null).
   const allowed = useHasPassed(request.status === "rejected" ? request.request_again_at : null);
   const refresh = () => queryClient.invalidateQueries({ queryKey: MINE_KEY });
@@ -164,6 +165,7 @@ function Actions({ request, notify }: { request: MyRequest; notify: (message: st
             type="button"
             className={BUTTON}
             disabled={!allowed || again.isPending}
+            {...(allowed ? {} : { "aria-describedby": availableId })}
             onClick={() => {
               setRefusal(null);
               again.mutate();
@@ -171,7 +173,11 @@ function Actions({ request, notify }: { request: MyRequest; notify: (message: st
           >
             {t("lobby.requests.requestAgain")}
           </button>
-          {!allowed && <p className="text-sm">{availableFrom(request.request_again_at)}</p>}
+          {!allowed && (
+            <p id={availableId} className="text-sm">
+              {availableFrom(request.request_again_at)}
+            </p>
+          )}
         </div>
       )}
       {refusal && <p role="alert">{refusal}</p>}
