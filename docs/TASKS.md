@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 85/308 tasks done (28%) · **ready now:** 21 · **epics awaiting breakdown:** 49
+**Overall:** 85/308 tasks done (28%) · **ready now:** 20 · **epics awaiting breakdown:** 49
 
 | Phase | Tasks done | Progress |
 |---|---|---|
@@ -140,7 +140,7 @@
 
 | | ID | Title | Module | Size | Depends on | PR |
 |---|---|---|---|---|---|---|
-| ▶ | [T-0101](../tracker/tasks/T-0101.md) | Asset hierarchy: oe_asset_level_def (roles) + oe_asset_node ltree tree (GiST, parent_id source of truth, display_path, PostGIS), per-path work-anchor invariant, code uniqueness, subtree move, tree API | asset_management | M | T-0012, T-0018 |  |
+| 🟦 | [T-0101](../tracker/tasks/T-0101.md) | Asset hierarchy: oe_asset_level_def (roles) + oe_asset_node ltree tree (GiST, parent_id source of truth, display_path, PostGIS), per-path work-anchor invariant, code uniqueness, subtree move, tree API | asset_management | M | T-0012, T-0018 |  |
 | ⬜ | [T-0134](../tracker/tasks/T-0134.md) | Asset restructure with lineage: split / merge / retire, invariant re-checks, roll-up through superseded_by / derived_from | asset_management | M | T-0101 |  |
 | ⬜ | [T-0135](../tracker/tasks/T-0135.md) | Collections: job packs, shutdown windows, test packs, work plans linked to nodes many-to-many | asset_management | S | T-0101 |  |
 | ⬜ | [T-0136](../tracker/tasks/T-0136.md) | Terminology layer: per-locale, plural-aware terminology packs (project → client pack → default) + frontend t() resolver | asset_management | M | T-0101, T-0024 |  |
