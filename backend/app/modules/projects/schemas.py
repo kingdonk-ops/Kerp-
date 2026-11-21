@@ -23,6 +23,7 @@ from pydantic import (
 )
 
 from app.core.locale import Currency, Locale, TimeZone
+from app.modules.projects.models import MAX_LEGAL_HOLD_REASON as MAX_LEGAL_HOLD_REASON
 
 MAX_RINGS: Final = 100
 MAX_RING_POSITIONS: Final = 10_000
@@ -144,6 +145,33 @@ class LobbyVisibility(BaseModel):
     visible_in_lobby: bool
 
 
+class LegalHoldChange(BaseModel):
+    """``PUT /admin/system/projects/{id}/legal-hold`` (T-0223, diff §4.7): put the project on
+    legal hold or take it off. ``system_admin`` only; a reason (1-500 characters after
+    trimming) is required both ways and goes to the audit ledger."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    on: bool
+    reason: Annotated[
+        str,
+        StringConstraints(strip_whitespace=True, min_length=1, max_length=MAX_LEGAL_HOLD_REASON),
+    ]
+
+
+class LegalHoldRead(BaseModel):
+    """A project's legal hold as the System console shows it. Reason, setter and time
+    describe the active hold; all three are ``null`` while it is off."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    project_id: uuid.UUID = Field(validation_alias="id")
+    legal_hold: bool
+    legal_hold_reason: str | None
+    legal_hold_set_by: uuid.UUID | None
+    legal_hold_set_at: datetime | None
+
+
 class ProjectAccessKind(StrEnum):
     """How the caller reaches a project (ADR 0016, T-0275): through a membership, or only
     through the ``system_admin`` grant (no membership on the project)."""
@@ -164,6 +192,10 @@ class ProjectRead(BaseModel):
     currency_code: str
     locale: str
     visible_in_lobby: bool
+    legal_hold: bool = Field(
+        description="the project is on legal hold (T-0223): it cannot be deleted; the reason "
+        "is shown in the System console only"
+    )
     revision: int
     created_at: datetime
     updated_at: datetime
