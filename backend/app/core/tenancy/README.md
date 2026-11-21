@@ -55,7 +55,7 @@ filter is off (`scope.site_filter(context)` is `None`). Migration `0035` replace
 every table that had it (frozen DDL; its downgrade restores the exact rule). Internal contexts
 that bind `is_system_admin=True` for a narrow read (jobs scheduler, teams reconcile, onboarding,
 the invite token lookup) now also see every project's records of the tenant; they read only
-their own tables (TD-457). Reads by a non-member admin are not access-logged (TD-427, default
+their own tables (TD-462). Reads by a non-member admin are not access-logged (TD-427, default
 no).
 
 ## Multi-project read scope (T-0010, TD-053, edge spec §6 amendments)
