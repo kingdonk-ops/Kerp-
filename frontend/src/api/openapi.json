@@ -3812,6 +3812,197 @@
         ]
       }
     },
+    "/api/v1/admin/system/queues": {
+      "get": {
+        "tags": [
+          "admin",
+          "admin"
+        ],
+        "summary": "Queue Overview",
+        "operationId": "queue_overview_api_v1_admin_system_queues_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueOverviewRead"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/system/queues/failed": {
+      "get": {
+        "tags": [
+          "admin",
+          "admin"
+        ],
+        "summary": "Failed Jobs",
+        "operationId": "failed_jobs_api_v1_admin_system_queues_failed_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FailedJobRead"
+                  },
+                  "title": "Response Failed Jobs Api V1 Admin System Queues Failed Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/system/queues/failed/{job_id}/retry": {
+      "post": {
+        "tags": [
+          "admin",
+          "admin"
+        ],
+        "summary": "Retry Job",
+        "operationId": "retry_job_api_v1_admin_system_queues_failed__job_id__retry_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobActionRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/system/queues/{job_id}/abort": {
+      "post": {
+        "tags": [
+          "admin",
+          "admin"
+        ],
+        "summary": "Abort Job",
+        "operationId": "abort_job_api_v1_admin_system_queues__job_id__abort_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobActionRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/saved-views/projects/{project_id}/views": {
       "get": {
         "tags": [
@@ -7068,6 +7259,80 @@
         "title": "CheckFinding",
         "description": "A rule of the set that did not pass. ``message`` is the user-readable reason."
       },
+      "CronJobRead": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "schedule": {
+            "type": "string",
+            "title": "Schedule"
+          },
+          "last_run_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Run At"
+          },
+          "last_finished_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Finished At"
+          },
+          "last_outcome": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "succeeded",
+                  "failed"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Outcome"
+          },
+          "next_run_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Run At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "schedule",
+          "last_run_at",
+          "last_finished_at",
+          "last_outcome",
+          "next_run_at"
+        ],
+        "title": "CronJobRead",
+        "description": "A cron job of the batch worker (there is no cron queue)."
+      },
       "DeliveryRead": {
         "properties": {
           "channel": {
@@ -7825,6 +8090,89 @@
         ],
         "title": "DriftEntryRead",
         "description": "A project rule that differs from the tenant default (or a default the project lacks)."
+      },
+      "FailedJobRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "queue": {
+            "type": "string",
+            "enum": [
+              "interactive",
+              "batch"
+            ],
+            "title": "Queue"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "project_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Code"
+          },
+          "attempts": {
+            "type": "integer",
+            "title": "Attempts"
+          },
+          "error_class": {
+            "type": "string",
+            "title": "Error Class"
+          },
+          "message": {
+            "type": "string",
+            "maxLength": 500,
+            "title": "Message"
+          },
+          "failed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failed At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "queue",
+          "project_id",
+          "project_code",
+          "attempts",
+          "error_class",
+          "message",
+          "failed_at"
+        ],
+        "title": "FailedJobRead",
+        "description": "``GET /admin/system/queues/failed``: one failed job, message at most 500 characters."
       },
       "FileRead": {
         "properties": {
@@ -8672,6 +9020,37 @@
         ],
         "title": "InviteTokenIn",
         "description": "The invite token of the link's fragment: always in the body, never in a URL."
+      },
+      "JobActionRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "running",
+              "succeeded",
+              "failed"
+            ],
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "status"
+        ],
+        "title": "JobActionRead",
+        "description": "The job after a retry or an abort."
       },
       "JobCreate": {
         "properties": {
@@ -10619,6 +10998,81 @@
         "type": "object",
         "title": "ProjectUpdate",
         "description": "``PATCH /projects/{id}``: only the given fields change; ``spatial_bounds: null`` clears."
+      },
+      "QueueOverviewRead": {
+        "properties": {
+          "queues": {
+            "items": {
+              "$ref": "#/components/schemas/QueueRead"
+            },
+            "type": "array",
+            "title": "Queues"
+          },
+          "cron_jobs": {
+            "items": {
+              "$ref": "#/components/schemas/CronJobRead"
+            },
+            "type": "array",
+            "title": "Cron Jobs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "queues",
+          "cron_jobs"
+        ],
+        "title": "QueueOverviewRead",
+        "description": "``GET /admin/system/queues``."
+      },
+      "QueueRead": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "enum": [
+              "interactive",
+              "batch"
+            ],
+            "title": "Name"
+          },
+          "queued": {
+            "type": "integer",
+            "title": "Queued"
+          },
+          "active": {
+            "type": "integer",
+            "title": "Active"
+          },
+          "scheduled": {
+            "type": "integer",
+            "title": "Scheduled"
+          },
+          "failed": {
+            "type": "integer",
+            "title": "Failed"
+          },
+          "oldest_queued_age_s": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oldest Queued Age S"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "queued",
+          "active",
+          "scheduled",
+          "failed",
+          "oldest_queued_age_s"
+        ],
+        "title": "QueueRead",
+        "description": "One SAQ queue: SAQ's counts (deployment-wide) and the failed job rows."
       },
       "RefreshRequest": {
         "properties": {

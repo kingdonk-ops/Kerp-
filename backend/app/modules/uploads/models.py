@@ -33,6 +33,8 @@ STATUSES: Final = ("pending", "verifying", "available", "rejected", "expired")
 STAGING_PREFIX: Final = "staging"
 QUARANTINE_PREFIX: Final = "quarantine"
 MAX_REASON: Final = 200
+# The scanner's signature name of an ``infected`` file, as returned by clamd (T-0218).
+MAX_SIGNATURE: Final = 200
 
 
 def staging_prefix(tenant_id: uuid.UUID, project_id: uuid.UUID) -> str:
@@ -62,6 +64,7 @@ class UploadedFile(Base, BaseRecordMixin):
     storage_key: Mapped[str | None] = mapped_column(String(512), nullable=True)
     rejection_reason: Mapped[str | None] = mapped_column(String(MAX_REASON), nullable=True)
     scan_result: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    scan_signature: Mapped[str | None] = mapped_column(String(MAX_SIGNATURE), nullable=True)
     job_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), nullable=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

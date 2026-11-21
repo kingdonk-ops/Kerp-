@@ -300,3 +300,58 @@ class InviteRefusal(BaseModel):
         "INVITE_NOT_RESENDABLE",
         "INVITE_SIGN_IN_REQUIRED",
     ]
+
+
+# --- System console: queue monitor (T-0218, diff §4.7) ---------------------------------------
+# Numbers, names and sanitised text only: never a job's payload, result or SAQ kwargs.
+
+
+class QueueRead(BaseModel):
+    """One SAQ queue: SAQ's counts (deployment-wide) and the failed job rows."""
+
+    name: Literal["interactive", "batch"]
+    queued: int
+    active: int
+    scheduled: int
+    failed: int
+    oldest_queued_age_s: float | None
+
+
+class CronJobRead(BaseModel):
+    """A cron job of the batch worker (there is no cron queue)."""
+
+    name: str
+    schedule: str
+    last_run_at: datetime | None
+    last_finished_at: datetime | None
+    last_outcome: Literal["succeeded", "failed"] | None
+    next_run_at: datetime | None
+
+
+class QueueOverviewRead(BaseModel):
+    """``GET /admin/system/queues``."""
+
+    queues: list[QueueRead]
+    cron_jobs: list[CronJobRead]
+
+
+class FailedJobRead(BaseModel):
+    """``GET /admin/system/queues/failed``: one failed job, message at most 500 characters."""
+
+    id: uuid.UUID
+    kind: str
+    queue: Literal["interactive", "batch"]
+    project_id: uuid.UUID | None
+    project_code: str | None
+    attempts: int
+    error_class: str
+    message: str = Field(max_length=500)
+    failed_at: datetime | None
+
+
+class JobActionRead(BaseModel):
+    """The job after a retry or an abort."""
+
+    id: uuid.UUID
+    kind: str
+    status: Literal["queued", "running", "succeeded", "failed"]

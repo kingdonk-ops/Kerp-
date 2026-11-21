@@ -1174,6 +1174,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/system/queues": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Queue Overview */
+        get: operations["queue_overview_api_v1_admin_system_queues_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/system/queues/failed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Failed Jobs */
+        get: operations["failed_jobs_api_v1_admin_system_queues_failed_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/system/queues/failed/{job_id}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Retry Job */
+        post: operations["retry_job_api_v1_admin_system_queues_failed__job_id__retry_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/system/queues/{job_id}/abort": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Abort Job */
+        post: operations["abort_job_api_v1_admin_system_queues__job_id__abort_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/saved-views/projects/{project_id}/views": {
         parameters: {
             query?: never;
@@ -2085,6 +2153,24 @@ export interface components {
             /** Finding Id */
             finding_id?: string | null;
         };
+        /**
+         * CronJobRead
+         * @description A cron job of the batch worker (there is no cron queue).
+         */
+        CronJobRead: {
+            /** Name */
+            name: string;
+            /** Schedule */
+            schedule: string;
+            /** Last Run At */
+            last_run_at: string | null;
+            /** Last Finished At */
+            last_finished_at: string | null;
+            /** Last Outcome */
+            last_outcome: ("succeeded" | "failed") | null;
+            /** Next Run At */
+            next_run_at: string | null;
+        };
         /** DeliveryRead */
         DeliveryRead: {
             /** Channel */
@@ -2416,6 +2502,36 @@ export interface components {
             project_version: number | null;
             /** Default Version */
             default_version: number | null;
+        };
+        /**
+         * FailedJobRead
+         * @description ``GET /admin/system/queues/failed``: one failed job, message at most 500 characters.
+         */
+        FailedJobRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Kind */
+            kind: string;
+            /**
+             * Queue
+             * @enum {string}
+             */
+            queue: "interactive" | "batch";
+            /** Project Id */
+            project_id: string | null;
+            /** Project Code */
+            project_code: string | null;
+            /** Attempts */
+            attempts: number;
+            /** Error Class */
+            error_class: string;
+            /** Message */
+            message: string;
+            /** Failed At */
+            failed_at: string | null;
         };
         /** FileRead */
         FileRead: {
@@ -2819,6 +2935,24 @@ export interface components {
         InviteTokenIn: {
             /** Invite Token */
             invite_token: string;
+        };
+        /**
+         * JobActionRead
+         * @description The job after a retry or an abort.
+         */
+        JobActionRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Kind */
+            kind: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "queued" | "running" | "succeeded" | "failed";
         };
         /**
          * JobCreate
@@ -3663,6 +3797,37 @@ export interface components {
             currency_code?: string | null;
             /** Locale */
             locale?: string | null;
+        };
+        /**
+         * QueueOverviewRead
+         * @description ``GET /admin/system/queues``.
+         */
+        QueueOverviewRead: {
+            /** Queues */
+            queues: components["schemas"]["QueueRead"][];
+            /** Cron Jobs */
+            cron_jobs: components["schemas"]["CronJobRead"][];
+        };
+        /**
+         * QueueRead
+         * @description One SAQ queue: SAQ's counts (deployment-wide) and the failed job rows.
+         */
+        QueueRead: {
+            /**
+             * Name
+             * @enum {string}
+             */
+            name: "interactive" | "batch";
+            /** Queued */
+            queued: number;
+            /** Active */
+            active: number;
+            /** Scheduled */
+            scheduled: number;
+            /** Failed */
+            failed: number;
+            /** Oldest Queued Age S */
+            oldest_queued_age_s: number | null;
         };
         /**
          * RefreshRequest
@@ -7077,6 +7242,120 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    queue_overview_api_v1_admin_system_queues_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueOverviewRead"];
+                };
+            };
+        };
+    };
+    failed_jobs_api_v1_admin_system_queues_failed_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FailedJobRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    retry_job_api_v1_admin_system_queues_failed__job_id__retry_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobActionRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    abort_job_api_v1_admin_system_queues__job_id__abort_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobActionRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
             };
         };
     };

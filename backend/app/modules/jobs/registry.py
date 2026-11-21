@@ -23,6 +23,12 @@ if TYPE_CHECKING:
 QueueName = Literal["interactive", "batch"]
 KIND_PATTERN: Final = re.compile(r"^[a-z][a-z0-9_]{1,39}\.[a-z][a-z0-9_.]{0,79}$")
 DEFAULT_TIMEOUT_S: Final = 600
+# The SAQ cron jobs of the batch worker (``scheduler.py``; there is no cron queue): function
+# name -> cron expression. Listed here, free of imports, for the queue monitor (T-0218).
+CRON_SCHEDULES: Final[dict[str, str]] = {
+    "sweep_cron": "*/5 * * * *",  # stuck-job sweep (T-0214)
+    "hourly_project_jobs": "17 * * * *",  # hourly per-project jobs, off the full hour (T-0215)
+}
 
 
 class JobUpdate(Protocol):
@@ -53,13 +59,21 @@ Handler = Callable[[JobContext], Awaitable[dict[str, Any] | None]]
 
 @dataclass(frozen=True, slots=True)
 class JobKind:
-    """A registered kind. ``api``: clients may enqueue it through ``POST /jobs``."""
+    """A registered kind. ``api``: clients may enqueue it through ``POST /jobs``.
+
+    ``max_attempts`` > 1 lets a handler raise ``service.RetryLaterError`` (T-0218): SAQ runs it
+    again after ``retry_delay_s``, doubling per attempt up to ``retry_max_delay_s`` (with
+    jitter); any other error still fails the job at once.
+    """
 
     kind: str
     queue: QueueName
     handler: Handler
     api: bool = False
     timeout_s: int = DEFAULT_TIMEOUT_S
+    max_attempts: int = 1
+    retry_delay_s: float = 0.0
+    retry_max_delay_s: float | None = None
 
 
 # A module's start-up precondition for the worker, e.g. "production needs a real scanner".
@@ -85,6 +99,8 @@ class JobRegistry:
             raise ValueError(f"job kind {job_kind.kind!r}: unknown queue {job_kind.queue!r}")
         if not inspect.iscoroutinefunction(job_kind.handler):
             raise TypeError(f"job kind {job_kind.kind!r}: the handler must be 'async def'")
+        if job_kind.max_attempts < 1 or job_kind.retry_delay_s < 0:
+            raise ValueError(f"job kind {job_kind.kind!r}: invalid retry settings")
         if job_kind.kind in self._kinds:
             raise ValueError(f"job kind {job_kind.kind!r} is already registered")
         self._kinds[job_kind.kind] = job_kind
@@ -132,11 +148,25 @@ def register_job(
     queue: QueueName,
     api: bool = False,
     timeout_s: int = DEFAULT_TIMEOUT_S,
+    max_attempts: int = 1,
+    retry_delay_s: float = 0.0,
+    retry_max_delay_s: float | None = None,
 ) -> Callable[[Handler], Handler]:
     """Register the decorated ``async`` handler as ``kind`` on ``queue``."""
 
     def decorate(handler: Handler) -> Handler:
-        JOB_REGISTRY.add(JobKind(kind, queue, handler, api=api, timeout_s=timeout_s))
+        JOB_REGISTRY.add(
+            JobKind(
+                kind,
+                queue,
+                handler,
+                api=api,
+                timeout_s=timeout_s,
+                max_attempts=max_attempts,
+                retry_delay_s=retry_delay_s,
+                retry_max_delay_s=retry_max_delay_s,
+            )
+        )
         return handler
 
     return decorate
