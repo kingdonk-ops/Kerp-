@@ -28,24 +28,28 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0 # PRs: diff against the merge base with the target branch
-      # Components that exist run. On a pull_request whose changes are all under tracker/,
-      # docs/ or .claude/ (scripts/ci_changes.py) the app jobs are skipped; ci-gate accepts "false" flags as
-      # expected skips. Push and workflow_dispatch always run everything that exists.
+      # Components that exist run. On a pull_request (scripts/ci_changes.py): changes all under
+      # tracker/, docs/ or .claude/ skip the app jobs; changes that are frontend-only besides
+      # those skip the backend jobs (T-0083). ci-gate accepts "false" flags as expected skips.
+      # Push and workflow_dispatch always run everything that exists.
       - id: d
         env:
           BASE_REF: ${{ github.base_ref }}
         run: |
           set -euo pipefail
           skip_app=false
+          backend_needed=true
           if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
             git diff --name-only --no-renames "origin/$BASE_REF...HEAD" > "$RUNNER_TEMP/changed.txt"
             echo "changed files:"; cat "$RUNNER_TEMP/changed.txt"
             result="$(python3 scripts/ci_changes.py < "$RUNNER_TEMP/changed.txt")"
             echo "$result"
-            [ "$result" = "docs_or_tracker_only=true" ] && skip_app=true
+            grep -qx "docs_or_tracker_only=true" <<<"$result" && skip_app=true
+            grep -qx "backend_needed=false" <<<"$result" && backend_needed=false
           fi
           flag() { [ "$skip_app" = false ] && [ -f "$1" ] && echo true || echo false; }
-          echo "backend=$(flag backend/pyproject.toml)" >> "$GITHUB_OUTPUT"
+          backend_flag() { [ "$backend_needed" = true ] && flag backend/pyproject.toml || echo false; }
+          echo "backend=$(backend_flag)" >> "$GITHUB_OUTPUT"
           echo "frontend=$(flag frontend/package.json)" >> "$GITHUB_OUTPUT"
           echo "e2e=$(flag e2e/package.json)" >> "$GITHUB_OUTPUT"
 

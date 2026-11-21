@@ -165,3 +165,17 @@ def test_backend_suites_run_as_parallel_jobs() -> None:
     for job in ("backend-publish", "e2e"):
         listed = re.search(r"needs: \[([^\]]*)\]", jobs[job])
         assert listed and {"backend", "backend-pg"} <= {n.strip() for n in listed.group(1).split(",")}
+
+
+def test_pull_request_with_backend_not_needed_passes() -> None:
+    """T-0083: a frontend-only PR: detect says backend=false, the backend jobs skip, the
+    frontend jobs still run and must be green."""
+    jobs = needs()
+    jobs["detect"]["outputs"]["backend"] = "false"
+    for job in ("backend", "backend-pg", "backend-image", "backend-publish"):
+        jobs[job]["result"] = "skipped"
+    assert ci_gate.evaluate(jobs, "pull_request") == []
+    jobs["frontend"]["result"] = "failure"
+    assert ci_gate.evaluate(jobs, "pull_request") != []
+    jobs["frontend"]["result"] = "skipped"
+    assert ci_gate.evaluate(jobs, "pull_request") != []  # frontend never skips on backend=false
