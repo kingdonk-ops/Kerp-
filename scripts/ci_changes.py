@@ -1,13 +1,15 @@
-"""Is a pull request tracker-only? Used by the ``detect`` job of .github/workflows/ci.yml.
+"""Can a pull request skip the app jobs? Used by the ``detect`` job of .github/workflows/ci.yml.
 
-A PR is tracker-only when every changed path is under ``tracker/`` or is one of the
-generated boards/digest (``docs/TASKS.md``, ``docs/TODO.md``, ``docs/pr-suggestions.md``).
+A PR is docs-or-tracker-only when every changed path is under ``tracker/``, ``docs/``
+(spec, plan, decisions, generated boards and digest) or ``.claude/`` (agent definitions).
+No backend, frontend or e2e test reads those trees (T-0081); the ``tracker`` job, which
+does read them (boards, ``docs/WORKFLOW.md``), always runs.
 Exception: a ``tracker/todo/TD-xxx.md`` cited by a ``known_gap.todo`` in
 ``tests/contract/conformance_fixtures.json`` is read by the CEL conformance suites
-(backend and frontend), so changing it is not tracker-only. An empty change list is
-not tracker-only (fail safe: run everything).
+(backend and frontend), so changing it runs everything. An empty change list is not
+docs-or-tracker-only (fail safe: run everything).
 
-CLI: paths as arguments, or one per line on stdin; prints ``tracker_only=true|false``.
+CLI: paths as arguments, or one per line on stdin; prints ``docs_or_tracker_only=true|false``.
 """
 from __future__ import annotations
 
@@ -19,7 +21,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 FIXTURES = ROOT / "tests" / "contract" / "conformance_fixtures.json"
-GENERATED = frozenset({"docs/TASKS.md", "docs/TODO.md", "docs/pr-suggestions.md"})
+SKIPPABLE_PREFIXES = ("tracker/", "docs/", ".claude/")
 _TODO_PATH = re.compile(r"tracker/todo/(TD-\d+)\.md")
 
 
@@ -34,11 +36,11 @@ def cited_todos(fixtures: Path) -> set[str]:
     return cited
 
 
-def is_tracker_only(paths: Iterable[str], fixtures: Path | None = None) -> bool:
+def is_docs_or_tracker_only(paths: Iterable[str], fixtures: Path | None = None) -> bool:
     changed = [p.strip() for p in paths if p.strip()]
     if not changed:
         return False
-    if not all(p.startswith("tracker/") or p in GENERATED for p in changed):
+    if not all(p.startswith(SKIPPABLE_PREFIXES) for p in changed):
         return False
     todos = {m.group(1) for p in changed if (m := _TODO_PATH.fullmatch(p))}
     if todos and todos & cited_todos(fixtures or FIXTURES):
@@ -49,7 +51,8 @@ def is_tracker_only(paths: Iterable[str], fixtures: Path | None = None) -> bool:
 def main(argv: list[str] | None = None) -> int:
     args = sys.argv[1:] if argv is None else argv
     paths = args if args else sys.stdin.read().splitlines()
-    print(f"tracker_only={'true' if is_tracker_only(paths, FIXTURES) else 'false'}")
+    skip = is_docs_or_tracker_only(paths, FIXTURES)
+    print(f"docs_or_tracker_only={'true' if skip else 'false'}")
     return 0
 
 

@@ -40,7 +40,7 @@ from app.modules.onboarding.schemas import (
 from app.modules.projects import service as projects
 from app.modules.settings import service as deployment_settings
 from app.modules.settings.models import SHIPPED_DEFAULTS
-from tests.audit_support import ALEMBIC_INI
+from tests.audit_support import ALEMBIC_INI, migrated_sqlite_file
 from tests.auth_support import PASSWORD, auth_app, make_settings
 from tests.db_support import ON_POSTGRES, database_url
 
@@ -57,6 +57,13 @@ ON_PG = pytest.mark.skipif(
 @pytest.fixture
 def db(tmp_path: Path) -> Iterator[Database]:
     """A database at head with an **empty** tenant directory."""
+    if not ON_POSTGRES:  # a copy of the unseeded migrated template (T-0081)
+        database = Database(migrated_sqlite_file(tmp_path, seeded=False))
+        try:
+            yield database
+        finally:
+            database.dispose()
+        return
     url = database_url(tmp_path)
     cfg = Config(str(ALEMBIC_INI))
     cfg.attributes.update(url=url, configure_logger=False)

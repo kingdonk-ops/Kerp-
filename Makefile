@@ -69,7 +69,7 @@ test-pg: up
 	cd backend && KERP_FAIL_ON_SKIP=1 $(PYTHON) -m pytest --no-cov $(PG_TESTS)
 
 test-pg-all: up
-	cd backend && $(PYTHON) -m pytest --no-cov
+	cd backend && $(PYTHON) -m pytest --no-cov -n auto
 
 worker: up
 	$(COMPOSE) --profile worker up -d --build worker

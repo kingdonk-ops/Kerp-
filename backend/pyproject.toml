@@ -36,6 +36,7 @@ dev = [
     "packaging>=24.0",  # tests/test_container.py parses the lock files
     "pytest>=8.2",
     "pytest-cov>=5.0",
+    "pytest-xdist>=3.6",  # `pytest -n auto`: the CI SQLite run and the local gate (T-0081)
     "ruff>=0.6",
     "types-pyyaml>=6.0",  # mypy --strict types for pyyaml (rule-set seed files)
 ]

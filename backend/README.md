@@ -142,9 +142,25 @@ python -m venv .venv
 .venv/Scripts/activate            # Windows; `source .venv/bin/activate` elsewhere
 pip install -e ".[dev]"
 
-ruff check . && mypy app && pytest
+ruff check . && mypy app && pytest -n auto
 KERP_ENVIRONMENT=development uvicorn app.main:create_app --factory --reload
 ```
+
+### Test speed (T-0081)
+
+- `pytest -n auto` runs the suite in parallel workers (`pytest-xdist`); plain `pytest` still
+  works. Coverage (`--cov-fail-under=90`) is combined across workers.
+- On SQLite, `tests/audit_support.py:migrated_database` migrates **one template file per
+  worker** and hands each test a byte copy, instead of migrating up and down per test. The
+  downgrade path is covered by `tests/test_migrations.py`. Tests that exercise migrations
+  themselves still build their own database.
+- On PostgreSQL (`make test-pg-all`, CI's `backend-pg` job; T-0082) the database named in
+  `KERP_DATABASE_URL` is only a template source. Each worker builds `kerp_tmpl_empty_<worker>`
+  and `kerp_tmpl_head_<worker>` (migrated as the runtime role, fixture tenants seeded) once,
+  and every test gets its own `CREATE DATABASE … TEMPLATE …` copy, dropped afterwards
+  (`tests/pg_databases.py`). So `-n auto` works there too, and every test still runs on real,
+  committed PostgreSQL with RLS as `kerp_app`. This needs `KERP_TEST_OWNER_URL` (a role that
+  may create databases); without it the suite falls back to the shared database, serially.
 
 The backend defaults to `KERP_ENVIRONMENT=production` (T-0070), which refuses to sign tokens
 without a configured key, so a local server must opt in to `development` (ephemeral key,

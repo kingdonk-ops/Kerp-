@@ -10,7 +10,7 @@ import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Connection
 
-from tests.db_support import ON_POSTGRES, POSTGRES_URL
+from tests.db_support import ON_POSTGRES, postgres_url
 
 pytestmark = pytest.mark.skipif(
     not ON_POSTGRES, reason="needs PostgreSQL; runs in CI's PostgreSQL step (TD-052)"
@@ -19,7 +19,7 @@ pytestmark = pytest.mark.skipif(
 
 @pytest.fixture
 def conn() -> Iterator[Connection]:
-    engine = create_engine(POSTGRES_URL)
+    engine = create_engine(postgres_url())
     try:
         with engine.connect() as connection:
             yield connection
