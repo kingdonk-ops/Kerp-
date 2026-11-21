@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 353 · **Closed:** 150
+**Open:** 369 · **Closed:** 150
 
 ## decision (40)
 
@@ -194,7 +194,7 @@
 | [TD-508](../tracker/todo/TD-508.md) | Verify the e2e suite on the make up compose stack, and give it its own database | T-0027 | implementer |
 | [TD-510](../tracker/todo/TD-510.md) | Deployment-config view lacks the mail reply-to of diff §4.7: Settings has no reply-to field yet | T-0230 | implementer |
 
-## later (141)
+## later (148)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -339,8 +339,15 @@
 | [TD-511](../tracker/todo/TD-511.md) | Drop the read-only oe_settings_deployment table (destructive migration, needs an ADR) | T-0230 | implementer |
 | [TD-512](../tracker/todo/TD-512.md) | Split the backend-pg CI job into parallel shards | T-0086 | coordinator |
 | [TD-513](../tracker/todo/TD-513.md) | CI: the SQLite backend job (~6.5 min) becomes the critical path once backend-pg is sharded | T-0086 | implementer |
+| [TD-517](../tracker/todo/TD-517.md) | scripts/pr_suggestions.py makes about 450 GitHub API calls per merge: fetch incrementally or batch (GraphQL) | — | planner |
+| [TD-518](../tracker/todo/TD-518.md) | scripts/pr_suggestions.py has no test in scripts/tests | — | planner |
+| [TD-522](../tracker/todo/TD-522.md) | Frontend Dexie outbox (frontend/src/db/outbox.ts) is shipped and tested but unused until the offline sync tasks wire it | T-0127 | planner |
+| [TD-526](../tracker/todo/TD-526.md) | Uploads orphan sweep runs one query per file; batch it | T-0346 | planner |
+| [TD-529](../tracker/todo/TD-529.md) | Two list endpoints have no paging (unbounded list responses) | T-0348 | planner |
+| [TD-530](../tracker/todo/TD-530.md) | Database pool size and overflow cannot be configured (create_engine accepts pool_size/max_overflow but settings do not expose them) | T-0348 | planner |
+| [TD-531](../tracker/todo/TD-531.md) | Job rows (jobs table) are never deleted: add a retention purge for finished jobs | T-0346 | planner |
 
-## bug (10)
+## bug (18)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -354,8 +361,16 @@
 | [TD-490](../tracker/todo/TD-490.md) | Admin -> Users invite form: a SoD 409 that returns after the user edited the form re-arms confirm_sod for the edited form (fields stay editable while the send is pending) | T-0331 | reviewer |
 | [TD-507](../tracker/todo/TD-507.md) | Local PostgreSQL test runs of parallel worktrees collide: template databases are named per xdist worker only | T-0230 | implementer |
 | [TD-509](../tracker/todo/TD-509.md) | Flaky: test_auth_magic_link_field_workers lockout test asserts Retry-After == 60 on the wall clock | T-0223 | implementer |
+| [TD-516](../tracker/todo/TD-516.md) | review gate counts dismissed reviews: a dismissed KERP-REVIEW APPROVED still satisfies scripts/review_gate.py | — | planner |
+| [TD-519](../tracker/todo/TD-519.md) | Promotion fails red when CI runs on dev finish out of order (promote.yml checks origin/dev, not the run's head_sha) | — | planner |
+| [TD-521](../tracker/todo/TD-521.md) | Login redirect drops the query string and hash: RequireAuth stores only location.pathname as state.from | T-0344 | planner |
+| [TD-523](../tracker/todo/TD-523.md) | Locale check accepts a trailing newline: _LOCALE regex in core/locale.py uses $ with re.match | — | planner |
+| [TD-524](../tracker/todo/TD-524.md) | Password-change revocation can miss tokens when server clocks drift (iat compared with password_changed_at from another clock) | T-0345 | planner |
+| [TD-525](../tracker/todo/TD-525.md) | Some Redis errors surface as 500 instead of 503 (raw redis ConnectionError/TimeoutError outside RevocationUnavailableError) | T-0349 | planner |
+| [TD-527](../tracker/todo/TD-527.md) | Published upload files can be orphaned (object kept with no live owner row, or row pointing at a deleted object) | T-0346 | planner |
+| [TD-528](../tracker/todo/TD-528.md) | Two concurrent adds of the same user to a team return 500 (unique violation) instead of the already-a-member answer | — | planner |
 
-## risk (33)
+## risk (34)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -392,6 +407,7 @@
 | [TD-455](../tracker/todo/TD-455.md) | Queue monitor: retry/abort commit the job write before the audit entry (two transactions); an audit-commit failure leaves the action unaudited | T-0218, T-0221 | implementer |
 | [TD-462](../tracker/todo/TD-462.md) | Internal contexts that bind is_system_admin=True for a narrow read (jobs scheduler deployment_scopes, teams reconcile, onboarding, the invite token lookup) now also see every project-scoped record of the tenant under ADR 0016 | T-0274 | implementer |
 | [TD-497](../tracker/todo/TD-497.md) | Quarantine re-check: a second verify job can still overlap one whose worker thread is mid-check after a queue-monitor abort (failed/ABORTED while the to_thread verify_upload runs on) or a queue-monitor retry of the replaced failed job; the later job finds the shared quarantine object gone and rejects a clean file as missing_object, the other leaves an orphan content object (fail-safe, nothing published unscanned) | T-0221 | implementer |
+| [TD-520](../tracker/todo/TD-520.md) | Review gate accepts a 7-character patch-id prefix (MARKER_RE [0-9a-f]{7,40} plus prefix matching) | — | planner |
 
 ## Closed
 
