@@ -105,9 +105,43 @@ def _build_templates(migrate_and_seed: Callable[[str], None]) -> None:
     assert source, "KERP_DATABASE_URL must name the source database"
     _create(EMPTY_TEMPLATE, source)
     _templates_built.add(EMPTY_TEMPLATE)
+    _check_empty(EMPTY_TEMPLATE, source)
     _create(HEAD_TEMPLATE, EMPTY_TEMPLATE)
+    _templates_built.add(HEAD_TEMPLATE)  # before migrating: dropped at session end even if it fails
     migrate_and_seed(runtime_url(HEAD_TEMPLATE))  # disposes its engines before returning
-    _templates_built.add(HEAD_TEMPLATE)
+
+
+# PostGIS creates spatial_ref_sys; a downgrade to base (the shared-database fallback) leaves an
+# empty alembic_version behind. Anything else in the source would leak into every test's copy.
+_ALLOWED_SOURCE_TABLES = frozenset({"spatial_ref_sys", "alembic_version"})
+
+
+def _check_empty(copy: str, source: str) -> None:
+    """Refuse a source database that still holds a schema (e.g. an aborted shared-database
+    run): every "empty" copy would inherit it. Inspects the fresh copy, so nothing ever
+    connects to the source itself (another worker may be copying it)."""
+    engine = create_engine(owner_url(copy), poolclass=NullPool)
+    try:
+        with engine.connect() as conn:
+            tables = set(
+                conn.execute(
+                    text("SELECT tablename FROM pg_tables WHERE schemaname = 'public'")
+                ).scalars()
+            )
+            versions = (
+                conn.execute(text("SELECT count(*) FROM alembic_version")).scalar_one()
+                if "alembic_version" in tables
+                else 0
+            )
+    finally:
+        engine.dispose()
+    leftovers = sorted(tables - _ALLOWED_SOURCE_TABLES)
+    if leftovers or versions:
+        raise RuntimeError(
+            f"source database {source!r} is not empty (tables: {leftovers}, alembic_version "
+            f"rows: {versions}); recreate it from infra/postgres/initdb (make reset) before "
+            "running the PostgreSQL tests"
+        )
 
 
 def begin_test() -> None:
