@@ -111,7 +111,7 @@
 | ✅ | [T-0072](../tracker/tasks/T-0072.md) | Duplicated tab keeps its session: cross-tab refresh lock and token hand-off | frontend | M | T-0037 | #105 |
 | ✅ | [T-0081](../tracker/tasks/T-0081.md) | CI speed 1: SQLite test DB from a migrated template + pytest-xdist, SQLite and PostgreSQL backend tests as parallel jobs, docs-only PRs skip app jobs, --durations | platform | M | — | #140 |
 | ▶ | [T-0218](../tracker/tasks/T-0218.md) | uploads: ClamAV scanner (clamd INSTREAM) in the worker replacing the stub, signature on the file row, scanner PING for health | uploads | S | T-0016, T-0213, T-0215 |  |
-| 🟦 | [T-0082](../tracker/tasks/T-0082.md) | CI speed 2: PostgreSQL tests on a per-test copy of a migrated template database, pytest-xdist on PostgreSQL, fsync-off CI Postgres, coverage floor on the PostgreSQL run | platform | M | T-0081 |  |
+| 🟪 | [T-0082](../tracker/tasks/T-0082.md) | CI speed 2: PostgreSQL tests on a per-test copy of a migrated template database, pytest-xdist on PostgreSQL, fsync-off CI Postgres, coverage floor on the PostgreSQL run | platform | M | T-0081 | #141 |
 | ⬜ | [T-0219](../tracker/tasks/T-0219.md) | admin: deployment stats (counts + byte totals via module stats providers and count-only SECURITY DEFINER functions) and health probes at /api/v1/admin/system | admin | M | T-0014, T-0015, T-0016, T-0039, T-0218 |  |
 | ▶ | [T-0220](../tracker/tasks/T-0220.md) | jobs: queue monitor API for System admins (queue depths, cron runs, failed jobs without payloads, retry/abort) | jobs | S | T-0015, T-0214, T-0039 |  |
 | ⬜ | [T-0083](../tracker/tasks/T-0083.md) | CI speed 3: frontend-only PRs skip the backend jobs (per-component change detection in ci.yml detect) | platform | S | T-0082 |  |
