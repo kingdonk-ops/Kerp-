@@ -3,7 +3,7 @@
 - **Status:** **proposed** (planner, 2026-11-21; decision TD-410 is open; nothing may be built on
   it until the user accepts it)
 - **Date:** 2026-11-21
-- **Affects:** T-0186, T-0187, T-0188, T-0189 (blocked by TD-410), `RECORD_SOURCES` in
+- **Affects:** T-0252, T-0253, T-0254, T-0255 (blocked by TD-410), `RECORD_SOURCES` in
   `app/core/db.py` (new value `public_link`), CLAUDE.md §6 wording on tenant resolution,
   diff §4.2 (who may capture without an account). Second instance of the pattern: the
   calendar iCal feed of E-04-15 (TD-419).
@@ -75,7 +75,7 @@ if ADR 0014 is accepted, equipment).
    project members (no e-mail, phone, user id, persona or internal id; opaque per-response
    handles map a pick back on submit). Only records that are active and approved for selection
    are listed (no out-of-service or decommissioned equipment).
-6. **Controls** (acceptance criteria of T-0187):
+6. **Controls** (acceptance criteria of T-0253):
    - per-client-IP rate limits (client address from the trusted-proxy configuration, T-0068 /
      TD-138), plus per-link limits on GET, presign and submit, `429` with `Retry-After`;
    - token hashing (SHA-256, stored hash only, never logged; access logs and Sentry scrub the
@@ -88,7 +88,7 @@ if ADR 0014 is accepted, equipment).
    - every create, revoke, use and refusal-by-rate-limit is audited (`source = "public_link"`
      for submissions; actor = the creating user for link management).
 7. **Who creates links.** PER-06 and PER-09 of the project (link management is authenticated,
-   T-0186). Revocation is immediate. Permanent links (`expires_at` null, fleet stickers) need
+   T-0252). Revocation is immediate. Permanent links (`expires_at` null, fleet stickers) need
    an explicit flag at creation and appear in a "permanent links" review list.
 8. **Privacy** (planner default, TD-410): IP and user agent kept 90 days then nulled by a batch
    job; `submitter_contact` kept with the record; both visible only to project members with read

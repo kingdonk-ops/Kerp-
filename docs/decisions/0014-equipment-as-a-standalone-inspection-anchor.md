@@ -2,7 +2,7 @@
 
 - **Status:** **proposed** (planner, 2026-11-21; decisions TD-411 and TD-412 are open)
 - **Date:** 2026-11-21
-- **Affects:** T-0184 (blocked by TD-411), T-0183 (blocked by TD-412), T-0111 (anchor rule; no
+- **Affects:** T-0250 (blocked by TD-411), T-0249 (blocked by TD-412), T-0111 (anchor rule; no
   change to its scope), T-0112 (equipment register), CLAUDE.md §6 anchor wording,
   `quality-and-inspection.md` §Standalone inspections
 
@@ -41,7 +41,7 @@ is the `equipment` module (T-0112, diff §5); today it holds calibrated test equ
 - The M1 freeze (T-0131) freezes the three-way anchor check if this lands before the freeze;
   later it needs an ADR amendment, as any post-freeze change.
 - Register views and the Pilot-0 tiles must not count equipment-anchored inspections as
-  QA progress (they are filtered by `category = qa_itp` by default, T-0185).
+  QA progress (they are filtered by `category = qa_itp` by default, T-0251).
 
 ## Alternative
 
