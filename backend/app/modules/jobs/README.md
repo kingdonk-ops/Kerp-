@@ -88,7 +88,7 @@ never mounted (it has no KERP auth).
   (best effort: the worker never starts a `failed` row, and `finish_job(only_running=True)`
   never overwrites an aborted one).
 * Visibility: under ADR 0016 (T-0274) a `system_admin` reads every project's job rows; until it
-  lands, only tenant-level rows and the projects of the caller's read scope are listed (TD-447).
+  lands, only tenant-level rows and the projects of the caller's read scope are listed (TD-451).
 
 ## Worker (rule 1)
 

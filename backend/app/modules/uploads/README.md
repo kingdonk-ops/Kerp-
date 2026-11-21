@@ -60,7 +60,7 @@ required, the settings refuse anything else). `ClamdScanner` uses only the stand
   is `infected` with that signature; anything else (`... ERROR`, garbage) counts as unavailable.
 * Size limit: an object larger than `KERP_UPLOAD_SCAN_MAX_BYTES` (100 MiB) is never sent, and
   clamd's own `INSTREAM size limit exceeded` is honoured too: the file is rejected with
-  `verify_failed` at once (it is never published unscanned, and retrying cannot help; TD-448). Keep
+  `verify_failed` at once (it is never published unscanned, and retrying cannot help; TD-452). Keep
   clamd's `StreamMaxLength` at least `KERP_UPLOAD_SCAN_MAX_BYTES`.
 * Unavailable (connection refused, `KERP_CLAMD_TIMEOUT_SECONDS` (30) per socket operation,
   error reply): `ScannerUnavailableError`. The file stays `verifying`, its quarantine copy is

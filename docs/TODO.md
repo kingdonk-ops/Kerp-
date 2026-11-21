@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 305 · **Closed:** 136
+**Open:** 307 · **Closed:** 136
 
 ## decision (38)
 
@@ -48,7 +48,7 @@
 | [TD-438](../tracker/todo/TD-438.md) | Machine credentials (ADR 0017): service-account representation and who manages API keys | T-0298, T-0307, T-0308, T-0309 | planner |
 | [TD-439](../tracker/todo/TD-439.md) | Feature flags: who toggles them, project overrides, and what a flag may gate | T-0306 | planner |
 
-## spec-gap (58)
+## spec-gap (59)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -110,6 +110,7 @@
 | [TD-425](../tracker/todo/TD-425.md) | CEL helper eligibility.is_product_approved cannot do I/O and must run offline: pure function over a resolved approvals map | T-0270 | planner |
 | [TD-428](../tracker/todo/TD-428.md) | ITP templates: line-item structure, approval authority and the ITP instance on an anchor are not specified in T-0113 / quality-and-inspection.md (pasted T-0187/T-0188 assume oe_qms_itp_template, draft → approved, is_customized) | T-0113, T-0187, T-0188, T-0281 | planner |
 | [TD-430](../tracker/todo/TD-430.md) | New rule kind itp_assignment in the ADR 0004 rule store (scope → approved ITP template): context variables, action vocabulary, editors | T-0188 | planner |
+| [TD-452](../tracker/todo/TD-452.md) | Uploads: a file larger than the malware scan limit (KERP_UPLOAD_SCAN_MAX_BYTES or clamd StreamMaxLength) is rejected as verify_failed; diff 4.7 lists no dedicated reason code (e.g. scan_too_large) | T-0218 | implementer |
 
 ## missed (7)
 
@@ -123,7 +124,7 @@
 | [TD-337](../tracker/todo/TD-337.md) | Web/Android route /magic-link#<token> that redeems the e-mailed sign-in link (POST /auth/magic-link/redeem); the e-mail now links there | T-0058 | implementer |
 | [TD-388](../tracker/todo/TD-388.md) | saved_views: wire the my_teams filter op | T-0074 | reviewer |
 
-## deferred (40)
+## deferred (41)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -167,6 +168,7 @@
 | [TD-432](../tracker/todo/TD-432.md) | Digest-pin the postgis/postgis:16-3.4 CI service image (ci.yml): the implementer sandbox could not reach the Docker Hub registry API to resolve its digest (redis is pinned); resolve with docker buildx imagetools inspect and drop the strict xfail in scripts/tests/test_workflows.py | T-0033 | implementer |
 | [TD-446](../tracker/todo/TD-446.md) | E2E journey: Sign in with Microsoft against the fake OIDC provider (T-0054) lands in the project, once the Playwright harness (T-0027) exists | T-0055 | implementer |
 | [TD-448](../tracker/todo/TD-448.md) | Playwright e2e journey for T-0026 (System admin appoints a Project Admin -> they create a project -> assign a user) once T-0027 sets up e2e/; covered meanwhile by the component-level journey in frontend/src/admin/MembersPage.test.tsx | T-0026 | implementer |
+| [TD-451](../tracker/todo/TD-451.md) | Queue monitor: failed-job list and retry/abort see only job rows the caller's RLS shows until T-0274 (ADR 0016) lets a system_admin read every project's oe_jobs_job rows | T-0218 | implementer |
 
 ## later (125)
 
