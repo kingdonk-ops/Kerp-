@@ -215,7 +215,11 @@ def test_weights_from_junit(tmp_path: Path) -> None:
         "</testsuite></testsuites>",
         encoding="utf-8",
     )
-    expected = {"tests/test_a.py": 1.75, "tests/test_b.py": 2.0}
+    extra = shard_tests.PER_TEST_OVERHEAD
+    expected = {
+        "tests/test_a.py": round(1.75 + 2 * extra, 2),  # two cases
+        "tests/test_b.py": round(2.0 + extra, 2),
+    }
     assert shard_tests.weights_from_junit([report]) == expected
     no_file = tmp_path / "junit-xunit2.xml"
     no_file.write_text('<testsuite><testcase classname="tests.a" name="t" time="1"/></testsuite>')
@@ -227,4 +231,5 @@ def test_weights_cli_prints_json(tmp_path: Path, capsys: pytest.CaptureFixture[s
     report = tmp_path / "r.xml"
     report.write_text('<testsuite><testcase file="tests/test_a.py" name="t" time="3"/></testsuite>')
     assert shard_tests.main(["weights", str(report)]) == 0
-    assert json.loads(capsys.readouterr().out) == {"tests/test_a.py": 3.0}
+    expected = {"tests/test_a.py": 3.0 + shard_tests.PER_TEST_OVERHEAD}
+    assert json.loads(capsys.readouterr().out) == expected

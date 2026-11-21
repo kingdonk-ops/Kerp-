@@ -6,7 +6,8 @@ the per-worker template databases stay per process, see ``backend/tests/pg_datab
 
 * the files are ``backend/tests/**/test_*.py`` and ``**/*_test.py`` (pytest's default
   ``python_files``; ``scripts/tests/test_shard_tests.py`` checks the backend does not change it);
-* each file weighs its measured PostgreSQL seconds from ``scripts/shard_weights.json``; a file
+* each file weighs its measured PostgreSQL seconds from ``scripts/shard_weights.json`` (JUnit
+  times plus a per-test overhead, see ``weights_from_junit``); a file
   not listed there (new since the last rebalance) weighs the mean of the listed ones;
 * files are placed heaviest first (ties by path) on the lightest shard (ties by shard number):
   the same tree and weights always give the same split, every file lands in exactly one shard.
@@ -148,15 +149,23 @@ def coverage_floor(pyproject: Path = BACKEND / "pyproject.toml") -> str:
     return floors[0]
 
 
+# Worker-seconds each test costs outside its JUnit time (xdist dispatch, coverage tracing,
+# reporting). Measured on CI run 44946765058: four shards with equal JUnit sums but 594 to
+# 1894 tests took 84 s to 137 s on 4 workers, about 0.1 s more per test.
+PER_TEST_OVERHEAD = 0.1
+
+
 def weights_from_junit(paths: Iterable[Path]) -> dict[str, float]:
-    """Seconds per test file, summed over the test cases of JUnit (xunit1) reports."""
+    """Seconds per test file: the JUnit (xunit1) times of its test cases plus
+    ``PER_TEST_OVERHEAD`` per test case."""
     totals: dict[str, float] = {}
     for path in paths:
         for case in ET.parse(path).getroot().iter("testcase"):
             file = case.get("file")
             if not file:
                 raise SystemExit(f"{path}: a test case has no file (use -o junit_family=xunit1)")
-            totals[file] = totals.get(file, 0.0) + float(case.get("time") or 0.0)
+            seconds = float(case.get("time") or 0.0) + PER_TEST_OVERHEAD
+            totals[file] = totals.get(file, 0.0) + seconds
     return {f: round(totals[f], 2) for f in sorted(totals)}
 
 
