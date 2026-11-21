@@ -1338,95 +1338,6 @@
         }
       }
     },
-    "/api/v1/modules": {
-      "get": {
-        "tags": [
-          "platform"
-        ],
-        "summary": "List Modules",
-        "description": "Every loaded module, dependencies first, with its state for the caller's project.",
-        "operationId": "list_modules_api_v1_modules_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/ModuleState"
-                  },
-                  "type": "array",
-                  "title": "Response List Modules Api V1 Modules Get"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
-      }
-    },
-    "/api/v1/modules/{name}": {
-      "put": {
-        "tags": [
-          "platform"
-        ],
-        "summary": "Set Module",
-        "description": "Enable or disable module ``name`` for the caller's project.\n\n404 for an unknown module; 409 when the module cannot be disabled or the change would\nbreak a dependency (the detail says which module to change first).",
-        "operationId": "set_module_api_v1_modules__name__put",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "name",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Name"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ModuleToggle"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ModuleState"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/v1/settings/deployment": {
       "get": {
         "tags": [
@@ -1756,6 +1667,127 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProjectRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project_id}/modules": {
+      "get": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "List Project Modules",
+        "description": "Every loaded module, dependencies first, with its state for the project (``V``).",
+        "operationId": "list_project_modules_api_v1_projects__project_id__modules_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Project Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ModuleState"
+                  },
+                  "title": "Response List Project Modules Api V1 Projects  Project Id  Modules Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project_id}/modules/{name}": {
+      "put": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "Set Project Module",
+        "description": "Enable or disable module ``name`` for the project (``admin``); its new state.\n\n404 for an unknown module; 409 when the module cannot be disabled or the change would\nbreak a dependency (the detail names the module to change first).",
+        "operationId": "set_project_module_api_v1_projects__project_id__modules__name__put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModuleToggle"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModuleState"
                 }
               }
             }
@@ -11620,7 +11652,7 @@
           "enabled"
         ],
         "title": "ModuleState",
-        "description": "A loaded module and whether it is enabled for the caller's project."
+        "description": "A loaded module and whether it is enabled for the project."
       },
       "ModuleToggle": {
         "properties": {
@@ -11635,7 +11667,7 @@
           "enabled"
         ],
         "title": "ModuleToggle",
-        "description": "Body of ``PUT /api/v1/modules/{name}``."
+        "description": "Body of ``PUT /api/v1/projects/{project_id}/modules/{name}``."
       },
       "MyProject": {
         "properties": {

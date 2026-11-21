@@ -18,7 +18,7 @@ FastAPI modular monolith (see `docs/spec/` and `CLAUDE.md` §6).
 | `app/core/audit/` | Hash-chained, append-only audit ledger (`append`, `verify_chain`; REVOKE + triggers) — see its `README.md` |
 | `app/core/auth/` | Users, scrypt passwords, EdDSA/RS256 JWTs + JWKS, rotating refresh, Redis `jti` revocation — see its `README.md` |
 | `app/core/mail/` | Outbound e-mail: `send_mail` (enqueue after commit), SES / fake / log transports, i18n templates, send log, bounce/complaint suppression, SNS endpoint — see its `README.md` |
-| `app/core/module_loader/` | Module loader + manifest contract, per-project enable/disable, toggle API `/api/v1/modules` — see its `README.md` |
+| `app/core/module_loader/` | Module loader + manifest contract, per-project enable/disable (toggle API: `projects` module, `/api/v1/projects/{project_id}/modules`) — see its `README.md` |
 | `app/modules/<name>/` | Domain modules (`manifest.py`, `models.py`, `router.py`, `service.py`, `schemas.py`, `README.md`), mounted at `/api/v1/<name>` |
 | `app/modules/onboarding/` | First-run provisioning of a deployment: `python -m app.modules.onboarding.first_run` (the one hidden tenant, deployment settings, the first System admin; deploy steps in `docs/deploy/first-run.md`) — see its `README.md` |
 | `app/modules/validation/` | Verification engine: `run_checks(context, rule_set)` and the single rule store (kinds, engines, compile-on-save, findings log) — see its `README.md` |

@@ -5,6 +5,7 @@ manifest contract, orders the modules by dependency and fails fast, with every p
 listed, on unknown or cyclic dependencies.
 """
 
+import ast
 from pathlib import Path
 
 import pytest
@@ -124,7 +125,7 @@ def test_manifest_contract_violations(manifest: object, expected: str) -> None:
 
 
 def test_reserved_names_are_refused() -> None:
-    assert "modules" in RESERVED_NAMES  # /api/v1/modules is the toggle API
+    assert "modules" in RESERVED_NAMES  # /api/v1/modules: the former toggle API path
     manifest = ModuleManifest(name="modules", version="1.0.0")
     assert any("reserved" in p for p in manifest_problems(manifest, directory="modules"))
 
@@ -251,7 +252,9 @@ def test_create_app_mounts_each_module_under_the_api_prefix(packages: ModulePack
     paths = set(app.openapi()["paths"])
     assert f"{API_PREFIX}/field-time/ping" in paths
     assert f"{API_PREFIX}/projects/ping" in paths
-    assert f"{API_PREFIX}/modules" in paths
+    # The toggle API is served by the projects module on the project path (T-0084); the
+    # loader mounts nothing of its own.
+    assert not {p for p in paths if p.startswith(f"{API_PREFIX}/modules")}
     # A module that cannot be disabled needs no database to serve.
     with TestClient(app) as client:
         assert client.get(f"{API_PREFIX}/projects/ping").json() == {"module": "projects"}
@@ -260,12 +263,71 @@ def test_create_app_mounts_each_module_under_the_api_prefix(packages: ModulePack
 def test_the_default_app_loads_app_modules() -> None:
     app = create_app(Settings(environment="test"))
     assert registry_of(app).package == "app.modules"
+    paths = app.openapi()["paths"]
+    assert {"get"} <= set(paths[f"{API_PREFIX}/projects/{{project_id}}/modules"])
+    assert {"put"} <= set(paths[f"{API_PREFIX}/projects/{{project_id}}/modules/{{name}}"])
+    assert not {p for p in paths if p.startswith(f"{API_PREFIX}/modules")}
 
 
 def test_a_router_module_without_router_fails(packages: ModulePackages) -> None:
     package = packages.write({"assets": FakeModule(router="ROUTES = []\n")})
     with pytest.raises(ModuleLoadError, match=r"assets: router.py must define router"):
         create_app(Settings(environment="test"), modules_package=package)
+
+
+# --- core boundary (T-0084) ------------------------------------------------------------------
+
+APP = Path(__file__).resolve().parents[1] / "app"
+
+
+def _imported_names(source: str, package: tuple[str, ...]) -> list[str]:
+    """Every module name ``source`` imports statically, relative imports resolved against
+    ``package`` (the package the file is in)."""
+    names: list[str] = []
+    for node in ast.walk(ast.parse(source)):
+        if isinstance(node, ast.Import):
+            names += [alias.name for alias in node.names]
+        elif isinstance(node, ast.ImportFrom):
+            base = list(package[: len(package) - node.level + 1]) if node.level else []
+            module = ".".join([*base, *([node.module] if node.module else [])])
+            names.append(module)
+            names += [f"{module}.{alias.name}" for alias in node.names]
+    return names
+
+
+def _is_module_import(name: str) -> bool:
+    return name == "app.modules" or name.startswith("app.modules.")
+
+
+def test_core_never_imports_app_modules() -> None:
+    # CLAUDE.md §6: modules call core; core never imports a module, also not lazily.
+    found = [
+        f"{path.relative_to(APP.parent)}: {name}"
+        for path in sorted((APP / "core").rglob("*.py"))
+        for name in _imported_names(
+            path.read_text(encoding="utf-8"), path.relative_to(APP.parent).parent.parts
+        )
+        if _is_module_import(name)
+    ]
+    assert found == []
+
+
+@pytest.mark.parametrize(
+    ("source", "flagged"),
+    [
+        ("import app.modules.projects.service", True),
+        ("from app.modules.projects import service", True),
+        ("from app import modules", True),
+        ("from ...modules import projects", True),
+        ("def f():\n    from app.modules import admin\n", True),
+        ("from app.core import db", False),
+        ("from . import service", False),
+        ("from .. import modules_like", False),
+    ],
+)
+def test_the_core_import_scan_flags_module_imports(source: str, flagged: bool) -> None:
+    names = _imported_names(source, ("app", "core", "module_loader"))
+    assert any(_is_module_import(n) for n in names) is flagged
 
 
 def test_registry_of_requires_a_loaded_app() -> None:

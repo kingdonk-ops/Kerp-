@@ -10,7 +10,7 @@ modules carries the project's `id` as its `project_id`.
 | `models.py` | `oe_projects_project` (`BaseRecordMixin`, tenant-level row; migration `0008`, membership-based RLS since `0015`, `visible_in_lobby` since `0021`, DB-side `status`/`site_timezone` defaults since `0033`) |
 | `schemas.py` | `ProjectCreate` / `ProjectUpdate` / `ProjectRead`, `LobbyVisibility`, `PolygonGeoJSON`; timezone, ISO 4217, BCP 47 validation from `app.core.locale` (shared with the settings module) |
 | `service.py` | `create_project`, `get_project`, `list_projects`, `live_project_ids` (the jobs scheduler, T-0214), `update_project`, `delete_project`, `site_zone`, `bind_project` (project-scoped routers, T-0217), `tenant_projects` (every live project a `system_admin` session sees, T-0275), `set_lobby_visibility`, the narrow lobby read `lobby_projects` / `project_by_code` (T-0040) and `lobby_projects_by_id` (access requests, T-0050) |
-| `router.py` | `GET/POST /api/v1/projects`, `GET/PATCH/DELETE /api/v1/projects/{id}`, `PUT /api/v1/projects/{id}/lobby` |
+| `router.py` | `GET/POST /api/v1/projects`, `GET/PATCH/DELETE /api/v1/projects/{id}`, `PUT /api/v1/projects/{id}/lobby`, the module toggle `GET /api/v1/projects/{id}/modules`, `PUT /api/v1/projects/{id}/modules/{name}` (T-0084) |
 
 ## Record
 
@@ -77,6 +77,22 @@ request's scope was resolved from, so they are read once per request, T-0071):
   While team-derived members remain (T-0073, ADR 0008) it answers 409 `team_links_present`:
   a System admin unlinks the project's teams first, so derived grants never outlive their link.
 
+## Module toggle (T-0084)
+
+`GET /api/v1/projects/{id}/modules` lists every loaded module in dependency order with
+`name`, `version`, `depends_on`, `toggleable` and `enabled` for that project;
+`PUT /api/v1/projects/{id}/modules/{name}` with `{"enabled": bool}` switches one on or off and
+returns its new state. The router binds the request session to the path's project with
+`bind_project` (`V` to read, `admin` to change: PER-09 or a `system_admin`, ADR 0016) and
+calls `app.core.module_loader.service` (`project_states`, `set_enabled`) with the app's
+registry; the shapes are `app.core.module_loader.schemas`. A non-member and an unknown,
+deleted or other tenant's project get 404, a member without `admin` 403. An unknown module is
+404; a module that cannot be disabled, or a change that would break a dependency, 409 naming
+the module (to change first). Each change goes to the project's `project_modules` audit chain
+with the caller's user id, and the enable listeners run (the validation module copies the
+module's default rule sets). The semantics are T-0011's: `app/core/module_loader/README.md`.
+This module owns the route because core never imports `app.modules`.
+
 ## Narrow lobby read (T-0040)
 
 The lobby module finds projects the caller is not a member of through `lobby_projects(session)`
@@ -131,5 +147,5 @@ access = projects.bind_project(session, principal, grants, project_id, require=C
 ## Tests
 
 `tests/test_projects.py` (SQLite and PostgreSQL; the PostGIS geometry check runs only on
-PostgreSQL, TD-052). The lobby flag and narrow read: `tests/test_lobby.py`,
+PostgreSQL, TD-052). The module toggle: `tests/test_module_toggle.py`. The lobby flag and narrow read: `tests/test_lobby.py`,
 `tests/test_rls_lobby.py`.
