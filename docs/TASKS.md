@@ -3,12 +3,12 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 74/277 tasks done (27%) · **ready now:** 27 · **epics awaiting breakdown:** 48
+**Overall:** 74/278 tasks done (27%) · **ready now:** 27 · **epics awaiting breakdown:** 48
 
 | Phase | Tasks done | Progress |
 |---|---|---|
 | 0 · Platform foundations | 74/112 | `██████░░░░` 66% |
-| 1 · Asset & Quality backbone | 0/139 (+1 epics) | `░░░░░░░░░░` 0% |
+| 1 · Asset & Quality backbone | 0/140 (+1 epics) | `░░░░░░░░░░` 0% |
 | 2 · Welding quality | 0/11 | `░░░░░░░░░░` 0% |
 | 3 · Logistics | 0/2 (+7 epics) | `░░░░░░░░░░` 0% |
 | 4 · Execution | 0/0 (+15 epics) | `░░░░░░░░░░` 0% |
@@ -265,9 +265,10 @@
 | ⬜ | [T-0271](../tracker/tasks/T-0271.md) | materials/inspections: substitutions in the offline reference bundle, substitution_id bound on the answer, read-only substitution note on the inspection and its PDF | materials | M | T-0270, T-0147, T-0158, T-0111 |  |
 | ⬜ | [T-0272](../tracker/tasks/T-0272.md) | Frontend: product selector shows approved substitutes badged "Approved Substitute (ref)" with the equivalency document viewable offline; selecting binds substitution_id | materials | S | T-0271, T-0165 |  |
 | 🟥 | [T-0280](../tracker/tasks/T-0280.md) | Frontend: Admin → Users 'Login as user (support)' with reason modal, persistent impersonation banner with countdown and Exit, session hand-back (blocked by TD-426) *(blocked by TD-426)* | frontend | M | T-0246, T-0026, T-0277, T-0278, T-0279 |  |
-| ⬜ | [T-0289](../tracker/tasks/T-0289.md) | signing: e-signature attestation for formal sign-offs — re-authentication grant (signing PIN or password; device PIN offline), versioned intent statement, timestamp/device/IP evidence in the sign-off ledger, refused under impersonation | signing | M | T-0119, T-0162, T-0143, T-0177, T-0230 |  |
-| ⬜ | [T-0290](../tracker/tasks/T-0290.md) | Frontend: signing ceremony — intent statement dialog, re-authentication prompt (signing PIN or password online, device PIN on Android offline), set/reset signing PIN for every user | frontend | M | T-0289, T-0143, T-0153 |  |
-| ⬜ | [T-0291](../tracker/tasks/T-0291.md) | signing: wire attestation into the phase-1 formal sign-offs (inspection approve, ITP hold/witness single-row sign-off, internal_qa substitution approval) and print the attestation block on the inspection PDF | signing | M | T-0289, T-0150, T-0114, T-0185, T-0158 |  |
+| ⬜ | [T-0289](../tracker/tasks/T-0289.md) | signing: e-signature attestation for formal sign-offs — re-authentication grant (signing PIN or password; device PIN offline), versioned intent statement, timestamp/device/IP evidence in the sign-off ledger, refused under impersonation (offline sync branch: T-0310) | signing | M | T-0119, T-0162, T-0143, T-0177, T-0230 |  |
+| ⬜ | [T-0290](../tracker/tasks/T-0290.md) | Frontend: signing ceremony — intent statement dialog, re-authentication prompt (signing PIN or password online, device PIN on Android offline), set/reset signing PIN for every user | frontend | M | T-0289, T-0310, T-0143, T-0153 |  |
+| ⬜ | [T-0310](../tracker/tasks/T-0310.md) | signing: offline formal sign-off acceptance at sync — no grant for device_pin_offline, intent version resolved at occurred_at (intent_outdated flag, never 409), inactive or revoked signer kept as evidence but not effective (signer_inactive → QA queue) | signing | S | T-0289, T-0143, T-0162, T-0181, T-0244 |  |
+| ⬜ | [T-0291](../tracker/tasks/T-0291.md) | signing: wire attestation into the phase-1 formal sign-offs (inspection approve, ITP hold/witness single-row sign-off, internal_qa substitution approval) and print the attestation block on the inspection PDF | signing | M | T-0289, T-0310, T-0150, T-0114, T-0185, T-0158 |  |
 | ▶ | [T-0292](../tracker/tasks/T-0292.md) | delegations: narrow delegation of authority — oe_delegations_delegation (time-bound, per project and kind), create/list/revoke API, audit, resolution service (never confers authority) | delegations | M | T-0010, T-0014, T-0006, T-0019 |  |
 | ⬜ | [T-0293](../tracker/tasks/T-0293.md) | delegations: route hold-point call-outs, verification items and SLA reminders/escalations to active delegates; act on behalf with the delegate's own persona, credentials and SoD; "signed by X on behalf of Y" in the ledger and PDF | delegations | M | T-0292, T-0289, T-0291, T-0181, T-0182, T-0115 |  |
 | ⬜ | [T-0294](../tracker/tasks/T-0294.md) | Frontend: delegations — My delegations (create, revoke), project delegations list for PER-09, "acting for" chip in queues and sign dialogs | frontend | S | T-0292, T-0031 |  |
@@ -351,9 +352,9 @@
 | ⬜ | [T-0189](../tracker/tasks/T-0189.md) | qms/ai_agents: ITP alignment watchdog — drift reviews on scope-change, P6 and task events, AI gap analysis and proposed ITP patch (proposal only), reviewer notification | qms | M | T-0015, T-0019, T-0058, T-0104, T-0187, T-0188, T-0281, T-0285, E-04-07, E-04-14, E-05-08 |  |
 | ⬜ | [T-0286](../tracker/tasks/T-0286.md) | qms: ITP alignment review actions — dismiss, mark manually updated, Apply AI proposal & approve (human-confirmed, signed lines preserved, ledgered) | qms | S | T-0189, T-0281 |  |
 | ⬜ | [T-0287](../tracker/tasks/T-0287.md) | Frontend: ITP Alignment Review drawer (what changed, AI gap analysis, proposed patch diff; dismiss / edit manually / apply & approve) and review register | frontend | M | T-0286, T-0283 |  |
-| ⬜ | [T-0307](../tracker/tasks/T-0307.md) | identity: service accounts (auth_user.account_type) and API keys oe_identity_api_key — tenant- or project-scoped, read/write scopes, required expiry, hashed, shown once, revocable, audited | identity | M | T-0014, T-0006, T-0298 |  |
-| ⬜ | [T-0308](../tracker/tasks/T-0308.md) | identity: API key authentication — tenant bound from the deployment, scopes ∩ memberships, A/S always removed, interactive-only routes refused, per-key rate limit, source="api" audit | identity | M | T-0307, T-0010 |  |
-| ⬜ | [T-0309](../tracker/tasks/T-0309.md) | Frontend: Admin → Service accounts and API keys (create shown once, scopes, projects, expiry, revoke, last used) | frontend | S | T-0307, T-0246 |  |
+| ⬜ | [T-0307](../tracker/tasks/T-0307.md) | identity: service accounts (auth_user.account_type) and API keys oe_identity_api_key — tenant- or project-scoped, read/write scopes, required expiry, hashed, shown once, revocable, rotatable with ≤ 24 h overlap, audited; service accounts never hold admin grants | identity | M | T-0014, T-0006, T-0298 |  |
+| ⬜ | [T-0308](../tracker/tasks/T-0308.md) | identity: API key authentication — tenant bound from the deployment, scopes ∩ memberships, A/S always removed, interactive-only routes refused, per-key rate limit, admin grants ignored, machine writes identified by service account + key id | identity | M | T-0307, T-0010 |  |
+| ⬜ | [T-0309](../tracker/tasks/T-0309.md) | Frontend: Admin → Service accounts and API keys (create shown once, scopes, projects, expiry, rotate, revoke, last used) | frontend | S | T-0307, T-0246 |  |
 
 ## Phase 6 — Defense, claims & controls
 

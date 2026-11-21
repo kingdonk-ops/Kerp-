@@ -864,12 +864,15 @@ the user approved. E-signature and delegation are in `modules/quality-and-inspec
   groups still never map to personas, grants or teams, so `/Groups` is not supported.
   - **Users:** create (no credentials, memberships or grants; `is_internal` derived as in §4.1),
     filter by `userName` (= e-mail) or `externalId` (= Entra object id, linked like an SSO link:
-    an account linked to a different oid → 409), PATCH/PUT, DELETE.
+    an account linked to a different oid → 409), PATCH/PUT, DELETE. SCIM acts only on
+    `is_internal = true` accounts and never on service accounts: a match on an external or
+    service account → 409, account untouched (TD-437).
   - **Deprovisioning** (`active = false` or DELETE) sets `auth_user.is_active = false` (never a
     hard delete) and revokes every live session at once through force sign-out's revoke (§4.8):
     the next request is 401, not `DEVICE_REVOKED`, and no device is wiped. Reactivation restores
-    sign-in only. The last active System admin cannot be deactivated (409, audited, System admins
-    notified).
+    sign-in only; offline formal sign-offs made after the deactivation are kept but not
+    effective (`signer_inactive`, quality-and-inspection.md §Signing attestation). The last
+    active System admin cannot be deactivated (409, audited, System admins notified).
   - **Token:** a bearer token per Entra application, created by a `system_admin`, shown once,
     stored only as a SHA-256 hash, with expiry (default 365 days, max 730), rotation (the old
     token stays valid 24 h) and revocation; the tenant is bound from deployment configuration and
@@ -894,13 +897,21 @@ the user approved. E-signature and delegation are in `modules/quality-and-inspec
   TD-438).** A service account is an `auth_user` with `account_type = service` (never signs in
   interactively; excluded from seats, presence and broadcasts) holding project memberships. Its
   API keys are tenant- or project-scoped, with `read`/`write` scopes and a required expiry
-  (≤ 365 days), stored hashed, shown once, revocable at once, audited, and rate limited per key
-  (`api_key_rate_per_minute`, §4.7). The tenant comes from the key (ADR 0017). Capabilities are
-  scopes ∩ memberships, and **`A` and `S` are always removed**: no sign-off, approval, hold
-  release, co-sign, attestation or confirmation of an AI proposal is ever made with a key.
-  Interactive-only routes (`/auth/*`, `/signing/reauth`, devices, PIN, invites, admin grants,
-  `/admin/*` mutations, SCIM) refuse keys. Records written with a key carry `source="api"`.
-  Outbound webhooks (HMAC) stay in E-05-07.
+  (≤ 365 days), stored hashed, shown once at creation and at rotation (rotation issues a new
+  secret and keeps the old one valid for an overlap of at most 24 h, as for SCIM tokens),
+  revocable at once, audited, and rate limited per key (`api_key_rate_per_minute`, §4.7). The
+  tenant comes from the key (ADR 0017). Capabilities are scopes ∩ memberships, and **`A` and
+  `S` are always removed**: no sign-off, approval, hold release, co-sign, attestation or
+  confirmation of an AI proposal is ever made with a key. A service account can **never hold
+  an admin grant** (the admin-grant API refuses it with 422), and key-authenticated requests
+  ignore admin grants and `system_admin` visibility (ADR 0016), so a key reaches only the
+  projects its account is a member of. Service accounts are `is_internal = false`, so the
+  internal-commercial boundary (T-0295) hides internal commercial data from keys; this is
+  intended. Interactive-only routes (`/auth/*`, `/signing/reauth`, devices, PIN, invites, admin
+  grants, `/admin/*` mutations, SCIM) refuse keys. Machine writes are identified by `created_by`
+  being an `account_type = service` user (or, for SCIM, the SCIM token id) plus the key or token
+  id in the audit payload; `source="api"` alone does not identify them, because it is also the
+  default for human JWT writes. Outbound webhooks (HMAC) stay in E-05-07.
 - **Network restrictions (IP allowlisting).** Not built in KERP: source-IP restrictions are
   infrastructure configuration (AWS WAF IP sets in front of the API and web app, Entra
   Conditional Access named locations for SSO users), documented in
@@ -920,8 +931,11 @@ come later (Phase 6, T-0303–T-0305, epic E-06-05). Rules:
   written through `metering/service.py` by the uploads file lifecycle (`available` adds a
   reference, `expired`/swept/deleted removes it; rejected files never count), the image
   derivatives (T-0247), the project archive registry (E-01-02: `ready`, tier changes, restore
-  copies). Cold archives count as `DEEP_ARCHIVE` (§4.7 storage classes). Idempotent through a
-  partial unique index on plain columns; soft delete only; nothing cascades into it.
+  copies). Cold archives count as `DEEP_ARCHIVE` (§4.7 storage classes). Idempotent through an
+  `idempotency_key` supplied by the hook (hook name + the source row's transition or version
+  id) with a partial unique index on `(tenant_id, idempotency_key)` over live rows, so a retried
+  hook writes nothing twice while every real transition (e.g. an archive moved to
+  `DEEP_ARCHIVE`, back and again) is kept; soft delete only; nothing cascades into it.
 - **Content-addressed bytes (TD-408, TD-436).** Physical bytes are counted once per object
   (tenant-wide and for its project); logical bytes per referencing file row. An object
   referenced from several projects is attributed in full to each project's figures and marked

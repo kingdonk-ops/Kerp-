@@ -334,19 +334,44 @@ before it ships carry no attestation and stay valid ("no attestation recorded" o
   `signing_reauth_ttl_minutes` (registry, default 5, 1–15). Offline on the Android tablet (field
   H/W sign-off) the app asks for the **device PIN again at the moment of signing**, even while
   unlocked (local keystore check, local lockout of diff §4.2); the queued mutation carries
-  `reauth_method = device_pin_offline` and its time evidence, and the server accepts it at sync
-  only if the device is active, enrolled to the signer and not revoked before `occurred_at`, and
-  flags it `grace_exceeded` (kept, not dropped) outside the offline grace/window.
+  `reauth_method = device_pin_offline` and its time evidence. Its sync acceptance is the
+  **offline branch** below.
+- **Offline branch at sync (T-0310).** A queued formal sign-off with
+  `reauth_method = device_pin_offline` needs **no server signing grant** (the device-PIN
+  re-entry is the re-authentication). The server decides on the reconstructed `occurred_at`
+  (diff §6.4.1):
+  - **Device:** accepted only if the device is active, enrolled to the signer and not revoked
+    before `occurred_at`; a mutation from a revoked or foreign device is refused like any other
+    mutation from it (T-0143). Past this check the sign-off is never dropped and never answered
+    with 409.
+  - **Intent version:** accepted if the version the device showed was the current one at
+    `occurred_at` (the registry keeps every version of a kind with its `effective_from` and its
+    i18n key, and the recorded text is that of the version the device showed); otherwise kept,
+    effective, flagged `intent_outdated` and listed for QA review.
+  - **Signer standing:** if the signer was `is_active = false`, or had their sessions revoked
+    (force sign-out, diff §4.8) after the device session the mutation was queued under began,
+    at any time before `occurred_at`, the sign-off is **kept as evidence but not effective**: it
+    does not count as signed, releases no hold and closes no row; it is flagged `signer_inactive`
+    and routed as an item to the QA verification queue (§QA verification queue), where a
+    qualified reviewer either signs the point themselves (a new attested online sign-off) or
+    records the flagged entry as void. Reactivating the account later changes nothing.
+  - **Grace:** outside the offline grace/window of diff §4.2 it is flagged `grace_exceeded`
+    (kept, effective, as any offline mutation).
+  Flags are recorded in the attestation (`flags: [...]`) and the audit payload; `ip_source = sync`.
 - **Intent statement.** Before signing the signer sees and explicitly accepts a statement such as
   "I, <name>, as <persona>, release hold point <code> on <anchor> and confirm the work meets the
   stated acceptance criteria" (wording per kind in the i18n catalogue). The server renders the
-  text in the signer's locale; an outdated `intent_version` → 409, not accepted → 422.
+  text in the signer's locale. Online, an outdated `intent_version` → 409 (the client re-renders
+  and asks again) and not accepted → 422; offline sign-offs follow the offline branch above.
 - **Evidence in the ledger.** The sign-off ledger entry's payload carries
   `attestation: {v, kind, intent_key, intent_version, locale, intent_text, intent_sha256,
   reauth_method, reauth_at, signed_at, occurred_at + time evidence (diff §6.4.1) when offline,
   device_id, ip, ip_source (request | sync), user_agent_family, on_behalf_of_user_id,
-  delegation_id}`. It is inside the hashed payload, so the ledger format (`v`) is unchanged. The
-  IP is the one uvicorn resolves behind trusted proxies only (`FORWARDED_ALLOW_IPS`).
+  delegation_id, flags}`. It is inside the hashed payload, so the ledger format (`v`) is
+  unchanged. The IP is the one uvicorn resolves behind trusted proxies only
+  (`FORWARDED_ALLOW_IPS`). Privacy: the IP and the user-agent family sit in the immutable,
+  hash-chained ledger and cannot be erased later; this is accepted for evidentiary sign-offs,
+  and only these minimum fields are kept (no full user-agent string, no geolocation; TD-433).
 - **Authority is unchanged.** Attestation proves who signed and that they meant it; it never
   grants anything. Persona, site scope, credentials (TD-099/TD-100), SoD and `run_checks` are
   checked by the consumer as before; `system_admin` has no `A`/`S` (ADR 0016).
@@ -381,9 +406,12 @@ forward to Phase 1 (T-0292 model and API, T-0293 routing and on-behalf actions, 
   runs the same `run_checks`. SoD and self-approval apply to the delegate (no approving work they
   performed or submitted; `allow_self_approval` evaluated for them). No admin grant adds anything
   (§4.1, ADR 0016). The delegator keeps their own authority; the first action wins.
-- **Signed on behalf.** The sign-off is the delegate's (ledger `created_by` = delegate) with
-  `attestation.on_behalf_of_user_id` and `delegation_id`; the PDF and the MDR print "Signed by
-  X on behalf of Y". Roster awareness (who is on shift) belongs to E-04-12.
+- **Recorded on behalf.** Every action a delegate takes on behalf of the delegator records
+  `on_behalf_of_user_id` + `delegation_id`, with `created_by` / the actor = the delegate: for
+  formal kinds in the ledger attestation (`attestation.on_behalf_of_user_id`, `delegation_id`);
+  for actions that are not attested (e.g. verification approve/reject in the QA verification
+  queue, reassignments) on the decision record itself and in its audit entry. The PDF and the
+  MDR print "Signed by X on behalf of Y". Roster awareness (who is on shift) belongs to E-04-12.
 
 ## Planning fields (Pilot-0, planner spec 2026-11-13; TD-165)
 
