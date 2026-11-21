@@ -490,6 +490,27 @@ def test_a_hold_link_for_an_individual_per09_needs_confirmation(
     assert _chain(db, P)[-1]["sod_warning"] is False
 
 
+@pytest.mark.parametrize("persona", sorted(HOLD_AUTHORITY))
+def test_a_hold_link_for_a_system_admin_needs_confirmation(db: Database, persona: Persona) -> None:
+    """ADR 0016, diff §4.1 (T-0275): a derived hold persona reaching a ``system_admin`` (no
+    PER-09 anywhere) warns like one reaching an individual PER-09."""
+    alice, bob = _users(db, ALICE, BOB)
+    with db.unit_of_work(ROOT) as s:
+        assert admin.grant(s, alice, SYSTEM_ADMIN, actor_id=None)
+    site = SITE if persona is Persona.SITE_INSPECTOR else None
+    with pytest.raises(SodConfirmationRequired) as refused:
+        _sync(db, [alice, bob], persona=persona, site=site)
+    assert (refused.value.user_ids, refused.value.project_id) == ({alice}, P)
+    assert [r for r in _rows(db) if r[4] == SOURCE_TEAM_LINK] == []
+    assert _chain(db, P) == []
+    _sync(db, [alice, bob], persona=persona, site=site, confirm_sod=True)
+    [entry] = _chain(db, P)
+    assert (entry["sod_warning"], entry["sod_user_ids"]) == (True, [str(alice)])
+    # A non-hold link for the same admin warns about nothing.
+    _sync(db, [alice], persona=Persona.PROJECT_VIEWER, link=OTHER_LINK)
+    assert _chain(db, P)[-1]["sod_warning"] is False
+
+
 def test_a_link_without_hold_authority_needs_no_confirmation(db: Database) -> None:
     [alice] = _users(db, ALICE)
     _direct(db, alice, P, Persona.PROJECT_ADMINISTRATOR, None)

@@ -155,7 +155,23 @@ def grant(
     confirm_sod: bool = False,
 ) -> bool:
     """Grant ``kind`` (``system_admin`` sessions only: the RLS policy and the ORM guard refuse
-    anyone else). ``False`` when the user already holds it. Called by ``/admin/grants``.
+    anyone else). ``False`` when the user already holds it (``grant_checked``)."""
+    created, _sod_projects = grant_checked(
+        session, user_id, kind, actor_id=actor_id, confirm_sod=confirm_sod
+    )
+    return created
+
+
+def grant_checked(
+    session: Session,
+    user_id: uuid.UUID,
+    kind: str,
+    *,
+    actor_id: uuid.UUID | None,
+    confirm_sod: bool = False,
+) -> tuple[bool, list[uuid.UUID]]:
+    """``grant``, also returning the projects that made it a separation-of-duties case (empty
+    when none, or when nothing was granted). Called by ``/admin/grants``.
 
     ``system_admin`` for a user holding a hold-authority persona on a live project needs
     ``confirm_sod`` (else ``SodConfirmationError``, nothing written) and is audited with
@@ -165,7 +181,7 @@ def grant(
     tenant_id = _tenant_id(session)
     users.get_user(session, user_id)
     if kind in own_admin_grants(session, tenant_id, user_id):
-        return False
+        return False, []
     sod_projects = hold_authority_projects(session, user_id) if kind == SYSTEM_ADMIN else []
     if sod_projects and not confirm_sod:
         raise SodConfirmationError(
@@ -193,7 +209,7 @@ def grant(
     if sod_projects:
         payload["sod_project_ids"] = [str(p) for p in sod_projects]
     _append(session, f"admin-grant:{user_id}", payload, actor_id)
-    return True
+    return True, sod_projects
 
 
 def revoke(session: Session, user_id: uuid.UUID, kind: str, *, actor_id: uuid.UUID | None) -> bool:
@@ -428,6 +444,7 @@ __all__ = [
     "assign_member",
     "create_user",
     "grant",
+    "grant_checked",
     "hold_authority_projects",
     "list_grants",
     "lookup_user",

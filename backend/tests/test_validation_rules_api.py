@@ -232,7 +232,7 @@ def test_a_non_member_system_admin_edits_like_per09_only(api: Api) -> None:
     assert listed.status_code == 200
     # Only this project's copy, though the admin can see every project's (ADR 0016).
     assert {s["id"] for s in listed.json()} == set(api.project_sets.values())
-    digest =api.client.put(api.project_rule(DIGEST, "added"), json=DIGEST_RULE, headers=headers)
+    digest = api.client.put(api.project_rule(DIGEST, "added"), json=DIGEST_RULE, headers=headers)
     assert digest.status_code == 200, digest.text
     check = api.client.put(api.project_rule(CHECK, "added"), json=RULE, headers=headers)
     assert check.status_code == 403

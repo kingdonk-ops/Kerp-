@@ -451,6 +451,31 @@ def test_per09_with_hold_authority_needs_confirmation(api: Api) -> None:
     assert api.invite(IVAN, "PER-09", confirm_sod=True).json()["sod_warning"] is True
 
 
+@pytest.mark.parametrize("by", [PAM, ROOT_ADMIN], ids=["per09", "system-admin"])
+def test_a_hold_persona_for_an_existing_system_admin_needs_confirmation(api: Api, by: str) -> None:
+    """ADR 0016, diff §4.1 (T-0275): inviting a ``system_admin`` with a hold-authority persona
+    warns, though the invitee holds no PER-09. A PER-09 inviter reads nobody's grants itself
+    (``access.system_admin_holders``)."""
+    with api.db.unit_of_work(ROOT) as s:
+        assert admin.grant(s, api.users[WORKER], SYSTEM_ADMIN, actor_id=None)
+    before = len(api.audit())
+    refused = api.invite(WORKER, "PER-06", by=by)
+    assert refused.status_code == 409
+    assert refused.json()["detail"]["code"] == "sod_confirmation_required"
+    assert refused.json()["detail"]["sod_warning"] is True
+    assert api.rows(WORKER) == []
+    assert len(api.audit()) == before
+    confirmed = api.invite(WORKER, "PER-06", by=by, confirm_sod=True)
+    assert confirmed.status_code == 201, confirmed.text
+    assert confirmed.json()["sod_warning"] is True
+    assert api.audit()[-1]["sod_warning"] is True
+    # A persona without hold authority for the same admin warns about nothing.
+    api.age(WORKER)  # past the send cap
+    viewer = api.invite(WORKER, "PER-16", by=by)
+    assert viewer.status_code == 201, viewer.text
+    assert viewer.json()["sod_warning"] is False
+
+
 # --- preview and accept (signed in) ---------------------------------------------------------
 
 

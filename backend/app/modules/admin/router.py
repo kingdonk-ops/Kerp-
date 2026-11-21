@@ -43,7 +43,6 @@ from sqlalchemy.orm import Session
 
 from app.core.auth import service as auth_service
 from app.core.auth.access import (
-    SYSTEM_ADMIN,
     CallerGrants,
     CallerIsSystemAdmin,
     Capability,
@@ -324,7 +323,7 @@ def grant(
     user = auth_service.get_user(session, body.user_id)
     kind = body.grant.value
     try:
-        created = service.grant(
+        created, sod_projects = service.grant_checked(
             session, user.id, kind, actor_id=principal.user_id, confirm_sod=body.confirm_sod
         )
     except service.SodConfirmationError as exc:
@@ -336,12 +335,10 @@ def grant(
         # Another request granted it first. This request wrote nothing else, so its unit of
         # work is rolled back here and the answer is the sequential one: already held.
         session.rollback()
-        created = False
+        created, sod_projects = False, []
     if not created:
         response.status_code = status.HTTP_200_OK
-    warn = (
-        created and kind == SYSTEM_ADMIN and bool(service.hold_authority_projects(session, user.id))
-    )
+    warn = bool(sod_projects)
     return AdminGranted(**_admin_grant(user, kind).model_dump(), sod_warning=warn)
 
 

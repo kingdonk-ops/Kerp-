@@ -394,8 +394,10 @@ def system_admin_holders(
 
 
 def _side_sessionmaker(session: Session) -> sessionmaker[Session]:
-    """The side pool of ``session``'s ``Database`` (``Database.session`` stashes it), else a
-    plain factory on its own engine (a bare session is never the shared request pool)."""
+    """The side pool of ``session``'s ``Database`` (``Database.session`` stashes it under
+    ``SIDE_WRITE_DB_KEY``; request sessions always carry it, so a request never waits on its
+    own pool here, T-0210), else a plain factory on its own engine (a bare session, scripts and
+    tests, is never the shared request pool)."""
     database = session.info.get(SIDE_WRITE_DB_KEY)
     if database is not None:
         maker: sessionmaker[Session] = database.side_write_sessionmaker
