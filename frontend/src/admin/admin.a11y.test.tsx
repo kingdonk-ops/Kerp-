@@ -1,4 +1,4 @@
-// Admin screens (T-0051, T-0026, T-0232) with their dialogs open: WCAG 2.1
+// Admin screens (T-0051, T-0026, T-0232, T-0224) with their dialogs open: WCAG 2.1
 // AA, contrast and 48 px glove targets in both themes on the field breakpoints (diff §6.3).
 import { fireEvent, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
@@ -8,6 +8,7 @@ import { auditA11y, FIELD_VIEWPORTS, formatFindings, setViewport } from "../test
 import { FAKE_USER, json } from "../test/fakeApi";
 import { applyTheme, THEMES } from "../theme/theme";
 import { DEPLOYMENT_CONFIG, REGISTRY } from "./settingsFixtures";
+import { COUNTS, FAILED_JOB, HEALTH, INFECTED_FILE, QUEUES, STATS, STUCK_FILE } from "./systemFixtures";
 import { ADMIN_PROJECT, project, renderAdmin } from "./testing";
 
 // The T-0026 cases wait on mocked round-trips through the whole shell (slow under load).
@@ -93,6 +94,61 @@ describe.each(THEMES)("admin screens in the %s theme", (theme) => {
       );
       fireEvent.change(days, { target: { value: "15" } });
       await screen.findByText(i18n.t("admin.settings.errors.max", { max: "14" }), {}, WAIT);
+
+      const findings = await auditA11y(document.body, theme);
+      expect(findings, formatFindings(findings)).toEqual([]);
+    }, SLOW);
+
+    it("deployment stats and health", async () => {
+      await setViewport(viewport);
+      renderAdmin(
+        "/admin/system/deployment",
+        {
+          "GET /api/v1/admin/system/stats": () => json(STATS),
+          "GET /api/v1/admin/system/health": () => json(HEALTH),
+        },
+        { theme, systemAdmin: true, projects: [] },
+      );
+      await screen.findByRole("region", { name: i18n.t("admin.deployment.healthTitle") }, WAIT);
+      await screen.findByRole("region", { name: i18n.t("admin.deployment.objectStore") }, WAIT);
+
+      const findings = await auditA11y(document.body, theme);
+      expect(findings, formatFindings(findings)).toEqual([]);
+    }, SLOW);
+
+    it("queue monitor with the retry dialog", async () => {
+      await setViewport(viewport);
+      renderAdmin(
+        "/admin/system/queues",
+        {
+          "GET /api/v1/admin/system/queues": () => json(QUEUES),
+          "GET /api/v1/admin/system/queues/failed": () => json([FAILED_JOB]),
+        },
+        { theme, systemAdmin: true, projects: [] },
+      );
+      const row = await screen.findByRole("listitem", { name: FAILED_JOB.kind }, WAIT);
+      fireEvent.click(within(row).getByRole("button", { name: i18n.t("admin.queues.retry") }));
+      await screen.findByRole("dialog", {}, WAIT);
+
+      const findings = await auditA11y(document.body, theme);
+      expect(findings, formatFindings(findings)).toEqual([]);
+    }, SLOW);
+
+    it("upload quarantine with the re-check dialog", async () => {
+      await setViewport(viewport);
+      renderAdmin(
+        "/admin/system/uploads",
+        {
+          "GET /api/v1/admin/system/uploads": () =>
+            json({ items: [STUCK_FILE, INFECTED_FILE], total: 2, limit: 50, offset: 0 }),
+          "GET /api/v1/admin/system/uploads/counts": () => json(COUNTS),
+        },
+        { theme, systemAdmin: true, projects: [] },
+      );
+      const row = await screen.findByRole("listitem", { name: STUCK_FILE.filename }, WAIT);
+      await screen.findByRole("region", { name: i18n.t("admin.quarantine.countsTitle") }, WAIT);
+      fireEvent.click(within(row).getByRole("button", { name: i18n.t("admin.quarantine.recheck") }));
+      await screen.findByRole("dialog", {}, WAIT);
 
       const findings = await auditA11y(document.body, theme);
       expect(findings, formatFindings(findings)).toEqual([]);

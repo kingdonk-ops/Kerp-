@@ -17,7 +17,7 @@ describe("createApiClient", () => {
 
     expect(data).toEqual(FAKE_USER);
     expect(calls).toEqual([
-      { method: "GET", path: "/api/v1/auth/me", auth: "Bearer access-7", body: null },
+      { method: "GET", path: "/api/v1/auth/me", query: "", auth: "Bearer access-7", body: null },
     ]);
   });
 
