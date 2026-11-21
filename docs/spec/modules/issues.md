@@ -238,6 +238,13 @@ gates, tiles and registers means any non-terminal state.
   - **Tightening** (towards `blocks`) needs only the reason.
 - **Client-raised issues are always `client`** (`origin = client` or raised by an
   `is_internal = false` account): visibility cannot be overridden to `internal` (422).
+- **External-audit issues are forced at raise (PR #145 review round 5).** An issue whose
+  `origin = external_audit` (manual raise, `create_issue`, or raise from an external-scope audit)
+  is raised with `visibility = client` whatever the template says, and a template
+  `mdr_effect = excluded` is lifted to `register_only` (`blocks` stays `blocks`,
+  `register_only` stays). The ledger entry of the raise records the template's original
+  defaults next to the effective flags. This is consistent with `origin = client` and with the
+  locked-origin guardrail below.
 - **Clients never see internal issues.** For every `is_internal = false` caller (client PER-15,
   subcontractors, third-party inspectors; diff §4.9 external parties) internal issues are absent
   from lists, counts, search, refs and exports and answer **404** by id, like the
@@ -304,7 +311,7 @@ Both create a **new record**; nothing is converted, re-dated or rewritten.
 
 ## 8. Raising from inspections and audits (user, 2026-11-21)
 
-- **Linked issue types (user, 2026-11-21).** An inspection template's settings link **1..many
+- **Linked issue types (user, 2026-11-21).** An inspection template's settings link **0..many
   issue templates** (`linked_issue_templates`, part of the inspection revision hash;
   quality-and-inspection.md §Template settings; T-0327). When an issue is raised from an
   inspection: **exactly one** linked → it is used; **several** → the user picks one of them;
@@ -333,7 +340,11 @@ Both create a **new record**; nothing is converted, re-dated or rewritten.
 - **Audits.** A site audit is an inspection template with the **audit** tick (any area, e.g.
   Health & Safety). Its findings raise issues through `audit` category issue templates:
   internal scope → `origin = internal_audit`, `internal` + `excluded` defaults; external scope →
-  `origin = external_audit`, `client` + `blocks` defaults (§1, §5 locked origins). The
+  `origin = external_audit`, `client` + `blocks` defaults (§1, §5 locked origins). An
+  external-scope audit always raises `origin = external_audit`, so even a linked internal
+  template yields a `client` issue with `excluded` lifted to `register_only` (§5, forced at
+  raise); the Templates settings panel warns when an external-scope audit links an internal
+  template (planner default). The
   internal audit finding templates are seeded for Pilot-0 (T-0322); the external ones with
   T-0327.
 - **Manual raise** (not from an inspection) filters templates by type + category; the

@@ -48,7 +48,7 @@
 | [TD-439](../tracker/todo/TD-439.md) | Feature flags: who toggles them, project overrides, and what a flag may gate | T-0306 | planner |
 | [TD-442](../tracker/todo/TD-442.md) | Issues: may an internal punch/NCR be assigned to an external account (subcontractor) who must then see it? Planner default: no (422), internal issues are invisible to every is_internal=false caller | T-0314 | planner |
 | [TD-445](../tracker/todo/TD-445.md) | MDR gate: mdr_effect alone governs mdr.compile (the open-Cat-A-punch clause is replaced); Cat A punch templates default to mdr_effect=blocks; Cat A always blocks work completion (planner default) | T-0314, E-05-05 | planner |
-| [TD-451](../tracker/todo/TD-451.md) | Template settings and project-level records: confirm the planner defaults (preset table, health_safety area, informal submit is final, allows_project_level issue categories, at most one equipment link, MDR location overlap rule) | T-0324, T-0325, T-0326, T-0327 | planner |
+| [TD-451](../tracker/todo/TD-451.md) | Template settings and project-level records: confirm the planner defaults (preset table, health_safety area, informal submit is final, allows_project_level issue categories, at most one equipment link, MDR location overlap rule) | T-0324, T-0325, T-0326, T-0327, T-0328, E-05-05 | planner |
 
 ## spec-gap (56)
 

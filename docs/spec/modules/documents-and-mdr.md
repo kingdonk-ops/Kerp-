@@ -38,8 +38,15 @@ or H&S issue may be project-level (no anchor). With `mdr_effect = blocks`, an op
 issue without a location is in the scope of **every** MDR of the project; one with a location is
 in the scope only of the MDRs whose dossier scope covers that location (the location is the scope
 node, inside it or an ancestor of it; planner default). The same rule decides whether it is listed
-in the NCR / concession register below. Informal inspections (quality-and-inspection.md
-§Template settings) are never collected into a dossier.
+in the NCR / concession register below.
+**Which inspection records a dossier collects (planner default, PR #145 review round 5; TD-451):**
+the dossier collects formal `qa_itp` records of its scope; formal project-level records are
+collected only when their location is inside the dossier scope (the location is the scope node
+or a descendant, through the `asset_management` service; unlike the blocking rule for
+project-level issues above, a location that is an ancestor of the scope does not pull a record
+into the dossier); records from templates with `is_audit` and `audit_scope = internal` are
+never collected; informal records are never collected (quality-and-inspection.md §Template
+settings).
 The check is the `mdr.compile` rule set (CEL, ADR 0004
 locked defaults) over the facts the `issues` service returns for the dossier scope; it is
 separate from the work-completion gate (`work_anchor.complete`). Final dossiers and commercial Delay Notices are signed with

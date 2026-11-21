@@ -571,7 +571,10 @@ menu), T-0320 (Issues menu → issue templates), epic E-01-03 (the shared design
     Templates list and as the category of the issue-type fallback (issues.md §8). It replaces
     the earlier `issue_category` field.
   - **Formal inspection** (`is_formal`, default on): ticked = the record counts toward QA
-    progress, ITP close-out, the MDR and KPIs and goes through review and approval
+    progress, ITP close-out and KPIs, is eligible for the MDR under the collection rule of
+    documents-and-mdr.md §Gating invariant (formal `qa_itp` records of the scope; formal
+    project-level records only when their location is inside the scope; internal-audit records
+    never; planner default) and goes through review and approval
     (§Review and return). Unticked = **informal**, record-only: no review step — submit is final
     and moves the record straight to `INSPECTED_PASSED` / `INSPECTED_FAILED` from the proposed
     result (planner default), it never enters the QA verification queue, and it is excluded from
@@ -582,7 +585,11 @@ menu), T-0320 (Issues menu → issue templates), epic E-01-03 (the shared design
     under any area (e.g. Health & Safety). Its findings raise issues through `audit` category
     issue templates: `internal` → origin `internal_audit`, `internal` + `excluded` defaults;
     `external` → origin `external_audit`, `client` + `blocks` defaults (issues.md §1, §5, §8).
-  - **Linked issue types** (`linked_issue_templates`, 0..many issue template keys; issues.md §8).
+    An external-scope audit always raises `client` issues (`excluded` lifted to
+    `register_only` at raise, issues.md §5); the settings panel warns when it links an internal
+    issue template (planner default).
+  - **Linked issue types** (`linked_issue_templates`, 0..many issue template keys: one → used, several → the user picks,
+    none → category × type default; issues.md §8).
   - **Locked settings.** Changing area, formal, audit (or its scope) — and with the area the
     anchor rule — on a template that has a published revision needs the project's QA authority
     (`qa_reviewer_persona`) or PER-09 (PER-13 for a tenant-library template) and is published as a
