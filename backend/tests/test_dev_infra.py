@@ -2,7 +2,8 @@
 
 ``docker-compose.yml`` and the ``Makefile`` live at the repository root;
 the app-role SQL in ``infra/postgres/initdb/`` is shared by compose (as an init script) and
-CI's backend-pg job (``psql -f``; T-0081 split it from the SQLite ``backend`` job). These tests only read files, so they run everywhere.
+CI's backend-pg job (``psql -f``; T-0081 split it from the SQLite ``backend`` job).
+These tests only read files, so they run everywhere.
 """
 
 import re
