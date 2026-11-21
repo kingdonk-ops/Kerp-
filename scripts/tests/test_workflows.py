@@ -124,9 +124,28 @@ def _service_images() -> list[tuple[str, str]]:
 def test_ci_service_containers_are_postgres_and_redis_only() -> None:
     services = _service_images()
     assert {name for name, _ in services} == {"postgres", "redis"}
-    # Only the PostgreSQL job has service containers since T-0081 (SQLite job runs without).
+    # The SQLite job runs without service containers since T-0081; the PostgreSQL jobs
+    # (backend-pg, and e2e since T-0027) have them.
     assert "services:" not in _jobs("ci.yml")["backend"]
     assert "services:" in _jobs("ci.yml")["backend-pg"]
+    assert "services:" in _jobs("ci.yml")["e2e"]
+
+
+def _services_block(job: str) -> str:
+    text = _jobs("ci.yml")[job]
+    return text.split("    services:\n", 1)[1].split("\n    env:\n", 1)[0]
+
+
+def test_e2e_runs_on_the_same_database_and_redis_as_backend_pg() -> None:
+    """T-0027: the journey runs against what the PostgreSQL suite proves (service containers
+    and the init script that creates the NOSUPERUSER NOBYPASSRLS runtime role)."""
+    assert _services_block("e2e") == _services_block("backend-pg")
+    e2e = _jobs("ci.yml")["e2e"]
+    assert "-f ../infra/postgres/initdb/20-kerp-app.sql" in e2e
+    assert "KERP_E2E_DATABASE_URL: postgresql+psycopg://kerp_app:kerp_app@" in e2e
+    assert "actions/setup-python@" in e2e
+    assert "npx playwright test" in e2e
+    assert "continue-on-error" not in e2e
 
 
 @pytest.mark.parametrize(
