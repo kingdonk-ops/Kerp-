@@ -281,7 +281,7 @@ bypass role, no `SECURITY DEFINER` function, no purge (TD-397):
 |---|---|
 | `GET /system/uploads?status=&reason=&project=&limit=&offset=` | `{items, total, limit, offset}`; items `verifying`, `rejected`, `expired` uploads: `id`, `project_id`, `project_code`, `module`, `filename`, `content_type`, `size_bytes`, `sha256`, `status`, `reason`, `scan_signature`, `uploader_id`, `object_deleted`, `created_at`, `updated_at`; most recently changed first |
 | `GET /system/uploads/counts?status=&reason=&project=` | `[{project_id, project_code, status, reason, count}]` |
-| `POST /system/uploads/{file_id}/recheck` | 202 `{job_id, project_id, kind, status: queued}` for a `verifying` file whose bytes still exist; 409 `NOT_VERIFYING` / `OBJECT_GONE`; 404 unknown |
+| `POST /system/uploads/{file_id}/recheck` | 202 `{job_id, project_id, kind, status: queued}` for a stuck `verifying` file (its verify job is not `queued`/`running`) whose bytes still exist; 409 `NOT_VERIFYING` / `CHECK_RUNNING` / `OBJECT_GONE`; 404 unknown |
 | `POST /system/uploads/sweep?project=` | 202 `{job_id, project_id, kind: uploads.sweep_orphans, status: queued}`; 404 unknown or deleted project |
 
 ## Audit

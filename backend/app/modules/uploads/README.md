@@ -102,12 +102,19 @@ The System console (`/api/v1/admin/system/uploads...`, `admin/system_uploads_rou
   media-probe codes of T-0169 appear once that lands); `scan_signature` for `infected`.
   `object_deleted` is true for `rejected` (bytes deleted at rejection, TD-397) and `expired`
   (the sweep that expires the row deletes its staging object). There is no purge.
-* `recheck_upload`: a file still `verifying` whose bytes still exist (staging, or the
-  quarantine copy kept during a scanner outage) gets a new `uploads.verify` /
-  `uploads.verify_large` job, created in the file's own project scope; it becomes the file's
-  `job_id` and `updated_at` restarts the `VERIFY_STUCK_AFTER` clock. Otherwise 409
-  `NOT_VERIFYING` or `OBJECT_GONE`. An older job still retrying is harmless (`verify_upload`
-  decides a file once, under a row lock).
+* `recheck_upload`: a **stuck** file, i.e. one still `verifying` whose current verify job
+  (read through `jobs.service.job_status`) is not `queued` or `running` (it `failed`, was
+  aborted, or is unknown), and whose bytes still exist (staging, or the quarantine copy kept
+  during a scanner outage), gets a new `uploads.verify` / `uploads.verify_large` job, created
+  in the file's own project scope; it becomes the file's `job_id` and `updated_at` restarts
+  the `VERIFY_STUCK_AFTER` clock. Otherwise 409 `NOT_VERIFYING`, `CHECK_RUNNING` or
+  `OBJECT_GONE`. Two verify jobs of one file must not run at once: the row lock in
+  `verify_upload` only makes one of them write the outcome, not the right one. Both use the
+  same quarantine object and each deletes it before writing, so a job that finds it already
+  gone rejects a clean file as `missing_object` and the other leaves an orphan content object.
+  A job whose worker died stays `running`: abort it in the queue monitor first. That abort
+  (and a queue-monitor retry of a replaced failed job) can still overlap a worker thread that
+  is mid-check: TD-497 (fail-safe: nothing is published unscanned).
 * `queue_project_sweep`: queues `uploads.sweep_orphans` for one live project now (housekeeping
   that returns no rows).
 

@@ -10,7 +10,8 @@ its ``service.py`` (no table access here).
 * ``GET  /system/uploads/counts?status=&reason=&project=``: per project, status and reason
   code, the number of those uploads.
 * ``POST /system/uploads/{file_id}/recheck``: queue the check of a file stuck in
-  ``verifying`` again (409 ``NOT_VERIFYING``; 409 ``OBJECT_GONE`` when its bytes are gone).
+  ``verifying`` again (409 ``NOT_VERIFYING``; 409 ``CHECK_RUNNING`` while its verify job is
+  ``queued`` or ``running``; 409 ``OBJECT_GONE`` when its bytes are gone).
 * ``POST /system/uploads/sweep?project=``: queue the project's orphan sweep now.
 
 Rows are read under the caller's normal project RLS, which shows a ``system_admin`` every
@@ -38,7 +39,6 @@ from app.modules.uploads.schemas import (
     QuarantineJobRead,
     QuarantinePage,
 )
-from app.modules.uploads.storage import get_storage
 
 UPLOADS: Final = "/system/uploads"
 MAX_REASON_FILTER: Final = 200
@@ -144,8 +144,12 @@ def recheck_file(
 ) -> QuarantineJobRead:
     try:
         job = uploads.recheck_upload(
-            session, _database(request), get_storage(), file_id, actor_id=principal.user_id
+            session, _database(request), file_id, actor_id=principal.user_id
         )
+    except uploads.CheckRunningError as exc:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, {"code": "CHECK_RUNNING", "message": str(exc)}
+        ) from None
     except uploads.ObjectGoneError as exc:
         raise HTTPException(
             status.HTTP_409_CONFLICT, {"code": "OBJECT_GONE", "message": str(exc)}

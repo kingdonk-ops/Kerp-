@@ -37,6 +37,7 @@ from app.modules.uploads.storage import (
     MAGIC_SNIFF_BYTES,
     PresignedRequest,
     Storage,
+    get_storage,
     matches_magic,
     sha256_of,
 )
@@ -51,6 +52,7 @@ __all__ = [
     "SWEEP_KIND",
     "VERIFY_KIND",
     "VERIFY_LARGE_KIND",
+    "CheckRunningError",
     "FileTooLargeError",
     "NotUploaderError",
     "ObjectGoneError",
@@ -106,6 +108,10 @@ class UploadStateError(RuntimeError):
 
 class ObjectGoneError(UploadStateError):
     """A stuck file's uploaded bytes are gone from storage: nothing to check (409)."""
+
+
+class CheckRunningError(UploadStateError):
+    """The file's verify job is still ``queued`` or ``running``: it is not stuck (409)."""
 
 
 def _project_id(session: Session) -> uuid.UUID:
@@ -569,33 +575,41 @@ def _console_audit(
     )
 
 
+# A verify job in one of these states is still going to decide the file (or is retrying
+# after a scanner outage): a re-check would run a second job on the same quarantine object.
+_CHECK_ACTIVE: Final = frozenset({"queued", "running"})
+
+
 def recheck_upload(
     session: Session,
     db: Database,
-    storage: Storage,
     file_id: uuid.UUID,
     *,
     actor_id: uuid.UUID | None,
+    storage: Storage | None = None,
 ) -> QueuedJob:
     """Queue the check of a file stuck in ``verifying`` again (audited); the new job.
 
     ``session`` is the caller's tenant-level request session: the row must be visible to it
     under normal RLS (a ``system_admin`` sees every project of its tenant, ADR 0016), else
-    ``OutOfScopeError`` (404). Not ``verifying``: ``UploadStateError``. The uploaded bytes
-    must still exist, in staging or as the quarantine copy a scanner outage keeps (T-0218),
-    else ``ObjectGoneError``. A new verify job is created in the file's own project scope (as
-    ``complete_upload`` does; never a bypass role) and becomes the file's job, so the sweep
-    judges the new job, and the stuck clock (``VERIFY_STUCK_AFTER``) restarts. A previous job
-    still retrying is harmless: ``verify_upload`` decides a file once, under a row lock.
+    ``OutOfScopeError`` (404). Not ``verifying``: ``UploadStateError``. Stuck means no verify
+    job is still working on the file: its current job (read through the jobs service) is not
+    ``queued`` or ``running``, else ``CheckRunningError``. Two verify jobs must never run at
+    once: both use the same quarantine object and each deletes it before it writes the
+    outcome, so the later one could reject a clean file as ``missing_object``. The uploaded
+    bytes must still exist, in staging or as the quarantine copy a scanner outage keeps
+    (T-0218), else ``ObjectGoneError``. A new verify job is created in the file's own project
+    scope (as ``complete_upload`` does; never a bypass role) and becomes the file's job, so the
+    sweep judges the new job, and the stuck clock (``VERIFY_STUCK_AFTER``) restarts.
+    ``storage`` defaults to the configured object store.
     """
+    storage = storage or get_storage()
     tenant_id = _console_tenant(session)
     file = get_or_404(session, UploadedFile, file_id)
     if file.tenant_id != tenant_id or file.project_id is None:  # defence in depth
         raise OutOfScopeError("UploadedFile not found")
     if file.status != "verifying":
         raise UploadStateError(f"the file is {file.status}")
-    if storage.head(file.staging_key) is None and storage.head(file.quarantine_key) is None:
-        raise ObjectGoneError("the uploaded object is gone")
     project_id = file.project_id
     scope = TenancyContext(tenant_id=tenant_id, project_id=project_id, user_id=actor_id)
     with db.unit_of_work(scope) as scoped:
@@ -603,6 +617,12 @@ def recheck_upload(
         scoped.refresh(row, with_for_update=True)
         if row.status != "verifying":
             raise UploadStateError(f"the file is {row.status}")
+        # Read in the file's own scope, where its job lives (the worker's scope).
+        current = job_status(scoped, row.job_id) if row.job_id is not None else None
+        if current in _CHECK_ACTIVE:
+            raise CheckRunningError(f"the file's check is {current}")
+        if storage.head(row.staging_key) is None and storage.head(row.quarantine_key) is None:
+            raise ObjectGoneError("the uploaded object is gone")
         kind = VERIFY_LARGE_KIND if row.size_bytes > LARGE_FILE_BYTES else VERIFY_KIND
         job: Job = create_job(scoped, _job_kind(kind), {"file_id": str(row.id)}, actor_id=actor_id)
         row.job_id, row.updated_by, row.updated_at = job.id, actor_id, utcnow()

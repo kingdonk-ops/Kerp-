@@ -10,6 +10,7 @@ PostgreSQL as the ``NOSUPERUSER NOBYPASSRLS`` role ``kerp_app``. All data is syn
 import hashlib
 import uuid
 from collections.abc import Iterator
+from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
@@ -19,7 +20,7 @@ from sqlalchemy import text
 
 from app.core.audit.service import chain_entries
 from app.core.auth.access import SYSTEM_ADMIN, Persona
-from app.core.db import Database
+from app.core.db import Database, utcnow
 from app.core.tenancy.context import TenancyContext
 from app.core.tenancy.rls import POLICY_NAMES
 from app.modules.admin import service as admin
@@ -132,6 +133,14 @@ class Api:
             if staged:
                 self.storage.write(file.staging_key, PNG)
             return file.id
+
+    def job(self, file_id: uuid.UUID, project: uuid.UUID, state: str) -> uuid.UUID:
+        """Give the file a verify job in ``state`` (as ``complete_upload`` would); its id."""
+        with self.db.unit_of_work(TenancyContext(tenant_id=T1, project_id=project)) as s:
+            job = jobs.create_job(s, service._job_kind(service.VERIFY_KIND), {})
+            job.status = state
+            service.get_file(s, file_id).job_id = job.id
+            return job.id
 
     def row(self, file_id: uuid.UUID, project: uuid.UUID) -> UploadedFile:
         with self.db.unit_of_work(TenancyContext(tenant_id=T1, project_id=project)) as s:
@@ -259,6 +268,19 @@ def test_the_list_filters_by_status_reason_and_project_and_pages(api: Api) -> No
         assert api.client.get(f"{UPLOADS}?{bad}", headers=alice).status_code == 422, bad
 
 
+def test_rows_of_a_project_deleted_since_stay_listed_without_a_code(api: Api) -> None:
+    infected = api.file(api.away, "rejected", reason="infected", signature=SIGNATURE, staged=False)
+    with api.db.unit_of_work(ROOT) as s:
+        projects.delete_project(s, api.away)
+    (row,) = api.get(UPLOADS)["items"]
+    assert (row["id"], row["project_id"], row["project_code"], row["reason"]) == (
+        str(infected),
+        str(api.away),
+        None,
+        "infected",
+    )
+
+
 # --- counts ---------------------------------------------------------------------------------
 
 
@@ -293,7 +315,6 @@ def test_a_system_admin_rechecks_a_stuck_file_of_any_project_audited(
     api: Api, dispatched: list[JobRef]
 ) -> None:
     file_id = api.file(api.away, "verifying")
-    before = api.row(file_id, api.away)
     response = api.client.post(f"{UPLOADS}/{file_id}/recheck", headers=api.headers(ALICE))
     assert response.status_code == 202, response.text
     body = response.json()
@@ -308,7 +329,6 @@ def test_a_system_admin_rechecks_a_stuck_file_of_any_project_audited(
         body["job_id"],
         api.users[ALICE],
     )
-    assert row.updated_at >= before.updated_at  # the stuck clock restarts
     assert [(r.job_id, r.project_id) for r in dispatched] == [(row.job_id, api.away)]
     assert api.chain() == [
         {
@@ -321,6 +341,59 @@ def test_a_system_admin_rechecks_a_stuck_file_of_any_project_audited(
     with api.db.unit_of_work(ROOT) as s:
         (entry,) = chain_entries(s, f"admin-system:{T1}")
         assert entry.created_by == api.users[ALICE]
+
+
+def test_a_recheck_restarts_the_stuck_clock(api: Api, storage: LocalStorage) -> None:
+    # Both files have been verifying for longer than VERIFY_STUCK_AFTER; only the re-checked
+    # one survives the next orphan sweep (its new job is judged, its clock restarted).
+    rechecked, left = api.file(api.home, "verifying"), api.file(api.home, "verifying")
+    with api.db.unit_of_work(TenancyContext(tenant_id=T1, project_id=api.home)) as s:
+        for file_id in (rechecked, left):
+            service.get_file(s, file_id).updated_at = (
+                utcnow() - service.VERIFY_STUCK_AFTER - timedelta(hours=1)
+            )
+    response = api.client.post(f"{UPLOADS}/{rechecked}/recheck", headers=api.headers(ALICE))
+    assert response.status_code == 202, response.text
+    service.sweep_orphans(
+        api.db, TenancyContext(tenant_id=T1, project_id=api.home), storage=storage
+    )
+    assert api.row(rechecked, api.home).status == "verifying"
+    assert (api.row(left, api.home).status, api.row(left, api.home).rejection_reason) == (
+        "rejected",
+        "verify_failed",
+    )
+
+
+@pytest.mark.parametrize("job_state", ["queued", "running"])
+def test_a_file_whose_check_is_queued_or_running_is_not_stuck_409(
+    api: Api, dispatched: list[JobRef], job_state: str
+) -> None:
+    # A second verify job next to a live one would share its quarantine object (TD-497).
+    file_id = api.file(api.home, "verifying")
+    job_id = api.job(file_id, api.home, job_state)
+    dispatched.clear()
+    response = api.client.post(f"{UPLOADS}/{file_id}/recheck", headers=api.headers(ALICE))
+    assert response.status_code == 409
+    assert response.json()["detail"]["code"] == "CHECK_RUNNING"
+    assert api.row(file_id, api.home).job_id == job_id
+    assert dispatched == []
+    assert api.chain() == []
+
+
+@pytest.mark.parametrize("job_state", ["failed", "succeeded"])
+def test_a_file_whose_check_has_ended_is_rechecked(
+    api: Api, dispatched: list[JobRef], job_state: str
+) -> None:
+    file_id = api.file(api.home, "verifying")
+    old = api.job(file_id, api.home, job_state)
+    dispatched.clear()
+    response = api.client.post(f"{UPLOADS}/{file_id}/recheck", headers=api.headers(ALICE))
+    assert response.status_code == 202, response.text
+    new = api.row(file_id, api.home).job_id
+    assert new is not None
+    assert new != old
+    assert str(new) == response.json()["job_id"]
+    assert [r.job_id for r in dispatched] == [new]
 
 
 def test_a_recheck_finds_the_quarantine_copy_kept_after_a_scanner_outage(
