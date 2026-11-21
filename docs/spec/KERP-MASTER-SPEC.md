@@ -723,7 +723,7 @@ The Turnover & MDR Collation Engine ([MOD-11]) automates the generation of clien
                                       v
                                 [2. Dependency Graph Verification]
                                       |-- Confirm 100% ITPs Passed
-                                      |-- Confirm 0 Open Cat A Punches
+                                      |-- Confirm 0 Open Issues with mdr_effect = blocks (issues.md §6)
                                       |-- Confirm 100% Heat MTRs Attached
                                       |
                                       v
@@ -749,7 +749,7 @@ The Turnover & MDR Collation Engine ([MOD-11]) automates the generation of clien
 #### Compilation Rules & Verification Criteria
 * **Gating Invariant**: An MDR compilation job cannot execute if:
   $$\sum \text{Open Cat A Punch Items} > 0 \quad \lor \quad \sum \text{Unsigned ITP Hold Points} > 0$$
-  **Amended (user, 2026-11-21):** also `Σ open issues with mdr_effect = blocks > 0`, and the dossier gains an NCR / concession register section (`docs/spec/modules/documents-and-mdr.md`, `docs/spec/modules/issues.md` §5–§6).
+  **Amended (user, 2026-11-21; planner default TD-445):** the invariant becomes `Σ open issues with mdr_effect = blocks > 0 ∨ Σ unsigned ITP hold points > 0`, and the dossier gains an NCR / concession register section (`docs/spec/modules/documents-and-mdr.md`, `docs/spec/modules/issues.md` §5–§6). **MDR gate rule (planner default, TD-445):** `mdr_effect` alone governs the MDR gate: `mdr.compile` blocks while any issue in the dossier scope with `mdr_effect = blocks` is open, and nothing else about an issue (type, `punch_category`, visibility) enters it; this replaces the earlier "open Cat A punch" clause. Punch templates that use Cat A (all system-default punch templates) default to `mdr_effect = blocks`. An open Cat A punch always blocks work completion (`work_anchor.complete`) regardless of `mdr_effect`.
 * **Bookmark Hierarchy Standard**:
   * Level 1: Subsystem Identifier (`System 310 - High Pressure Hydrocarbon Gas`)
   * Level 2: Discipline Dossier (`Piping Quality Dossier`)

@@ -58,7 +58,8 @@ Designed the same way inspection templates are, only simpler.
   default).
 - **Layers, copied not overlaid (ADR 0004 §2 model).** (1) **System defaults** shipped with the
   module seed and with client packs (ADR 0003 §4, T-0108): at least one punch and one NCR template
-  for `general` plus the pack's discipline templates; (2) **tenant library / client pack**,
+  for `general` plus the pack's discipline templates; system-default punch templates (which use
+  Cat A) default to `mdr_effect = blocks` (§6, TD-445); (2) **tenant library / client pack**,
   edited by PER-13; (3) **project copy**, made when the project is provisioned or when a library
   template is first used, with a `derived_from` link (TD-107 style), edited by the project.
   Library updates are offered as a new revision to adopt, never forced (ADR 0004 §4 analogy;
@@ -166,7 +167,7 @@ gates, tiles and registers means any non-terminal state.
     the MDR NCR/concession register, does not block) | `excluded` (not in the MDR). The dossier
     goes to the client, so `internal` issues are never printed in it; an internal issue with
     `blocks` still blocks the compile while open (planner default; documents-and-mdr.md §NCR /
-    concession register).
+    concession register). The MDR gate rule is stated once in §6 (TD-445).
   - `completion_effect` (planner default name): `blocks | none`; default `blocks` for NCR
     templates. For punch the completion gate is Cat A (§6) and `completion_effect` is ignored.
 - **Per-issue override** only by QA authority or the project's PER-09, with a mandatory reason,
@@ -178,7 +179,9 @@ gates, tiles and registers means any non-terminal state.
 - **Clients never see internal issues.** For every `is_internal = false` caller (client PER-15,
   subcontractors, third-party inspectors; diff §4.9 external parties) internal issues are absent
   from lists, counts, search, refs and exports and answer **404** by id, like the
-  `internal_commercial` boundary (T-0295). Planner default: an internal issue cannot be assigned
+  `internal_commercial` boundary (T-0295). Links that point to or from an internal issue
+  (`escalated_from_issue_id`, `upgraded_from_issue_id`, `successor_issue_id`) are omitted for
+  them. Planner default: an internal issue cannot be assigned
   to an external account (422) (TD-442).
 - **Examples:** internal audit (we audit ourselves) → `internal` + `excluded`; external or
   client audit, and client-raised NCRs → `client` + `blocks`.
@@ -196,12 +199,15 @@ type, `punch_category`, `completion_effect`, `mdr_effect` and status as rule con
 | Rule set (owner) | Locked default rule |
 |---|---|
 | `work_anchor.complete` (T-0124) | no open punch with `punch_category = A`; no open NCR with `completion_effect = blocks` |
-| `mdr.compile` (E-05-05) | no open issue with `mdr_effect = blocks` in the dossier scope (documents-and-mdr.md §Gating invariant) |
+| `mdr.compile` (E-05-05) | no open issue with `mdr_effect = blocks` in the dossier scope (MDR gate rule below; documents-and-mdr.md §Gating invariant) |
 | hydrotest pack release (E-06b-01) | no open Cat A punch on the test boundary (master spec MOD-10) |
 | `weld.accept` (welding, Phase 2) | no open NCR anchored to the weld's Item (R-WPS-4) |
+| `closeout.final_handover` (E-04-10, planner default name) | no open punch with `punch_category = B` (or A) on the handed-over scope: master spec MOD-09 "Cat B must be rectified prior to final contractual handover" |
 
-Projects may add stricter rules (e.g. Cat B blocks final handover). Upgraded and escalated
-sources are not open; their successors count instead.
+**MDR gate rule (planner default, TD-445):** `mdr_effect` alone governs the MDR gate: `mdr.compile` blocks while any issue in the dossier scope with `mdr_effect = blocks` is open, and nothing else about an issue (type, `punch_category`, visibility) enters it; this replaces the earlier "open Cat A punch" clause. Punch templates that use Cat A (all system-default punch templates) default to `mdr_effect = blocks`. An open Cat A punch always blocks work completion (`work_anchor.complete`) regardless of `mdr_effect`.
+
+Projects may add stricter rules to any of these sets. Upgraded and escalated sources are not
+open; their successors count instead.
 
 ## 7. Upgrade punch → NCR and "Raise external NCR from this" (user, 2026-11-21)
 
@@ -211,8 +217,11 @@ Both create a **new record**; nothing is converted, re-dated or rewritten.
   punch's category (§2 default mapping), dated now and raised by the clicking user; answers are
   copied where field keys match; photos carry over **with their real capture timestamps and
   hashes** (same attachment ids); the punch closes as `upgraded`; both are linked
-  (`upgraded_from_issue_id` / `successor_issue_id`). Visibility follows the NCR template, except
-  that a client-visible punch gives a client-visible NCR.
+  (`upgraded_from_issue_id` / `successor_issue_id`). **An upgrade never widens visibility:** the
+  NCR keeps the punch's visibility (internal punch → internal NCR, client punch → client NCR),
+  whatever the NCR template's `default_visibility` says; widening to `client` happens only through
+  "Raise external NCR from this" (planner default, PR #145 review). Upgrade links that touch an
+  internal issue are hidden from `is_internal = false` callers (§5).
 - **Raise external NCR from this** (button + confirm dialog; on an `internal` issue of either
   type; QA authority or PER-09): creates a **new client-visible NCR** dated now, raised by the
   clicking user, from the NCR template of the category (the user may pick another NCR template).

@@ -334,7 +334,7 @@
 | 🧩 | [E-04-07](../tracker/tasks/E-04-07.md) | tasks: generic tasks lodged at RSW | tasks | L | T-0101 |  |
 | 🧩 | [E-04-08](../tracker/tasks/E-04-08.md) | resource_summary: demand rollup from look-ahead/tasks (moved from Phase 3) | resource_summary | L | E-04-02 |  |
 | 🧩 | [E-04-09](../tracker/tasks/E-04-09.md) | safety / hse: SWMS/PTW permits + incident + KPI ingestion | safety | L | T-0012 |  |
-| 🧩 | [E-04-10](../tracker/tasks/E-04-10.md) | site_supervision / commissioning / closeout / defects_liability | site_supervision | L | E-04-03 |  |
+| 🧩 | [E-04-10](../tracker/tasks/E-04-10.md) | site_supervision / commissioning / closeout / defects_liability | site_supervision | L | E-04-03, T-0314 |  |
 | 🧩 | [E-04-11](../tracker/tasks/E-04-11.md) | handover: shift/swing handover register - free-form sections, record links + hover preview, activity suggestions (rule set), first-shift delivery + acknowledgement | handover | L | T-0006, T-0015, T-0018, T-0019, T-0025, T-0101 |  |
 | 🧩 | [E-04-12](../tracker/tasks/E-04-12.md) | planner: work plans (shutdown/break-in/campaign) in overlay or interrupt mode, resource pool (groups, people, crews, rosters), allocation grid by day/shift, capacity check, overlay Gantt, commit into programme | planner | L | E-04-01, E-04-07, T-0101, T-0018, T-0019, T-0118 |  |
 | 🧩 | [E-04-13](../tracker/tasks/E-04-13.md) | scaffolding: scaffold register (location, build/approve/tag data, files, photos), lifecycle, tagging on one-engine inspections, automatic re-inspection tasks + overdue gate, build/modify/dismantle requests, QR card | scaffolding | L | T-0101, T-0103, T-0111, T-0118, T-0016, T-0019, E-04-07 |  |

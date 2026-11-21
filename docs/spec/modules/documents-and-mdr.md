@@ -23,16 +23,17 @@ adapter** `app/core/integrations/parsers.py` handles neutral formats (`.dxf`, `.
 
 ## Automated MDR / turnover collation engine
 Batch pipeline (**SAQ `batch`** queue, heavy libs lazy):
-1. subsystem scope query → **dependency-graph verification** (100 % ITPs passed, 0 open Cat A
-   punches, 0 open issues with `mdr_effect = blocks`, 100 % heat MTRs attached);
+1. subsystem scope query → **dependency-graph verification** (100 % ITPs passed, 0 open issues
+   with `mdr_effect = blocks`, 100 % heat MTRs attached);
 2. stream S3 inspection PDFs / MTRs / NDE plates;
 3. transform: dynamic pagination, client cover sheets/title stamps, hierarchical bookmark
    tree, hyperlinked TOC;
 4. atomic output: store compiled PDF, compute **SHA-256**, generate outgoing transmittal.
 
-**Gating invariant:** a compile cannot run while `Σ open Cat A punches > 0`,
-`Σ open issues with mdr_effect = blocks > 0` (extended by the user, 2026-11-21; [issues.md](issues.md)
-§5–§6) or `Σ unsigned ITP hold points > 0`. The check is the `mdr.compile` rule set (CEL, ADR 0004
+**Gating invariant:** a compile cannot run while `Σ open issues with mdr_effect = blocks > 0`
+or `Σ unsigned ITP hold points > 0` (amended 2026-11-21; [issues.md](issues.md) §5–§6).
+**MDR gate rule (planner default, TD-445):** `mdr_effect` alone governs the MDR gate: `mdr.compile` blocks while any issue in the dossier scope with `mdr_effect = blocks` is open, and nothing else about an issue (type, `punch_category`, visibility) enters it; this replaces the earlier "open Cat A punch" clause. Punch templates that use Cat A (all system-default punch templates) default to `mdr_effect = blocks`. An open Cat A punch always blocks work completion (`work_anchor.complete`) regardless of `mdr_effect`.
+The check is the `mdr.compile` rule set (CEL, ADR 0004
 locked defaults) over the facts the `issues` service returns for the dossier scope; it is
 separate from the work-completion gate (`work_anchor.complete`). Final dossiers and commercial Delay Notices are signed with
 **pyHanko** (ETSI **PAdES-B-LTA** + **RFC 3161** timestamp).
