@@ -206,6 +206,12 @@ export const en = {
     loading: "Loading projects…",
     loadError: "Your projects could not be loaded.",
     projectOption: "{{code}} — {{name}}",
+    projectOptionAdmin: "{{code}} — {{name}} ({{badge}})",
+    adminAccess: "Admin access",
+    adminAccessHint:
+      "You reach this project through your system admin grant, not a membership. Approving and signing need a persona on the project.",
+    choose: "Choose a project…",
+    choosePrompt: "Choose a project in the picker above to start.",
     current: "Scope: {{scope}}",
     browseLobby: "Browse / join another project",
   },

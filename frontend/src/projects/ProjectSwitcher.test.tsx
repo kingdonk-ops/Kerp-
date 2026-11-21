@@ -8,7 +8,13 @@ import type { AppServices } from "../app/services";
 import { memoryStorage, type KeyValueStorage } from "../auth/tokenStore";
 import { i18n } from "../i18n";
 import { FAKE_USER, json, makeServices, tokens, type Recorded } from "../test/fakeApi";
-import { byName, hasPortfolioPersona, type ProjectSummary } from "./directory";
+import {
+  byName,
+  hasPortfolioPersona,
+  hasSystemAdminAccess,
+  offersPortfolio,
+  type ProjectSummary,
+} from "./directory";
 import { resolveScope, scopeStorageKey } from "./ProjectScopeProvider";
 
 const TANK: ProjectSummary = {
@@ -31,6 +37,22 @@ const PIPELINE: ProjectSummary = {
   name: "Synthetic Pipeline Spread",
   personas: ["PER-05"],
   access: "member",
+};
+
+// Projects a system_admin reaches through its grant only (ADR 0016, T-0275): no personas.
+const JETTY: ProjectSummary = {
+  id: "p-jetty",
+  code: "SYN-004",
+  name: "Synthetic Jetty Upgrade",
+  personas: [],
+  access: "system_admin",
+};
+const BERTH: ProjectSummary = {
+  id: "p-berth",
+  code: "SYN-005",
+  name: "Synthetic Berth Works",
+  personas: [],
+  access: "system_admin",
 };
 
 const KEY = scopeStorageKey(FAKE_USER.id);
@@ -254,5 +276,114 @@ describe("landing after sign-in (diff §4.1)", () => {
     expect(
       await screen.findByRole("heading", { level: 1, name: i18n.t("nav.groups.documents.title") }),
     ).toBeInTheDocument();
+  });
+});
+
+describe("system_admin picker and All-Projects (ADR 0016, T-0276)", () => {
+  const adminOption = (p: ProjectSummary) =>
+    i18n.t("scope.projectOptionAdmin", {
+      code: p.code,
+      name: p.name,
+      badge: i18n.t("scope.adminAccess"),
+    });
+
+  it("detects admin access and offers the portfolio scope for it", () => {
+    expect(hasSystemAdminAccess([TANK, REFINERY])).toBe(false);
+    expect(hasSystemAdminAccess([TANK, JETTY])).toBe(true);
+    expect(offersPortfolio([TANK, REFINERY])).toBe(false);
+    expect(offersPortfolio([TANK, JETTY])).toBe(true);
+    expect(offersPortfolio([{ ...TANK, personas: ["PER-13"] }])).toBe(true);
+  });
+
+  it("lands an admin without membership on the remembered project, else on none", () => {
+    const list = byName([JETTY, BERTH]);
+    expect(resolveScope(null, list)).toEqual({ kind: "none" });
+    expect(resolveScope({ kind: "project", projectId: "p-gone" }, list)).toEqual({ kind: "none" });
+    expect(resolveScope({ kind: "project", projectId: JETTY.id }, list)).toEqual({
+      kind: "project",
+      projectId: JETTY.id,
+    });
+    expect(resolveScope({ kind: "all" }, list)).toEqual({ kind: "all" });
+    // An admin who is also a member falls back to the first project it is a member of.
+    expect(resolveScope(null, byName([JETTY, BERTH, TANK]))).toEqual({
+      kind: "project",
+      projectId: TANK.id,
+    });
+  });
+
+  it("lists every project with an 'Admin access' badge on those reached without membership", async () => {
+    const ctx = setup([TANK, JETTY, BERTH]);
+    renderApp("/", ctx);
+
+    const select = await picker();
+    expect(within(select).getAllByRole("option").map((o) => o.textContent)).toEqual([
+      i18n.t("scope.allProjects"),
+      adminOption(BERTH),
+      adminOption(JETTY),
+      option(TANK),
+    ]);
+    // The badge is text in the option itself, so type-ahead finds it like any other project.
+    expect(adminOption(JETTY)).toContain(i18n.t("scope.adminAccess"));
+    // A member project carries no badge.
+    expect(screen.queryByTestId("scope-admin-badge")).toBeNull();
+  });
+
+  it("opens project B without a membership and marks it accessibly", async () => {
+    const ctx = setup([TANK, JETTY]);
+    renderApp("/", ctx);
+
+    const select = await picker();
+    fireEvent.change(select, { target: { value: JETTY.id } });
+    await expectScope(option(JETTY));
+    expect(ctx.preferences.getItem(KEY)).toBe(`project:${JETTY.id}`);
+
+    const badge = screen.getByTestId("scope-admin-badge");
+    expect(badge).toHaveTextContent(i18n.t("scope.adminAccess"));
+    expect(badge).toHaveAttribute("title", i18n.t("scope.adminAccessHint"));
+    // The picker is described by the badge, so assistive technology hears it with the value.
+    expect(select).toHaveAccessibleDescription(i18n.t("scope.adminAccess"));
+  });
+
+  it("offers All-Projects to an admin without a portfolio persona", async () => {
+    const ctx = setup([TANK, JETTY]);
+    renderApp("/", ctx);
+
+    fireEvent.change(await picker(), { target: { value: "__all__" } });
+    await expectScope(i18n.t("scope.allProjects"));
+    expect(ctx.preferences.getItem(KEY)).toBe("all");
+  });
+
+  it("lands an admin with no membership on the picker, not the lobby", async () => {
+    renderApp("/login", setup([JETTY, BERTH], { signedIn: false }));
+    await signIn();
+
+    await screen.findByRole("heading", { level: 1, name: i18n.t("nav.groups.overview.title") });
+    expect(screen.queryByRole("heading", { level: 1, name: i18n.t("lobby.title") })).toBeNull();
+    await expectScope(i18n.t("scope.none"));
+    const select = await picker();
+    expect(select).toHaveValue("");
+    expect(within(select).getAllByRole("option")[0]).toHaveTextContent(i18n.t("scope.choose"));
+    expect(screen.getByText(i18n.t("scope.choosePrompt"))).toBeInTheDocument();
+  });
+
+  it("lands an admin with no membership on the last used project", async () => {
+    const preferences = memoryStorage();
+    preferences.setItem(KEY, `project:${JETTY.id}`);
+    renderApp("/login", setup([JETTY, BERTH], { signedIn: false, preferences }));
+    await signIn();
+
+    await screen.findByRole("heading", { level: 1, name: i18n.t("nav.groups.overview.title") });
+    await expectScope(option(JETTY));
+    expect(await picker()).toHaveValue(JETTY.id);
+  });
+
+  it("keeps a non-admin to its own projects, with no badge and no All-Projects", async () => {
+    renderApp("/", setup([TANK, REFINERY]));
+
+    const select = await picker();
+    const labels = within(select).getAllByRole("option").map((o) => o.textContent);
+    expect(labels).toEqual([option(REFINERY), option(TANK)]);
+    expect(labels.some((l) => l.includes(i18n.t("scope.adminAccess")))).toBe(false);
+    expect(screen.queryByTestId("scope-admin-badge")).toBeNull();
   });
 });

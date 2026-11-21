@@ -9,12 +9,13 @@ import { useScopeLabel } from "../projects/ProjectSwitcher";
 /**
  * Overview group landing page, and the post-sign-in landing of diff §4.1: the picker's
  * scope opens the user's only project, or the last used / first by name of several; a user
- * with no project goes to the lobby.
+ * with no project goes to the lobby. A `system_admin` without membership (ADR 0016) lands
+ * here with no project picked and is asked to choose one in the picker.
  */
 export function HomePage() {
   const { t } = useTranslation();
   const { user } = useAuth();
-  const { projects, isLoading, isError } = useProjectScope();
+  const { scope: picked, projects, isLoading, isError } = useProjectScope();
   const scope = useScopeLabel();
 
   if (isLoading) {
@@ -34,6 +35,7 @@ export function HomePage() {
       <p className="text-sm text-muted" data-testid="scope-indicator">
         {t("scope.current", { scope })}
       </p>
+      {picked.kind === "none" && projects.length > 0 && <p>{t("scope.choosePrompt")}</p>}
     </section>
   );
 }
