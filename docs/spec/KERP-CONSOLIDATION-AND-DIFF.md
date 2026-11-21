@@ -839,7 +839,10 @@ additive and need an ADR (CLAUDE.md §6).
   reason required) revokes every live session of the user in the revocation store at once; the
   next request or refresh is `401` and the user signs in again. It is **not** a device revoke:
   no `DEVICE_REVOKED`, no wipe (§4.3); an offline device keeps its outbox, which drains after the
-  next sign-in. Audited with `event: user_sessions_revoked`, actor and reason.
+  next sign-in. Audited with `event: user_sessions_revoked`, actor and reason. Force sign-out,
+  deactivation, reactivation and every sign-in are also persisted as durable standing events in
+  the identity service (T-0310), because the session index expires; offline formal sign-offs
+  are checked against them (quality-and-inspection.md §Signing attestation).
 - **Resend invite** (T-0244; TD-407): only for `invited` accounts. Re-sends the user's pending
   project invites through the invite re-send of §4.1 (rotation, audit, rate limits unchanged),
   else sends the set-password (reset) e-mail of §4.2 to an account without a password. Never a
@@ -870,9 +873,10 @@ the user approved. E-signature and delegation are in `modules/quality-and-inspec
   - **Deprovisioning** (`active = false` or DELETE) sets `auth_user.is_active = false` (never a
     hard delete) and revokes every live session at once through force sign-out's revoke (§4.8):
     the next request is 401, not `DEVICE_REVOKED`, and no device is wiped. Reactivation restores
-    sign-in only; offline formal sign-offs made after the deactivation are kept but not
-    effective (`signer_inactive`, quality-and-inspection.md §Signing attestation). The last
-    active System admin cannot be deactivated (409, audited, System admins notified).
+    sign-in only; offline formal sign-offs whose signer-standing window contains the
+    deactivation are kept but not effective (`signer_inactive`, quality-and-inspection.md
+    §Signing attestation). The last active System admin cannot be deactivated (409, audited,
+    System admins notified).
   - **Token:** a bearer token per Entra application, created by a `system_admin`, shown once,
     stored only as a SHA-256 hash, with expiry (default 365 days, max 730), rotation (the old
     token stays valid 24 h) and revocation; the tenant is bound from deployment configuration and

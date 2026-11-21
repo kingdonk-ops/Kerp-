@@ -346,15 +346,30 @@ before it ships carry no attestation and stay valid ("no attestation recorded" o
     with 409.
   - **Intent version:** accepted if the version the device showed was the current one at
     `occurred_at` (the registry keeps every version of a kind with its `effective_from` and its
-    i18n key, and the recorded text is that of the version the device showed); otherwise kept,
-    effective, flagged `intent_outdated` and listed for QA review.
-  - **Signer standing:** if the signer was `is_active = false`, or had their sessions revoked
-    (force sign-out, diff §4.8) after the device session the mutation was queued under began,
-    at any time before `occurred_at`, the sign-off is **kept as evidence but not effective**: it
-    does not count as signed, releases no hold and closes no row; it is flagged `signer_inactive`
-    and routed as an item to the QA verification queue (§QA verification queue), where a
-    qualified reviewer either signs the point themselves (a new attested online sign-off) or
-    records the flagged entry as void. Reactivating the account later changes nothing.
+    i18n key); otherwise kept, effective, flagged `intent_outdated` and listed for QA review. The
+    device sends only the `intent_version` it showed; the server renders that version's i18n
+    text in the signer's locale and never accepts client-supplied intent text.
+  - **Signer standing:** `signer_standing(user_id, from_ts, to_ts)` in the identity service
+    answers from durable standing events persisted in the identity table
+    `oe_identity_account_standing_event` (`deactivated | reactivated | sessions_revoked |
+    signed_in`, with `occurred_at` and, for `signed_in`, the `device_id`), written by admin
+    deactivation and reactivation (T-0014 path), force sign-out (T-0244), SCIM (T-0299) and every
+    successful sign-in; it never reads the expiring Redis session index. The window starts at the
+    signer's last successful sign-in on the mutation's `device_id` at or before `occurred_at` (no
+    such record: at the signer's earliest recorded event, fail-safe) and ends at `occurred_at`;
+    when `time_confidence` is neither `MONOTONIC_RECONSTRUCTED` nor `VERIFIED_ONLINE`, it ends at
+    the sync time instead (fail-safe against a backdated clock). If a deactivation or a session
+    revocation of the signer falls inside the window, the sign-off is **kept as evidence but not
+    effective**: it does not count as signed, releases no hold and closes no row, and it is
+    flagged `signer_inactive`. A deactivation and reactivation both before the window start do not
+    flag it; a later reactivation never makes a flagged sign-off effective.
+  - **QA routing:** a `signer_inactive` sign-off creates a QA verification item of target kind
+    `offline_signoff_signer_inactive`, whose provider is registered in `signing/service.py`.
+    Neither approve nor reject ever makes the original sign-off effective: the provider's
+    `apply_approved` records the flag as reviewed and `apply_rejected` records the entry void,
+    each only as a ledger append; the flagged entry is never altered and nothing is released or
+    closed. The point is resolved only by a fresh attested online sign-off by a qualified signer
+    through the normal consumer path, or by recording the flagged entry void.
   - **Grace:** outside the offline grace/window of diff §4.2 it is flagged `grace_exceeded`
     (kept, effective, as any offline mutation).
   Flags are recorded in the attestation (`flags: [...]`) and the audit payload; `ip_source = sync`.
