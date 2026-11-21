@@ -288,9 +288,9 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
   (verification SLA), T-0183 (expiry alerts), T-0184 (shelf-life extension, **Phase 3**: no
   material batch exists before E-03-03; TD-421), E-04-15 (calendar epic, Phase 4,
   needs-breakdown). Splits to stay S/M got T-0249–T-0268: T-0249 fleet classes (TD-412 resolved 2026-11-21, unblocked),
-  T-0250 equipment anchor (blocked TD-411, ADR 0014 proposed; re-scoped 2026-11-21 to equipment links, see below), T-0251 registers + tile toggle,
+  T-0250 equipment anchor (re-scoped 2026-11-21 to equipment links, see below; TD-411 resolved, ADR 0014 superseded), T-0251 registers + tile toggle,
   T-0252–T-0255 public capture (blocked TD-410, ADR 0013 proposed), T-0256 notify action,
-  T-0257 follow-ups + tagout gate (node/Item; equipment part T-0288, waits on TD-411), T-0258/T-0259 screens, T-0260 equipment.activate, T-0261
+  T-0257 follow-ups + tagout gate (node/Item; equipment part T-0288; TD-411 resolved), T-0258/T-0259 screens, T-0260 equipment.activate, T-0261
   credential.activate, T-0262 two-lane window, T-0263 banner, T-0264 SLA for overrides and
   follow-ups, T-0265 material_cert.verify (Phase 2), T-0266/T-0267 readiness conflicts,
   T-0268 offline batch bundle (Phase 3). Where the paste disagreed with the spec, the spec won:

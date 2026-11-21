@@ -1107,7 +1107,7 @@ later, so a slot that links only the line counts for the ITR, **provided the slo
 the ITR's anchor** (the ITR's node or Item is a slot anchor or lies in the subtree of one);
 otherwise that slot does not count for the ITR. Per party, the requirement is met when its
 attendance is `attended` or `waived`, or `absent` on a `W` point with `notice_met`; it is unmet
-when no slot was issued, the slot is `requested`/`confirmed`, the party was absent on an `H`
+when no slot was issued, its attendance is still `pending`, the party was absent on an `H`
 point or after short notice, or the slot `failed`. Precedence: `failed` makes every party unmet;
 otherwise the party's attendance decides, and `pending` = unmet. `construction_control` adds two locked
 system-default `check` rules (ADR 0004 §5) to `inspection.submit` (§Review and return),

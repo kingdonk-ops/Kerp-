@@ -6,7 +6,7 @@
   anchor. TD-411 resolved; TD-412 resolved 2026-11-21 (fleet vehicles and plant join the Phase-1 register, T-0249). The text below is
   kept as history and is **not** in force.
 - **Date:** 2026-11-21
-- **Affects:** T-0250 (blocked by TD-411), T-0249 (TD-412, resolved 2026-11-21), T-0111 (anchor rule; no
+- **Affects:** T-0250 (TD-411, resolved 2026-11-21), T-0249 (TD-412, resolved 2026-11-21), T-0111 (anchor rule; no
   change to its scope), T-0112 (equipment register), CLAUDE.md §6 anchor wording,
   `quality-and-inspection.md` §Standalone inspections
 

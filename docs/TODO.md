@@ -3,9 +3,9 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 334 · **Closed:** 146
+**Open:** 333 · **Closed:** 147
 
-## decision (40)
+## decision (39)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -48,7 +48,6 @@
 | [TD-442](../tracker/todo/TD-442.md) | Issues: may an internal punch/NCR be assigned to an external account (subcontractor) who must then see it? Planner default: no (422), internal issues are invisible to every is_internal=false caller | T-0314 | planner |
 | [TD-484](../tracker/todo/TD-484.md) | RFI notification e-mail: may it carry the date/time/location, the RFI PDF attachment and an .ics invite, and go to client distribution addresses without a KERP account? | T-0335 | planner |
 | [TD-486](../tracker/todo/TD-486.md) | RFI witness check: may an unmet hold-point (H) witness requirement be overridden per record (ADR 0004 Amendment A), or is it non-overridable? | T-0333 | planner |
-| [TD-492](../tracker/todo/TD-492.md) | Phase 0 exit 'module toggled': no shipped module is toggleable yet (every manifest has toggleable=False), so the e2e journey cannot switch one off and on | T-0027 | planner |
 
 ## spec-gap (64)
 
@@ -524,3 +523,4 @@
 | ✅ | [TD-447](../tracker/todo/TD-447.md) | Admin → Users screen (T-0026 remainder): System admin creates / deactivates / reactivates accounts (GET/POST/PATCH /admin/users); PER-09 invites by e-mail to one of its projects with persona(s) + site + SoD confirm, shows the link once, lists / re-sends / revokes open invites |  |
 | ✅ | [TD-451](../tracker/todo/TD-451.md) | Queue monitor: failed-job list and retry/abort see only job rows the caller's RLS shows until T-0274 (ADR 0016) lets a system_admin read every project's oe_jobs_job rows | Covered by T-0274 (ADR 0016, PR #151): a system_admin without a membership lists, retries and aborts any project's failed job in its tenant; other tenants stay 404 (test_a_system_admin_without_membership_lists_retries_and_aborts_any_projects_job, SQLite and PostgreSQL). Resolved when PR #151 is on dev. |
 | ✅ | [TD-456](../tracker/todo/TD-456.md) | Template settings and project-level records: confirm the planner defaults (preset table, health_safety area, informal submit is final, allows_project_level issue categories, at most one equipment link, MDR location overlap rule) | Product owner (user, 2026-11-21): all items approved except item 7 (discipline replacing issue_category). Decided instead: inspection templates keep the optional issue_category, pointing at the issue category value list, which holds non-discipline categories (vehicle, equipment, pre-start, general, ...) alongside disciplines (painting, blasting, ...), because e.g. issues from a vehicle pre-start have no discipline; raise-time fallback is issue_category x type (none -> general). There is no separate discipline field; the Templates list filters by area and issue category. |
+| ✅ | [TD-492](../tracker/todo/TD-492.md) | Phase 0 exit 'module toggled': no shipped module is toggleable yet (every manifest has toggleable=False), so the e2e journey cannot switch one off and on | User, 2026-11-21: planner default (a) accepted. T-0027 tests the refusals now (platform module 409, unknown module 404, state unchanged); the switch-off/switch-on step is test.skip with TD-492 in the reason until the first toggleable module merges, whose task removes the skip. |
