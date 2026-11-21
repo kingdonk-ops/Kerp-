@@ -62,7 +62,17 @@ string through `t()` (`admin.*`, `devices.*`, `personas.*`).
   project; "Save anyway" sends `confirm_sod: true` for **that project only**, continues the rest
   with `false` and stops again, with a warning naming it, at the next project that needs it. Any
   change in the dialog withdraws a pending warning.
-- The account and invite screen (Admin → Users) is TD-447.
+- **Open invitations** (`PendingInvites.tsx`, `invites.ts`, T-0053, diff §4.1 Re-send): below
+  the members, `GET /admin/projects/{p}/invites` lists pending and expired (never accepted)
+  invites with e-mail, persona(s) + site, `expires_at` and `last_sent_at`. **Resend** is disabled
+  until `resend_available_at` (re-enabled by a timer) and asks first ("the previous link stops
+  working"); the answer's new copyable link (`invite_link`, `invite_token` only) is shown once
+  in a read-only field with **Copy** until closed, never cached or stored, and the screen says a
+  new e-mail was sent. `429` → when re-sending is possible again (`Retry-After`). **Revoke**
+  asks first. `409`/`404` (accepted or revoked meanwhile) is explained and the list re-read;
+  accepted and revoked invites are not listed, so they offer no Resend. Hidden for a member
+  without PER-09 (403).
+- Creating invites (Admin → Users) is T-0331; it should reuse `PendingInvites`.
 
 ## Access requests (`AccessRequestsPage`, diff §4.1)
 

@@ -45,6 +45,8 @@ src/
   auth/       token store, AuthProvider (login/logout/me), RequireAuth route guard, Entra ID SSO button + codes
   db/         Dexie database (KerpDb) + offline outbox helpers
   i18n/       i18next instance + message catalogues (locales/en.ts)
+  invite/     `/invite#<token>`: join, invite carried through sign-in, first password (README.md)
+  password/   forgot password (`/forgot-password`), `/reset-password#<token>`, new-password form
   lib/api/    API client (bearer token, single-flight refresh rotation + one retry on 401)
   lib/cel/    offline CEL rule evaluation (@marcbachmann/cel-js), parity with the server
   lobby/      lobby screens: lobby list, project-code entry, Active requests panel (README.md)
@@ -69,10 +71,14 @@ src/
   a field), with a short hint for company staff. Password sign-in stays below it for everyone,
   internal users included (never hidden by e-mail domain). Without `sso`, or when the
   configuration cannot be read, the screen is password only, as before. (The magic-link
-  request for Field Workers is not on this screen yet: TD-147.) The button is a plain HTML
+  request is offered only on the invite sign-in, T-0053; the general one is TD-147.) The button is a plain HTML
   form to the server's `start_url` (accepted only as a same-origin `/api/...` path, since the
   pre-auth and session cookies are same-origin): a `GET` top-level navigation, or a `POST`
-  with the `invite_token` in the body when a pending invite is passed (wired by T-0053).
+  with the `invite_token` in the body when a pending invite is passed (T-0053).
+- **Invites and passwords (T-0053, diff §4.1, §4.2).** `/invite#<token>` (join, sign-in
+  carry-through, "Create your password"), "Forgot password?" → `/forgot-password` and
+  `/reset-password#<token>` live outside the auth guard; tokens come only from the URL fragment,
+  which is removed at once: `src/invite/README.md`.
   The callback redirects to **`/login/sso-return`** (`src/pages/SsoReturnPage.tsx`):
   `?status=signed_in` → the tab adopts the session the server set as the `httpOnly` refresh
   cookie (`TokenStore.adoptCookieSession`: only the "signed in" marker is stored; the access

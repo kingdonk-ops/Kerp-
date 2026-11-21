@@ -18,10 +18,20 @@ export class LoginError extends Error {
   }
 }
 
+type TokenResponse = components["schemas"]["TokenResponse"];
+
+/** What a sign-in that carried an `invite_token` did with it (T-0052, T-0053). */
+export interface SignInResult {
+  joinedProjectId: string | null;
+  inviteError: string | null;
+}
+
 interface AuthContextValue {
   status: AuthStatus;
   user: CurrentUser | null;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string, inviteToken?: string) => Promise<SignInResult>;
+  /** Starts the session of a token response another endpoint issued (accept-with-password). */
+  startSession: (tokens: TokenResponse) => void;
   /** Takes over the session the SSO callback set as a cookie (T-0055); see `TokenStore`. */
   adoptCookieSession: () => void;
   logout: () => Promise<void>;
@@ -50,20 +60,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
   });
 
+  const startSession = useCallback(
+    (data: TokenResponse) => {
+      queryClient.removeQueries({ queryKey: ME_QUERY_KEY });
+      tokens.set(data);
+    },
+    [queryClient, tokens],
+  );
+
   const login = useCallback(
-    async (email: string, password: string) => {
+    async (email: string, password: string, inviteToken?: string) => {
       const { data, response } = await api.POST("/api/v1/auth/login", {
-        body: { email, password },
+        body: inviteToken ? { email, password, invite_token: inviteToken } : { email, password },
       });
       if (!data) {
         throw new LoginError(
           response.status === 401 ? "invalid" : response.status === 429 ? "locked" : "failed",
         );
       }
-      queryClient.removeQueries({ queryKey: ME_QUERY_KEY });
-      tokens.set(data);
+      startSession(data);
+      return {
+        joinedProjectId: data.joined_project_id ?? null,
+        inviteError: data.invite_error ?? null,
+      };
     },
-    [api, queryClient, tokens],
+    [api, startSession],
   );
 
   const adoptCookieSession = useCallback(() => {
@@ -93,11 +114,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       status,
       user: hasSession ? (me.data ?? null) : null,
       login,
+      startSession,
       adoptCookieSession,
       logout,
       retry: () => void me.refetch(),
     };
-  }, [hasSession, me, login, adoptCookieSession, logout]);
+  }, [hasSession, me, login, startSession, adoptCookieSession, logout]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

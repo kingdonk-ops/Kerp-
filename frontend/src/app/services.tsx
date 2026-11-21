@@ -12,6 +12,8 @@ export interface AppServices {
   preferences: KeyValueStorage;
   /** Shares refresh and sign-out with the browser's other tabs (T-0072); optional in tests. */
   crossTab?: CrossTabAuth;
+  /** This tab's `sessionStorage`: a pending invite during sign-in (T-0053); memory when absent. */
+  session?: KeyValueStorage;
 }
 
 function browserStorage(kind: "localStorage" | "sessionStorage"): KeyValueStorage {
@@ -32,6 +34,7 @@ export function createAppServices(): AppServices {
     tokens,
     crossTab,
     preferences: browserStorage("localStorage"),
+    session: browserStorage("sessionStorage"),
   };
 }
 
@@ -45,6 +48,13 @@ export function ServicesProvider({
   children: ReactNode;
 }) {
   return <ServicesContext.Provider value={services}>{children}</ServicesContext.Provider>;
+}
+
+const memorySession = memoryStorage();
+
+/** The tab-scoped storage (`AppServices.session`, else an in-memory one). */
+export function useSessionStorage(): KeyValueStorage {
+  return useServices().session ?? memorySession;
 }
 
 export function useServices(): AppServices {

@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 308 · **Closed:** 144
+**Open:** 312 · **Closed:** 144
 
 ## decision (38)
 
@@ -48,7 +48,7 @@
 | [TD-439](../tracker/todo/TD-439.md) | Feature flags: who toggles them, project overrides, and what a flag may gate | T-0306 | planner |
 | [TD-442](../tracker/todo/TD-442.md) | Issues: may an internal punch/NCR be assigned to an external account (subcontractor) who must then see it? Planner default: no (422), internal issues are invisible to every is_internal=false caller | T-0314 | planner |
 
-## spec-gap (57)
+## spec-gap (58)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -109,6 +109,7 @@
 | [TD-428](../tracker/todo/TD-428.md) | ITP templates: line-item structure, approval authority and the ITP instance on an anchor are not specified in T-0113 / quality-and-inspection.md (pasted T-0187/T-0188 assume oe_qms_itp_template, draft → approved, is_customized) | T-0113, T-0187, T-0188, T-0281 | planner |
 | [TD-430](../tracker/todo/TD-430.md) | New rule kind itp_assignment in the ADR 0004 rule store (scope → approved ITP template): context variables, action vocabulary, editors | T-0188 | planner |
 | [TD-452](../tracker/todo/TD-452.md) | Uploads: a file larger than the malware scan limit (KERP_UPLOAD_SCAN_MAX_BYTES or clamd StreamMaxLength) is rejected as verify_failed; diff 4.7 lists no dedicated reason code (e.g. scan_too_large) | T-0218 | implementer |
+| [TD-460](../tracker/todo/TD-460.md) | Invite setup-preview returns no invited e-mail (and no password policy): 'Create your password' cannot show the e-mail read-only or a minimum-length hint before the first submit | T-0053 | implementer |
 
 ## missed (7)
 
@@ -122,7 +123,7 @@
 | [TD-337](../tracker/todo/TD-337.md) | Web/Android route /magic-link#<token> that redeems the e-mailed sign-in link (POST /auth/magic-link/redeem); the e-mail now links there | T-0058 | implementer |
 | [TD-388](../tracker/todo/TD-388.md) | saved_views: wire the my_teams filter op | T-0074 | reviewer |
 
-## deferred (42)
+## deferred (44)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -168,8 +169,10 @@
 | [TD-448](../tracker/todo/TD-448.md) | Playwright e2e journey for T-0026 (System admin appoints a Project Admin -> they create a project -> assign a user) once T-0027 sets up e2e/; covered meanwhile by the component-level journey in frontend/src/admin/MembersPage.test.tsx | T-0026 | implementer |
 | [TD-451](../tracker/todo/TD-451.md) | Queue monitor: failed-job list and retry/abort see only job rows the caller's RLS shows until T-0274 (ADR 0016) lets a system_admin read every project's oe_jobs_job rows | T-0218 | implementer |
 | [TD-457](../tracker/todo/TD-457.md) | Playwright e2e journey for T-0041 (external user: code lookup -> request with ticket -> reject with reason -> Request again disabled -> short cooldown -> Request again without ticket -> approve via T-0051 -> project in the picker) once T-0027 sets up e2e/; covered meanwhile by the component-level journey in frontend/src/lobby/LobbyPage.test.tsx | T-0041 | implementer |
+| [TD-458](../tracker/todo/TD-458.md) | Android (Capacitor) App Links for /invite and /reset-password (verified via assetlinks.json) showing the T-0053 invite and password screens, once the Android shell exists (T-0141/T-0143) | T-0053 | implementer |
+| [TD-459](../tracker/todo/TD-459.md) | E2E journeys for invites and passwords once the Playwright harness (T-0027) exists: PER-09 invites an existing user who signs in and lands in the project; brand-new external creates the first password from the invite e-mail; forgot password -> reset -> old session refused -> sign in | T-0053 | implementer |
 
-## later (127)
+## later (128)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -300,6 +303,7 @@
 | [TD-450](../tracker/todo/TD-450.md) | Project settings dialog: edit project code and spatial bounds (PATCH /projects accepts both; T-0026 edits name, status, time zone, currency, locale) | T-0026 | implementer |
 | [TD-453](../tracker/todo/TD-453.md) | main ruleset: require the fast-forwarded commit to be on dev (today main only requires a CI-green ci-gate on the commit, so any contents:write token could fast-forward main to an unreviewed CI-green commit; no workflow does this today) — from the PR #138 review | T-0332 | coordinator |
 | [TD-454](../tracker/todo/TD-454.md) | Dev tooling: pin mypy (and friends) in the backend dev extra or lock so local runs match CI (local mypy 2.3.1 flags core/audit/guard.py:66 and admin/service.py:122, CI's 2.4.1 does not) — from the PR #136/#138 reviews | T-0332 | coordinator |
+| [TD-461](../tracker/todo/TD-461.md) | 'Send me an e-mail to set my password' from a copied invite link: the invite is carried only within the tab, so after setting the password from the e-mail (usually a new tab) the invitee must open the invite link again | T-0053 | implementer |
 
 ## bug (6)
 

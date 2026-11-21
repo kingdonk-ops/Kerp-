@@ -3,11 +3,11 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 82/300 tasks done (27%) · **ready now:** 20 · **epics awaiting breakdown:** 49
+**Overall:** 83/300 tasks done (28%) · **ready now:** 19 · **epics awaiting breakdown:** 49
 
 | Phase | Tasks done | Progress |
 |---|---|---|
-| 0 · Platform foundations | 82/114 | `███████░░░` 72% |
+| 0 · Platform foundations | 83/114 | `███████░░░` 73% |
 | 1 · Asset & Quality backbone | 0/160 (+2 epics) | `░░░░░░░░░░` 0% |
 | 2 · Welding quality | 0/11 | `░░░░░░░░░░` 0% |
 | 3 · Logistics | 0/2 (+7 epics) | `░░░░░░░░░░` 0% |
@@ -85,12 +85,12 @@
 | ✅ | [T-0042](../tracker/tasks/T-0042.md) | Top-bar project picker wired to memberships + post-login landing (one project -> in, several -> last used, none -> lobby) | frontend | S | T-0014, T-0024 | #108 |
 | ⚫ | [T-0048](../tracker/tasks/T-0048.md) | Devices screen: list enrolled devices, revoke with wipe warning (admin and own devices) | frontend | S | T-0043, T-0024 |  |
 | ✅ | [T-0051](../tracker/tasks/T-0051.md) | Admin access-request inbox and devices screens: pending requests for the user's PER-09 projects (approve with persona/site scope, reject with optional reason); enrolled devices list and revoke with wipe warning (admin and own devices) | frontend | M | T-0050, T-0042, T-0043, T-0024 | #134 |
-| ▶ | [T-0053](../tracker/tasks/T-0053.md) | Invite link screens: one-click 'Join project' for signed-in users, invite token carried through sign-in, land in the project (lobby skipped) | frontend | S | T-0052, T-0042, T-0055, T-0026 |  |
+| ✅ | [T-0053](../tracker/tasks/T-0053.md) | Invite link and password screens: one-click 'Join project' for signed-in users, invite token carried through sign-in, land in the project; create your password at invite acceptance, forgot password and reset password | frontend | M | T-0052, T-0042, T-0055, T-0026, T-0059, T-0077 | #152 |
 | ✅ | [T-0055](../tracker/tasks/T-0055.md) | Web sign-in with Microsoft (Entra ID SSO): button when enabled, callback landing, translated refusals | frontend | S | T-0054, T-0042 | #146 |
 | ▶ | [T-0331](../tracker/tasks/T-0331.md) | Admin → Users screen: System admin creates / deactivates / reactivates accounts; PER-09 invites a user by e-mail to one of its projects (persona(s) + site + SoD confirm), link shown once, open invites listed / re-sent / revoked | frontend | S | T-0026 |  |
 | ▶ | [T-0027](../tracker/tasks/T-0027.md) | Playwright setup + Phase 0 exit journey | e2e | S | T-0023, T-0024, T-0018 |  |
 | ⚫ | [T-0056](../tracker/tasks/T-0056.md) | Transactional e-mails for access-request decisions (approve / reject) via the outbound e-mail service | admin | S | T-0050, T-0058 |  |
-| ⬜ | [T-0078](../tracker/tasks/T-0078.md) | Screens: create your password at invite acceptance, forgot password and reset password (web and Android) | frontend | S | T-0053, T-0059, T-0077 |  |
+| ⚫ | [T-0078](../tracker/tasks/T-0078.md) | Screens: create your password at invite acceptance, forgot password and reset password (web and Android) | frontend | S | T-0053, T-0059, T-0077 |  |
 | ✅ | [T-0028](../tracker/tasks/T-0028.md) | CI hardening: detect in ci-gate needs, least-privilege GHCR publish, SHA-pinned actions, base image digest + Renovate, drop empty postgres extra | platform | S | T-0004 | #18 |
 | ⚫ | [T-0032](../tracker/tasks/T-0032.md) | CI hardening 2: weekly uv lock refresh PR, SHA-pinned promote/review-gate actions, digest-pinned service images, publish the smoke-tested image by digest | platform | S | T-0028 |  |
 | ✅ | [T-0033](../tracker/tasks/T-0033.md) | Platform hardening: migrations inline frozen RLS/ledger DDL per revision (+ drift test against the live helpers); CI hardening 2 (weekly uv lock refresh PR, SHA-pinned promote/review-gate actions, digest-pinned service images, publish the smoke-tested image by digest) | platform | M | T-0006, T-0007, T-0028 | #138 |
@@ -279,7 +279,7 @@
 | ⬜ | [T-0267](../tracker/tasks/T-0267.md) | compliance: P6 activity readiness targets — resources of anchor-linked P6 activities, re-evaluation on P6 import commit | compliance | S | T-0266, T-0104 |  |
 | ⬜ | [T-0161](../tracker/tasks/T-0161.md) | e2e: Pilot-0 journey — download, inspect offline with annotated photo, sign and sync, return, resubmit, approve, PDF; scan-to-locate | e2e | S | T-0149, T-0153, T-0155, T-0157, T-0159, T-0160, T-0143, T-0027, T-0164, T-0165, T-0170, T-0171, T-0172, T-0175, T-0176 |  |
 | ⬜ | [T-0185](../tracker/tasks/T-0185.md) | materials/qms: product substitution register oe_material_substitution — internal_qa route (QE approval signed through T-0119), non-QA drafts to the verification queue, scope by project/subtree/work anchor/Item | materials | M | T-0016, T-0018, T-0019, T-0119, T-0181, T-0108, T-0006, T-0140 |  |
-| ⬜ | [T-0146](../tracker/tasks/T-0146.md) | [Pilot-0] readiness gate: NFR budgets become hard CI gates; pilot scope checklist green | platform | S | T-0318, T-0319, T-0322, T-0045, T-0145, T-0046, T-0142, T-0143, T-0144, T-0111, T-0119, T-0126, T-0127, T-0037, T-0038, T-0039, T-0040, T-0041, T-0042, T-0049, T-0050, T-0051, T-0052, T-0053, T-0054, T-0055, T-0057, T-0058, T-0059, T-0077, T-0078, T-0043, T-0044, T-0047, T-0147, T-0148, T-0149, T-0150, T-0151, T-0152, T-0153, T-0154, T-0155, T-0156, T-0157, T-0158, T-0159, T-0160, T-0161, T-0130, T-0162, T-0163, T-0164, T-0165, T-0167, T-0168, T-0169, T-0170, T-0171, T-0172, T-0107, T-0173, T-0174, T-0175, T-0176, T-0177 |  |
+| ⬜ | [T-0146](../tracker/tasks/T-0146.md) | [Pilot-0] readiness gate: NFR budgets become hard CI gates; pilot scope checklist green | platform | S | T-0318, T-0319, T-0322, T-0045, T-0145, T-0046, T-0142, T-0143, T-0144, T-0111, T-0119, T-0126, T-0127, T-0037, T-0038, T-0039, T-0040, T-0041, T-0042, T-0049, T-0050, T-0051, T-0052, T-0053, T-0054, T-0055, T-0057, T-0058, T-0059, T-0077, T-0043, T-0044, T-0047, T-0147, T-0148, T-0149, T-0150, T-0151, T-0152, T-0153, T-0154, T-0155, T-0156, T-0157, T-0158, T-0159, T-0160, T-0161, T-0130, T-0162, T-0163, T-0164, T-0165, T-0167, T-0168, T-0169, T-0170, T-0171, T-0172, T-0107, T-0173, T-0174, T-0175, T-0176, T-0177 |  |
 | ⬜ | [T-0269](../tracker/tasks/T-0269.md) | materials: baseline approved product list per specified product code (oe_material_approved_product), seeded from client packs | materials | S | T-0185, T-0108 |  |
 | ⬜ | [T-0131](../tracker/tasks/T-0131.md) | [M1] Phase 1 backbone-freeze contract gate: freeze core tables, level-def shape + role names, rule-store shape, override record, field ownership, seam sigs; CEL parity | platform | M | T-0005, T-0016, T-0018, T-0101, T-0103, T-0110, T-0111, T-0112, T-0124, T-0132, T-0035, T-0139 |  |
 | ⬜ | [T-0270](../tracker/tasks/T-0270.md) | eligibility/forms: is_product_approved CEL helper (pure, dual-runtime parity fixtures) over context.product_approvals resolved by the eligibility service | materials | S | T-0185, T-0269, T-0139, T-0110, T-0017 |  |

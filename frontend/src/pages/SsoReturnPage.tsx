@@ -2,9 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Navigate, useNavigate, useSearchParams } from "react-router";
 
-import { useServices } from "../app/services";
+import { useServices, useSessionStorage } from "../app/services";
 import { useAuth } from "../auth/AuthProvider";
 import { SSO_SIGNED_IN, ssoErrorCode, type SsoErrorCode } from "../auth/sso";
+import type { InviteOutcomeState } from "../invite/InvitePage";
+import { clearPendingInvite, INVITE_PATH } from "../invite/pendingInvite";
 import { rememberProjectScope } from "../projects/ProjectScopeProvider";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -26,7 +28,8 @@ function refused(code: SsoErrorCode) {
  * - `?status=signed_in[&joined_project_id=<id>]` → the server set the session's `httpOnly`
  *   refresh cookie; the tab adopts it (`/auth/refresh` gives the in-memory access token) and
  *   lands like any sign-in (diff §4.1: `/` opens the only / last used / first project, or
- *   the lobby). A just-joined project is remembered first, so it opens.
+ *   the lobby). A just-joined project is remembered first, so it opens; `&invite_error=<code>`
+ *   (T-0053) lands on `/invite` with the neutral message for that code instead.
  *
  * No token ever travels in this URL; nothing from it is shown or logged except a known code.
  */
@@ -35,6 +38,7 @@ export function SsoReturnPage() {
   const [params] = useSearchParams();
   const { status, user, adoptCookieSession } = useAuth();
   const { preferences } = useServices();
+  const session = useSessionStorage();
   const navigate = useNavigate();
   const started = useRef(false);
   const [adopted, setAdopted] = useState(false);
@@ -42,6 +46,12 @@ export function SsoReturnPage() {
   const error = params.get("error");
   const signedIn = error === null && params.get("status") === SSO_SIGNED_IN;
   const joined = params.get("joined_project_id");
+  const inviteError = params.get("invite_error");
+
+  useEffect(() => {
+    // The SSO start carried any pending invite to the server (T-0053): the tab drops it.
+    clearPendingInvite(session);
+  }, [session]);
 
   useEffect(() => {
     // Once per landing: a second adoption would only drop the fresh access token again.
@@ -55,8 +65,11 @@ export function SsoReturnPage() {
     if (!adopted || status !== "authenticated" || !user) return;
     // A `joined_project_id` that is not a UUID is ignored: the normal landing applies.
     if (joined !== null && UUID.test(joined)) rememberProjectScope(preferences, user.id, joined);
-    void navigate("/", { replace: true });
-  }, [adopted, status, user, joined, preferences, navigate]);
+    // A refused invite (T-0053): `/invite` shows its neutral message (codes only, never raw).
+    const outcome: InviteOutcomeState = { inviteError };
+    if (inviteError !== null) void navigate(INVITE_PATH, { replace: true, state: outcome });
+    else void navigate("/", { replace: true });
+  }, [adopted, status, user, joined, inviteError, preferences, navigate]);
 
   if (error !== null) return refused(ssoErrorCode(error));
   if (!signedIn) return <Navigate to="/login" replace />;
