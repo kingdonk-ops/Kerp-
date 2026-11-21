@@ -113,7 +113,8 @@ jobs:
         run: pytest -n auto --durations=25
 
   # The full suite again on PostgreSQL 16 + PostGIS + ltree as the NOSUPERUSER NOBYPASSRLS
-  # runtime role, so RLS applies. Runs in parallel with `backend` (T-0081).
+  # runtime role, so RLS applies, with the coverage floor (T-0082). Runs in parallel with
+  # `backend` (T-0081).
   backend-pg:
     needs: detect
     if: needs.detect.outputs.backend == 'true'
@@ -158,15 +159,27 @@ jobs:
         run: >-
           psql -h localhost -U kerp -d kerp_test -v ON_ERROR_STOP=1
           -f ../infra/postgres/initdb/20-kerp-app.sql
-      # Serial on purpose: every test shares the one kerp_test database until T-0082 gives
-      # each test its own copy of a migrated template.
+      # Throwaway database: trade crash safety for speed (T-0082). Service `options` are docker
+      # flags, not server flags, so set them at runtime; all three apply on reload.
+      - name: Postgres without durability (CI only)
+        env:
+          PGPASSWORD: kerp
+        run: >-
+          psql -h localhost -U kerp -d kerp_test -v ON_ERROR_STOP=1
+          -c "ALTER SYSTEM SET fsync = off"
+          -c "ALTER SYSTEM SET synchronous_commit = off"
+          -c "ALTER SYSTEM SET full_page_writes = off"
+          -c "SELECT pg_reload_conf()"
+          -c "SHOW fsync"
+      # Each test gets its own copy of a per-worker migrated template database
+      # (tests/pg_databases.py), so the workers never share a database (T-0082).
       - name: Tests (PostgreSQL + RLS)
         env:
           KERP_DATABASE_URL: postgresql+psycopg://kerp_app:kerp_app@localhost:5432/kerp_test
           KERP_TEST_OWNER_URL: postgresql+psycopg://kerp:kerp@localhost:5432/kerp_test
           KERP_REDIS_URL: redis://localhost:6379/0
         # exit 5 = no tests collected (before the DB layer exists) — allowed
-        run: pytest --no-cov --durations=25 || [ $? -eq 5 ]
+        run: pytest -n auto --durations=25 || [ $? -eq 5 ]
 
   # Backend container image (T-0004): build + smoke test on every run, read-only token.
   backend-image:

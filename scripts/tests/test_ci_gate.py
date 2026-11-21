@@ -158,7 +158,9 @@ def test_backend_suites_run_as_parallel_jobs() -> None:
     assert "--cov" not in sqlite  # the coverage floor comes from pyproject addopts
     assert "postgresql+psycopg://kerp_app:" in pg  # NOSUPERUSER NOBYPASSRLS runtime role
     assert "20-kerp-app.sql" in pg
-    assert "pytest --no-cov --durations=25" in pg
+    assert "pytest -n auto --durations=25" in pg  # per-test databases (T-0082)
+    assert "--no-cov" not in pg  # the coverage floor applies on PostgreSQL too (T-0082)
+    assert "ALTER SYSTEM SET fsync = off" in pg and "pg_reload_conf()" in pg
     assert ci_gate.EXPECTED["backend-pg"] == ("backend", False)
     for job in ("backend-publish", "e2e"):
         listed = re.search(r"needs: \[([^\]]*)\]", jobs[job])

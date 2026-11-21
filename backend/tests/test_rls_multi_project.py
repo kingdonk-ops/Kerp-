@@ -15,7 +15,7 @@ from sqlalchemy.pool import QueuePool
 from app.core.db import Database
 from app.core.tenancy.context import TenancyContext
 from app.core.tenancy.rls import ALLOWED_SETTING, bind_connection, install_pool_reset
-from tests.db_support import ON_POSTGRES, POSTGRES_URL, Widget
+from tests.db_support import ON_POSTGRES, Widget, postgres_url
 from tests.tenancy_support import PA, PB, PC, T1, seeded_database
 from tests.test_rls_bypass import RLS_ERROR, _raw_row
 
@@ -77,7 +77,7 @@ def test_unbound_session_still_sees_nothing(db: Database) -> None:
 
 
 def test_pool_reset_clears_the_allowed_list(db: Database) -> None:
-    engine = create_engine(POSTGRES_URL, poolclass=QueuePool, pool_size=1, max_overflow=0)
+    engine = create_engine(postgres_url(), poolclass=QueuePool, pool_size=1, max_overflow=0)
     install_pool_reset(engine)
     try:
         with engine.connect() as conn:
