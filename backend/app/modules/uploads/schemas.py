@@ -80,3 +80,62 @@ class UploadTicket(BaseModel):
 
     file: FileRead
     upload: PresignedRead
+
+
+# --- quarantine monitor (T-0221): System console, ``/api/v1/admin/system/uploads`` ------------
+
+MonitoredStatus = Literal["verifying", "rejected", "expired"]
+
+
+class QuarantineFileRead(BaseModel):
+    """An upload the monitor shows. ``reason`` is a code the client translates (media-probe
+    codes of T-0169 included); ``scan_signature`` is set for ``infected``. ``object_deleted``:
+    the bytes are gone (rejected at once, TD-397; expired by the sweep); there is no purge."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    project_id: uuid.UUID
+    project_code: str | None
+    module: str
+    filename: str
+    content_type: str
+    size_bytes: int
+    sha256: str
+    status: MonitoredStatus
+    reason: str | None
+    scan_signature: str | None
+    uploader_id: uuid.UUID | None
+    object_deleted: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class QuarantinePage(BaseModel):
+    """``GET /admin/system/uploads``: one page, most recently changed first."""
+
+    items: list[QuarantineFileRead]
+    total: int
+    limit: int
+    offset: int
+
+
+class QuarantineCountRead(BaseModel):
+    """``GET /admin/system/uploads/counts``: uploads of one project per status and reason."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    project_id: uuid.UUID
+    project_code: str | None
+    status: MonitoredStatus
+    reason: str | None
+    count: int
+
+
+class QuarantineJobRead(BaseModel):
+    """A queued re-check or sweep: the job to poll (``/api/v1/jobs/{id}``)."""
+
+    job_id: uuid.UUID
+    project_id: uuid.UUID
+    kind: str
+    status: Literal["queued"]

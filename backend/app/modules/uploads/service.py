@@ -10,17 +10,21 @@ from __future__ import annotations
 
 import importlib
 import uuid
+from collections.abc import Collection
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any, Final, Literal
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.audit import service as audit
 from app.core.db import Database, utcnow
 from app.core.tenancy.context import TenancyContext
 from app.core.tenancy.rls import session_tenancy
 from app.core.tenancy.scope import OutOfScopeError, get_or_404
-from app.modules.jobs.service import JOB_REGISTRY, create_job, job_status
+from app.modules.jobs.service import CONSOLE_CHAIN, JOB_REGISTRY, create_job, job_status
+from app.modules.projects import service as projects
 from app.modules.uploads.models import UploadedFile, quarantine_prefix, staging_prefix
 from app.modules.uploads.scan import (
     Scanner,
@@ -42,16 +46,26 @@ if TYPE_CHECKING:
     from app.modules.jobs.registry import JobKind
 
 __all__ = [
+    "MAX_QUARANTINE_LIST",
+    "MONITORED_STATUSES",
     "SWEEP_KIND",
     "VERIFY_KIND",
     "VERIFY_LARGE_KIND",
     "FileTooLargeError",
     "NotUploaderError",
+    "ObjectGoneError",
+    "QuarantineCount",
+    "QuarantineFile",
+    "QueuedJob",
     "UploadStateError",
     "complete_upload",
     "download_request",
     "get_file",
     "presign_upload",
+    "quarantine_counts",
+    "quarantine_files",
+    "queue_project_sweep",
+    "recheck_upload",
     "schedule_sweep",
     "sweep_orphans",
     "verify_upload",
@@ -88,6 +102,10 @@ class NotUploaderError(PermissionError):
 
 class UploadStateError(RuntimeError):
     """The file is not in a state that allows the call (the API answers 409)."""
+
+
+class ObjectGoneError(UploadStateError):
+    """A stuck file's uploaded bytes are gone from storage: nothing to check (409)."""
 
 
 def _project_id(session: Session) -> uuid.UUID:
@@ -369,3 +387,255 @@ def schedule_sweep(session: Session, *, actor_id: uuid.UUID | None = None) -> Jo
     """Queue an orphan sweep of the session's project (batch queue)."""
     _project_id(session)
     return create_job(session, _job_kind(SWEEP_KIND), {}, actor_id=actor_id)
+
+
+# --- quarantine monitor (T-0221, diff §4.7): System console, every project of the tenant ------
+
+# The statuses the monitor shows: still in the check, refused, or never completed.
+MONITORED_STATUSES: Final = ("verifying", "rejected", "expired")
+MAX_QUARANTINE_LIST: Final = 200
+
+
+@dataclass(frozen=True, slots=True)
+class QuarantineFile:
+    """An upload row as the console shows it: metadata only, never a URL or a storage key."""
+
+    id: uuid.UUID
+    project_id: uuid.UUID
+    project_code: str | None
+    module: str
+    filename: str
+    content_type: str
+    size_bytes: int
+    sha256: str
+    status: str
+    reason: str | None
+    scan_signature: str | None
+    uploader_id: uuid.UUID | None
+    object_deleted: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class QueuedJob:
+    """A job the console queued: its id, project and kind."""
+
+    job_id: uuid.UUID
+    project_id: uuid.UUID
+    kind: str
+
+
+@dataclass(frozen=True, slots=True)
+class QuarantineCount:
+    project_id: uuid.UUID
+    project_code: str | None
+    status: str
+    reason: str | None
+    count: int
+
+
+def _console_tenant(session: Session) -> uuid.UUID:
+    """The tenant of the caller's tenant-level request session (checked before any write)."""
+    context = session_tenancy(session)
+    if context is None or context.project_id is not None:
+        raise RuntimeError("the quarantine monitor needs a tenant-level bound session")
+    return context.tenant_id
+
+
+def _monitor_filters(
+    statuses: Collection[str] | None, reason: str | None, project_id: uuid.UUID | None
+) -> list[Any]:
+    wanted = [s for s in (statuses or MONITORED_STATUSES) if s in MONITORED_STATUSES]
+    filters: list[Any] = [UploadedFile.status.in_(wanted)]
+    if reason is not None:
+        filters.append(UploadedFile.rejection_reason == reason)
+    if project_id is not None:
+        filters.append(UploadedFile.project_id == project_id)
+    return filters
+
+
+def _codes(session: Session, project_ids: Collection[uuid.UUID]) -> dict[uuid.UUID, str]:
+    return {p.id: p.code for p in projects.list_projects(session, set(project_ids))}
+
+
+def quarantine_files(
+    session: Session,
+    *,
+    statuses: Collection[str] | None = None,
+    reason: str | None = None,
+    project_id: uuid.UUID | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> tuple[list[QuarantineFile], int]:
+    """``verifying``, ``rejected`` and ``expired`` uploads the caller's RLS shows, most
+    recently changed first, and their total.
+
+    Read under the normal project RLS of the caller's tenant-level session: a
+    ``system_admin`` sees the rows of every project of its tenant (ADR 0016, T-0274), never
+    through a bypass role. A rejected or expired file's bytes are gone (deleted at rejection,
+    TD-397; an expired upload's staging object by the same sweep that expires it), so
+    ``object_deleted`` is set; there is no purge. A project soft-deleted since keeps its
+    rows, without a code. Reason codes are passed through, never enumerated (T-0169).
+    """
+    _console_tenant(session)
+    filters = _monitor_filters(statuses, reason, project_id)
+    total = session.scalar(select(func.count()).select_from(UploadedFile).where(*filters)) or 0
+    rows = list(
+        session.scalars(
+            select(UploadedFile)
+            .where(*filters)
+            .order_by(UploadedFile.updated_at.desc(), UploadedFile.id)
+            .limit(max(1, min(limit, MAX_QUARANTINE_LIST)))
+            .offset(max(0, offset))
+        )
+    )
+    codes = _codes(session, {f.project_id for f in rows if f.project_id is not None})
+    files = [
+        QuarantineFile(
+            id=f.id,
+            project_id=f.project_id,
+            project_code=codes.get(f.project_id),
+            module=f.module,
+            filename=f.filename,
+            content_type=f.content_type,
+            size_bytes=f.size_bytes,
+            sha256=f.sha256,
+            status=f.status,
+            reason=f.rejection_reason,
+            scan_signature=f.scan_signature,
+            uploader_id=f.created_by,
+            object_deleted=f.status != "verifying",
+            created_at=f.created_at,
+            updated_at=f.updated_at,
+        )
+        for f in rows
+        if f.project_id is not None
+    ]
+    return files, int(total)
+
+
+def quarantine_counts(
+    session: Session,
+    *,
+    statuses: Collection[str] | None = None,
+    reason: str | None = None,
+    project_id: uuid.UUID | None = None,
+) -> list[QuarantineCount]:
+    """Per project, status and reason code: the number of monitored uploads.
+
+    A ``GROUP BY`` under the same normal RLS as ``quarantine_files``; no ``SECURITY DEFINER``
+    function (ADR 0016). Sorted by project code, status and reason.
+    """
+    _console_tenant(session)
+    rows = session.execute(
+        select(
+            UploadedFile.project_id,
+            UploadedFile.status,
+            UploadedFile.rejection_reason,
+            func.count(),
+        )
+        .where(*_monitor_filters(statuses, reason, project_id))
+        .group_by(UploadedFile.project_id, UploadedFile.status, UploadedFile.rejection_reason)
+    ).all()
+    codes = _codes(session, {r[0] for r in rows if r[0] is not None})
+    counts = [
+        QuarantineCount(
+            project_id=pid,
+            project_code=codes.get(pid),
+            status=str(state),
+            reason=why,
+            count=int(n),
+        )
+        for pid, state, why, n in rows
+        if pid is not None
+    ]
+    return sorted(
+        counts, key=lambda c: (c.project_code or "", str(c.project_id), c.status, c.reason or "")
+    )
+
+
+def _console_audit(
+    session: Session, event: str, payload: dict[str, Any], actor_id: uuid.UUID | None
+) -> None:
+    # After the job write committed in its own unit of work, as the queue monitor does: a
+    # failed commit of the request session leaves the action unaudited (TD-455).
+    audit.append(
+        session,
+        CONSOLE_CHAIN.format(tenant_id=_console_tenant(session)),
+        {"event": event, **payload},
+        actor_id=actor_id,
+        source="api",
+    )
+
+
+def recheck_upload(
+    session: Session,
+    db: Database,
+    storage: Storage,
+    file_id: uuid.UUID,
+    *,
+    actor_id: uuid.UUID | None,
+) -> QueuedJob:
+    """Queue the check of a file stuck in ``verifying`` again (audited); the new job.
+
+    ``session`` is the caller's tenant-level request session: the row must be visible to it
+    under normal RLS (a ``system_admin`` sees every project of its tenant, ADR 0016), else
+    ``OutOfScopeError`` (404). Not ``verifying``: ``UploadStateError``. The uploaded bytes
+    must still exist, in staging or as the quarantine copy a scanner outage keeps (T-0218),
+    else ``ObjectGoneError``. A new verify job is created in the file's own project scope (as
+    ``complete_upload`` does; never a bypass role) and becomes the file's job, so the sweep
+    judges the new job, and the stuck clock (``VERIFY_STUCK_AFTER``) restarts. A previous job
+    still retrying is harmless: ``verify_upload`` decides a file once, under a row lock.
+    """
+    tenant_id = _console_tenant(session)
+    file = get_or_404(session, UploadedFile, file_id)
+    if file.tenant_id != tenant_id or file.project_id is None:  # defence in depth
+        raise OutOfScopeError("UploadedFile not found")
+    if file.status != "verifying":
+        raise UploadStateError(f"the file is {file.status}")
+    if storage.head(file.staging_key) is None and storage.head(file.quarantine_key) is None:
+        raise ObjectGoneError("the uploaded object is gone")
+    project_id = file.project_id
+    scope = TenancyContext(tenant_id=tenant_id, project_id=project_id, user_id=actor_id)
+    with db.unit_of_work(scope) as scoped:
+        row = get_file(scoped, file_id)
+        scoped.refresh(row, with_for_update=True)
+        if row.status != "verifying":
+            raise UploadStateError(f"the file is {row.status}")
+        kind = VERIFY_LARGE_KIND if row.size_bytes > LARGE_FILE_BYTES else VERIFY_KIND
+        job: Job = create_job(scoped, _job_kind(kind), {"file_id": str(row.id)}, actor_id=actor_id)
+        row.job_id, row.updated_by, row.updated_at = job.id, actor_id, utcnow()
+        queued = QueuedJob(job.id, project_id, kind)
+    _console_audit(
+        session,
+        "upload_rechecked",
+        {"file_id": str(file_id), "project_id": str(project_id), "job_id": str(queued.job_id)},
+        actor_id,
+    )
+    return queued
+
+
+def queue_project_sweep(
+    session: Session, db: Database, project_id: uuid.UUID, *, actor_id: uuid.UUID | None
+) -> QueuedJob:
+    """Queue the orphan sweep of ``project_id`` now (audited housekeeping); the job.
+
+    The project must be a live project the caller's session shows (a ``system_admin`` sees
+    every project of its tenant, ADR 0016), else ``OutOfScopeError`` (404). The job is created
+    in the project's own scope and runs there, as the hourly sweep does (T-0215).
+    """
+    tenant_id = _console_tenant(session)
+    project = projects.get_project(session, project_id)
+    if project.tenant_id != tenant_id:  # defence in depth: RLS and the ORM scope hide it
+        raise OutOfScopeError("Project not found")
+    scope = TenancyContext(tenant_id=tenant_id, project_id=project.id, user_id=actor_id)
+    with db.unit_of_work(scope) as scoped:
+        queued = QueuedJob(schedule_sweep(scoped, actor_id=actor_id).id, project.id, SWEEP_KIND)
+    _console_audit(
+        session,
+        "upload_sweep_queued",
+        {"project_id": str(project_id), "job_id": str(queued.job_id)},
+        actor_id,
+    )
+    return queued

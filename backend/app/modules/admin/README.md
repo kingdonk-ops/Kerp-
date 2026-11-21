@@ -10,6 +10,7 @@ stays in code and RLS but is never taken or returned by this API.
 | `service.py` | `own_admin_grants` (registered as core's admin-grant lookup), `list_grants` / `grant` / `revoke`, `create_user` / `update_user` / `lookup_user`, `project_members` / `assign_member` / `remove_member` |
 | `router.py` | `/api/v1/admin/...` (below) |
 | `system_router.py` | System console (diff §4.7): the queue monitor (T-0218, *System console* below); it calls the jobs service only |
+| `system_uploads_router.py` | System console: the upload quarantine monitor (T-0221, *System console* below); it calls the uploads service only |
 | `invites.py`, `invites_router.py` | Project invites (T-0052, *Project invites* below): `oe_admin_project_invite` (`ProjectInvite` in `models.py`, own `project_invite` RLS policy; migration `0030`), the invite service, the post-authentication hook and the magic-link eligibility provider registered with core auth, and the invite endpoints |
 | `audit_explorer.py`, `audit_router.py`, `audit_jobs.py`, `jobs.py` | Audit explorer (T-0222, *Audit explorer* below): the service, its endpoints and the `admin.audit_verify_all` batch job (`jobs.py` is what the module loader imports) |
 
@@ -272,6 +273,17 @@ surface, not a project record). Queue monitor (T-0218, absorbed T-0220; detail i
 
 SAQ's own web UI is not mounted (it has no KERP auth; a test checks every route).
 
+Upload quarantine monitor (T-0221; detail in `app/modules/uploads/README.md` *Quarantine
+monitor*). Rows of every project of the tenant under the normal project RLS (ADR 0016); no
+bypass role, no `SECURITY DEFINER` function, no purge (TD-397):
+
+| Endpoint | Answer |
+|---|---|
+| `GET /system/uploads?status=&reason=&project=&limit=&offset=` | `{items, total, limit, offset}`; items `verifying`, `rejected`, `expired` uploads: `id`, `project_id`, `project_code`, `module`, `filename`, `content_type`, `size_bytes`, `sha256`, `status`, `reason`, `scan_signature`, `uploader_id`, `object_deleted`, `created_at`, `updated_at`; most recently changed first |
+| `GET /system/uploads/counts?status=&reason=&project=` | `[{project_id, project_code, status, reason, count}]` |
+| `POST /system/uploads/{file_id}/recheck` | 202 `{job_id, project_id, kind, status: queued}` for a `verifying` file whose bytes still exist; 409 `NOT_VERIFYING` / `OBJECT_GONE`; 404 unknown |
+| `POST /system/uploads/sweep?project=` | 202 `{job_id, project_id, kind: uploads.sweep_orphans, status: queued}`; 404 unknown or deleted project |
+
 ## Audit
 
 Tenant-level chains: `admin-user:<user>` (create, update), `admin-user-lookup:<caller>` (every
@@ -280,7 +292,8 @@ lookup), `project-members:<project>` (`assign` with added / removed / grants / `
 `resend` with `email_queued`, `revoke`, `first_password_set`, `accept` and `refuse` with stage
 and reason; the invitee by account id) and `project-invites` (`refuse` of a token that matches
 no invite), `admin-system:<tenant>` (System console: `job_retried`, `job_aborted` with job id,
-kind, queue and project id; T-0218). Invite entries never carry a token, a hash, a password or an e-mail address. An accepted invite also writes the usual
+kind, queue and project id; T-0218; `upload_rechecked` with file, project and job id,
+`upload_sweep_queued` with project and job id; T-0221). Invite entries never carry a token, a hash, a password or an e-mail address. An accepted invite also writes the usual
 `assign` entry on `project-members:<project>`.
 
 ## Audit explorer (`/api/v1/admin/system/audit`, T-0222, diff §4.7)
@@ -322,4 +335,5 @@ behind the triggers as in `tests/test_audit_ledger.py`).
 send cap, races, log scrubbing), `tests/test_invite_setup.py` (the invite e-mail, the
 `setup_token`, first password at acceptance, its races, scrubbing; capturing mail queue),
 `tests/test_rls_invites.py` (PostgreSQL as `kerp_app`), `tests/test_queue_monitor.py` (System
-console queue monitor; SQLite and PostgreSQL).
+console queue monitor; SQLite and PostgreSQL), `tests/test_uploads_quarantine.py` (upload
+quarantine monitor; SQLite and PostgreSQL as `kerp_app`).

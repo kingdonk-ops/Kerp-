@@ -10,9 +10,9 @@ the bytes; it signs, checks and records. Helpers adapted from Inspection-ERP
 | `storage.py` | `clean_filename`, `content_disposition`, served-type (H-10) and magic-byte allowlists, `Storage` Protocol, `LocalStorage` (traversal guard; tests), `S3Storage` (boto3, lazy), `get_storage`/`set_storage` |
 | `scan.py` | `Scanner` seam; `StubScanner` (always clean; dev and tests); `ClamdScanner` (ClamAV over the clamd socket, `INSTREAM`, `PING`; T-0218); `scanner_from_settings` / `get_scanner` (`KERP_UPLOAD_SCANNER`); `ping_scanner` (health probe, T-0219); `require_real_scanner`, the worker startup check that refuses the stub in production (T-0213) |
 | `models.py` | `oe_uploads_file` (`BaseRecordMixin`, project RLS, migration `0009`; `scan_signature`, migration `0034`) |
-| `service.py` | `presign_upload`, `complete_upload`, `get_file`, `download_request`, `verify_upload`, `sweep_orphans`, `schedule_sweep` |
+| `service.py` | `presign_upload`, `complete_upload`, `get_file`, `download_request`, `verify_upload`, `sweep_orphans`, `schedule_sweep`; quarantine monitor: `quarantine_files`, `quarantine_counts`, `recheck_upload`, `queue_project_sweep` (T-0221) |
 | `jobs.py` | `uploads.verify` (interactive), `uploads.verify_large` (batch; both retried with back-off while the scanner is unavailable) and `uploads.sweep_orphans` (batch; queued hourly per project) |
-| `router.py`, `schemas.py` | `/api/v1/uploads/projects/{project_id}/files...` |
+| `router.py`, `schemas.py` | `/api/v1/uploads/projects/{project_id}/files...`; the monitor's shapes (`Quarantine*`), served by `admin/system_uploads_router.py` |
 
 ## Flow
 
@@ -88,6 +88,33 @@ project (`schedule_hourly_per_project` in `jobs.py`, T-0215); `schedule_sweep(se
 one on demand. A bucket lifecycle rule on `staging/` is the backstop (TD-208, with bucket
 provisioning and CORS). No delete endpoint or content-object GC yet (TD-209).
 
+## Quarantine monitor (T-0221, diff §4.7)
+
+The System console (`/api/v1/admin/system/uploads...`, `admin/system_uploads_router.py`,
+`system_admin` only; 403 for everyone else, PER-09 included) calls this service:
+
+* `quarantine_files` / `quarantine_counts`: `verifying`, `rejected` and `expired` uploads (rows,
+  paged; counts per project, status and reason code) with `status`, `reason` and `project`
+  filters, read on the caller's tenant-level request session under the normal project RLS of
+  `oe_uploads_file`. A `system_admin` session sees every project of its tenant (ADR 0016,
+  T-0274): no uploads-specific policy, no bypass role, no `SECURITY DEFINER` function. Rows
+  carry metadata only (never a URL or storage key); `reason` codes are passed through (the
+  media-probe codes of T-0169 appear once that lands); `scan_signature` for `infected`.
+  `object_deleted` is true for `rejected` (bytes deleted at rejection, TD-397) and `expired`
+  (the sweep that expires the row deletes its staging object). There is no purge.
+* `recheck_upload`: a file still `verifying` whose bytes still exist (staging, or the
+  quarantine copy kept during a scanner outage) gets a new `uploads.verify` /
+  `uploads.verify_large` job, created in the file's own project scope; it becomes the file's
+  `job_id` and `updated_at` restarts the `VERIFY_STUCK_AFTER` clock. Otherwise 409
+  `NOT_VERIFYING` or `OBJECT_GONE`. An older job still retrying is harmless (`verify_upload`
+  decides a file once, under a row lock).
+* `queue_project_sweep`: queues `uploads.sweep_orphans` for one live project now (housekeeping
+  that returns no rows).
+
+Re-check and sweep are written to the tenant-level console chain `admin-system:<tenant>`
+(`upload_rechecked`, `upload_sweep_queued`) after the job commits, as the queue monitor does
+(TD-455).
+
 ## Configuration (`KERP_` env)
 
 `STORAGE_BUCKET` (`kerp-vault`), `S3_ENDPOINT_URL` (MinIO; unset for AWS),
@@ -107,6 +134,7 @@ to start while the scanner is the always-clean `StubScanner` (worker startup che
 
 `tests/test_uploads_storage.py` (helpers, `LocalStorage`, `S3Storage` via botocore's
 `Stubber`; a real MinIO round trip when `KERP_TEST_S3_ENDPOINT` is set) and
-`tests/test_uploads.py` (service, jobs, API on `LocalStorage`; SQLite and PostgreSQL) and
-`tests/test_uploads_clamd.py` (`ClamdScanner` against a fake clamd socket server that reports a
+`tests/test_uploads.py` (service, jobs, API on `LocalStorage`; SQLite and PostgreSQL),
+`tests/test_uploads_quarantine.py` (the System console monitor; SQLite and PostgreSQL as
+`kerp_app`) and `tests/test_uploads_clamd.py` (`ClamdScanner` against a fake clamd socket server that reports a
 synthetic marker string as a detection; no real malware or EICAR file in the repository).
