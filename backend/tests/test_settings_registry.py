@@ -5,6 +5,7 @@ the migrated schema. All data is synthetic.
 """
 
 import json
+import socket
 import time
 import uuid
 from collections.abc import Iterator
@@ -14,6 +15,7 @@ from typing import Any
 
 import fakeredis
 import pytest
+import redis
 import sqlalchemy as sa
 from alembic import command
 from alembic.config import Config
@@ -138,6 +140,10 @@ def test_values_are_checked_against_the_type_and_bounds(
         "field_pin",
         "storage_credentials",
         "webhook_signature",
+        "partner_apikey_value",
+        "smtp_apikey",
+        "bearer_header_value",
+        "upstream_bearer",
     ],
 )
 def test_registration_refuses_secret_like_keys(key: str) -> None:
@@ -585,11 +591,11 @@ def test_the_local_copy_expires_and_a_stale_reader_cannot_overwrite_a_change() -
 class BrokenRedis:
     """Every call fails, as when Redis is unreachable."""
 
-    def __getattr__(self, name: str) -> Any:
-        import redis
+    error: redis.RedisError = redis.ConnectionError("synthetic outage")
 
+    def __getattr__(self, name: str) -> Any:
         def fail(*_args: Any, **_kwargs: Any) -> Any:
-            raise redis.ConnectionError("synthetic outage")
+            raise self.error
 
         return fail
 
@@ -605,6 +611,48 @@ def test_without_redis_the_database_is_read_and_nothing_fails() -> None:
     cache.close()
     assert settings_cache.NullCache().load(T1, loader) == {"offline_window_days": 3}
     assert isinstance(settings_cache.open_cache(None), settings_cache.NullCache)
+
+
+class SlowRedis(BrokenRedis):
+    """Every call times out, as redis-py reports a Redis that does not answer in time."""
+
+    error = redis.TimeoutError("synthetic timeout")
+
+
+def test_a_redis_that_times_out_falls_back_to_the_database_without_caching() -> None:
+    cache = settings_cache.RedisSettingsCache(SlowRedis())  # type: ignore[arg-type]
+    loader = Loader(offline_window_days=3)
+    assert cache.load(T1, loader) == {"offline_window_days": 3}
+    assert cache.cached(T1) is None
+    assert cache.load(T1, loader) == {"offline_window_days": 3}
+    assert loader.calls == 2
+    cache.invalidate(T1)  # INCR and publish time out too: logged, never raised
+
+
+def test_a_redis_that_accepts_and_never_answers_does_not_block_a_read() -> None:
+    """A real socket that accepts the connection and stays silent (a hung Redis)."""
+    with socket.create_server(("127.0.0.1", 0)) as server:
+        port = server.getsockname()[1]
+        cache = settings_cache.RedisSettingsCache.from_url(
+            f"redis://127.0.0.1:{port}/0", timeout=0.2
+        )
+        try:
+            loader = Loader(offline_window_days=3)
+            started = time.monotonic()
+            assert cache.load(T1, loader) == {"offline_window_days": 3}
+            assert time.monotonic() - started < 5.0
+            assert cache.cached(T1) is None
+            assert loader.calls == 1
+        finally:
+            cache.close()
+
+
+def test_the_production_cache_has_short_socket_timeouts() -> None:
+    assert 0 < settings_cache.SOCKET_TIMEOUT_S <= 2.0
+    cache = settings_cache.RedisSettingsCache.from_url("redis://127.0.0.1:1/0")
+    kwargs = cache._client.connection_pool.connection_kwargs
+    assert kwargs["socket_timeout"] == settings_cache.SOCKET_TIMEOUT_S
+    assert kwargs["socket_connect_timeout"] == settings_cache.SOCKET_TIMEOUT_S
 
 
 @pytest.fixture

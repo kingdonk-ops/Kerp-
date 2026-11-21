@@ -15,9 +15,9 @@ every API and worker process) and reads them through ``settings.service``::
   can never exceed. ``effective`` applies it on read, for a cap lowered after a value was
   stored.
 * **No secret is ever an entry**: ``register`` refuses a key that names a secret (password,
-  secret, credential, private or access key anywhere; token, key, PIN, salt, signature, DSN or
-  certificate as the last word) and any type outside the six. ``cosign_pin_token_ttl_minutes``
-  is fine: it is a lifetime, not a token.
+  secret, credential, private or access key, ``apikey``, ``bearer`` anywhere; token, key, PIN,
+  salt, signature, DSN or certificate as the last word) and any type outside the six.
+  ``cosign_pin_token_ttl_minutes`` is fine: it is a lifetime, not a token.
 * ``add_rule``: a rule across keys, checked on the values a change would leave behind
   (``offline_grace_hours`` against ``offline_window_days``).
 """
@@ -47,6 +47,8 @@ _SECRET_ANYWHERE: Final = (
     "credential",
     "private_key",
     "access_key",
+    "apikey",
+    "bearer",
 )
 _SECRET_LAST_WORD: Final = frozenset(
     {"token", "key", "pin", "salt", "signature", "dsn", "cert", "certificate"}

@@ -55,7 +55,7 @@ and reads it with `settings.service.get_value(session, MAX_THINGS.key)`.
 would leave behind (`offline_grace_hours` ≤ 24 × `offline_window_days`).
 
 **No secret is ever an entry.** `register` refuses a key that names a secret (`password`,
-`secret`, `credential`, `private_key`, `access_key` anywhere; `token`, `key`, `pin`, `salt`,
+`secret`, `credential`, `private_key`, `access_key`, `apikey`, `bearer` anywhere; `token`, `key`, `pin`, `salt`,
 `signature`, `dsn`, `cert` as the last word) and any type outside the six. A key that only
 mentions one (`cosign_pin_token_ttl_minutes`, `api_key_rate_per_minute`) is fine.
 
@@ -109,7 +109,10 @@ a change **commits**, the writer starts a new generation for the tenant and publ
 tenant id on `kerp:settings:invalidate`; every process listens (one daemon thread) and drops
 its copy at once. A transaction that changed a setting reads the database until it ends, and a
 rolled-back change publishes nothing. Copies also expire (30 s in the process, 60 s in Redis),
-which bounds staleness if Redis is unreachable at the moment of a change. A Redis failure is
+which bounds staleness: if the generation `INCR` or the publish fails at the moment of a change
+(Redis unreachable), other processes may serve the old value for up to 30 s from their own copy
+and up to 60 s more from the Redis copy, about 90 s at worst. The connection has 1 s socket
+timeouts, so a Redis that hangs makes a read fall back to the database. A Redis failure is
 never an error for the caller.
 
 ## New projects

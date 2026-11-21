@@ -12,7 +12,9 @@ thread) and drops its own copy at once.
 * The process's own copy also expires after ``local_ttl`` (30 s) and the Redis copy after
   ``redis_ttl`` (60 s): the bound on staleness if a pub/sub message or the invalidation
   itself is lost (Redis unreachable at that moment).
-* Redis down is never an error here: the database is read instead (and nothing is cached).
+* Redis down or not answering is never an error here: the database is read instead (and
+  nothing is cached). The connection has short socket timeouts (``SOCKET_TIMEOUT_S``), so a
+  hanging Redis costs a read at most that long.
 
 Only values are cached, never anything secret (the registry refuses secrets). Without Redis
 (development, tests) ``NullCache`` reads the database every time.
@@ -36,6 +38,9 @@ CHANNEL: Final = KEY_PREFIX + "invalidate"
 LOCAL_TTL_S: Final = 30.0
 REDIS_TTL_S: Final = 60
 _RETRY_S: Final = 1.0
+# Longest wait for Redis to connect or answer before a read falls back to the database
+# (the revocation store uses 2 s; a settings read is on more request paths).
+SOCKET_TIMEOUT_S: Final = 1.0
 
 logger = logging.getLogger("kerp.settings")
 Values = dict[str, Any]
@@ -87,8 +92,13 @@ class RedisSettingsCache:
         self._subscribed = threading.Event()
 
     @classmethod
-    def from_url(cls, url: str) -> RedisSettingsCache:
-        return cls(redis.Redis.from_url(url))
+    def from_url(cls, url: str, *, timeout: float = SOCKET_TIMEOUT_S) -> RedisSettingsCache:
+        """On the Redis at ``url``. Connecting and every reply are bounded by ``timeout``
+        seconds, so a Redis that hangs (partition, a server that accepts but never answers)
+        is a ``redis.TimeoutError`` and the caller reads the database instead of waiting."""
+        return cls(
+            redis.Redis.from_url(url, socket_timeout=timeout, socket_connect_timeout=timeout)
+        )
 
     # --- reads and writes ---------------------------------------------------------------
 

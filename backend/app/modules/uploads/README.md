@@ -22,7 +22,12 @@ the bytes; it signs, checks and records. Helpers adapted from Inspection-ERP
    type and length are **signed**, so storage refuses any other size; the size limit
    is checked first (413). The limit and the URL lifetime are the runtime settings
    `max_upload_size_mb` and `presigned_url_ttl_minutes` (`service.upload_limits`, T-0230),
-   never above the deployment's `KERP_UPLOAD_MAX_BYTES` and `KERP_UPLOAD_URL_SECONDS`. Only types in the magic-byte allowlist can be declared.
+   never above the deployment's `KERP_UPLOAD_MAX_BYTES` and `KERP_UPLOAD_URL_SECONDS`.
+   **Upgrade note:** the environment values are now only the ceiling. A deployment that set
+   `KERP_UPLOAD_MAX_BYTES` above 100 MiB or `KERP_UPLOAD_URL_SECONDS` above 900 s gets the
+   registry defaults (100 MiB, 15 min) after this change, until a System admin raises
+   `max_upload_size_mb` / `presigned_url_ttl_minutes` (Admin → System → Settings, or
+   `PATCH /api/v1/settings/registry/{key}`). Only types in the magic-byte allowlist can be declared.
 2. The client `PUT`s the bytes with the returned headers.
 3. `POST .../files/{id}/complete` (`C`, and only the uploader, else 403): `HEAD` the
    object (409 if absent, the row stays `pending`), compare the size, sniff the first 512
