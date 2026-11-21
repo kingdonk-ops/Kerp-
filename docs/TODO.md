@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 322 · **Closed:** 146
+**Open:** 321 · **Closed:** 146
 
 ## decision (39)
 
@@ -49,7 +49,7 @@
 | [TD-484](../tracker/todo/TD-484.md) | RFI notification e-mail: may it carry the date/time/location, the RFI PDF attachment and an .ics invite, and go to client distribution addresses without a KERP account? | T-0335 | planner |
 | [TD-486](../tracker/todo/TD-486.md) | RFI witness check: may an unmet hold-point (H) witness requirement be overridden per record (ADR 0004 Amendment A), or is it non-overridable? | T-0333 | planner |
 
-## spec-gap (62)
+## spec-gap (63)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -111,12 +111,13 @@
 | [TD-430](../tracker/todo/TD-430.md) | New rule kind itp_assignment in the ADR 0004 rule store (scope → approved ITP template): context variables, action vocabulary, editors | T-0188 | planner |
 | [TD-452](../tracker/todo/TD-452.md) | Uploads: a file larger than the malware scan limit (KERP_UPLOAD_SCAN_MAX_BYTES or clamd StreamMaxLength) is rejected as verify_failed; diff 4.7 lists no dedicated reason code (e.g. scan_too_large) | T-0218 | implementer |
 | [TD-460](../tracker/todo/TD-460.md) | Invite setup-preview returns no invited e-mail (and no password policy): 'Create your password' cannot show the e-mail read-only or a minimum-length hint before the first submit | T-0053 | implementer |
-| [TD-464](../tracker/todo/TD-464.md) | Level def semantics where ADR 0003 is silent: strict layering by depth (no self-nesting levels), root = depth 0, and what is frozen once nodes use a level | T-0101 | implementer |
-| [TD-465](../tracker/todo/TD-465.md) | code_uniqueness scopes: per_parent and per_level compare within the level, per_project across every level both ways; codes are case-sensitive, never trimmed | T-0101 | implementer |
-| [TD-466](../tracker/todo/TD-466.md) | code_pattern is a 'validation/generation pattern': T-0101 validates node codes against it as an RE2 regex; generation (and its syntax, e.g. {seq:4}) is undefined | T-0101 | implementer |
-| [TD-467](../tracker/todo/TD-467.md) | oe_asset_node columns the spec does not name or type: name, planned_start/planned_finish, Numeric(18,4) quantities, list-of-ids lineage; display_code for a level missing on the path | T-0101 | implementer |
+| [TD-477](../tracker/todo/TD-477.md) | Asset API paths: spec writes /assets/nodes/{id}/move, the module loader mounts asset_management at /api/v1/asset-management and project-scoped routers carry the project in the path | T-0101 | implementer |
+| [TD-478](../tracker/todo/TD-478.md) | Level def semantics where ADR 0003 is silent: strict layering by depth (no self-nesting levels), root = depth 0, and what is frozen once nodes use a level | T-0101 | implementer |
+| [TD-479](../tracker/todo/TD-479.md) | code_uniqueness scopes: per_parent and per_level compare within the level, per_project across every level both ways; codes are case-sensitive, never trimmed | T-0101 | implementer |
+| [TD-480](../tracker/todo/TD-480.md) | code_pattern is a 'validation/generation pattern': T-0101 validates node codes against it as an RE2 regex; generation (and its syntax, e.g. {seq:4}) is undefined | T-0101 | implementer |
+| [TD-481](../tracker/todo/TD-481.md) | oe_asset_node columns the spec does not name or type: name, planned_start/planned_finish, Numeric(18,4) quantities, list-of-ids lineage; display_code for a level missing on the path | T-0101 | implementer |
 
-## missed (8)
+## missed (7)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -127,7 +128,6 @@
 | [TD-327](../tracker/todo/TD-327.md) | Frontend i18n key notifications.kind.access_requests.requested for the inbox (needed when the access-request UI lands) | T-0050 | reviewer |
 | [TD-337](../tracker/todo/TD-337.md) | Web/Android route /magic-link#<token> that redeems the e-mailed sign-in link (POST /auth/magic-link/redeem); the e-mail now links there | T-0058 | implementer |
 | [TD-388](../tracker/todo/TD-388.md) | saved_views: wire the my_teams filter op | T-0074 | reviewer |
-| [TD-463](../tracker/todo/TD-463.md) | Server: refuse self-deactivation on PATCH /admin/users/{id} (Admin → Users only hides the button) | T-0331 | implementer |
 
 ## deferred (44)
 
@@ -176,7 +176,7 @@
 | [TD-457](../tracker/todo/TD-457.md) | Playwright e2e journey for T-0041 (external user: code lookup -> request with ticket -> reject with reason -> Request again disabled -> short cooldown -> Request again without ticket -> approve via T-0051 -> project in the picker) once T-0027 sets up e2e/; covered meanwhile by the component-level journey in frontend/src/lobby/LobbyPage.test.tsx | T-0041 | implementer |
 | [TD-458](../tracker/todo/TD-458.md) | Android (Capacitor) App Links for /invite and /reset-password (verified via assetlinks.json) showing the T-0053 invite and password screens, once the Android shell exists (T-0141/T-0143) | T-0053 | implementer |
 | [TD-459](../tracker/todo/TD-459.md) | E2E journeys for invites and passwords once the Playwright harness (T-0027) exists: PER-09 invites an existing user who signs in and lands in the project; brand-new external creates the first password from the invite e-mail; forgot password -> reset -> old session refused -> sign in | T-0053 | implementer |
-| [TD-468](../tracker/todo/TD-468.md) | asset_management: node edit (code / name / attributes, with display_path and display_code rewrite of the subtree), node delete and level def delete are not built in T-0101 | T-0101 | implementer |
+| [TD-482](../tracker/todo/TD-482.md) | asset_management: node edit (code / name / attributes, with display_path and display_code rewrite of the subtree), node delete and level def delete are not built in T-0101 | T-0101 | implementer |
 
 ## later (130)
 
@@ -310,10 +310,10 @@
 | [TD-453](../tracker/todo/TD-453.md) | main ruleset: require the fast-forwarded commit to be on dev (today main only requires a CI-green ci-gate on the commit, so any contents:write token could fast-forward main to an unreviewed CI-green commit; no workflow does this today) — from the PR #138 review | T-0332 | coordinator |
 | [TD-454](../tracker/todo/TD-454.md) | Dev tooling: pin mypy (and friends) in the backend dev extra or lock so local runs match CI (local mypy 2.3.1 flags core/audit/guard.py:66 and admin/service.py:122, CI's 2.4.1 does not) — from the PR #136/#138 reviews | T-0332 | coordinator |
 | [TD-461](../tracker/todo/TD-461.md) | 'Send me an e-mail to set my password' from a copied invite link: the invite is carried only within the tab, so after setting the password from the e-mail (usually a new tab) the invitee must open the invite link again | T-0053 | implementer |
-| [TD-469](../tracker/todo/TD-469.md) | asset_management: display_code recompute and the project tree lock are inline; move them to a batch job / narrower lock if trees get large | T-0101 | implementer |
+| [TD-483](../tracker/todo/TD-483.md) | asset_management: display_code recompute and the project tree lock are inline; move them to a batch job / narrower lock if trees get large | T-0101 | implementer |
 | [TD-485](../tracker/todo/TD-485.md) | Cross-link inspection requests (RFIs) to TQs (Technical Queries) when the TQ module exists (E-05-04) | T-0115 | planner |
 
-## bug (7)
+## bug (6)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -323,7 +323,6 @@
 | [TD-330](../tracker/todo/TD-330.md) | scripts/pr_suggestions.py rebuild fails in cloud sessions: gh api --paginate follows numeric-ID repository Link URLs that the agent proxy rejects (HTTP 403); paginate with explicit repos/{owner}/{repo} page params | — | coordinator |
 | [TD-339](../tracker/todo/TD-339.md) | jobs LoopDispatcher.drain can spin forever when the commit ran on the loop's own thread (finished tasks stay in the set until their done callbacks run) | T-0058 | implementer |
 | [TD-375](../tracker/todo/TD-375.md) | mypy 2.3.1 (local toolchain) reports var-annotated in app/core/audit/guard.py:66 and app/modules/admin/service.py:122 on untouched dev code | T-0052 | implementer |
-| [TD-470](../tracker/todo/TD-470.md) | mypy app reports 'Need type annotation' in app/core/audit/guard.py:66 and app/modules/admin/service.py:122 in the implementer's environment (cause not isolated; CI installs unpinned) | T-0101 | implementer |
 
 ## risk (32)
 

@@ -21,10 +21,10 @@ Scope/Job Package/Line under one contract).
 | Column | Rule |
 |---|---|
 | `key` | `[a-z][a-z0-9_]{0,63}`; unique `(project_id, key)`; **never changes once a node (live or deleted) uses the level** (409), nor while another level names it as a parent |
-| `depth`, `allowed_parent_keys` | the levels are layered: depth 0 ⇔ no parents (a root level); every named parent exists and has a smaller depth. A level may name several parents (optional or skipped levels). No level nests under itself (TD-464) |
+| `depth`, `allowed_parent_keys` | the levels are layered: depth 0 ⇔ no parents (a root level); every named parent exists and has a smaller depth. A level may name several parents (optional or skipped levels). No level nests under itself (TD-478) |
 | `label_key` | i18n key (`level.rsw`); the label comes from the terminology pack (T-0136) |
 | `roles` | subset of `grouping`, `physical`, `work_anchor`, `inspection_anchor`, `progress_unit`, `schedule_link` (frozen at M1); stored sorted |
-| `code_pattern` | optional **RE2** pattern (linear time) a node code must match in full; checked when a node is created. Generation is not built (TD-466) |
+| `code_pattern` | optional **RE2** pattern (linear time) a node code must match in full; checked when a node is created. Generation is not built (TD-480) |
 | `code_uniqueness` | `per_parent` (default) \| `per_level` \| `per_project`, see below |
 | `field_schema_id` | the level's JSONSchema in the field registry; no FK until T-0102 creates the registry |
 | `display_code_template` | optional, e.g. `{asset} / {rsw}`: only `{level_key}` placeholders (never `str.format`) |
@@ -57,11 +57,11 @@ otherwise). Labels, other roles, the pattern (new codes only) and the display te
   | `per_project` | **every** node of the project, any level, both ways: it repeats no node's code and no node repeats it | `project` |
 
   The cross-level half of `per_project` is checked by the service under the tree lock. The
-  scope semantics are this module's reading of ADR 0003 Amendment 4 (TD-465).
+  scope semantics are this module's reading of ADR 0003 Amendment 4 (TD-479).
 - `name`, `discipline_code`, external keys (`wbs_code`, `activity_id`, `external_source`,
   `external_id`, `synced_at`; references, never FKs), `planned_start` / `planned_finish`,
   `spatial_location` (PostGIS `geometry(PointZ,4326)`; GeoJSON `[lon, lat, elevation]`),
-  `custom_fields`. Names and types the spec leaves open: TD-467.
+  `custom_fields`. Names and types the spec leaves open: TD-481.
 - `budget_qty`, `uom`, `budget_hours`, `earned_qty` — `progress_unit` levels only (422 on
   another level). `earned_qty` is written by progress (E-04-03), never by this API.
 - Lineage: `status` (`active` / `retired`), `superseded_by`, `derived_from` (lists of node
@@ -101,7 +101,7 @@ write lock. It then re-reads what it checks. Two writers therefore never interle
 checks: a move cannot slip a work anchor under a path another transaction is anchoring, and
 two creates cannot take the same code. This relies on `READ COMMITTED` (the default). A long
 transaction that mutates the tree (a bulk import) blocks the project's other tree writers, not
-its readers (TD-469).
+its readers (TD-483).
 
 ### "Visible" is not "mine"
 
@@ -113,7 +113,7 @@ programming error (`RuntimeError`).
 ## API
 
 Mounted at `/api/v1/asset-management` (the loader's prefix; the spec writes `/assets/...`,
-TD-463). The project is in the path and bound by `projects.bind_project`.
+TD-477). The project is in the path and bound by `projects.bind_project`.
 
 | Route | Needs | Notes |
 |---|---|---|
@@ -127,5 +127,5 @@ TD-463). The project is in the path and bound by `projects.bind_project`.
 | `POST /projects/{p}/nodes/{id}/move` | `E` | body `{new_parent_id}` (`null` = to the root) |
 | `GET /projects/{p}/nodes/{id}/work-anchor` | `V` | 422 when the path has no work anchor |
 
-Not built here: node edit / delete and level delete (TD-468), Asset-Site scoping of the tree
+Not built here: node edit / delete and level delete (TD-482), Asset-Site scoping of the tree
 for PER-07 (TD-150), `custom_fields` validation against the level's schema (T-0102).
