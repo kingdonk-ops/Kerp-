@@ -3,9 +3,9 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 329 · **Closed:** 146
+**Open:** 334 · **Closed:** 146
 
-## decision (39)
+## decision (40)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -48,6 +48,7 @@
 | [TD-442](../tracker/todo/TD-442.md) | Issues: may an internal punch/NCR be assigned to an external account (subcontractor) who must then see it? Planner default: no (422), internal issues are invisible to every is_internal=false caller | T-0314 | planner |
 | [TD-484](../tracker/todo/TD-484.md) | RFI notification e-mail: may it carry the date/time/location, the RFI PDF attachment and an .ics invite, and go to client distribution addresses without a KERP account? | T-0335 | planner |
 | [TD-486](../tracker/todo/TD-486.md) | RFI witness check: may an unmet hold-point (H) witness requirement be overridden per record (ADR 0004 Amendment A), or is it non-overridable? | T-0333 | planner |
+| [TD-492](../tracker/todo/TD-492.md) | Phase 0 exit 'module toggled': no shipped module is toggleable yet (every manifest has toggleable=False), so the e2e journey cannot switch one off and on | T-0027 | planner |
 
 ## spec-gap (64)
 
@@ -184,7 +185,7 @@
 | [TD-474](../tracker/todo/TD-474.md) | Unit registry for `measurement` fields: unit catalogue, SI storage and conversion with a shared vector file (ADR 0002 units-v1 port) | T-0110 | implementer |
 | [TD-482](../tracker/todo/TD-482.md) | asset_management: node edit (code / name / attributes, with display_path and display_code rewrite of the subtree), node delete and level def delete are not built in T-0101 | T-0101 | implementer |
 
-## later (131)
+## later (134)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -319,8 +320,11 @@
 | [TD-476](../tracker/todo/TD-476.md) | Form renderer and designer follow-ups on the shared palette: capture controls, section rendering, palette labels, field-ownership map | T-0110, T-0025 | implementer |
 | [TD-483](../tracker/todo/TD-483.md) | asset_management: display_code recompute and the project tree lock are inline; move them to a batch job / narrower lock if trees get large | T-0101 | implementer |
 | [TD-485](../tracker/todo/TD-485.md) | Cross-link inspection requests (RFIs) to TQs (Technical Queries) when the TQ module exists (E-05-04) | T-0115 | planner |
+| [TD-488](../tracker/todo/TD-488.md) | fields/form engine polish from the #156 review | T-0110 | reviewer |
+| [TD-489](../tracker/todo/TD-489.md) | Invite and password screens polish from the #152 review (race-fix test, wrong-user README wording, resend link cache, sessionStorage note) | T-0053 | reviewer |
+| [TD-491](../tracker/todo/TD-491.md) | Admin -> Users polish from the #154 review: test that no invite token is in the mutation cache; require a name on Create account | T-0331 | reviewer |
 
-## bug (7)
+## bug (8)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -331,6 +335,7 @@
 | [TD-339](../tracker/todo/TD-339.md) | jobs LoopDispatcher.drain can spin forever when the commit ran on the loop's own thread (finished tasks stay in the set until their done callbacks run) | T-0058 | implementer |
 | [TD-375](../tracker/todo/TD-375.md) | mypy 2.3.1 (local toolchain) reports var-annotated in app/core/audit/guard.py:66 and app/modules/admin/service.py:122 on untouched dev code | T-0052 | implementer |
 | [TD-471](../tracker/todo/TD-471.md) | CEL parity: divergences between celpy and cel-js found by the T-0110 edge probe (pinned as known_gap fixtures) | T-0110, T-0017 | implementer |
+| [TD-490](../tracker/todo/TD-490.md) | Admin -> Users invite form: a SoD 409 that returns after the user edited the form re-arms confirm_sod for the edited form (fields stay editable while the send is pending) | T-0331 | reviewer |
 
 ## risk (32)
 

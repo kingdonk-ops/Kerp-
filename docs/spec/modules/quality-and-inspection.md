@@ -514,7 +514,8 @@ Each tile opens the matching filtered list. Soft-deleted records are not counted
 The user's 2026-11-21 paste adds inspections that are not part of the ITP chain: daily
 pre-starts, safety checks, equipment checks and repair/fault reports. Tasks: T-0179 (categories),
 T-0324 (template settings), T-0325 (project-level records, location, links), T-0251 (registers
-and tile filter), T-0250 (equipment links), T-0249 (fleet classes, blocked by TD-412).
+and tile filter), T-0250 (equipment links), T-0249 (fleet classes; TD-412 resolved 2026-11-21: fleet vehicles and plant join the Phase-1
+register and can be inspection targets through equipment links).
 
 - **Category = Area.** Templates (revisions) and `oe_inspections_inspection` carry `category`
   (`qa_itp | safety_prestart | equipment_check | repair_fault | health_safety | general`, default
@@ -1107,7 +1108,8 @@ the ITR's anchor** (the ITR's node or Item is a slot anchor or lies in the subtr
 otherwise that slot does not count for the ITR. Per party, the requirement is met when its
 attendance is `attended` or `waived`, or `absent` on a `W` point with `notice_met`; it is unmet
 when no slot was issued, the slot is `requested`/`confirmed`, the party was absent on an `H`
-point or after short notice, or the slot `failed`. `construction_control` adds two locked
+point or after short notice, or the slot `failed`. Precedence: `failed` makes every party unmet;
+otherwise the party's attendance decides, and `pending` = unmet. `construction_control` adds two locked
 system-default `check` rules (ADR 0004 §5) to `inspection.submit` (§Review and return),
 evaluated from the ITP line's external points: `WITNESS_REQUIREMENT_HOLD` fails only for unmet
 parties whose point is `H`, and `WITNESS_REQUIREMENT_WITNESS` only for unmet parties whose point
