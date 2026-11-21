@@ -134,6 +134,22 @@ describe("accounts (System admins)", () => {
     expect(screen.getByRole("listitem", { name: PLANNER.display_name })).toHaveTextContent(i18n.t("admin.users.active"));
   });
 
+  it("explains a refused self-deactivation (409 CANNOT_DEACTIVATE_SELF) and re-reads the list", async () => {
+    // A stale list or a second tab: the server, not the hidden button, has the last word (T-0085).
+    const patch = `/api/v1/admin/users/${PLANNER.id}`;
+    const refusal = { detail: "you cannot deactivate your own account", code: "CANNOT_DEACTIVATE_SELF" };
+    const calls = asSystemAdmin({ [`PATCH ${patch}`]: () => json(refusal, 409) });
+    fireEvent.click(button(i18n.t("admin.users.deactivate"), await account(PLANNER.display_name)));
+    fireEvent.click(button(i18n.t("admin.users.deactivate"), screen.getByRole("dialog")));
+
+    expect(await status(i18n.t("admin.users.cannotDeactivateSelf"))).toHaveAttribute("role", "status");
+    expect(screen.queryByText(i18n.t("admin.users.lastSystemAdmin"))).toBeNull();
+    expect(screen.queryByRole("dialog")).toBeNull();
+    await waitFor(() => {
+      expect(sent(calls, "GET", "/api/v1/admin/users").length).toBeGreaterThan(1);
+    }, WAIT);
+  });
+
   it("reactivates a deactivated account", async () => {
     const patch = `/api/v1/admin/users/${LEAVER.id}`;
     const calls = asSystemAdmin({ [`PATCH ${patch}`]: () => json({ ...LEAVER, is_active: true }) });

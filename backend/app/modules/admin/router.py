@@ -3,7 +3,8 @@
 Who may call what (the caller's ``system_admin`` flag is the one the request session was
 bound with, loaded from the grants table at authentication, never from the request):
 
-* ``GET/POST /users``, ``PATCH /users/{id}``: ``system_admin`` only (else 403).
+* ``GET/POST /users``, ``PATCH /users/{id}``: ``system_admin`` only (else 403). Nobody
+  deactivates their own account: 409 ``CANNOT_DEACTIVATE_SELF`` (audited, T-0085).
 * ``POST /users/lookup``: a PER-09 of any project or a ``system_admin`` (else 403); exact
   e-mail only, rate-limited per caller (429), every lookup audited.
 * ``GET /projects/{p}/members``, ``PUT/DELETE /projects/{p}/members/{user}``: a PER-09 of
@@ -43,6 +44,7 @@ from datetime import timedelta
 from typing import Annotated, Any, Final
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from app.core.auth import service as auth_service
@@ -78,6 +80,7 @@ from app.modules.admin.schemas import (
     UserRead,
     UserSummary,
     UserUpdate,
+    UserUpdateRefusal,
 )
 from app.modules.admin.stats_router import router as stats_router
 from app.modules.admin.system_router import router as system_router
@@ -193,14 +196,32 @@ def create_user(
     return UserRead.model_validate(user)
 
 
-@router.patch("/users/{user_id}", response_model=UserRead, dependencies=[SystemAdminOnly])
+@router.patch(
+    "/users/{user_id}",
+    response_model=UserRead,
+    dependencies=[SystemAdminOnly],
+    responses={
+        status.HTTP_409_CONFLICT: {
+            "model": UserUpdateRefusal,
+            "description": (
+                "`code: CANNOT_DEACTIVATE_SELF`: the caller tried to deactivate their own "
+                "account (refused and audited, T-0085); or, with a plain `detail` and no "
+                "`code`, the last active System admin cannot be deactivated"
+            ),
+        }
+    },
+)
 def update_user(
     user_id: uuid.UUID, body: UserUpdate, principal: CurrentPrincipal, session: DbSession
-) -> UserRead:
+) -> UserRead | JSONResponse:
     try:
         user = service.update_user(session, user_id, body, actor_id=principal.user_id)
     except service.LastSystemAdminError as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+    except service.SelfDeactivationError as exc:
+        session.rollback()  # nothing of this request is kept; the audit entry is committed
+        refusal = UserUpdateRefusal(detail=str(exc), code=exc.code)
+        return JSONResponse(refusal.model_dump(), status_code=status.HTTP_409_CONFLICT)
     return UserRead.model_validate(user)
 
 
