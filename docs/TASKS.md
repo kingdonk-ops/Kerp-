@@ -3,12 +3,12 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 71/202 tasks done (35%) · **ready now:** 25 · **epics awaiting breakdown:** 47
+**Overall:** 71/203 tasks done (35%) · **ready now:** 25 · **epics awaiting breakdown:** 47
 
 | Phase | Tasks done | Progress |
 |---|---|---|
 | 0 · Platform foundations | 71/103 | `██████░░░░` 69% |
-| 1 · Asset & Quality backbone | 0/90 (+1 epics) | `░░░░░░░░░░` 0% |
+| 1 · Asset & Quality backbone | 0/91 (+1 epics) | `░░░░░░░░░░` 0% |
 | 2 · Welding quality | 0/9 | `░░░░░░░░░░` 0% |
 | 3 · Logistics | 0/0 (+7 epics) | `░░░░░░░░░░` 0% |
 | 4 · Execution | 0/0 (+14 epics) | `░░░░░░░░░░` 0% |
@@ -112,14 +112,14 @@
 | ▶ | [T-0218](../tracker/tasks/T-0218.md) | uploads: ClamAV scanner (clamd INSTREAM) in the worker replacing the stub, signature on the file row, scanner PING for health | uploads | S | T-0016, T-0213, T-0215 |  |
 | ⬜ | [T-0219](../tracker/tasks/T-0219.md) | admin: deployment stats (counts + byte totals via module stats providers and count-only SECURITY DEFINER functions) and health probes at /api/v1/admin/system | admin | M | T-0014, T-0015, T-0016, T-0039, T-0218 |  |
 | ▶ | [T-0220](../tracker/tasks/T-0220.md) | jobs: queue monitor API for System admins (queue depths, cron runs, failed jobs without payloads, retry/abort) | jobs | S | T-0015, T-0214, T-0039 |  |
-| ⬜ | [T-0221](../tracker/tasks/T-0221.md) | uploads: quarantine monitor API — rejected/verifying/expired uploads across projects through a narrow metadata path, re-check stuck files, sweep now | uploads | S | T-0218, T-0215, T-0039 |  |
+| ⬜ | [T-0221](../tracker/tasks/T-0221.md) | uploads: quarantine monitor API — rejected/verifying/expired upload rows of member projects, counts for the others, re-check stuck files, sweep now | uploads | S | T-0218, T-0215, T-0039, T-0219 |  |
 | ▶ | [T-0222](../tracker/tasks/T-0222.md) | admin: read-only audit explorer over the hash-chain ledger (filters, verify one chain, verify all as a batch job) | admin | M | T-0006, T-0043, T-0039, T-0015 |  |
 | ▶ | [T-0223](../tracker/tasks/T-0223.md) | projects: per-project legal hold (flag + reason, System admin only, audited) blocking soft delete with 409 LEGAL_HOLD_ACTIVE (ADR) | projects | S | T-0012, T-0039 |  |
 | ▶ | [T-0226](../tracker/tasks/T-0226.md) | core mail: delivery ledger — delivered status from SES delivery events, recipient_user_id/project_id/broadcast_id, stats and searchable history (ADR) | platform | M | T-0058 |  |
 | ▶ | [T-0227](../tracker/tasks/T-0227.md) | core mail: automated template overrides — per template + locale subject/text blocks with revisions, preview, test send to self, reset to shipped default | platform | M | T-0058, T-0039 |  |
 | ▶ | [T-0230](../tracker/tasks/T-0230.md) | settings: typed runtime settings registry extending T-0044 (code-declared entries, per-key storage, Redis cache + pub/sub invalidation, bounds 422, audit, no secrets) | settings | M | T-0044, T-0039, T-0006 |  |
 | ⬜ | [T-0228](../tracker/tasks/T-0228.md) | notifications: broadcast e-mail — server-side audience resolution (System admin tenant-wide, PER-09 own projects), batch dispatch, broadcast opt-out, per-broadcast stats | notifications | M | T-0019, T-0058, T-0226, T-0014, T-0049 |  |
-| ⬜ | [T-0231](../tracker/tasks/T-0231.md) | settings: client bootstrap config GET /api/v1/settings/client (client-visible entries) read by web and Android at sign-in and sync | settings | S | T-0230, T-0127 |  |
+| ⬜ | [T-0231](../tracker/tasks/T-0231.md) | settings: client bootstrap config API GET /api/v1/settings/client (client-visible entries only) | settings | S | T-0230 |  |
 | ⬜ | [T-0224](../tracker/tasks/T-0224.md) | Frontend: Admin → System console — deployment stats + health, queue monitor, upload quarantine | frontend | M | T-0026, T-0219, T-0220, T-0221 |  |
 | ⬜ | [T-0225](../tracker/tasks/T-0225.md) | Frontend: Admin → System → Audit log (filters, verify chain, verify all) and legal-hold toggle on the project admin page | frontend | S | T-0026, T-0222, T-0223 |  |
 | ⬜ | [T-0229](../tracker/tasks/T-0229.md) | Frontend: Admin → Communications — broadcast composer, delivery stats and history, automated template editor | frontend | M | T-0026, T-0226, T-0227, T-0228 |  |
@@ -197,6 +197,7 @@
 | ⬜ | [T-0175](../tracker/tasks/T-0175.md) | Frontend: client app co-sign — enrol a device signing key, scan the challenge QR, approve, show the signed assertion QR (offline) | frontend | M | T-0173, T-0163, T-0172, T-0141, T-0155 |  |
 | ⬜ | [T-0176](../tracker/tasks/T-0176.md) | Frontend: client confirmations — PER-15 list of provisional co-signatures, read-only record with the wet image, confirm or reject with reason | frontend | S | T-0174, T-0025 |  |
 | ⬜ | [T-0177](../tracker/tasks/T-0177.md) | sync: offline action time reconstruction — occurred_at + time_confidence from monotonic/anchor/skew, evidence columns on answers and comments, audit payload | sync | M | T-0126, T-0147, T-0111, T-0038, T-0044 |  |
+| ⬜ | [T-0248](../tracker/tasks/T-0248.md) | Frontend: consume client bootstrap config (GET /api/v1/settings/client) at sign-in and sync, stored through the client storage contract, replacing limit constants | frontend | S | T-0231, T-0127 |  |
 | ⬜ | [T-0129](../tracker/tasks/T-0129.md) | Frontend: P6 import wizard UI (upload, map, unmatched-row linking, commit) | frontend | M | T-0104, T-0128 |  |
 | ⬜ | [T-0130](../tracker/tasks/T-0130.md) | Frontend: inspections register + raise/close + calibration-gated tool pick + gate findings | frontend | M | T-0111, T-0112, T-0124, T-0128 |  |
 | ⬜ | [T-0132](../tracker/tasks/T-0132.md) | Phase 1 exit journey: P6→hierarchy→inspection gates→completion blocked by open NCR; expired tool blocked | e2e | S | T-0129, T-0130 |  |

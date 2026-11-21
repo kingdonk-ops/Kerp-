@@ -46,6 +46,27 @@ be moved between storage tiers, and can be restored. Epic **E-01-02** (tasks T-0
 admin screens in diff §6.5; legal hold in diff §4.7. Open points: TD-401 (restore as new and
 the audit ledger; no hard purge), TD-403 (providers of later modules), TD-405 (file layout).
 
+### Access: membership required (TD-396)
+The archive holds every record, file and audit chain of a project, so it follows diff §4.1:
+System admins read no project-scoped record without a membership. **Export and download
+require `system_admin` *and* a live membership of the requesting admin on that project** (any
+persona; PER-09 is the usual one); restore of a deleted project requires the membership the
+admin held when it was deleted (below). A System admin without one first
+grants themselves PER-09 through the existing membership API (`PUT
+/api/v1/admin/projects/{p}/members/{user}`, T-0014), which is written to the audit chain
+`project-members:<project>`; the archive endpoints never grant it implicitly. A deleted project
+has no live memberships (deleting revokes them all, and the membership API answers 404 on a
+deleted project, T-0014), so for **restore of a deleted project** the check is that the
+requesting admin held a membership on it when it was deleted (a membership row revoked by that
+deletion, read through the admin module's `service.py`); a System admin who did not restores it
+as a new project instead. A `system_admin` without the membership gets **404** on these
+endpoints (cross-scope is 404, CLAUDE.md §6); a caller without `system_admin` gets 403. The
+registry list (project code and name, size, tier, status) is tenant-level metadata like the project list a System admin already sees (diff §4.1),
+so it shows every archive; storage-tier changes and deep-archive restores move objects without
+exposing their content and need `system_admin` only. **Restore as new**: the restoring admin
+becomes PER-09 of the new project in the restoring transaction, audited in
+`project-members:<new project>`. Planner default; the user may relax it (TD-396).
+
 ### Package (T-0233, T-0234, T-0235)
 - Built by a **`batch` SAQ job**, heavy libraries imported lazily; streamed to the object store
   as a multipart upload, never assembled in memory. Name
@@ -72,7 +93,12 @@ the audit ledger; no hard purge), TD-403 (providers of later modules), TD-405 (f
     the project's levels instead of a fixed asset/work-anchor pair).
 - **Each module exports itself** through an export provider in its `service.py` (rows, restore
   lines, files); the archive module never reads another module's tables (CLAUDE.md §6). Reads
-  run under the exporting job's tenant and project RLS context.
+  run under the exporting job's tenant and project RLS context, bound to the requesting admin,
+  whose membership is checked when the export is requested and again when the job starts (no
+  `is_system_admin` widening of project-scoped reads).
+- The offline viewer is a **packaged static bundle** built with the frontend and shipped inside
+  the backend image; the build job copies it into the zip and the manifest records the KERP
+  version it belongs to (T-0236).
 - Synthetic fixtures only in tests; no real client data.
 
 ### Offline viewer (T-0236)
@@ -84,7 +110,8 @@ the audit ledger; no hard purge), TD-403 (providers of later modules), TD-405 (f
 
 ### Registry, tiers and download (T-0233, T-0237, T-0238)
 - `oe_archive_project_archive` (`BaseRecordMixin`, tenant RLS; only `system_admin` through the
-  API): project id, code and name, exported at/by, size, SHA-256, bucket and key, storage class
+  API; export and download also need a membership, see Access above): project id, code and
+  name, exported at/by, size, SHA-256, bucket and key, storage class
   `STANDARD | GLACIER_IR | DEEP_ARCHIVE`, restore status `available | restoring |
   restored_temp`, restore expiry, status `queued | building | ready | failed`, error code.
   Bucket and region come from deployment configuration (default `ap-southeast-2`, diff §4.4),
@@ -92,8 +119,8 @@ the audit ledger; no hard purge), TD-403 (providers of later modules), TD-405 (f
 - Storage tier change by S3 `CopyObject` onto itself with the new storage class; the registry is
   updated only after the copy succeeds. Moving to `DEEP_ARCHIVE` warns about the minimum storage
   duration and the restore time (hours).
-- Download: a short-lived presigned GET for `STANDARD`, `GLACIER_IR`, or a `restored_temp`
-  copy; `DEEP_ARCHIVE` answers 409 until restored. **Restore from deep archive**
+- Download (membership required, non-member → 404): a short-lived presigned GET for
+  `STANDARD`, `GLACIER_IR`, or a `restored_temp` copy; `DEEP_ARCHIVE` answers 409 until restored. **Restore from deep archive**
   (`RestoreObject`, tier `Bulk` or `Standard`, chosen days) is polled by an SAQ cron job
   (`HeadObject` restore header); when ready the requesting admin gets an in-app notification
   and an e-mail (§4.6); the registry shows the expiry of the temporary copy.
@@ -102,17 +129,24 @@ the audit ledger; no hard purge), TD-403 (providers of later modules), TD-405 (f
   in this epic.
 
 ### Restore (T-0239, T-0240)
-- `POST /api/v1/admin/projects/restore` (`system_admin`) takes an archive id or a `.zip`
-  uploaded through presigned uploads (T-0016, scanned like any upload). Runs as a `batch` job.
+- `POST /api/v1/admin/projects/restore` (`system_admin`; mode `deleted` also needs the
+  membership the admin held when the project was deleted, else 404; see Access above) takes an
+  archive id or a `.zip` uploaded through presigned uploads (T-0016, scanned like any upload). Runs as a `batch` job.
   Before anything is written it checks every SHA-256 of the manifest, the schema versions (an
   archive from a newer schema is refused; older ones go through per-module upgrade steps) and
   verifies every audit chain; any failure writes nothing.
-- **Restore deleted project:** a soft-deleted project with the same id is brought back with its
-  rows (ids unchanged); refused when the project is live.
+- **Restore deleted project:** a soft-deleted project's rows still exist. The restore verifies
+  that the existing soft-deleted rows match the archive manifest (per-table counts and checksums,
+  file SHA-256s) and then **un-deletes them in place** (ids unchanged); it never upserts from the
+  archive. The memberships revoked by the deletion come back with it, so the restoring admin's
+  own membership is live again (audited in `project-members:<project>`). Any difference → 409
+  `ARCHIVE_DIFF` with the differing tables, nothing written (use restore as new instead).
+  Refused when the project is live (409).
 - **Restore as new project:** new project id and code; every entity id remapped
   deterministically (UUIDv5 of the new project id and the old id), foreign keys inside the
   archive rewritten, ltree paths rebuilt from the remapped nodes, files copied to the new
-  project's object keys and re-verified by SHA-256. The archived audit chains are kept as
+  project's object keys and re-verified by SHA-256. The restoring admin becomes PER-09 of the
+  new project (audited), otherwise nobody could open it. The archived audit chains are kept as
   read-only, verified evidence; new chains start with a genesis entry referencing the archive id
   and SHA-256 — no ledger row is ever rewritten (ADR; TD-401). Counts per table and file hashes
   are compared after the restore and reported.
