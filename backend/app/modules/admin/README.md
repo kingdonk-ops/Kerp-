@@ -358,11 +358,9 @@ no invite), `admin-system:<tenant>` (System console: `job_retried`, `job_aborted
 kind, queue and project id; T-0218; `upload_rechecked` with file, project and job id,
 `upload_sweep_queued` with project and job id; T-0221; `stats_viewed`,
 `object_store_refresh_queued`, `object_store_refresh_running`, `health_checked`;
-T-0219). Invite entries never carry a token, a hash, a password or an e-mail address. An accepted invite also writes the usual
-
-`upload_sweep_queued` with project and job id; T-0221; `legal_hold_set`, `legal_hold_cleared`
-with project id, code and reason; T-0223). Invite entries never carry a token, a hash, a password or an e-mail address. An accepted invite also writes the usual
-`assign` entry on `project-members:<project>`.
+T-0219; `legal_hold_set`, `legal_hold_cleared` with project id, code and reason; T-0223).
+Invite entries never carry a token, a hash, a password or an e-mail address. An accepted invite
+also writes the usual `assign` entry on `project-members:<project>`.
 
 ## Audit explorer (`/api/v1/admin/system/audit`, T-0222, diff §4.7)
 
