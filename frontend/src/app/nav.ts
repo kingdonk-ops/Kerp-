@@ -71,26 +71,40 @@ export const NAV_ITEMS = [
   { group: "controlsInsights", id: "moneyMirror" },
   { group: "admin", id: "users" },
   { group: "admin", id: "personas" },
-  { group: "admin", id: "system" },
-  { group: "admin", id: "accessRequests" },
-] as const satisfies readonly { group: NavGroupId; id: string }[];
+  // System = deployment settings, admin grants, devices; its first screen is Devices (T-0051).
+  { group: "admin", id: "system", path: "/admin/system/devices", requires: "projectAdmin" },
+  { group: "admin", id: "accessRequests", path: "/admin/access-requests", requires: "projectAdmin" },
+] as const satisfies readonly {
+  group: NavGroupId;
+  id: string;
+  path?: string;
+  requires?: NavAudience;
+}[];
 
 export type NavItemId = (typeof NAV_ITEMS)[number]["id"];
+
+/** Who sees an item: `projectAdmin` = PER-09 on some project or System admin (T-0051). */
+export type NavAudience = "projectAdmin";
 
 export interface NavItem {
   id: NavItemId;
   group: NavGroupId;
   /** Route of the item's screen; absent while the screen is not built yet. */
   path?: string;
+  /** Shown only to this audience; absent: everyone. The server still checks every call. */
+  requires?: NavAudience;
 }
 
-/** The items of `group` whose screens exist, in mapping order. */
+/** The items of `group` whose screens exist and that `audiences` may see, in mapping order. */
 export function registeredNavItems(
   group: NavGroupId,
   items: readonly NavItem[] = NAV_ITEMS,
+  audiences: ReadonlySet<NavAudience> = new Set(),
 ): (NavItem & { path: string })[] {
   return items.filter(
     (entry): entry is NavItem & { path: string } =>
-      entry.group === group && entry.path !== undefined,
+      entry.group === group &&
+      entry.path !== undefined &&
+      (entry.requires === undefined || audiences.has(entry.requires)),
   );
 }

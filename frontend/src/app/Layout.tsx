@@ -1,23 +1,36 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { NavLink, Outlet } from "react-router";
 
+import { useAdminAccess } from "../admin/access";
 import { useAuth } from "../auth/AuthProvider";
 import { ProjectScopeProvider } from "../projects/ProjectScopeProvider";
 import { ProjectSwitcher } from "../projects/ProjectSwitcher";
 import { ThemeToggle } from "../theme/ThemeToggle";
-import { NAV_GROUPS, NAV_ITEMS, registeredNavItems, type NavGroupId, type NavItem } from "./nav";
+import {
+  NAV_GROUPS,
+  NAV_ITEMS,
+  registeredNavItems,
+  type NavAudience,
+  type NavGroupId,
+  type NavItem,
+} from "./nav";
+
+/** Route of Profile → My devices (T-0051, diff §4.3). */
+export const MY_DEVICES_PATH = "/profile/devices";
 
 /** The group's items whose screens exist (diff §6.1); nothing while there are none. */
 export function NavItemList({
   group,
   items = NAV_ITEMS,
+  audiences,
 }: {
   group: NavGroupId;
   items?: readonly NavItem[];
+  audiences?: ReadonlySet<NavAudience>;
 }) {
   const { t } = useTranslation();
-  const registered = registeredNavItems(group, items);
+  const registered = registeredNavItems(group, items, audiences);
   if (registered.length === 0) return null;
   return (
     <ul className="flex flex-wrap gap-touch-gap md:ml-3 md:flex-col">
@@ -36,6 +49,44 @@ export function NavItemList({
         </li>
       ))}
     </ul>
+  );
+}
+
+/** The 8 groups with the items this user may see (Admin items: PER-09 or System admin). */
+function MainNav() {
+  const { t } = useTranslation();
+  const { projectAdmin } = useAdminAccess();
+  const audiences = useMemo(
+    () => new Set<NavAudience>(projectAdmin ? ["projectAdmin"] : []),
+    [projectAdmin],
+  );
+  return (
+    <nav
+      aria-label={t("nav.label")}
+      className="shrink-0 border-b border-line p-2 md:w-56 md:border-r md:border-b-0"
+    >
+      <ul className="flex flex-wrap gap-touch-gap md:flex-col">
+        {NAV_GROUPS.map((group) => (
+          <li key={group.id} className="shrink-0">
+            <NavLink
+              to={group.path}
+              end={group.path === "/"}
+              className={({ isActive }) =>
+                `flex min-h-touch items-center justify-between gap-2 rounded px-3 whitespace-nowrap ${
+                  isActive ? "bg-brand text-on-brand" : "hover:bg-line"
+                }`
+              }
+            >
+              <span>{t(`nav.groups.${group.id}.title`)}</span>
+              {group.pillar && (
+                <span className="rounded bg-pillar px-1 text-xs text-ink">{t("nav.pillar")}</span>
+              )}
+            </NavLink>
+            <NavItemList group={group.id} audiences={audiences} />
+          </li>
+        ))}
+      </ul>
+    </nav>
   );
 }
 
@@ -66,6 +117,12 @@ export function Layout() {
           <ProjectSwitcher />
           <div className="flex flex-wrap items-center gap-touch-gap text-sm md:ml-auto">
             {user && <span>{t("auth.signedInAs", { name: user.display_name })}</span>}
+            <NavLink
+              to={MY_DEVICES_PATH}
+              className="flex min-h-touch min-w-touch items-center rounded px-3 underline"
+            >
+              {t("profile.myDevices")}
+            </NavLink>
             <ThemeToggle />
             <button
               type="button"
@@ -77,34 +134,7 @@ export function Layout() {
           </div>
         </header>
         <div className="flex flex-col md:flex-row">
-          <nav
-            aria-label={t("nav.label")}
-            className="shrink-0 border-b border-line p-2 md:w-56 md:border-r md:border-b-0"
-          >
-            <ul className="flex flex-wrap gap-touch-gap md:flex-col">
-              {NAV_GROUPS.map((group) => (
-                <li key={group.id} className="shrink-0">
-                  <NavLink
-                    to={group.path}
-                    end={group.path === "/"}
-                    className={({ isActive }) =>
-                      `flex min-h-touch items-center justify-between gap-2 rounded px-3 whitespace-nowrap ${
-                        isActive ? "bg-brand text-on-brand" : "hover:bg-line"
-                      }`
-                    }
-                  >
-                    <span>{t(`nav.groups.${group.id}.title`)}</span>
-                    {group.pillar && (
-                      <span className="rounded bg-pillar px-1 text-xs text-ink">
-                        {t("nav.pillar")}
-                      </span>
-                    )}
-                  </NavLink>
-                  <NavItemList group={group.id} />
-                </li>
-              ))}
-            </ul>
-          </nav>
+          <MainNav />
           <main id="main" className="min-w-0 flex-1 p-4">
             <Outlet />
           </main>
