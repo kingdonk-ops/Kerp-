@@ -68,6 +68,42 @@ changed only by an approved extension).
 - **MDR:** the dossier attaches the original MTR/batch certificate and every approved extension
   certificate in chronological order (`documents-and-mdr.md` §Material traceability in the MDR).
 
+## Product substitutions (user, 2026-11-21; planner defaults; T-0185, T-0269–T-0273)
+A register of approved substitutes for specified products (coatings, consumables, components),
+with traceable authority, used by the product-spec check on inspections.
+- **Record** `oe_material_substitution` (`BaseRecordMixin` + project RLS): `ref`
+  (`{project}-SUB-{seq:4}`, project numbering pattern, T-0108), `approval_route` (`client_tq |
+  internal_qa`), `tq_id` / `tq_ref`, `scope_kind` (`project | node_subtree | work_anchor |
+  item`) with `scope_node_id` / `scope_item_id`, original and substitute product code and name,
+  `justification` (mandatory), `equivalency_document_id` (manufacturer equivalency letter,
+  datasheet or engineering memo, T-0016), `status` (`draft | pending_approval | approved |
+  rejected | revoked`), requester, approver, `approval_signature_id` (T-0119 sign-off ledger),
+  `rejection_reason`; index `(project_id, status, original_product_code,
+  substitute_product_code)`.
+- **Baseline list** `oe_material_approved_product` (T-0269; TD-424): approved products per
+  specified product code, seeded from client packs, maintained by PER-06/PER-09.
+- **internal_qa route** (Phase 1): approvers are the project's `substitution_approver_personas`
+  (default PER-06; PER-13 per TD-422). The approver differs from the requester unless the project
+  allows self-approval (TD-423), in which case the record is flagged `self_approved`. Approval
+  needs the equivalency document or a documented engineering rationale, signs through T-0119 and
+  is written to the ledger. A draft by anyone else goes to the QA verification queue
+  (`target_kind = material_substitution`).
+- **client_tq route** (Phase 5, T-0273, with the TQ register E-05-04): linked to a TQ, approved
+  when the TQ is approved or with recorded client approval evidence.
+- **Product check** (T-0270; TD-425): the eligibility service resolves `context.product_approvals`
+  (baseline list + approved substitutions whose scope covers the record's anchor, approved on or
+  before the inspection date and not revoked by then); rules call the pure CEL function
+  `is_product_approved(approvals, spec_product_code, selected_product_code)`, identical on both
+  runtimes. An unapproved alternative fails the rule; other rules still run.
+- **Field use** (T-0271, T-0272): approved substitutions, the baseline list and equivalency
+  documents are in the offline reference bundle; the tablet selector badges substitutes
+  "Approved Substitute ({tq_ref or ref})"; selecting one binds `substitution_id` on the answer
+  and adds the read-only note "Product substitution applied: {substitute} used in place of
+  {original} per {tq_ref or ref}" to the inspection and its PDF.
+- **MDR:** every inspection or asset that references a `substitution_id` brings the approved
+  substitution record (or the linked TQ approval) and its equivalency document into the dossier
+  (`documents-and-mdr.md` §Material traceability in the MDR).
+
 ## Cutting interface
 Confirmed cutting plans post net stock consumption + new offcuts to `site_inventory`; the
 optimiser draws from available offcuts before new stock (1D **FFD**, 2D **rectpack** — GPL

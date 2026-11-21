@@ -288,6 +288,21 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
   Updated: T-0111, T-0112, T-0118, T-0122, T-0147, T-0160, T-0205, T-0207 (notes), E-03-03,
   E-03-04, E-03-07, E-04-02 (now depends on T-0183/T-0266), E-04-07, E-04-12, E-05-05 (now
   depends on T-0184/T-0265). Raised: TD-410–TD-422.
+  Fifth addendum the same day: **product substitutions** (user's T-0185, id kept):
+  `materials-and-traceability.md` §Product substitutions, MDR rule in `documents-and-mdr.md`.
+  T-0185 (register + internal_qa route, M, phase 1), T-0269 (baseline approved product list, S;
+  TD-424), T-0270 (pure CEL helper `is_product_approved` with parity fixtures over a resolved
+  approvals map, S; TD-425), T-0271 (offline bundle, `substitution_id` binding, inspection/PDF
+  note, M), T-0272 (tablet selector badge, S), T-0273 (client_tq route, S, **phase 5** with the
+  TQ register E-05-04). Self-approval of internal_qa substitutions is TD-423 (default: four
+  eyes); PER-13 approval follows TD-422. T-0139, T-0147, T-0158, T-0165 notes only (Pilot-0
+  unchanged); E-05-05 now also depends on T-0185/T-0271; T-0181 gains target kinds
+  `material_shelf_life_extension` and `material_substitution`.
+  PR #137 review round 3 suggestions folded in here (PR #137 itself unchanged): T-0237/T-0239 and
+  `documents-and-mdr.md` §Access revive only `direct` membership rows soft-deleted by the
+  deletion itself (tests for an earlier team-link row and a PER-07 grant on another site), and an
+  uploaded-zip restore needs the caller's own upload (`file_id` readable under upload RLS, else
+  404).
 
 ## Key engineering decisions (baked into the spec — see consolidation diff)
 
@@ -310,5 +325,5 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
 | Region (2026-11-13) | Per-deployment setting: AWS `ap-southeast-2` for Australian deployments (diff §4.4) |
 
 ## Open decisions (see `TODO.md`)
-TD-410 (public capture links, ADR 0013 proposed), TD-411 (equipment as an inspection anchor, ADR 0014 proposed), TD-412 (fleet in the Phase-1 equipment register), TD-418 (escalation and approval authority), TD-419 (calendar iCal feed), TD-422 (PER-13 shelf-life approval), TD-096 (coating/Grating ITR, with the client; interim confirmed 2026-11-15), TD-293 (shared tablets in the pilot, ask the pilot team before go-live), TD-004 (hosting target), TD-072 (ADR 0004 rule-set defaults per project), TD-073 (handover first-shift trigger),
+TD-410 (public capture links, ADR 0013 proposed), TD-411 (equipment as an inspection anchor, ADR 0014 proposed), TD-412 (fleet in the Phase-1 equipment register), TD-418 (escalation and approval authority), TD-419 (calendar iCal feed), TD-422 (PER-13 shelf-life approval), TD-423 (self-approval of internal-QA substitutions), TD-096 (coating/Grating ITR, with the client; interim confirmed 2026-11-15), TD-293 (shared tablets in the pilot, ask the pilot team before go-live), TD-004 (hosting target), TD-072 (ADR 0004 rule-set defaults per project), TD-073 (handover first-shift trigger),
 TD-039 (dropped AIP-proposal extras). TD-013 (review-gate ignores tracker) is resolved by T-0029. TD-002/005/007/008/009/012 are resolved by this merge; TD-001 by ADR 0001 (`docs/decisions/`). TD-002 is carried into code by ADR 0002 (`docs/decisions/0002-port-one-engine.md`). TD-034 (remaining Inspection-ERP core packages) is resolved by ADR 0007. TD-003 (SSO vs local JWT) is resolved; the SSO spec is diff §4.5 (TD-043 resolved 2026-11-14). Resolved 2026-11-14 by the product owner: TD-257 (offline grace binds; window is an upper bound), TD-136 (magic links PER-14 only, T-0057) and TD-262 (externals create their own password, reset by e-mail); TD-084 (outbound e-mail) resolved by diff §4.6. Resolved 2026-11-15 by the product owner: TD-224 (per-mailbox magic-link cap), TD-213 (object key layout), TD-271 (T-0079), TD-261 (PER-15 password/SSO) and TD-223 (PR principals; residual risk TD-276). Resolved 2026-11-15 (second batch): TD-283 (one account per device id, per-account client store; follow-up TD-293), TD-281 (rule-set upgrade permissions, ADR 0004 Amendment G) and TD-285 (native-origin allow-list); TD-286 and TD-291 (device risks) accepted for development and covered by T-0080 before pilot go-live.

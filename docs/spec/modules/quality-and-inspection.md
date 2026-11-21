@@ -475,12 +475,14 @@ accepted, public). Tasks: T-0180 (store, engine, `update_target_fields`), T-0256
 
 One queue for documents QA must verify before a record becomes active. Tasks: T-0181 (queue),
 T-0260 (equipment), T-0261 (credentials), T-0265 (heat/MTR, Phase 2), T-0184 (shelf-life
-extensions, Phase 3; materials-and-traceability.md §Shelf-life extension), T-0262 (window).
+extensions, Phase 3; materials-and-traceability.md §Shelf-life extension), T-0185 (product
+substitution drafts; §Product substitutions there), T-0262 (window).
 
 - **QA authority.** Project setting `qa_reviewer_persona` (default PER-06; QA-capable personas
   only). Holding it on the project is QA authority; admin grants never confer it (diff §4.1).
 - **Item** `oe_qms_verification_item` (`BaseRecordMixin` + project RLS): `target_kind`
-  (`equipment_calibration | staff_credential | material_mtr | material_shelf_life_extension`),
+  (`equipment_calibration | staff_credential | material_mtr | material_shelf_life_extension |
+  material_substitution`),
   `target_id`, `parent_entity_id`,
   `document_id`, `status` (`pending | approved | rejected | reassigned | escalated |
   superseded`), submitter, assigned persona/user, decision by/at, `rejection_reason`,

@@ -41,7 +41,10 @@ used (`materials-and-traceability.md` §Shelf-life extension), the dossier attac
 extension certificate, in chronological order (`extension_seq`). The material traceability index
 lists per batch: original use-by date, each extension (sequence, previous and new date, issuer
 kind, approver, approval date, document SHA-256) and the effective use-by date. Rejected and
-pending extensions are not included. Batch and extension data come from the materials service;
+pending extensions are not included. Every inspection or asset that references a
+`substitution_id` (materials-and-traceability.md §Product substitutions; T-0185) brings the
+approved substitution record, or for the `client_tq` route the linked TQ approval, and its
+equivalency document into the dossier, listed on the material traceability index. Batch and extension data come from the materials service;
 the MDR engine reads no materials table. Verified certificates only (`material_cert.verify`,
 T-0265).
 
@@ -69,7 +72,7 @@ the usual one), else **404** (cross-scope is 404, CLAUDE.md §6):
 | Export (T-0233) | live membership on the (live) project |
 | Download (T-0237) | live project: live membership; deleted project: membership held when it was deleted |
 | Restore from a registry `archive_id`, mode `deleted` **or** `new` (T-0239, T-0240) | same as download |
-| Restore from an uploaded `.zip` (`file_id`), either mode | none: `system_admin` only, because the caller already holds the bytes (the upload is scanned like any other, T-0016) |
+| Restore from an uploaded `.zip` (`file_id`), either mode | none: `system_admin` only, because the caller already holds the bytes (the upload is scanned like any other, T-0016); the `file_id` must be readable by the caller under the normal upload RLS (their own upload), else 404 |
 | Registry list and detail, storage-tier change, deep-archive restore request | none: tenant-level metadata (like the project list a System admin already sees, diff §4.1) and object moves that expose no content |
 
 **Live membership.** A System admin without one grants themselves PER-09 through the existing
@@ -85,8 +88,14 @@ a sorted list of `"<user id>:<persona>"` for every grant that was live at the de
 that point, they are unlinked first). Memberships removed earlier are soft-deleted too, but they
 are not in that list, so they neither pass the gate nor come back on restore. The admin module
 reads it through a new `admin.service.memberships_at_deletion(session, project_id) → dict[user
-id, set[Grant]]`, built on `app/core/auth/memberships.py` (soft-deleted rows of the project,
-filtered to the pairs of the latest `delete` entry, which the projects module exposes as
+id, set[Grant]]`, built on `app/core/auth/memberships.py` (soft-deleted rows of the project with `source_type = 'direct'`,
+filtered to the pairs of the latest `delete` entry and to the rows that deletion soft-deleted
+(`deleted_at` and `updated_by` matching the deletion's time and actor, which the projects
+service returns with the pairs; if the stamps cannot be matched exactly, the `delete` payload
+additively records source and site id per grant instead). The pair alone is not precise, because
+the membership key also has `source_type`, `source_id` and `site_node_id`: an earlier team-link
+row or a PER-07 grant on another site removed earlier must never come back (PR #137 review
+round 3). The `delete` entry is exposed by the projects module as
 `projects.service.deletion_revoked_memberships(session, project_id)`; the archive module never
 reads the ledger or another module's tables itself). A System admin who was not a member at deletion has no way in through the
 registry; the only path left is an uploaded zip they already hold.
