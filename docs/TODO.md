@@ -3,9 +3,9 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 299 · **Closed:** 138
+**Open:** 298 · **Closed:** 140
 
-## decision (40)
+## decision (39)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -27,7 +27,6 @@
 | [TD-404](../tracker/todo/TD-404.md) | Pilot-0: is the ClamAV scanner (T-0218) required live in the pilot deployment, or is the stub with KERP_UPLOAD_SCANNER_ALLOW_STUB accepted for the pilot? | T-0218, T-0146 | planner |
 | [TD-407](../tracker/todo/TD-407.md) | Admin 'Resend invite' for an invited user: re-send the user's pending project invites (T-0052) or a password-setup e-mail, never a magic link for non-Field-Workers; via core mail, not notifications | T-0244 | planner |
 | [TD-410](../tracker/todo/TD-410.md) | Public unauthenticated inspection capture links (pasted T-0179 part 2/3): accept ADR 0013 (no-JWT endpoint, tenant from deployment config, project bound from the link token) or keep capture authenticated (PER-14 magic link)? | T-0252, T-0253, T-0254, T-0255 | planner |
-| [TD-411](../tracker/todo/TD-411.md) | Equipment (oe_equipment_asset) as an inspection anchor: accept ADR 0014 amending ADR 0003 (a third exclusive anchor for standalone equipment inspections only)? | T-0250, T-0111, T-0288 | planner |
 | [TD-412](../tracker/todo/TD-412.md) | Fleet vehicles and plant in the Phase-1 equipment register: pull this part of E-03-07 into Phase 1 (equipment_class, requires_calibration, custodian) or wait for Phase 3? | T-0249, T-0112, E-03-07 | planner |
 | [TD-413](../tracker/todo/TD-413.md) | Post-submit notify_users: SMS has no channel and e-mail may not carry project data beyond code and name (diff §4.6) — confirm in-app + push + e-mail link only | T-0256 | planner |
 | [TD-414](../tracker/todo/TD-414.md) | QA verification gates on existing records: which equipment, credentials and heat/MTR records count as verified when T-0260/T-0261/T-0265 land, and do imports start unverified? | T-0260, T-0261, T-0265 | planner |
@@ -47,8 +46,8 @@
 | [TD-438](../tracker/todo/TD-438.md) | Machine credentials (ADR 0017): service-account representation and who manages API keys | T-0298, T-0307, T-0308, T-0309 | planner |
 | [TD-439](../tracker/todo/TD-439.md) | Feature flags: who toggles them, project overrides, and what a flag may gate | T-0306 | planner |
 | [TD-442](../tracker/todo/TD-442.md) | Issues: may an internal punch/NCR be assigned to an external account (subcontractor) who must then see it? Planner default: no (422), internal issues are invisible to every is_internal=false caller | T-0314 | planner |
-| [TD-443](../tracker/todo/TD-443.md) | Issues on a path with no work-anchor node (audit findings above the work-anchor level, condition surveys): create_issue skips + notifies (planner default) vs allowing issues without a work anchor | T-0316, T-0312 | planner |
 | [TD-445](../tracker/todo/TD-445.md) | MDR gate: mdr_effect alone governs mdr.compile (the open-Cat-A-punch clause is replaced); Cat A punch templates default to mdr_effect=blocks; Cat A always blocks work completion (planner default) | T-0314, E-05-05 | planner |
+| [TD-451](../tracker/todo/TD-451.md) | Template settings and project-level records: confirm the planner defaults (preset table, health_safety area, informal submit is final, allows_project_level issue categories, at most one equipment link, MDR location overlap rule) | T-0324, T-0325, T-0326, T-0327 | planner |
 
 ## spec-gap (56)
 
@@ -480,4 +479,6 @@
 | ✅ | [TD-385](../tracker/todo/TD-385.md) | T-0075 reconcile: a live link to a deleted project expects no derived rows (rows it holds are excess, --fix revokes) | user decision 2026-11-21: accept. A live link to a deleted project expects no derived rows (matches the teams service, TD-358); rows it holds are excess and --fix revokes them; after a project restore reconcile expects them again. T-0075 AC reworded |
 | ✅ | [TD-386](../tracker/todo/TD-386.md) | audit ledger: concurrent appends to one chain race on SQLite (seq unique violation → 500) | on SQLite _lock_chain takes the database write lock (a no-op UPDATE on audit_ledger) before the tail read, so a second appender waits for the first to commit and links to it (fix/audit-ledger-sqlite-race) |
 | ✅ | [TD-396](../tracker/todo/TD-396.md) | System console and project archive: may a System admin see project-scoped records (upload quarantine rows, audit entries, archive contents) of projects where they hold no membership? | Answered by the user's decision of 2026-11-21: system_admin has global read/admin visibility across all projects of the tenant without a membership (docs/decisions/0016-system-admin-global-visibility.md, accepted; diff §4.1; T-0274-T-0276). Quarantine rows and audit chains of every project, archive export/download/restore of any project; count-only functions and membership gates dropped (T-0219, T-0221, T-0222, T-0224, T-0233, T-0237, T-0239, T-0240, T-0241). |
+| ✅ | [TD-411](../tracker/todo/TD-411.md) | Equipment (oe_equipment_asset) as an inspection anchor: accept ADR 0014 amending ADR 0003 (a third exclusive anchor for standalone equipment inspections only)? | Product owner (user, 2026-11-21): equipment becomes an informational link, not a third exclusive anchor. qa_itp inspections keep the ADR 0003 anchors; every other area is project-level with an optional location and links (asset node/Item, material, equipment). ADR 0014 superseded by the ADR 0003 amendment 2026-11-21. |
+| ✅ | [TD-443](../tracker/todo/TD-443.md) | Issues on a path with no work-anchor node (audit findings above the work-anchor level, condition surveys): create_issue skips + notifies (planner default) vs allowing issues without a work anchor | Product owner (user, 2026-11-21): issues from project-level inspections (audit, H&S and every non-qa_itp area) are project-level (no work anchor) with optional location/links; they never block work completion; with mdr_effect=blocks a project-level issue blocks every MDR of the project and a location-tagged one only the MDRs whose scope covers the location. Remaining case (a qa_itp inspection on a path without a work anchor): the planner default stays (manual raise 422 until a work anchor is picked; create_issue logged skipped NO_WORK_ANCHOR and notifies). |
 | ✅ | [TD-444](../tracker/todo/TD-444.md) | Pilot-0 scope after the issues re-plan: T-0311-T-0314 replace T-0116/T-0117 in the Phase 1 pilot subset; screens T-0318-T-0320, upgrade/escalate, create_issue and pins outside the gate (planner default) | Product owner (user, 2026-11-21): T-0318 (register, raise, punch detail) and a slimmed T-0319 (NCR detail workflow up to the ncr_close_verify sign-off) join the Pilot-0 gate, with T-0311-T-0314 and the seeded starting templates T-0322 (T-0108 transitively). Flag-override, upgrade and raise-external dialogs split to T-0321 after the pilot; T-0315, T-0317 stay outside the pilot; shared template designer epic E-01-03 after Pilot-0. |

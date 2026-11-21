@@ -993,8 +993,10 @@ come later (Phase 6, T-0303–T-0305, epic E-06-05). Rules:
   post-submit rule; a blocking tagout follow-up keeps it there until confirmed and closed
   (`equipment.activate` fails with 422 while it is open). Out-of-service, quarantined and
   decommissioned equipment is never selectable in inspections or allocation.
-- **Standalone inspections on equipment** (pre-starts, fault reports): ADR 0014, proposed
-  (TD-411). Expiry lead-time alerts for calibration: T-0183.
+- **Standalone inspections on equipment** (pre-starts, fault reports): equipment is an
+  informational **link** of a project-level inspection, never an anchor (user, 2026-11-21;
+  ADR 0003 amendment 2026-11-21, ADR 0014 superseded, TD-411 resolved; T-0250). Fleet vehicles
+  and plant in the register still wait on TD-412 (T-0249). Expiry lead-time alerts for calibration: T-0183.
 
 ---
 
@@ -1022,12 +1024,19 @@ Module screens register their nav items in these groups. Individual items may mo
 |---|---|
 | **Overview** | dashboards, my work |
 | **Backbone** | projects, asset hierarchy, items, teams |
-| **Execution** | inspections / QMS, ITPs, field time, progress, look-ahead |
+| **Execution** | inspections / QMS, ITPs, **Templates** (every inspection template in one filterable list: area, discipline, formal, audit, status, kind; presets; user, 2026-11-21), **Issues** (punch/NCR register and, for the QA authority / PER-09 / PER-13, the issue templates — issue types per category; user, 2026-11-21), field time, progress, look-ahead |
 | **Logistics** | materials, equipment, storeman |
 | **Documents** | documents, transmittals, CDRL, drawings |
 | **Defense & Claims** | TQs, variations, NOD / EOT, claims |
 | **Controls & Insights** | P6 schedule, reporting, money mirror |
 | **Admin** | users, personas, access requests, communications (broadcast e-mail, delivery stats, automated e-mail templates), project archives (export, storage tiering, download, restore), system (deployment stats, queue monitor, upload quarantine, runtime settings, admin grants, devices, audit log) (user, 2026-11-21; §4.7, §6.5) |
+
+**Templates and Issues (user, 2026-11-21):** two menu items, one shared template designer
+(E-01-03). Templates lists inspection templates (QA/ITP forms, H&S checks, pre-starts, equipment
+checks, repair/fault, audits); Issues holds the issue register (T-0318) and the issue templates
+(T-0320). "New template" starts from a preset (`modules/quality-and-inspection.md` §Template
+settings; `modules/issues.md` §2). Both are project screens; a PER-13 caller also sees a
+"Tenant library" scope (planner default). Template settings are not Admin screens (§6.5).
 
 The top-bar **Project Switcher** is the project picker of §4.1: it lists the user's projects
 (from memberships), remembers the last project per user on this client, offers All-Projects to portfolio

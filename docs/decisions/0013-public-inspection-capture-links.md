@@ -35,8 +35,9 @@ accounts with magic link + PIN (existing T-0057/T-0009 path).
 
 A **public capture link** (`oe_inspections_public_link`, inspections module, `BaseRecordMixin`
 + the standard project policies) is a capability for **one** action: submit one inspection of
-one pinned template revision in one project, optionally pre-bound to one anchor (node, Item or,
-if ADR 0014 is accepted, equipment).
+one pinned template revision in one project, optionally pre-bound to one anchor (node or Item, `qa_itp` templates only) or, for any other
+area, to a location and an equipment link (ADR 0014 superseded by the ADR 0003 amendment
+2026-11-21: equipment is a link, never an anchor).
 
 1. **Tenant.** The public router never reads a tenant from the request. It binds the
    deployment's hidden tenant from configuration (`KERP_DEFAULT_TENANT_ID`, diff §4.1), exactly

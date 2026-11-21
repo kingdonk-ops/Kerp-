@@ -1,10 +1,26 @@
 # ADR 0014 — Equipment as the anchor of standalone inspections (amends ADR 0003)
 
-- **Status:** **proposed** (planner, 2026-11-21; decisions TD-411 and TD-412 are open)
+- **Status:** **superseded** (user, 2026-11-21) by the
+  [ADR 0003 amendment 2026-11-21](0003-configurable-breakdown-and-terminology.md) (section "Amendment 2026-11-21"):
+  equipment is an informational **link** of a project-level inspection, not a third exclusive
+  anchor. TD-411 resolved; TD-412 (fleet in the Phase-1 register) stays open. The text below is
+  kept as history and is **not** in force.
 - **Date:** 2026-11-21
 - **Affects:** T-0250 (blocked by TD-411), T-0249 (blocked by TD-412), T-0111 (anchor rule; no
   change to its scope), T-0112 (equipment register), CLAUDE.md §6 anchor wording,
   `quality-and-inspection.md` §Standalone inspections
+
+## Superseding decision (user, 2026-11-21)
+
+- No `equipment_id` anchor on `oe_inspections_inspection`; inspections of every area other than
+  `qa_itp` are project-level with an optional `location_node_id` and links
+  (`oe_inspections_link`, `target_kind = equipment` among others; T-0325). At most one equipment
+  link per record (planner default) is the `equipment` context of post-submit automations
+  (T-0250, T-0288).
+- The equipment checks of Decision point 4 below still apply to the **link**: unknown or other
+  project → 404; decommissioned → 422; out-of-service or quarantined → 422 except for
+  `repair_fault` (T-0250).
+- Decision point 5 below (CLAUDE.md wording) is replaced by point 7 of the ADR 0003 amendment.
 
 ## Context
 

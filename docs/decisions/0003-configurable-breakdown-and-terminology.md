@@ -193,3 +193,44 @@ and task edits are tracked in TD-112.
    a "changes available" prompt with a diff; nothing is rewritten automatically (as ADR 0004).
 8. **Time without a work anchor.** Time lines may book to a delay or overhead code (standby,
    induction) with no work anchor (see TD-108).
+
+## Amendment 2026-11-21 — project-level inspections, location and links (user, 2026-11-21)
+
+Product-owner decision (user, 2026-11-21). Where it conflicts with §6, Amendment 5 or the
+Consequences above, it wins. Supersedes the proposed ADR 0014 (equipment as a third exclusive
+anchor) and resolves TD-411 and TD-443.
+
+1. **Belongs to vs connected to, derived from the inspection area.** The area is the template's
+   `category` (`modules/quality-and-inspection.md` §Standalone inspections, §Template settings).
+   - **`qa_itp` inspections belong to an asset**: they anchor to an `inspection_anchor` node or an
+     Item exactly as §6 and Amendment 5 say (exactly one of `node_id` / `item_id`). Roll-ups,
+     completion gates and the M1 freeze are unchanged.
+   - **Every other area** (pre-starts, equipment checks, repair/fault, H&S, general, audits) has
+     **no anchor**: the record belongs to the **project**, with an optional informational
+     **location** (`location_node_id`, any live node) and optional **links** to an asset (node or
+     Item), a material (materials module) or an equipment register entry.
+2. **Links and location are informational and traceability only.** They never roll up, never
+   feed progress, never block or satisfy completion and never make a record count for an asset.
+   They are searchable and shown on the linked record. Targets are referenced by id and checked
+   through the owning module's `service.py` (no cross-module FKs or table access).
+3. **Equipment is a link, not an anchor.** There is no third exclusive anchor. Post-submit
+   automations act on the record's (single) equipment link (tagout, `out_of_service`).
+4. **Issues follow the same rule** (`modules/issues.md` §3.1): findings of project-level
+   inspections and manual raises in categories that allow it are project-level issues with
+   optional location and links. They never block work completion; their MDR effect is scoped by
+   project or location (`modules/documents-and-mdr.md` §Gating invariant). Issues on assets keep
+   the §2 anchors and the work-anchor resolution.
+5. **Unchanged:** work anchors to a work-anchor node (Amendment 1); still **no BOQ anchor
+   anywhere**; RLS stays project-scoped for every record, anchored or project-level.
+6. **Locked setting.** Because the anchor rule follows the area, changing a published template's
+   area needs QA authority or PER-09 and creates a new revision; existing records keep their
+   pinned revision and their anchoring.
+7. **CLAUDE.md §6** wording (edited by the coordinator): "inspections to any `inspection_anchor`
+   level or an Item" becomes "QA/ITP inspections to any `inspection_anchor` level or an Item;
+   other inspections belong to the project with an optional informational location and links
+   (ADR 0003 amendment 2026-11-21)".
+
+Tasks: T-0324 (template settings), T-0325 (project-level inspections, location, links), T-0326
+(project-level issues), T-0250 (equipment links), T-0288 (follow-ups on the linked equipment),
+T-0329 (screens). T-0111 is unchanged (it builds the anchor check that T-0325 relaxes for
+non-`qa_itp` areas).

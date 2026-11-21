@@ -6,7 +6,8 @@ This replaces the separate `ncr` and `punchlist` modules of the earlier plan: ta
 T-0117 are dropped and re-planned as T-0311–T-0323 and epic E-01-03 (§12). Pilot-0 gate
 (user, 2026-11-21): T-0311–T-0314, T-0318, T-0319, T-0322.
 
-Anchors follow [ADR 0003](../../decisions/0003-configurable-breakdown-and-terminology.md) §2,
+Anchors follow [ADR 0003](../../decisions/0003-configurable-breakdown-and-terminology.md) §2
+and its amendment 2026-11-21 (project-level issues, location and links, §3.1),
 templates and layers follow ADR 0003 §4/§6 and
 [ADR 0004](../../decisions/0004-project-rule-sets-with-defaults.md) §2–§5, fields come from the
 shared registry ([quality-and-inspection.md](quality-and-inspection.md) §One field-type registry).
@@ -35,6 +36,12 @@ shared registry ([quality-and-inspection.md](quality-and-inspection.md) §One fi
 
 Designed the same way inspection templates are, only simpler.
 
+- **Where they are managed (user, 2026-11-21).** Issue templates (issue types: punch or NCR per
+  category) are created and managed under the **Issues** menu item, separate from the
+  **Templates** menu item that lists every inspection template (quality-and-inspection.md
+  §Template settings; diff §6.1). "New issue template" asks one question — **Punch** or **NCR**
+  — and the preset copies the type and flag defaults of the project's `general` template of that
+  type (planner default); every setting stays editable before the first publish (T-0320).
 - **Authoring.** Templates are authored in the **shared template designer** used by inspection
   and issue templates alike (epic E-01-03, after Pilot-0; one engine, no per-module designer).
   For Pilot-0 the starting templates — `painting`, `blasting`, `civil`, `mechanical`, `welding`
@@ -75,8 +82,12 @@ Designed the same way inspection templates are, only simpler.
 - **Categories.** A pack- and project-editable value list `oe_issues_category`
   (`key`, localised `label`, `is_active`, `sort_order`; same three layers). Seed (planner
   default): `painting`, `blasting`, `insulation`, `cladding`, `civil`, `mechanical`, `piping`,
-  `welding`, `scaffolding`, `electrical`, `audit`, `general`. Keys are never re-keyed or deleted once
-  used, only deactivated.
+  `welding`, `scaffolding`, `electrical`, `audit`, `general`; T-0326 adds `health_safety`
+  (planner default). Keys are never re-keyed or deleted once used, only deactivated. The same
+  list is the **discipline** list of inspection templates (quality-and-inspection.md §Template
+  settings). Each category carries `allows_project_level` (bool, default false; seeded true for
+  `audit` and `health_safety`, planner default): only issues of such a category may be raised
+  manually without an anchor (§3.1).
 - **Default template per category × type.** `oe_issues_default_template` (project,
   `category`, `issue_type`, template key). Raising an issue of category `painting` and type
   `punch` pre-selects the project's painting punch template; with no mapping the user picks from
@@ -92,8 +103,9 @@ the template; template answers live in `answers` JSONB, validated against the pi
 | `number` | per-type numbering pattern of the project (ADR 0003 §4 item 5); defaults `{project}-NCR-{seq:4}` and `{project}-PL-{seq:4}` (planner default). Assigned by the server, never reused; a voided issue keeps its number |
 | `issue_type` | `punch | ncr`, from the template |
 | `template_key`, `template_revision_id` | pinned at raise |
-| `anchor_node_id` / `anchor_item_id`, `anchor_role` | exactly one of the two; `anchor_role` = role of the anchor's level (`work_anchor`, `inspection_anchor`, `physical`) or `item` (ADR 0003 §2). Never a BOQ anchor |
-| `work_anchor_node_id` | resolved at raise by `asset_management.service.work_anchor_for` (T-0101); a path without a work-anchor node → 422 until one is picked or created (asset-and-tagging.md §Anchor invariants, TD-113). Retired nodes → 422 |
+| `anchor_node_id` / `anchor_item_id`, `anchor_role` | exactly one of the two, or neither for a **project-level** issue (§3.1); `anchor_role` = role of the anchor's level (`work_anchor`, `inspection_anchor`, `physical`) or `item` (ADR 0003 §2), NULL when project-level. Never a BOQ anchor |
+| `work_anchor_node_id` | resolved at raise by `asset_management.service.work_anchor_for` (T-0101); a path without a work-anchor node → 422 until one is picked or created (asset-and-tagging.md §Anchor invariants, TD-113). Retired nodes → 422. NULL for a project-level issue |
+| `location_node_id`, links | project-level issues only: optional informational location (any live node) and 0..many links (`oe_issues_link`: node, Item, material, equipment) (§3.1) |
 | `category` | from the template (may be changed to another active category only by re-templating before the first step completes; planner default: not editable) |
 | `origin` | §1 |
 | `severity` | `minor | major | critical` (planner default list); required for NCR, optional for punch |
@@ -107,6 +119,27 @@ the template; template answers live in `answers` JSONB, validated against the pi
 | `closed_by_inspection_id` | the re-inspection that verified the fix, when one was used (TD-167) |
 | `client_seen_at`, `client_seen_channel` | nullable; set once by `issues.service.mark_client_seen(issue_ids, channel)` (idempotent, first value wins), never cleared (§5) |
 | `void_reason`, `voided_by`, `voided_at` | §4.3 |
+
+### 3.1 Project-level issues (user, 2026-11-21; resolves TD-443)
+
+Audit and H&S findings may be **project-level**: no anchor and no work anchor, belonging to the
+project (ADR 0003 amendment 2026-11-21; T-0326).
+
+- **When.** An issue raised from a project-level inspection (any area other than `qa_itp`,
+  quality-and-inspection.md §Project-level inspections) is project-level and inherits the
+  inspection's location and links (§8). A manual raise may be project-level only when the issue
+  template's category has `allows_project_level` (§2); every other manual raise still needs an
+  anchor (422).
+- **Location and links** follow the inspection rules: `location_node_id` (any live node),
+  `oe_issues_link` (`issue_id`, `target_kind` `node | item | material | equipment`,
+  `target_id`; `BaseRecordMixin` + project RLS), every target checked through its owning
+  module's service; informational only (never roll up, never block or satisfy completion),
+  searchable (`GET /api/v1/issues?location=…&linked=<kind>:<id>`) and shown on the linked record
+  through `issues.service.linked_issues`; internal issues stay hidden from external callers
+  there too (§5).
+- **Gates.** A project-level issue never blocks work completion (it has no work anchor to
+  block). MDR: see §6.
+- RLS stays project-scoped; cross-project → 404.
 
 Photos and other media are template answers (photo field with capture time and annotation,
 quality-and-inspection.md §Photo answers). Every create, transition, assignment, flag override
@@ -190,8 +223,9 @@ gates, tiles and registers means any non-terminal state.
     `issues.service.mark_client_seen(issue_ids, channel)` (idempotent, first value wins) the
     first time an `is_internal = false` account reads the issue through the issues API or
     receives it in the offline pull (T-0314), or a client-facing output includes it: portal
-    (E-07-xx), an inspection PDF exported by an external account (T-0158/T-0159), shared saved
-    views (E-01-01), and the MDR, where `mdr_register` marks its rows itself (planner default for
+    (E-07-xx, channel `portal`), an inspection PDF exported by an external account
+    (T-0158/T-0159, `pdf_export`), shared saved views reached by an external account outside the
+    portal (E-01-01, channel `saved_view`), and the MDR (`mdr`), where `mdr_register` marks its rows itself (planner default for
     "has been client-visible"). Every such consumer reads issues through the service and calls
     it. After that `client → internal` is refused (422).
   - **No widening by override.** `internal → client` is not an override; it goes through "Raise
@@ -232,6 +266,14 @@ type, `punch_category`, `completion_effect`, `mdr_effect` and status as rule con
 | `weld.accept` (welding, Phase 2) | no open NCR anchored to the weld's Item (R-WPS-4) |
 | `closeout.final_handover` (E-04-10, planner default name) | no open punch with `punch_category = B` (or A) on the handed-over scope: master spec MOD-09 "Cat B must be rectified prior to final contractual handover" |
 
+**Project-level issues (user, 2026-11-21; §3.1):** never in `work_anchor.complete`, hydrotest
+pack release, `weld.accept` or `closeout.final_handover` facts (nothing to block). With
+`mdr_effect = blocks`, an open project-level issue **without a location** blocks every MDR of the
+project; one **with a location** blocks only the MDRs whose dossier scope covers that location —
+the location node is the scope node, inside it, or an ancestor of it (scopes overlap; lineage
+through the `asset_management` service; planner default, conservative). `mdr_register` lists
+project-level issues on the same rule.
+
 **MDR gate rule (planner default, TD-445):** `mdr_effect` alone governs the MDR gate: `mdr.compile` blocks while any issue in the dossier scope with `mdr_effect = blocks` is open, and nothing else about an issue (type, `punch_category`, visibility) enters it; this replaces the earlier "open Cat A punch" clause. Punch templates that use Cat A (all system-default punch templates) default to `mdr_effect = blocks`. An open Cat A punch always blocks work completion (`work_anchor.complete`) regardless of `mdr_effect`.
 
 Projects may add stricter rules to any of these sets. Upgraded and escalated sources are not
@@ -262,33 +304,47 @@ Both create a **new record**; nothing is converted, re-dated or rewritten.
 
 ## 8. Raising from inspections and audits (user, 2026-11-21)
 
+- **Linked issue types (user, 2026-11-21).** An inspection template's settings link **1..many
+  issue templates** (`linked_issue_templates`, part of the inspection revision hash;
+  quality-and-inspection.md §Template settings; T-0327). When an issue is raised from an
+  inspection: **exactly one** linked → it is used; **several** → the user picks one of them;
+  **none** → the category × type default of §2 for the template's discipline (no discipline →
+  `general`). For an **audit** template with no links the fallback is the `audit` category
+  templates of the type whose `default_origin` matches the audit scope (`internal_audit` /
+  `external_audit`); one → used, several → the user picks (planner default).
 - **Post-submit action `create_issue`** (quality-and-inspection.md §Post-submit automation):
-  `action_config` names the issue template key (or "default for category × type") and the type,
-  plus optional `punch_category`, `severity` and an answer mapping (inspection field key → issue
-  field key). It runs when the inspection reaches its **result** (`INSPECTED_PASSED` /
-  `INSPECTED_FAILED` after review, T-0150), not at `SUBMITTED`, so a returned inspection never
-  raises issues (planner default). The new issue anchors to the inspection's anchor, links
-  `source_inspection_id`, carries the inspection's photos selected by the mapping, and has
-  `raised_by` = the approving reviewer (planner default) with `source = "automation"` in the
+  `action_config` names **one of the template's linked issue templates** (422 otherwise; a
+  template without linked issue types cannot use `create_issue`), plus optional
+  `punch_category`, `severity` and an answer mapping (inspection field key → issue field key).
+  The type comes from the named template. It runs when the inspection reaches its **result**
+  (`INSPECTED_PASSED` / `INSPECTED_FAILED` after review, T-0150; for an informal record, at
+  submit, which is final), not at `SUBMITTED`, so a returned inspection never raises issues
+  (planner default). The new issue anchors to the inspection's anchor (or is project-level with
+  the inspection's location and links, §3.1), links `source_inspection_id`, carries the
+  inspection's photos selected by the mapping, and has `raised_by` = the approving reviewer (the
+  submitter for an informal record) (planner default) with `source = "automation"` in the
   ledger.
 - **Auto-raise from `INSPECTED_FAILED`** (T-0111 lifecycle `INSPECTED_FAILED → (Cat A punch |
   NCR) → RE_INSPECT`) goes through `create_issue`: a failed painting inspection raises the
   painting punch or NCR. If no rule raised an issue, the approve-as-failed dialog requires the
-  reviewer to raise one (pre-selected default template for the inspection's issue category);
-  `RE_INSPECT` needs at least one linked issue (planner default).
-- **Issue category on inspection templates (planner default).** Inspection template revisions
-  gain an optional `issue_category` (key from §2's list) — separate from the inspection's
-  standalone `category` (quality-and-inspection.md §Standalone inspections). Manual raise from an
-  inspection pre-filters templates by type + this category.
-- **Audits.** A site audit is a **standalone inspection template**; its findings raise issues
-  through audit issue templates (e.g. "Internal audit finding" = punch or NCR template in
-  category `audit` with `default_origin = internal_audit`, `internal` + `excluded`).
-- **Manual raise** filters templates by type + category; the project's default template per
-  category × type is pre-selected.
-- **No work anchor on the path.** Manual raise answers 422 until a work-anchor node is picked or
-  created (§3). A `create_issue` action on such a path does not roll the result back: it is
-  logged `skipped` (`NO_WORK_ANCHOR`) and the reviewer and QA authority are notified to raise it
-  manually (planner default; TD-443).
+  reviewer to raise one (template chosen by the linked-issue-type rule above);
+  `RE_INSPECT` needs at least one linked issue (planner default). Informal records have no
+  approve step, so nothing is forced (planner default).
+- **Audits.** A site audit is an inspection template with the **audit** tick (any area, e.g.
+  Health & Safety). Its findings raise issues through `audit` category issue templates:
+  internal scope → `origin = internal_audit`, `internal` + `excluded` defaults; external scope →
+  `origin = external_audit`, `client` + `blocks` defaults (§1, §5 locked origins). The
+  internal audit finding templates are seeded for Pilot-0 (T-0322); the external ones with
+  T-0327.
+- **Manual raise** (not from an inspection) filters templates by type + category; the
+  project's default template per category × type is pre-selected.
+- **No work anchor on the path** (TD-443, resolved by the user 2026-11-21): findings of
+  project-level inspections (audits, H&S checks, pre-starts) are project-level issues (§3.1), so
+  they need no work anchor. What remains is a `qa_itp` inspection on an `inspection_anchor` node
+  whose path has no work anchor (e.g. a condition survey, ADR 0003 Amendment 5): manual raise
+  answers 422 until a work-anchor node is picked or created (§3), and a `create_issue` action
+  does not roll the result back: it is logged `skipped` (`NO_WORK_ANCHOR`) and the reviewer and
+  QA authority are notified to raise it manually (planner default kept).
 
 ## 9. Offline (user, 2026-11-21)
 
@@ -324,11 +380,14 @@ superseded drawing revision stays on that revision (planner default).
 | T-0314 | visibility / MDR / completion flags, `client_seen_at` + `mark_client_seen`, external-caller filtering, gate context providers, `mdr_register` |
 | T-0323 | per-issue flag override API with guardrails (after Pilot-0) |
 | T-0315 | upgrade punch → NCR, raise external NCR from an internal issue |
-| T-0316 | `create_issue` post-submit action, auto-raise from `INSPECTED_FAILED`, inspection `issue_category` |
+| T-0316 | `create_issue` post-submit action (names a linked issue type), auto-raise from `INSPECTED_FAILED`, issues from project-level inspections |
 | T-0317 | spatial pins on drawings |
 | T-0318 | screens: issues register, raise (online/offline), punch detail (Pilot-0) |
 | T-0319 | screens: NCR detail workflow up to the `ncr_close_verify` sign-off (Pilot-0) |
-| T-0320 | screens: issue template settings (categories, defaults, library copy) |
+| T-0320 | screens: Issues menu → issue templates (Punch / NCR presets, list, categories, defaults, library copy) |
 | T-0321 | screens: flag override, upgrade and raise-external dialogs; signing ceremony for `ncr_close_verify` (after Pilot-0) |
 | T-0322 | seed the Pilot-0 starting issue templates as tenant defaults (Pilot-0) |
+| T-0326 | project-level issues: no anchor, location, links, `allows_project_level` categories, gate and MDR scope rules (§3.1, §6) |
+| T-0327 | linked issue types on inspection templates, raise-time resolution, audit fallback by scope, external audit seed templates (§8) |
+| T-0330 | screen: raise an issue from an inspection with the linked-issue-type picker (§8) |
 | E-01-03 | shared template designer for inspection and issue templates (after Pilot-0) |

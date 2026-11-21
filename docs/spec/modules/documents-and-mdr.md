@@ -33,6 +33,13 @@ Batch pipeline (**SAQ `batch`** queue, heavy libs lazy):
 **Gating invariant:** a compile cannot run while `Σ open issues with mdr_effect = blocks > 0`
 or `Σ unsigned ITP hold points > 0` (amended 2026-11-21; [issues.md](issues.md) §5–§6).
 **MDR gate rule (planner default, TD-445):** `mdr_effect` alone governs the MDR gate: `mdr.compile` blocks while any issue in the dossier scope with `mdr_effect = blocks` is open, and nothing else about an issue (type, `punch_category`, visibility) enters it; this replaces the earlier "open Cat A punch" clause. Punch templates that use Cat A (all system-default punch templates) default to `mdr_effect = blocks`. An open Cat A punch always blocks work completion (`work_anchor.complete`) regardless of `mdr_effect`.
+**Project-level issues in the dossier scope (user, 2026-11-21; issues.md §3.1, §6):** an audit
+or H&S issue may be project-level (no anchor). With `mdr_effect = blocks`, an open project-level
+issue without a location is in the scope of **every** MDR of the project; one with a location is
+in the scope only of the MDRs whose dossier scope covers that location (the location is the scope
+node, inside it or an ancestor of it; planner default). The same rule decides whether it is listed
+in the NCR / concession register below. Informal inspections (quality-and-inspection.md
+§Template settings) are never collected into a dossier.
 The check is the `mdr.compile` rule set (CEL, ADR 0004
 locked defaults) over the facts the `issues` service returns for the dossier scope; it is
 separate from the work-completion gate (`work_anchor.complete`). Final dossiers and commercial Delay Notices are signed with
@@ -48,7 +55,8 @@ attestation (Pilot-0) say so.
 Every dossier carries an **NCR / concession register** section (its own Level 4 bookmark under
 the discipline dossier, planner default) listing the scope's issues with `mdr_effect = blocks`
 (all closed by then) or `register_only`: number, type, template name, category, origin,
-severity / punch category, anchor in project terminology, disposition and `concession_ref`
+severity / punch category, anchor in project terminology (or "Project" plus the location for a
+project-level issue), disposition and `concession_ref`
 (NCR), root-cause category, raised and closed dates, verifier and the `ncr_close_verify`
 attestation block. Issues with `mdr_effect = excluded` and `void` issues are never listed.
 Because the dossier goes to the client, **`internal` issues are never printed** (clients never

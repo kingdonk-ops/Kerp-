@@ -132,9 +132,10 @@ brought these into Pilot-0; limits, formats and the processing split are planner
 Single store across all kinds: **`kind IN (inspection, itp)`**. TD-045 (decided 2026-11-10)
 renames the old `rfi` kind and `RFI_ISSUED` state; the Request for Inspection (RFI) becomes its own `inspection_request` record (§`inspection_requests`).
 The names used here are **confirmed by the user (TD-045, 2026-11-10)**: no `rfi` kind, and the
-call-out state is `INSPECTION_REQUESTED`. Anchors to **any node whose level has the `inspection_anchor` role, or an Item**
+call-out state is `INSPECTION_REQUESTED`. A `qa_itp` record anchors to **any node whose level has the `inspection_anchor` role, or an Item**
 (ADR 0003 §6; e.g. Line in `cui-line`, RSW and Item in `remediation-*`), including a node with no
-work under it yet (ADR 0003 Amendment 5). Holds responses authored against a template revision
+work under it yet (ADR 0003 Amendment 5). Records of every other area are project-level with an
+optional location and links (§Project-level inspections; ADR 0003 amendment 2026-11-21). Holds responses authored against a template revision
 (pins `template_revision_id`), `status` lifecycle, `reading_*`, `signed_off_*` (user, signature
 hash, UTC timestamp, geolocation). Lifecycle (master spec §4.2):
 `PENDING → INSPECTION_REQUESTED → INSPECTED_PASSED → LOCKED_FOR_TURNOVER`, with
@@ -510,24 +511,106 @@ Each tile opens the matching filtered list. Soft-deleted records are not counted
 
 The user's 2026-11-21 paste adds inspections that are not part of the ITP chain: daily
 pre-starts, safety checks, equipment checks and repair/fault reports. Tasks: T-0179 (categories),
-T-0251 (registers and tile filter), T-0249/T-0250 (equipment, blocked by TD-412/TD-411).
+T-0324 (template settings), T-0325 (project-level records, location, links), T-0251 (registers
+and tile filter), T-0250 (equipment links), T-0249 (fleet classes, blocked by TD-412).
 
-- **Category.** Templates (revisions) and `oe_inspections_inspection` carry `category`
-  (`qa_itp | safety_prestart | equipment_check | repair_fault | general`, default `qa_itp`) and
-  `is_standalone` (default false). A record takes both from its pinned revision; the category is
-  part of the revision hash. Rule sets may branch on `record.category`.
+- **Category = Area.** Templates (revisions) and `oe_inspections_inspection` carry `category`
+  (`qa_itp | safety_prestart | equipment_check | repair_fault | health_safety | general`, default
+  `qa_itp`) and `is_standalone` (default false). The screens call it **Area** and show plain
+  labels through `t()`: Quality (QA/ITP), Pre-start, Equipment check, Repair / fault,
+  Health & Safety, General (user, 2026-11-21; `health_safety` added as the area for H&S checks
+  and H&S audits, planner default). A record takes both from its pinned revision; the category
+  is part of the revision hash. Rule sets may branch on `record.category`.
 - **No parent ITP.** A standalone template is `kind = inspection` only and is never attached to an
-  ITP line. Its lifecycle, review (§Review and return) and signing are the same as any inspection.
-- **Anchors.** ADR 0003 applies unchanged: an `inspection_anchor` node or an Item. Anchoring to an
-  equipment register entry (fleet vehicle, plant) is **proposed** in ADR 0014 (TD-411): a third
-  exclusive anchor `equipment_id`, allowed only for standalone `safety_prestart`,
-  `equipment_check` and `repair_fault` records, plus an informational `location_node_id` that
-  never counts for roll-ups or completion. Until TD-411 and TD-412 are decided, standalone
-  inspections anchor to nodes and Items only.
+  ITP line. Its lifecycle and signing are the same as any inspection; review depends on the
+  formal tick (§Template settings).
+- **Belongs to vs connected to** (user, 2026-11-21; ADR 0003 amendment 2026-11-21): derived from
+  the area, not a separate setting. A `qa_itp` record **belongs to an asset**: it anchors to an
+  `inspection_anchor` node or an Item exactly as ADR 0003 §6 says (roll-ups and completion gates
+  unchanged). A record of any other area has **no anchor**: it belongs to the **project**, with an
+  optional informational **location** and optional **links** (§Project-level inspections).
+  Equipment is a link, never an anchor (ADR 0014 superseded; TD-411 resolved).
 - **Where they show.** Dedicated registers (Inspections → Pre-starts, Safety checks, Fault
   reports). The Pilot-0 tiles count `qa_itp` only by default, with a toggle for all categories
-  (T-0251; T-0160 itself is unchanged).
+  (T-0251; T-0160 itself is unchanged); informal records are never counted (§Template settings).
 
+## Template settings, presets and the two template menus (user, 2026-11-21)
+
+Tasks: T-0324 (settings, presets, lock rules), T-0327 (linked issue types), T-0328 (Templates
+menu), T-0320 (Issues menu → issue templates), epic E-01-03 (the shared designer both open).
+
+- **Two menu items, one designer.** **Templates** (Execution group, diff §6.1) lists **all**
+  inspection templates of the project in one filterable list — QA/ITP forms, H&S checks,
+  pre-starts, equipment checks, repair/fault forms, audits — with filters area, discipline,
+  formal, audit, status (`draft | published | retired`) and kind (`inspection | itp`).
+  **Issues** is a separate menu item where issue templates (issue types: punch or NCR per
+  category) are created and managed ([issues.md](issues.md) §2). Both open the same shared
+  template designer (E-01-03) for sections and fields. Inspections are filled full-page in the
+  field; issue forms are simpler.
+- **Presets.** "New template" asks one question. Inspection side: QA inspection, H&S check,
+  Pre-start, Equipment check, Repair/fault, Internal audit, External audit; Issues side: Punch,
+  NCR. The preset only pre-sets the settings below; the user can change every one of them before
+  the first publish. Inspection presets (planner default):
+
+  | Preset | Area | Formal | Audit |
+  |---|---|---|---|
+  | QA inspection | `qa_itp` | on | off |
+  | H&S check | `health_safety` | off | off |
+  | Pre-start | `safety_prestart` | off | off |
+  | Equipment check | `equipment_check` | off | off |
+  | Repair/fault | `repair_fault` | off | off |
+  | Internal audit | `general` | on | `internal` |
+  | External audit | `general` | on | `external` |
+
+  The issue presets copy the type and flag defaults of the project's `general` punch or NCR
+  template (issues.md §2; planner default).
+- **Settings** (on the template revision, part of the revision hash):
+  - **Area** = `category` above.
+  - **Discipline** (optional, planner default): a key from the shared discipline/category list
+    `oe_issues_category` (issues.md §2), read through the issues service; used to filter the
+    Templates list and as the category of the issue-type fallback (issues.md §8). It replaces
+    the earlier `issue_category` field.
+  - **Formal inspection** (`is_formal`, default on): ticked = the record counts toward QA
+    progress, ITP close-out, the MDR and KPIs and goes through review and approval
+    (§Review and return). Unticked = **informal**, record-only: no review step — submit is final
+    and moves the record straight to `INSPECTED_PASSED` / `INSPECTED_FAILED` from the proposed
+    result (planner default), it never enters the QA verification queue, and it is excluded from
+    the MDR, the progress tiles and KPIs; it is still kept, signed, ledgered and auditable.
+    `kind = itp` templates and every template attached to an ITP line are always formal (the
+    tick is locked on; attaching an informal template to an ITP line → 422).
+  - **Audit template** (`is_audit`, with `audit_scope` `internal | external`): an audit can sit
+    under any area (e.g. Health & Safety). Its findings raise issues through `audit` category
+    issue templates: `internal` → origin `internal_audit`, `internal` + `excluded` defaults;
+    `external` → origin `external_audit`, `client` + `blocks` defaults (issues.md §1, §5, §8).
+  - **Linked issue types** (`linked_issue_templates`, 0..many issue template keys; issues.md §8).
+  - **Locked settings.** Changing area, formal, audit (or its scope) — and with the area the
+    anchor rule — on a template that has a published revision needs the project's QA authority
+    (`qa_reviewer_persona`) or PER-09 (PER-13 for a tenant-library template) and is published as a
+    **new revision**; existing records keep their pinned revision (403 for anyone else).
+
+## Project-level inspections, location and links (user, 2026-11-21; ADR 0003 amendment 2026-11-21)
+
+Task: T-0325 (inspections), T-0326 (the same for issues), T-0250 (equipment specifics),
+T-0329 (screens).
+
+- **Project-level record.** An inspection whose area is not `qa_itp` has `node_id` and `item_id`
+  NULL (giving one → 422) and belongs to the project. It is still project-scoped by RLS like
+  every record; cross-project → 404.
+- **Location** (`location_node_id`, optional): any live node of the project, where the check was
+  done. Informational only.
+- **Links** (`oe_inspections_link`: `inspection_id`, `target_kind` `node | item | material |
+  equipment`, `target_id`; `BaseRecordMixin` + project RLS): 0..many links to an asset (node or
+  Item), a material (materials module) or an equipment register entry. Each target is checked
+  through its owning module's `service.py` (no FKs across modules, no cross-module table
+  access); unknown or other project → 404. At most one `equipment` link per record (planner
+  default), so post-submit automations have one unambiguous `equipment` context (T-0250, T-0288).
+  `material` links are accepted once the materials module exposes a link target (E-03-03; until
+  then 422 `LINK_KIND_UNAVAILABLE`, planner default).
+- **Informational only.** Location and links never roll up (node inspection roll-up of T-0111),
+  never feed progress, never block or satisfy completion and never make a record count for an
+  asset. They are searchable (`GET /api/v1/inspections?location=…&linked=<kind>:<id>`) and shown
+  on the linked record ("Linked inspections" on the node, Item, equipment or material detail,
+  through `inspections.service.linked_records`).
 ## Public capture links (user, 2026-11-21; **proposed**, ADR 0013, decision TD-410)
 
 Nothing in this section may be built until the user accepts ADR 0013 (T-0252–T-0255 are
@@ -536,8 +619,10 @@ links for Field Workers only (diff §4.2), so it needs an explicit, documented e
 
 - **Link** `oe_inspections_public_link` (`BaseRecordMixin` + standard project RLS; the paste's
   `oe_inspection_public_link`): one pinned standalone template revision, `category` (default
-  `safety_prestart`), at most one pre-bound anchor (`anchor_node_id`, `anchor_item_id`,
-  `equipment_id`), `token_hash` (SHA-256, unique), `label` (e.g. "LV-042 Daily Pre-Start QR"),
+  `safety_prestart`), pre-bound context following §Project-level inspections (user,
+  2026-11-21): for a `qa_itp` template at most one anchor (`anchor_node_id`, `anchor_item_id`);
+  for any other area an optional `location_node_id` and an optional `equipment_id` that becomes
+  the record's equipment **link**, never an anchor (TD-411 resolved), `token_hash` (SHA-256, unique), `label` (e.g. "LV-042 Daily Pre-Start QR"),
   `allowed_lookup_scopes` (default `{"equipment": false, "staff": false}`), `expires_at` (null
   only for an explicitly permanent link), `max_submissions`, `submission_count`, `is_active`,
   `created_by_user_id`; index `(project_id, is_active)`. Created, revoked and rotated by the
@@ -565,14 +650,15 @@ links for Field Workers only (diff §4.2), so it needs an explicit, documented e
 
 Template-level rules that run after an inspection reaches `SUBMITTED` (authenticated and, once
 accepted, public). Tasks: T-0180 (store, engine, `update_target_fields`), T-0256
-(`notify_users`), T-0257 (`create_action_task`, tagout gate for node/Item), T-0288 (equipment follow-ups and
-the `equipment.activate` tagout provider; waits on TD-411), T-0258/T-0259 (screens), T-0316
+(`notify_users`), T-0257 (`create_action_task`, tagout gate for node/Item), T-0288 (follow-ups on the linked equipment and
+the `equipment.activate` tagout provider; equipment is a link, TD-411 resolved), T-0258/T-0259 (screens), T-0316
 (`create_issue`).
 
 - **Rule** `oe_inspections_post_action` (paste: `oe_inspection_post_action`): `sort_order`,
   `name`, `enabled`, `trigger_cel` (CEL bool over `answers`, `result`, `category`, `inspection`,
   `equipment`, `node`, `item`; default `true`; compiled on save; sandboxed, fails closed),
-  `action_type`, `action_config`. Part of the frozen template revision and copied with client
+  `action_type`, `action_config`. `equipment` in the context is the record's single equipment
+  link (§Project-level inspections; T-0250). Part of the frozen template revision and copied with client
   packs; edited by PER-06 and PER-09 on draft revisions.
 - **`update_target_fields`:** only fields the owning module whitelists in its `service.py`
   (equipment: `last_inspected_at`, `last_inspection_id`, status `out_of_service` /
@@ -592,14 +678,15 @@ the `equipment.activate` tagout provider; waits on TD-411), T-0258/T-0259 (scree
   (PER-04/PER-03) gets a pinned high-priority "Confirm physical tagout applied" (timestamp, user,
   optional tag photo, notes); returning to `active` fails `run_checks(context,
   "equipment.activate")` with 422 while a blocking follow-up is open.
-- **`create_issue` (user, 2026-11-21; [issues.md](issues.md) §8):** names the issue template
-  (or the project's default for category × type), the type, optional `punch_category`,
+- **`create_issue` (user, 2026-11-21; [issues.md](issues.md) §8):** names one of the
+  template's **linked issue types** (§Template settings), the type, optional `punch_category`,
   `severity` and an answer mapping. Runs when the inspection reaches its result
   (`INSPECTED_PASSED` / `INSPECTED_FAILED`), not at `SUBMITTED` (planner default), so a failed
   painting inspection raises the painting punch or NCR. The `INSPECTED_FAILED` auto-raise of the
   lifecycle goes through it. A site audit is a standalone inspection template whose findings
-  raise issues through audit issue templates. Inspection template revisions may carry an
-  `issue_category` that pre-filters manual raise (planner default).
+  raise issues through audit issue templates. Manual raise from an inspection uses the linked
+  issue types (one → used, several → the user picks, none → the category × type default for
+  the template's discipline; issues.md §8).
 - **Execution and audit:** database actions run in the submit transaction; remote notification
   channels after commit on the SAQ `interactive` queue. Each action writes
   `oe_inspections_action_log` and a T-0006 ledger entry with `source = "automation"` (new
