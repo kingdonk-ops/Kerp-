@@ -39,6 +39,7 @@ npm run gen:api    # regenerate src/api/ from the backend OpenAPI schema (backen
 
 ```
 src/
+  admin/      Admin screens: access-request inbox, devices (admin + My devices), revoke (README.md)
   api/        generated API types (openapi.json, schema.ts) — never hand-edit (see src/api/README.md)
   app/        providers (AppRoot/AppProviders), services, router, shell layout, nav groups, query client
   auth/       token store, AuthProvider (login/logout/me), RequireAuth route guard
@@ -65,8 +66,10 @@ src/
   (Logistics, Execution, Defense & Claims, Controls & Insights), Backbone, Documents,
   Admin. `NAV_ITEMS` holds the item mapping of diff §6.1 (e.g. Execution: inspections / QMS,
   ITPs, field time, progress, look-ahead); an item shows under its group only once its
-  screen exists — the module task that ships the screen gives the item its `path`. No item
-  has a screen yet (T-0042).
+  screen exists — the module task that ships the screen gives the item its `path`. An item
+  with `requires: "projectAdmin"` shows only to PER-09 holders and System admins. Built so
+  far: Admin → System (Devices) and Admin → Access requests (T-0051, `src/admin/README.md`).
+  The top bar links Profile → **My devices** (`/profile/devices`).
 - **Project picker and landing (T-0042, diff §4.1, §6.1).** The top-bar picker lists the
   caller's projects from `GET /api/v1/me/projects` (memberships, T-0014) as "code — name",
   ordered by name, then code. **All-Projects** is offered only to users holding a portfolio

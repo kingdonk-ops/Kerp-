@@ -60,7 +60,7 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
   - **Phase 0** as planned, including the 2026-11-13 additions: T-0037 (12 h sessions, hidden
     tenant), T-0038 (hybrid PIN), T-0039–T-0042 (Project Admins, lobby, access requests,
     picker), T-0049 (internal staff flag), T-0050/T-0051 (access-request lifecycle and admin
-    inbox), T-0052/T-0053 (project invites; in the gate since 2026-11-14), T-0054/T-0055 (Entra ID SSO, identity only; 2026-11-14), T-0057 (magic links for Field Workers only; product owner confirmed in the gate, 2026-11-14), T-0058 (outbound e-mail, SES), T-0059 (invite e-mail + first-password set), T-0077 (password policy + self-service reset), T-0078 (password screens) (all 2026-11-14), T-0043 + T-0048 (device registry, revoke/wipe), T-0044 (deployment settings,
+    inbox), T-0052/T-0053 (project invites; in the gate since 2026-11-14), T-0054/T-0055 (Entra ID SSO, identity only; 2026-11-14), T-0057 (magic links for Field Workers only; product owner confirmed in the gate, 2026-11-14), T-0058 (outbound e-mail, SES), T-0059 (invite e-mail + first-password set), T-0077 (password policy + self-service reset), T-0078 (password screens) (all 2026-11-14), T-0043 + T-0048 (device registry, revoke/wipe; T-0048 absorbed into T-0051, 2026-11-20), T-0044 (deployment settings,
     offline window), T-0045–T-0047 (NFR harness, glove/high-contrast tokens, localised template
     strings); plus the AWS production deploy in `ap-southeast-2` (TD-004, TD-171).
   - **Daily re-login dependency:** sessions end 12 h after sign-in, so the pilot inspectors
@@ -232,6 +232,10 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
   New: T-0080 (identity, S, phase 0, order 10). Updated: T-0143 (per-account store, depends on
   T-0080). Raised: TD-293 (decision, ask the pilot team).
 
+- **2026-11-20 — Phase 0 bundling (user request):** small ready Phase 0 tasks ship together, one
+  PR per bundle; the absorbed task is `dropped` (body kept) and its acceptance criteria live on in
+  the survivor. T-0051 absorbs T-0048 (devices screen; both Admin-group screens on merged
+  backends; size M). T-0146 now depends on T-0051 for the devices screen.
 - **2026-11-21 — admin operations, communications, runtime settings, project archive and the
   user directory (user-supplied spec + addendum; planner pass):** spec added as diff §4.7
   (system console, legal hold, communications, runtime settings registry), §4.8 (account state,
