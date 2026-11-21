@@ -2,7 +2,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { components } from "../api/schema";
 import { useServices } from "../app/services";
 import {
   AdminApiError,
@@ -10,20 +9,11 @@ import {
   fetchPending,
   rejectRequest,
   type DecisionResult,
-  type GrantIn,
   type PendingRequest,
 } from "./api";
+import { PersonaFields, toGrants, type Persona } from "./personas";
 import { BUTTON, Dialog, formatAge, PRIMARY } from "./ui";
 
-type Persona = components["schemas"]["Persona"];
-/** PER-01 … PER-16, in code order (edge spec §5.2). */
-const PERSONAS = Array.from(
-  { length: 16 },
-  (_, i) => `PER-${String(i + 1).padStart(2, "0")}` as Persona,
-);
-/** Site-scoped persona: names its site (backend `GrantIn`). */
-const SITE_PERSONA: Persona = "PER-07";
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const REASON_MAX = 500;
 const KEY = ["accessRequests", "pending"] as const;
 
@@ -131,29 +121,18 @@ function ApproveDialog({ request, onClose, onDone }: DialogProps) {
   const [chosen, setChosen] = useState<ReadonlySet<Persona>>(new Set());
   const [site, setSite] = useState("");
   const [sod, setSod] = useState(false);
-  const needsSite = chosen.has(SITE_PERSONA);
-  const siteValid = !needsSite || UUID.test(site.trim());
-  const grants: GrantIn[] = PERSONAS.filter((p) => chosen.has(p)).map((persona) =>
-    persona === SITE_PERSONA ? { persona, site_node_id: site.trim() } : { persona },
-  );
+  const grants = toGrants(chosen, site);
   const approve = useMutation({
-    mutationFn: (confirmSod: boolean) => approveRequest(api, request.id, grants, confirmSod),
+    mutationFn: (confirmSod: boolean) => approveRequest(api, request.id, grants ?? [], confirmSod),
     onSuccess: (res) => {
       if (res === "sod") setSod(true);
       onDone(res);
     },
   });
-  const toggle = (p: Persona) => {
-    const next = new Set(chosen);
-    if (!next.delete(p)) next.add(p);
-    setChosen(next);
-    setSod(false);
-  };
   const project = t("admin.accessRequests.project", {
     code: request.project_code,
     name: request.project_name,
   });
-
 
   return (
     <Dialog
@@ -175,7 +154,7 @@ function ApproveDialog({ request, onClose, onDone }: DialogProps) {
           <button
             type="button"
             className={PRIMARY}
-            disabled={grants.length === 0 || !siteValid || approve.isPending}
+            disabled={!grants?.length || approve.isPending}
             onClick={() => {
               approve.mutate(false);
             }}
@@ -185,40 +164,16 @@ function ApproveDialog({ request, onClose, onDone }: DialogProps) {
         )
       }
     >
-      <fieldset className="space-y-1">
-        <legend className="font-semibold">
-          {t("admin.accessRequests.personasLegend", { project })}
-        </legend>
-        {PERSONAS.map((p) => (
-          <label key={p} className="flex min-h-touch items-center gap-touch-gap">
-            <input
-              type="checkbox"
-              className="size-touch shrink-0"
-              checked={chosen.has(p)}
-              onChange={() => {
-                toggle(p);
-              }}
-            />
-            {t("admin.accessRequests.persona", { code: p, name: t(`personas.${p}`) })}
-          </label>
-        ))}
-      </fieldset>
-      {needsSite && (
-        <label className="block space-y-1">
-          <span>{t("admin.accessRequests.site")}</span>
-          <input
-            className="block min-h-touch w-full rounded border border-line bg-panel px-2"
-            value={site}
-            aria-invalid={!siteValid}
-            onChange={(e) => {
-              setSite(e.target.value);
-            }}
-          />
-          {!siteValid && site !== "" && (
-            <span className="text-sm text-danger">{t("admin.accessRequests.siteInvalid")}</span>
-          )}
-        </label>
-      )}
+      <PersonaFields
+        legend={t("admin.accessRequests.personasLegend", { project })}
+        chosen={chosen}
+        onChange={(next) => {
+          setChosen(next);
+          setSod(false);
+        }}
+        site={site}
+        onSite={setSite}
+      />
       {approve.isError && <p role="alert">{t("admin.actionError")}</p>}
       {sod && (
         <p role="alert" className="rounded border-2 border-warning p-2">

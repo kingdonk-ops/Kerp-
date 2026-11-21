@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 302 · **Closed:** 135
+**Open:** 306 · **Closed:** 135
 
 ## decision (38)
 
@@ -123,7 +123,7 @@
 | [TD-337](../tracker/todo/TD-337.md) | Web/Android route /magic-link#<token> that redeems the e-mailed sign-in link (POST /auth/magic-link/redeem); the e-mail now links there | T-0058 | implementer |
 | [TD-388](../tracker/todo/TD-388.md) | saved_views: wire the my_teams filter op | T-0074 | reviewer |
 
-## deferred (39)
+## deferred (41)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -166,8 +166,10 @@
 | [TD-394](../tracker/todo/TD-394.md) | Approve access request: site picker for PER-07 site scope once the asset hierarchy API exists | T-0051 | implementer |
 | [TD-432](../tracker/todo/TD-432.md) | Digest-pin the postgis/postgis:16-3.4 CI service image (ci.yml): the implementer sandbox could not reach the Docker Hub registry API to resolve its digest (redis is pinned); resolve with docker buildx imagetools inspect and drop the strict xfail in scripts/tests/test_workflows.py | T-0033 | implementer |
 | [TD-446](../tracker/todo/TD-446.md) | E2E journey: Sign in with Microsoft against the fake OIDC provider (T-0054) lands in the project, once the Playwright harness (T-0027) exists | T-0055 | implementer |
+| [TD-447](../tracker/todo/TD-447.md) | Admin → Users screen (T-0026 remainder): System admin creates / deactivates / reactivates accounts (GET/POST/PATCH /admin/users); PER-09 invites by e-mail to one of its projects with persona(s) + site + SoD confirm, shows the link once, lists / re-sends / revokes open invites | T-0026 | implementer |
+| [TD-448](../tracker/todo/TD-448.md) | Playwright e2e journey for T-0026 (System admin appoints a Project Admin -> they create a project -> assign a user) once T-0027 sets up e2e/; covered meanwhile by the component-level journey in frontend/src/admin/MembersPage.test.tsx | T-0026 | implementer |
 
-## later (123)
+## later (125)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -294,6 +296,8 @@
 | [TD-415](../tracker/todo/TD-415.md) | Inspection follow-ups (oe_inspections_follow_up) move to the generic tasks module when E-04-07 is broken down | T-0257, T-0288, E-04-07 | planner |
 | [TD-440](../tracker/todo/TD-440.md) | In-app IP allowlisting is not built: network restrictions live in the WAF / Entra Conditional Access; revisit only if a client contract requires per-project IP rules | — | planner |
 | [TD-441](../tracker/todo/TD-441.md) | Per-test PostgreSQL databases: widen the empty-source check to leftover types, sequences, views and functions (not only tables) | T-0082 | reviewer |
+| [TD-449](../tracker/todo/TD-449.md) | Expose the caller's create_projects grant (Project Admin) on GET /auth/me (with is_system_admin, TD-393) so Backbone -> Projects offers 'New project' only to Project Admins; today every user sees it and a 403 is explained | T-0026 | implementer |
+| [TD-450](../tracker/todo/TD-450.md) | Project settings dialog: edit project code and spatial bounds (PATCH /projects accepts both; T-0026 edits name, status, time zone, currency, locale) | T-0026 | implementer |
 
 ## bug (6)
 

@@ -6,7 +6,7 @@ import { useServices } from "../app/services";
 import { useAuth } from "../auth/AuthProvider";
 import { useAdminAccess } from "./access";
 import { fetchAdminDevices, fetchMyDevices, revokeDevice, type AdminDevice } from "./api";
-import { Dialog, formatTime, PRIMARY } from "./ui";
+import { Dialog, formatTime, PRIMARY, SystemTabs } from "./ui";
 
 /** Admin → System → Devices (diff §4.3): System admin all users, PER-09 its projects' members. */
 export function AdminDevicesPage() {
@@ -22,6 +22,7 @@ export function AdminDevicesPage() {
   return (
     <section className="space-y-3">
       <h1 className="text-2xl font-bold">{t("devices.adminTitle")}</h1>
+      <SystemTabs systemAdmin={access.systemAdmin} />
       {!access.isLoading && !access.projectAdmin ? (
         <p role="alert">{t("admin.forbidden")}</p>
       ) : (

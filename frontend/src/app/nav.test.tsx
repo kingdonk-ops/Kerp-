@@ -50,11 +50,13 @@ describe("navigation items (diff §6.1)", () => {
     expect(links[0]).toHaveAttribute("href", "/execution/inspections");
   });
 
-  it("registers only the built screens: Admin system and access requests, for project admins", () => {
-    for (const group of NAV_GROUP_IDS) expect(registeredNavItems(group)).toEqual([]);
+  it("registers only the built screens: Projects for everyone, Admin system and access requests for project admins", () => {
+    expect(NAV_GROUP_IDS.flatMap((g) => registeredNavItems(g)).map((i) => i.path)).toEqual([
+      "/backbone/projects",
+    ]);
     const admins = new Set(["projectAdmin"] as const);
     expect(
       NAV_GROUP_IDS.flatMap((g) => registeredNavItems(g, NAV_ITEMS, admins)).map((i) => i.path),
-    ).toEqual(["/admin/system/devices", "/admin/access-requests"]);
+    ).toEqual(["/backbone/projects", "/admin/system/devices", "/admin/access-requests"]);
   });
 });
