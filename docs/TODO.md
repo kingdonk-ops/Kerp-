@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 334 · **Closed:** 147
+**Open:** 336 · **Closed:** 147
 
 ## decision (39)
 
@@ -49,7 +49,7 @@
 | [TD-484](../tracker/todo/TD-484.md) | RFI notification e-mail: may it carry the date/time/location, the RFI PDF attachment and an .ics invite, and go to client distribution addresses without a KERP account? | T-0335 | planner |
 | [TD-486](../tracker/todo/TD-486.md) | RFI witness check: may an unmet hold-point (H) witness requirement be overridden per record (ADR 0004 Amendment A), or is it non-overridable? | T-0333 | planner |
 
-## spec-gap (64)
+## spec-gap (65)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -117,6 +117,7 @@
 | [TD-479](../tracker/todo/TD-479.md) | code_uniqueness scopes: per_parent and per_level compare within the level, per_project across every level both ways; codes are case-sensitive, never trimmed | T-0101 | implementer |
 | [TD-480](../tracker/todo/TD-480.md) | code_pattern is a 'validation/generation pattern': T-0101 validates node codes against it as an RE2 regex; generation (and its syntax, e.g. {seq:4}) is undefined | T-0101 | implementer |
 | [TD-481](../tracker/todo/TD-481.md) | oe_asset_node columns the spec does not name or type: name, planned_start/planned_finish, Numeric(18,4) quantities, list-of-ids lineage; display_code for a level missing on the path | T-0101 | implementer |
+| [TD-494](../tracker/todo/TD-494.md) | Audit explorer: which verifications are audited console actions (single-chain verify, verify-all request and outcome) | T-0222 | implementer |
 
 ## missed (9)
 
@@ -132,7 +133,7 @@
 | [TD-463](../tracker/todo/TD-463.md) | Server: refuse self-deactivation on PATCH /admin/users/{id} (Admin → Users only hides the button) | T-0331, T-0085 | implementer |
 | [TD-487](../tracker/todo/TD-487.md) | Frontend: Admin -> System grants page needs the SoD confirm step for system_admin on a hold-authority holder (POST /admin/grants 409 sod_confirmation_required, confirm_sod), plus the same warning for hold personas on system_admins in member/invite/team UIs | T-0275 | implementer |
 
-## deferred (47)
+## deferred (48)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -183,6 +184,7 @@
 | [TD-473](../tracker/todo/TD-473.md) | Template lint over the CEL AST: unknown field references, forward calculated references, rules that read hidden fields, authoring-time type checks (safe CEL subset, TD-041 decision) | T-0110, T-0113 | implementer |
 | [TD-474](../tracker/todo/TD-474.md) | Unit registry for `measurement` fields: unit catalogue, SI storage and conversion with a shared vector file (ADR 0002 units-v1 port) | T-0110 | implementer |
 | [TD-482](../tracker/todo/TD-482.md) | asset_management: node edit (code / name / attributes, with display_path and display_code rewrite of the subtree), node delete and level def delete are not built in T-0101 | T-0101 | implementer |
+| [TD-495](../tracker/todo/TD-495.md) | Audit explorer at scale: no ledger index for the explorer filters; verify-all is one pass (1 h timeout, no progress or resume) | T-0222 | implementer |
 
 ## later (135)
 

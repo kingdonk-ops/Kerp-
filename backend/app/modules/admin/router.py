@@ -57,6 +57,7 @@ from app.core.auth.models import User
 from app.core.auth.runtime import AuthRuntime, get_auth_runtime
 from app.core.db import DbSession
 from app.modules.admin import service
+from app.modules.admin.audit_router import router as audit_router
 from app.modules.admin.invites_router import router as invites_router
 from app.modules.admin.schemas import (
     AdminGranted,
@@ -362,6 +363,10 @@ def revoke(
 # --- project invites (T-0052): ``invites_router.py`` ------------------------------------------
 
 router.include_router(invites_router)
+
+# --- System console: audit explorer (T-0222): ``audit_router.py`` ------------------------------
+
+router.include_router(audit_router)
 
 # --- System console: queue monitor (T-0218): ``system_router.py`` ------------------------------
 

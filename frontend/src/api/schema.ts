@@ -1281,6 +1281,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/system/audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Audit Entries */
+        get: operations["list_audit_entries_api_v1_admin_system_audit_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/system/audit/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Verify Chain */
+        post: operations["verify_chain_api_v1_admin_system_audit_verify_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/system/audit/verify-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Verify All */
+        post: operations["verify_all_api_v1_admin_system_audit_verify_all_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/system/queues": {
         parameters: {
             query?: never;
@@ -2257,6 +2308,54 @@ export interface components {
             fn: "sum" | "avg" | "min" | "max" | "count" | "count-distinct";
         };
         /**
+         * AuditEntryRead
+         * @description One ledger entry, as written (``actor_id`` is the entry's ``created_by``).
+         */
+        AuditEntryRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Project Id */
+            project_id: string | null;
+            /** Chain Key */
+            chain_key: string;
+            /** Seq */
+            seq: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Actor Id */
+            actor_id: string | null;
+            /** Device Id */
+            device_id: string | null;
+            /** Source */
+            source: string;
+            /** Payload */
+            payload: {
+                [key: string]: unknown;
+            };
+            /** Prev Hash */
+            prev_hash: string;
+            /** Content Hash */
+            content_hash: string;
+            /** Hash Version */
+            hash_version: number;
+        };
+        /**
+         * AuditPageRead
+         * @description ``GET /admin/system/audit``: a page, newest first; pass ``next_cursor`` as ``cursor``.
+         */
+        AuditPageRead: {
+            /** Items */
+            items: components["schemas"]["AuditEntryRead"][];
+            /** Next Cursor */
+            next_cursor: string | null;
+        };
+        /**
          * AuthConfigResponse
          * @description What the sign-in screen offers. No secret, no tenant id.
          */
@@ -2264,6 +2363,40 @@ export interface components {
             password?: components["schemas"]["PasswordOption"];
             /** @description Present when the deployment offers Entra ID SSO */
             sso?: components["schemas"]["SsoOption"] | null;
+        };
+        /**
+         * ChainVerifyIn
+         * @description ``POST /admin/system/audit/verify``: the chain key and its scope (a project, or
+         *     ``null`` for the tenant level); the same key in two scopes is two chains.
+         */
+        ChainVerifyIn: {
+            /** Chain Key */
+            chain_key: string;
+            /** Project Id */
+            project_id?: string | null;
+        };
+        /**
+         * ChainVerifyRead
+         * @description The verification report: ``first_broken_seq`` is the first entry that fails a ledger
+         *     rule (after a removed entry: the one behind the gap); ``problems`` holds at most 100.
+         */
+        ChainVerifyRead: {
+            /** Chain Key */
+            chain_key: string;
+            /** Project Id */
+            project_id: string | null;
+            /** Ok */
+            ok: boolean;
+            /** Length */
+            length: number;
+            /** Head Hash */
+            head_hash: string;
+            /** First Broken Seq */
+            first_broken_seq: number | null;
+            /** Problem Count */
+            problem_count: number;
+            /** Problems */
+            problems: string[];
         };
         /**
          * CheckFinding
@@ -7882,6 +8015,98 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    list_audit_entries_api_v1_admin_system_audit_get: {
+        parameters: {
+            query?: {
+                actor_id?: string | null;
+                device_id?: string | null;
+                chain_key_prefix?: string | null;
+                event?: string | null;
+                flag?: string | null;
+                created_from?: string | null;
+                created_to?: string | null;
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditPageRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    verify_chain_api_v1_admin_system_audit_verify_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChainVerifyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChainVerifyRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    verify_all_api_v1_admin_system_audit_verify_all_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobActionRead"];
+                };
             };
         };
     };
