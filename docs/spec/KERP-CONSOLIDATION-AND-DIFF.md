@@ -814,6 +814,26 @@ additive and need an ADR (CLAUDE.md §6).
   `equipment.calibration_due_date >= context.inspection_date && equipment.status == 'active'`
 - Active cert PDFs + calibration details **auto-compile into the project MDR**.
 
+**Equipment additions (user, 2026-11-21; planner reconciliation):**
+- **Equipment classes** (T-0249, blocked by TD-412): `equipment_class` (`instrument | vehicle |
+  plant`), `requires_calibration` (true for instruments), `asset_number` (fleet number),
+  `custodian_user_id`. The calibration gate and the activation cert rule apply only when
+  `requires_calibration` is true. Pulls a slice of E-03-07 into Phase 1 if accepted.
+- **Activation gate** (T-0260): new equipment starts `out_of_service`; moving to `active` calls
+  `run_checks(context, "equipment.activate")`, whose locked system-default rule is
+  `!equipment.requires_calibration || (has(equipment.active_cert) &&
+  equipment.active_cert.verification_status == 'verified' && equipment.active_cert.document_id !=
+  null && equipment.active_cert.expiry_date >= context.today)`. A cert uploaded without QA
+  authority is `pending_qa_verification` and goes to the QA verification queue
+  (`quality-and-inspection.md` §QA verification queue); the OCR-discrepancy review of this section
+  is routed into the same queue (TD-416).
+- **Out of service and tagout** (T-0257): a failed pre-start can set `out_of_service` through a
+  post-submit rule; a blocking tagout follow-up keeps it there until confirmed and closed
+  (`equipment.activate` fails with 422 while it is open). Out-of-service, quarantined and
+  decommissioned equipment is never selectable in inspections or allocation.
+- **Standalone inspections on equipment** (pre-starts, fault reports): ADR 0014, proposed
+  (TD-411). Expiry lead-time alerts for calibration: T-0183.
+
 ---
 
 ## 6. Front-end architecture & edge screens

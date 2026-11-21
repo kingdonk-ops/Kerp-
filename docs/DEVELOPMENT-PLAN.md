@@ -255,6 +255,36 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
   Updated: T-0147, T-0156, T-0157, T-0158, T-0159 (note), T-0168, T-0230, T-0235, T-0239.
   Raised: TD-408 (reconciliation with the upload model, ADR 0005 path, EXIF frame).
 
+- **2026-11-21 — standalone inspections, public capture, post-submit automation, QA
+  verification workbench, verification SLA, expiry alerts, readiness conflicts, shelf-life
+  extensions and the calendar (user-supplied tasks T-0179–T-0184 + E-04-15; planner pass):**
+  spec in `quality-and-inspection.md` (§Standalone inspections, §Public capture links,
+  §Post-submit automation, §QA verification queue and two-lane workbench, §Verification SLA and
+  pending-approval banners, §Expiry lead-time alerts, §Schedule readiness conflicts),
+  `materials-and-traceability.md` (§MTR verification gate, §Shelf-life extension), diff §5
+  (equipment additions), `documents-and-mdr.md` (§Material traceability in the MDR),
+  `planner-and-work-plans.md` §15 (calendar). The user's ids were free on every branch and are
+  kept: T-0179 (categories), T-0180 (post-submit rules), T-0181 (verification queue), T-0182
+  (verification SLA), T-0183 (expiry alerts), T-0184 (shelf-life extension, **Phase 3**: no
+  material batch exists before E-03-03; TD-421), E-04-15 (calendar epic, Phase 4,
+  needs-breakdown). Splits to stay S/M got T-0249–T-0268: T-0249 fleet classes (blocked TD-412),
+  T-0250 equipment anchor (blocked TD-411, ADR 0014 proposed), T-0251 registers + tile toggle,
+  T-0252–T-0255 public capture (blocked TD-410, ADR 0013 proposed), T-0256 notify action,
+  T-0257 follow-ups + tagout gate, T-0258/T-0259 screens, T-0260 equipment.activate, T-0261
+  credential.activate, T-0262 two-lane window, T-0263 banner, T-0264 SLA for overrides and
+  follow-ups, T-0265 material_cert.verify (Phase 2), T-0266/T-0267 readiness conflicts,
+  T-0268 offline batch bundle (Phase 3). Where the paste disagreed with the spec, the spec won:
+  tenant from configuration only under a proposed ADR (no row-returning RLS bypass); equipment
+  anchoring only under a proposed ADR; module-prefixed table names
+  (`oe_inspections_public_link`, `oe_inspections_post_action`, `oe_inspections_follow_up`);
+  automations only restrict; e-mail carries code/name + link only and no SMS; escalation does not
+  widen approval; `verification.sla` and `compliance.expiry_alerts` use ADR 0004's `notify`
+  kind (no new kind); the M1-frozen override table is not altered. **Pilot-0 gate unchanged**:
+  T-0112, T-0118, T-0139, T-0147 and T-0160 got notes only; none of the new tasks is in T-0146.
+  Updated: T-0111, T-0112, T-0118, T-0122, T-0147, T-0160, T-0205, T-0207 (notes), E-03-03,
+  E-03-04, E-03-07, E-04-02 (now depends on T-0183/T-0266), E-04-07, E-04-12, E-05-05 (now
+  depends on T-0184/T-0265). Raised: TD-410–TD-422.
+
 ## Key engineering decisions (baked into the spec — see consolidation diff)
 
 | Area | Decision |
@@ -276,5 +306,5 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
 | Region (2026-11-13) | Per-deployment setting: AWS `ap-southeast-2` for Australian deployments (diff §4.4) |
 
 ## Open decisions (see `TODO.md`)
-TD-096 (coating/Grating ITR, with the client; interim confirmed 2026-11-15), TD-293 (shared tablets in the pilot, ask the pilot team before go-live), TD-004 (hosting target), TD-072 (ADR 0004 rule-set defaults per project), TD-073 (handover first-shift trigger),
+TD-410 (public capture links, ADR 0013 proposed), TD-411 (equipment as an inspection anchor, ADR 0014 proposed), TD-412 (fleet in the Phase-1 equipment register), TD-418 (escalation and approval authority), TD-419 (calendar iCal feed), TD-422 (PER-13 shelf-life approval), TD-096 (coating/Grating ITR, with the client; interim confirmed 2026-11-15), TD-293 (shared tablets in the pilot, ask the pilot team before go-live), TD-004 (hosting target), TD-072 (ADR 0004 rule-set defaults per project), TD-073 (handover first-shift trigger),
 TD-039 (dropped AIP-proposal extras). TD-013 (review-gate ignores tracker) is resolved by T-0029. TD-002/005/007/008/009/012 are resolved by this merge; TD-001 by ADR 0001 (`docs/decisions/`). TD-002 is carried into code by ADR 0002 (`docs/decisions/0002-port-one-engine.md`). TD-034 (remaining Inspection-ERP core packages) is resolved by ADR 0007. TD-003 (SSO vs local JWT) is resolved; the SSO spec is diff §4.5 (TD-043 resolved 2026-11-14). Resolved 2026-11-14 by the product owner: TD-257 (offline grace binds; window is an upper bound), TD-136 (magic links PER-14 only, T-0057) and TD-262 (externals create their own password, reset by e-mail); TD-084 (outbound e-mail) resolved by diff §4.6. Resolved 2026-11-15 by the product owner: TD-224 (per-mailbox magic-link cap), TD-213 (object key layout), TD-271 (T-0079), TD-261 (PER-15 password/SSO) and TD-223 (PR principals; residual risk TD-276). Resolved 2026-11-15 (second batch): TD-283 (one account per device id, per-account client store; follow-up TD-293), TD-281 (rule-set upgrade permissions, ADR 0004 Amendment G) and TD-285 (native-origin allow-list); TD-286 and TD-291 (device risks) accepted for development and covered by T-0080 before pilot go-live.

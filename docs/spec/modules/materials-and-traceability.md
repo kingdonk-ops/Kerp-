@@ -20,6 +20,54 @@ installed spool. Commitments only — money is an external read-only mirror.
   staged; heat numbers link to every weld execution id.
 - MTRs + inspection certs auto-compile into the **MDR** ([`documents-and-mdr.md`](documents-and-mdr.md)).
 
+## MTR verification gate (user, 2026-11-21; planner defaults; T-0265, Phase 2)
+- A heat/MTR record (T-0205) carries `verification_status` (`pending_verification | verified |
+  rejected`). It stays `pending_verification` until QA verifies the uploaded MTR PDF through the
+  unified verification queue (`quality-and-inspection.md` §QA verification queue and two-lane
+  workbench; `target_kind = material_mtr`).
+- Rule set `material_cert.verify` (locked system-default `check`, ADR 0004 §5): a weld or spool
+  that uses a heat without a verified MTR cannot be accepted or released (`run_checks`). The
+  client-supplied-steel waiver (TD-091, welding-and-nde.md) is unchanged.
+- Creating a heat batch without a certificate notifies the project's QA reviewer persona (high
+  priority). An MTR uploaded by a user without QA authority stays pending even when SAQ OCR
+  matches; the QA reviewer may verify their own upload at once (audited).
+- The two-lane window shows heat chemistry/mechanical values next to the OCR values and the MTR
+  history of the lot. MRIR receiving (E-03-03) reuses this gate.
+- **Use-by dates** of stock lots (coatings, epoxies, electrodes; E-03-03/E-03-04) feed the expiry
+  lead-time alerts and schedule readiness conflicts (`quality-and-inspection.md` §Expiry
+  lead-time alerts, §Schedule readiness conflicts) through a materials provider.
+
+## Shelf-life extension (user, 2026-11-21; planner defaults; T-0184 and T-0268, Phase 3)
+Material batches/lots with a use-by date (coatings, epoxies, electrodes) are defined when E-03-03 /
+E-03-04 are broken down (Phase 3; TD-421); the batch carries `original_use_by_date` (immutable
+once set) and `effective_use_by_date` (equal to the original until an extension is approved,
+changed only by an approved extension).
+- **Extension** `oe_material_shelf_life_extension` (`BaseRecordMixin` + project RLS):
+  `material_batch_id`, `extension_seq` (1, 2, …), `previous_expiry_date`, `proposed_expiry_date`
+  (CHECK proposed > previous), `reason_notes` (mandatory, non-blank), `document_id` (mandatory,
+  a complete T-0016 upload: manufacturer concession letter or Quality Engineer evaluation),
+  `issuer_kind` (`manufacturer | quality_engineer`), requester and time, `status`
+  (`pending_approval | approved | rejected`), approver and time, `rejection_reason`; unique
+  `(project_id, material_batch_id, extension_seq)`; index `(project_id, material_batch_id,
+  status)`. One pending extension per batch at a time.
+- **Approval** through the QA verification queue (`target_kind = material_shelf_life_extension`):
+  the approver is the project's QA reviewer persona (default PER-06); when the requester holds
+  PER-06, a PER-13 Quality Director with access to the project (user, 2026-11-21; persona-matrix
+  check TD-422). Nobody approves their own request; `allow_self_approval` (T-0140) is ignored
+  for extensions (always false). Approve sets `effective_use_by_date`, makes the batch eligible
+  again (as-of-date eligibility, T-0139, through the materials provider), re-evaluates readiness
+  conflicts and expiry alerts (T-0183, T-0266) and writes original date, new date, document
+  SHA-256, requester and approver to the ledger. Reject keeps the batch blocked, needs a reason
+  and notifies the requester.
+- **Gate:** selecting a batch on an inspection form evaluates
+  `material.effective_use_by_date >= context.inspection_date` on client and server (CEL); an
+  expired batch fails eligibility and blocks acceptance of the inspection.
+- **Offline** (T-0268): the sync reference bundle (T-0147 contract, unchanged) gains active
+  batches (batch/heat number, original and effective use-by) and the approved extension documents
+  and MTRs of those batches, downloadable for offline viewing.
+- **MDR:** the dossier attaches the original MTR/batch certificate and every approved extension
+  certificate in chronological order (`documents-and-mdr.md` §Material traceability in the MDR).
+
 ## Cutting interface
 Confirmed cutting plans post net stock consumption + new offcuts to `site_inventory`; the
 optimiser draws from available offcuts before new stock (1D **FFD**, 2D **rectpack** — GPL

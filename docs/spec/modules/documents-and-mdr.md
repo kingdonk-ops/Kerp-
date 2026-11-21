@@ -34,6 +34,17 @@ Batch pipeline (**SAQ `batch`** queue, heavy libs lazy):
 `Σ unsigned ITP hold points > 0`. Final dossiers and commercial Delay Notices are signed with
 **pyHanko** (ETSI **PAdES-B-LTA** + **RFC 3161** timestamp).
 
+### Material traceability in the MDR (user, 2026-11-21; E-05-05, from T-0184)
+For every subsystem or asset where a material batch with an approved shelf-life extension was
+used (`materials-and-traceability.md` §Shelf-life extension), the dossier attaches under the
+**Material Test Reports** bookmark the original MTR/batch certificate **and** every approved
+extension certificate, in chronological order (`extension_seq`). The material traceability index
+lists per batch: original use-by date, each extension (sequence, previous and new date, issuer
+kind, approver, approval date, document SHA-256) and the effective use-by date. Rejected and
+pending extensions are not included. Batch and extension data come from the materials service;
+the MDR engine reads no materials table. Verified certificates only (`material_cert.verify`,
+T-0265).
+
 ## Related registers (epics)
 `transmittals` (purpose-coded, recipients + ack), `correspondence`, `tq` (Technical Query — Request for Information)/`submittals`,
 `meetings` (feeds portal v3 visit scheduling), `file_search` (tsvector OCR of dockets for the

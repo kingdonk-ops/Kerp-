@@ -382,6 +382,189 @@ only, with the time they were computed:
   `punchlist` services.
 Each tile opens the matching filtered list. Soft-deleted records are not counted.
 
+## Standalone inspections (user, 2026-11-21; planner reconciliation)
+
+The user's 2026-11-21 paste adds inspections that are not part of the ITP chain: daily
+pre-starts, safety checks, equipment checks and repair/fault reports. Tasks: T-0179 (categories),
+T-0251 (registers and tile filter), T-0249/T-0250 (equipment, blocked by TD-412/TD-411).
+
+- **Category.** Templates (revisions) and `oe_inspections_inspection` carry `category`
+  (`qa_itp | safety_prestart | equipment_check | repair_fault | general`, default `qa_itp`) and
+  `is_standalone` (default false). A record takes both from its pinned revision; the category is
+  part of the revision hash. Rule sets may branch on `record.category`.
+- **No parent ITP.** A standalone template is `kind = inspection` only and is never attached to an
+  ITP line. Its lifecycle, review (§Review and return) and signing are the same as any inspection.
+- **Anchors.** ADR 0003 applies unchanged: an `inspection_anchor` node or an Item. Anchoring to an
+  equipment register entry (fleet vehicle, plant) is **proposed** in ADR 0014 (TD-411): a third
+  exclusive anchor `equipment_id`, allowed only for standalone `safety_prestart`,
+  `equipment_check` and `repair_fault` records, plus an informational `location_node_id` that
+  never counts for roll-ups or completion. Until TD-411 and TD-412 are decided, standalone
+  inspections anchor to nodes and Items only.
+- **Where they show.** Dedicated registers (Inspections → Pre-starts, Safety checks, Fault
+  reports). The Pilot-0 tiles count `qa_itp` only by default, with a toggle for all categories
+  (T-0251; T-0160 itself is unchanged).
+
+## Public capture links (user, 2026-11-21; **proposed**, ADR 0013, decision TD-410)
+
+Nothing in this section may be built until the user accepts ADR 0013 (T-0252–T-0255 are
+blocked by TD-410). It conflicts with "tenant from the JWT only" (CLAUDE.md §6) and with magic
+links for Field Workers only (diff §4.2), so it needs an explicit, documented exception.
+
+- **Link** `oe_inspections_public_link` (`BaseRecordMixin` + standard project RLS; the paste's
+  `oe_inspection_public_link`): one pinned standalone template revision, `category` (default
+  `safety_prestart`), at most one pre-bound anchor (`anchor_node_id`, `anchor_item_id`,
+  `equipment_id`), `token_hash` (SHA-256, unique), `label` (e.g. "LV-042 Daily Pre-Start QR"),
+  `allowed_lookup_scopes` (default `{"equipment": false, "staff": false}`), `expires_at` (null
+  only for an explicitly permanent link), `max_submissions`, `submission_count`, `is_active`,
+  `created_by_user_id`; index `(project_id, is_active)`. Created, revoked and rotated by the
+  project's PER-06 and PER-09; the token is shown once.
+- **Token and scope.** The token is opaque: project id + 32 random bytes. The public router binds
+  the deployment tenant from configuration and the token's project as the session scope, then
+  looks the hash up under the normal project policies. No row-returning RLS bypass. Every failure
+  (unknown, tampered, expired, revoked, inactive, exhausted, other project, public capture
+  disabled on the project) is the same 404 and leaks nothing.
+- **Endpoints** `/api/v1/public/inspections/{token}`: `GET /` (template, localised strings,
+  anchor header, allowed lookups), `POST /uploads/presign` (T-0016, project-scoped, size ≤
+  `max_upload_size_mb`, real ClamAV scan T-0218 required), `POST /submit` (server-side CEL
+  validation, T-0110; `source = "public_link"`, `public_link_id`, `submitted_by_display_name`,
+  optional `submitter_contact`, IP, user agent; ledger entry; post-submit automation).
+- **Lookups** list only selectable fleet asset numbers + descriptions and/or display names of
+  active members: never e-mails, phones, user ids or internal ids.
+- **Controls:** per-client-IP and per-link rate limits (429), token hashing and log scrubbing,
+  no PII in lookups, project-scoped short-lived presigned uploads, ClamAV, abuse controls
+  (caps, idempotency, honeypot, size limits, project kill switch), audit with
+  `source = "public_link"`. IP and user agent are kept 90 days (planner default, TD-410).
+- **Runner** `/public/inspect/:token`: mobile-first, Dynamic Form Renderer, 48 dp targets, photo
+  capture + annotation, receipt.
+
+## Post-submit automation (user, 2026-11-21; planner defaults)
+
+Template-level rules that run after an inspection reaches `SUBMITTED` (authenticated and, once
+accepted, public). Tasks: T-0180 (store, engine, `update_target_fields`), T-0256
+(`notify_users`), T-0257 (`create_action_task`, tagout gate), T-0258/T-0259 (screens).
+
+- **Rule** `oe_inspections_post_action` (paste: `oe_inspection_post_action`): `sort_order`,
+  `name`, `enabled`, `trigger_cel` (CEL bool over `answers`, `result`, `category`, `inspection`,
+  `equipment`, `node`, `item`; default `true`; compiled on save; sandboxed, fails closed),
+  `action_type`, `action_config`. Part of the frozen template revision and copied with client
+  packs; edited by PER-06 and PER-09 on draft revisions.
+- **`update_target_fields`:** only fields the owning module whitelists in its `service.py`
+  (equipment: `last_inspected_at`, `last_inspection_id`, status `out_of_service` /
+  `quarantined`; node/Item: `last_inspected_at`, `last_inspection_id`), applied through that
+  service's own transition (with its `run_checks`). **Automations only restrict, never release**
+  (planner rule): no automatic transition to `active`.
+- **`notify_users`:** personas (resolved to project members at send time), the equipment
+  custodian, explicit users; in-app high priority (T-0019), push, and an e-mail with project
+  code/name and a deep link only (diff §4.6). No SMS (TD-413). Manual API notifications stay
+  PER-09-only (diff §4.1); automations notify through the service.
+- **`create_action_task`:** `oe_inspections_follow_up` (paste: `oe_inspection_follow_up`) with
+  `kind` (`tagout_confirmation | repair_request | supervisor_review`), assignee persona/user,
+  `due_at` from SLA hours, `blocks_return_to_service`, status `open | tagout_confirmed |
+  resolved | cancelled`. May move to the tasks module later (E-04-07, TD-415).
+- **Tagout gate:** a blocking `tagout_confirmation` sets the target `out_of_service` in the submit
+  transaction (blocked from selection in inspections and allocation, T-0112 gate); the supervisor
+  (PER-04/PER-03) gets a pinned high-priority "Confirm physical tagout applied" (timestamp, user,
+  optional tag photo, notes); returning to `active` fails `run_checks(context,
+  "equipment.activate")` with 422 while a blocking follow-up is open.
+- **Execution and audit:** database actions run in the submit transaction; remote notification
+  channels after commit on the SAQ `interactive` queue. Each action writes
+  `oe_inspections_action_log` and a T-0006 ledger entry with `source = "automation"` (new
+  `RECORD_SOURCES` value, TD-417). A template without rules has no side effects.
+
+## QA verification queue and two-lane workbench (user, 2026-11-21; planner defaults)
+
+One queue for documents QA must verify before a record becomes active. Tasks: T-0181 (queue),
+T-0260 (equipment), T-0261 (credentials), T-0265 (heat/MTR, Phase 2), T-0184 (shelf-life
+extensions, Phase 3; materials-and-traceability.md §Shelf-life extension), T-0262 (window).
+
+- **QA authority.** Project setting `qa_reviewer_persona` (default PER-06; QA-capable personas
+  only). Holding it on the project is QA authority; admin grants never confer it (diff §4.1).
+- **Item** `oe_qms_verification_item` (`BaseRecordMixin` + project RLS): `target_kind`
+  (`equipment_calibration | staff_credential | material_mtr | material_shelf_life_extension`),
+  `target_id`, `parent_entity_id`,
+  `document_id`, `status` (`pending | approved | rejected | reassigned | escalated |
+  superseded`), submitter, assigned persona/user, decision by/at, `rejection_reason`,
+  `follow_up_task_id`; indexes `(project_id, status, target_kind)`, `(project_id,
+  parent_entity_id)`. Owning modules register a provider (details, OCR values, history,
+  apply-approved, apply-rejected); qms never reads their tables.
+- **Gates** (`run_checks`, locked system-default `check` rules, ADR 0004 §5):
+  `equipment.activate` (diff §5), `credential.activate` (eligibility fails unverified
+  credentials, T-0139), `material_cert.verify` (materials-and-traceability.md).
+- **Missing-document alert:** creating equipment that requires calibration, a credential whose
+  type needs a document, or a heat batch without a certificate sends a high-priority notification
+  to the QA reviewer persona.
+- **Non-QA upload routing:** an upload by a user without QA authority is `pending_qa_verification`
+  (equipment) / `pending_verification` (credential, MTR) even when SAQ OCR matches, and creates an
+  item with a deep-link notification; a QA reviewer's own upload may be verified at once (still an
+  item, audited). The T-0112 OCR-discrepancy review is routed into this queue (TD-416).
+- **Decisions:** Accept/Verify (target verified and active, prior certificate superseded and
+  locked, ledger, uploader notified); Reject (mandatory non-blank reason, target stays inactive,
+  optional rectification follow-up); Reassign/Forward (user or persona + note). Nobody decides an
+  item they submitted unless the project allows self-approval (T-0140).
+- **Window:** full-height drawer from the inbox or a notification. Left lane: record values next to
+  OCR values with discrepancies highlighted and a history selector of superseded documents. Right
+  lane: PDF/image viewer over presigned URLs with zoom and pages.
+- **Existing records** when the gates land: TD-414 (planner default: documents already attached
+  count as verified with `verification_source = 'pre_gate'`).
+
+## Verification SLA and pending-approval banners (user, 2026-11-21; planner defaults)
+
+Tasks: T-0182 (SLA rule set, cron, APIs), T-0263 (banner), T-0264 (overrides and follow-ups).
+
+- **Rule set `verification.sla`** (ADR 0004; project-editable, not locked): rules of the existing
+  `notify` kind; CEL bool over the item (`event.target_kind`, `event.record_type`,
+  `event.criticality`, `event.category`, `event.p6_start_in_hours` when a P6 link exists via
+  `oe_p6_anchor_link`) with `params` `{remind_after_hours, escalate_after_hours,
+  escalate_to_persona}`; first matching rule wins; default 24 h / 48 h / PER-02.
+- **Columns** on `oe_qms_verification_item`: `due_remind_at`, `due_escalate_at`,
+  `reminder_sent_at`, `escalated_at`, `escalated_to_user_id`, `escalated_to_persona`. Override
+  requests (`oe_validation_override`, frozen at M1) and follow-ups keep their shape; their SLA
+  state is a qms-owned `oe_qms_sla_state` row (TD-420).
+- **Cron** (`batch` SAQ, every 15 min per active project): reminder (pinned high-priority in-app +
+  e-mail `verification_reminder`) once; escalation once (status `escalated`, target notified,
+  original reviewer notified, ledger `verification.escalated`). Idempotent.
+- **Escalation does not widen approval** (planner default, TD-418): approve/reject still needs QA
+  authority; override approvals keep ADR 0004 Amendment A routing.
+- **Banner** on the DetailPage of any record with an active pending or escalated item:
+  status, assignee, submitted at, countdown or overdue; Review & Verify for QA authority; Send
+  Reminder for the submitter and PER-02/03/09 (one per item per 4 h, 429 beyond).
+
+## Expiry lead-time alerts (user, 2026-11-21; planner defaults)
+
+Task T-0183 (module `compliance`). Warns ahead of expiry; validity itself stays the as-of-date
+check of the owning modules (§eligibility service).
+
+- **Rule set `compliance.expiry_alerts`** (ADR 0004 layers, shipped in client packs, project copy
+  edited by PER-06/PER-09): `notify`-kind rules selecting resources by kind and subtype
+  (equipment type or criticality, qualification type, material class) with `params`
+  `{lead_days, notify_holder, notify_personas, notify_user_ids}`. Defaults: calibration
+  [30, 14, 3], credentials [60, 30, 7], material use-by [14, 7, 2] (when materials register).
+- **Providers:** `equipment` (calibration due, custodian), `credentials` (expiry, holder), later
+  welder continuity (T-0207) and material use-by (E-03-03/E-03-04), through `service.py`.
+- **Daily cron** sends one warning per resource, expiry date and threshold (dedup log
+  `oe_compliance_expiry_alert_log`, unique `(project_id, resource_kind, resource_id,
+  expiry_date, lead_days)`); in-app + e-mail `expiry_lead_warning` (code/name + link).
+
+## Schedule readiness conflicts (user, 2026-11-21; planner defaults)
+
+Tasks T-0266 (engine, inspections), T-0267 (P6). Rendering belongs to the calendar (E-04-15) and
+the Look-Ahead board (E-04-02).
+
+- `oe_schedule_readiness_conflict` (`BaseRecordMixin` + project RLS): resource (`resource_kind`,
+  id, label, `expiry_date`), target (`target_kind` `p6_activity | work_plan_line |
+  scheduled_inspection`, id, label, planned start/finish), `anchor_node_id`, `status` (`open |
+  acknowledged | resolved`), `last_notified_at`, `resolved_at`; unique `(project_id,
+  resource_kind, resource_id, target_kind, target_id)`; index `(project_id, status,
+  expiry_date)`.
+- A conflict exists when a required resource (assigned or anchor-linked equipment, an assignee's
+  required credential, a staged material lot) expires before the target's planned finish (or the
+  inspection date). Targets come from providers (inspections T-0152, P6 through
+  `oe_p6_anchor_link` T-0104, work-plan lines E-04-12).
+- Evaluated daily and reactively (inspection date/assignee change, P6 import commit, expiry
+  change, verification approved). A conflict that no longer holds resolves itself. Conflict alerts
+  (in-app + e-mail `schedule_readiness_conflict`) go to the matching rule's recipients, again only
+  when the target dates change.
+
 ## `eligibility` service (stateless, no tables)
 Answers "is this person / instrument / material valid **on the inspection date**?" (ADR 0004
 Amendment C; the `as_of` date defaults to today only for forward-looking assignment) across:
