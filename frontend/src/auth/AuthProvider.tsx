@@ -1,5 +1,12 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { createContext, useCallback, useContext, useMemo, useSyncExternalStore } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useSyncExternalStore,
+} from "react";
 import type { ReactNode } from "react";
 
 import type { components } from "../api/schema";
@@ -42,16 +49,47 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 export const ME_QUERY_KEY = ["auth", "me"] as const;
 
+/** Where a tab goes (full page load) when its session turned out to be another user's. */
+export const SIGN_IN_PATH = "/login";
+
+/**
+ * Session isolation (T-0344, audit items 4 and 5): the server-state cache belongs to one
+ * session. It is cleared whenever the tab goes from signed in to signed out, whatever the
+ * cause (sign-out here or in another tab, a refused refresh / session expiry), and when a
+ * new session starts. A refreshed or broadcast token for another user than the loaded one
+ * (`TokenStore.rotate` / `bindUser`) signs the tab out and reloads it on the sign-in route.
+ */
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const { api, tokens, crossTab } = useServices();
+  const { api, tokens, crossTab, reloadTo } = useServices();
   const queryClient = useQueryClient();
-  const hasSession = useSyncExternalStore(
-    (onChange) => tokens.subscribe(onChange),
-    () => tokens.hasSession,
+  const subscribe = useCallback((onChange: () => void) => tokens.subscribe(onChange), [tokens]);
+  const hasSession = useSyncExternalStore(subscribe, () => tokens.hasSession);
+  // A new session (or the end of one) re-renders and re-keys `me`, even when the tab was
+  // signed in before and after.
+  const session = useSyncExternalStore(subscribe, () => tokens.session);
+
+  useEffect(() => {
+    let signedIn = tokens.hasSession;
+    return tokens.subscribe(() => {
+      const now = tokens.hasSession;
+      if (signedIn && !now) queryClient.clear();
+      signedIn = now;
+    });
+  }, [queryClient, tokens]);
+
+  useEffect(
+    () =>
+      tokens.onForeignSession(() => {
+        // The store has already cleared the session (so the cache too); drop every in-memory
+        // trace of the previous user with a full load of the sign-in route.
+        queryClient.clear();
+        reloadTo?.(SIGN_IN_PATH);
+      }),
+    [queryClient, reloadTo, tokens],
   );
 
   const me = useQuery({
-    queryKey: ME_QUERY_KEY,
+    queryKey: [...ME_QUERY_KEY, session],
     enabled: hasSession,
     queryFn: async () => {
       const { data, response } = await api.GET("/api/v1/auth/me");
@@ -60,9 +98,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
   });
 
+  const loadedUserId = me.data?.id;
+  useEffect(() => {
+    // The session belongs to the user `me` returned; a token for anyone else is refused.
+    if (hasSession && loadedUserId !== undefined) tokens.bindUser(loadedUserId);
+  }, [hasSession, loadedUserId, tokens]);
+
   const startSession = useCallback(
     (data: TokenResponse) => {
-      queryClient.removeQueries({ queryKey: ME_QUERY_KEY });
+      // Nothing of an earlier session (possibly another user's) survives a new sign-in.
+      queryClient.clear();
       tokens.set(data);
     },
     [queryClient, tokens],
@@ -88,9 +133,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const adoptCookieSession = useCallback(() => {
+    // The adopted session may be another user's: nothing of the earlier one survives, and
+    // `me` is loaded afresh (its key carries the new session).
+    queryClient.clear();
     tokens.adoptCookieSession();
-    // A tab that was already signed in reloads `me` for the session just adopted.
-    void queryClient.resetQueries({ queryKey: ME_QUERY_KEY });
   }, [queryClient, tokens]);
 
   const logout = useCallback(async () => {

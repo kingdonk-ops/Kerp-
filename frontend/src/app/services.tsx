@@ -14,6 +14,11 @@ export interface AppServices {
   crossTab?: CrossTabAuth;
   /** This tab's `sessionStorage`: a pending invite during sign-in (T-0053); memory when absent. */
   session?: KeyValueStorage;
+  /**
+   * Full page load of `path`: a tab whose session turned out to be another user's starts
+   * over on the sign-in route (T-0344). Optional in tests.
+   */
+  reloadTo?: (path: string) => void;
 }
 
 function browserStorage(kind: "localStorage" | "sessionStorage"): KeyValueStorage {
@@ -35,6 +40,9 @@ export function createAppServices(): AppServices {
     crossTab,
     preferences: browserStorage("localStorage"),
     session: browserStorage("sessionStorage"),
+    reloadTo: (path) => {
+      window.location.replace(path);
+    },
   };
 }
 

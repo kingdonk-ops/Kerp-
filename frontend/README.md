@@ -66,6 +66,18 @@ src/
   `sessionStorage` keeps only a "signed in" marker, so a reload resumes the session via
   `/api/v1/auth/refresh` (same origin). A session ends 12 hours after sign-in. Every other route sits behind `RequireAuth`. Sign-out calls
   `/api/v1/auth/logout` and clears the session even when the server is unreachable.
+  `RequireAuth` keeps the whole requested location (path, query and hash, TD-521) and the
+  sign-in returns there (`returnPath`: in-app paths only, never `/login` itself).
+- **Session isolation on shared devices (T-0344).** The React Query cache belongs to one
+  session. `AuthProvider` clears all of it on every signed-in → signed-out transition, whatever
+  the cause (sign-out here, a sign-out broadcast from another tab, a refused refresh / session
+  expiry), and before a new session starts (`startSession`, `adoptCookieSession`). `TokenStore`
+  binds the session to one user: the `sub` of the sign-in token, else the first refreshed one,
+  and the `me.id` that loads. A refreshed (`lib/api/client.ts`) or broadcast (`auth/crossTab.ts`)
+  token goes through `TokenStore.rotate`; one for a different user is never stored (no request
+  carries it, it is not re-posted), signs only this tab out (no server sign-out: the session is
+  the other user's), and the tab reloads on `/login` (`AppServices.reloadTo`). A token whose
+  `sub` cannot be read is not compared (the server always sets `sub`; test fakes do not).
 - **Sign in with Microsoft (T-0055, diff §4.5).** `/login` asks `GET /api/v1/auth/config`
   (T-0054). When it reports `sso`, **"Sign in with Microsoft"** is the primary, default action:
   first on the screen, visually primary, focused when it appears (unless the user is already in

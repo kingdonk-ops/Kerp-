@@ -65,8 +65,9 @@ function isAuthMessage(data: unknown): data is AuthMessage {
 
 /**
  * Wire `tokens` to the other tabs. A token another tab posts is adopted only while this tab
- * has a session (a signed-out tab stays signed out); a sign-out another tab posts drops this
- * tab's access token and session marker. Adopted state is never re-posted (no echo loop).
+ * has a session (a signed-out tab stays signed out) and only when it is for this tab's user
+ * (a token for another user signs this tab out, T-0344); a sign-out another tab posts drops
+ * this tab's access token and session marker. Adopted state is never re-posted (no echo loop).
  */
 export function connectCrossTab(
   tokens: TokenStore,
@@ -76,7 +77,8 @@ export function connectCrossTab(
     const data: unknown = event.data;
     if (!isAuthMessage(data)) return;
     if (data.type === "logout") tokens.clear();
-    else if (tokens.hasSession) tokens.set({ access_token: data.access_token });
+    // `rotate` refuses a token for a different user and signs this tab out (T-0344).
+    else if (tokens.hasSession) tokens.rotate({ access_token: data.access_token });
   });
   return {
     withRefreshLock: (refresh) => (locks ? locks.request(REFRESH_LOCK, refresh) : refresh()),

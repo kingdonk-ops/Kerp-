@@ -22,6 +22,16 @@ function outcomePath(outcome: InviteOutcomeState): string {
 }
 
 /**
+ * Where a sign-in returns to: the location `RequireAuth` kept (path, query and hash, TD-521),
+ * or `/`. Only an in-app path, and never `/login` itself (no loop).
+ */
+export function returnPath(from: unknown): string {
+  if (typeof from !== "string" || !from.startsWith("/") || from.startsWith("//")) return "/";
+  const pathname = from.split(/[?#]/, 1)[0];
+  return pathname === "/login" ? "/" : from;
+}
+
+/**
  * Sign-in screen. When the deployment offers Entra ID SSO, "Sign in with Microsoft" is the
  * primary, default action and password sign-in stays below it for everyone, internal users
  * included (diff §4.5 *SSO promoted, password kept*); without SSO, password only.
@@ -58,7 +68,7 @@ export function LoginPage() {
     if (!inviteFlow) clearPendingInvite(session);
   }, [inviteFlow, session]);
 
-  const from = typeof state?.from === "string" && state.from !== "/login" ? state.from : "/";
+  const from = returnPath(state?.from);
   // An SSO refusal from the callback landing (T-0055); hidden once a password attempt starts.
   const ssoError: SsoErrorCode | null =
     state?.ssoError !== undefined && failure === null && !submitting
