@@ -7,5 +7,5 @@
  */
 export const ASYNC_UTIL_TIMEOUT_MS = 5000;
 
-/** Per-test limit for the unit project; must leave room for several waits of ASYNC_UTIL_TIMEOUT_MS. */
+/** Per-test limit for the unit and a11y projects; must leave room for several waits of ASYNC_UTIL_TIMEOUT_MS. */
 export const UNIT_TEST_TIMEOUT_MS = 20_000;

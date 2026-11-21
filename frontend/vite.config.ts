@@ -32,6 +32,8 @@ export default defineConfig({
         extends: true,
         test: {
           name: "a11y",
+          // Explicit (Vitest's browser default is 15 s): room for several Testing Library waits.
+          testTimeout: UNIT_TEST_TIMEOUT_MS,
           setupFiles: ["./src/test/setup.browser.ts"],
           include: [A11Y_TESTS],
           css: true,

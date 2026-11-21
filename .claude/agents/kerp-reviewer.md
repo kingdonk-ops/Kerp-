@@ -38,7 +38,13 @@ git show origin/dev:scripts/review_gate.py > /tmp/review_gate_base.py && python 
 7. **Tracker** — task file updated, TODOs raised for anything deferred/missed, boards rendered (`python scripts/tracker.py render --check`).
 
 ## Re-check after a rebase (no code change requested)
-When the coordinator asks only for a re-check because a rebase or bookkeeping changed the patch-id: compare `git range-diff <old base>..<approved head>` with `origin/dev..HEAD`, confirm the non-tracker diff's `+`/`-` lines are unchanged (or list what changed), run the tracker gates, and post the marker for the new patch-id. Do not repeat the full review.
+When the coordinator asks only for a re-check because a rebase or bookkeeping changed the patch-id:
+1. The previous head must carry an `APPROVED` marker. A re-check never turns a non-approval into an approval; otherwise do a full review.
+2. Name the old base (the `origin/dev` commit the approved head was reviewed against) and compare `git range-diff <old base>..<approved head> origin/dev..HEAD`, then the content itself:
+   - the code diff's `+`/`-` lines (everything except `tracker/**` and the generated `docs/TASKS.md`, `docs/TODO.md`, `docs/pr-suggestions.md`) must be identical between `<old base>..<approved head>` and `origin/dev...HEAD`;
+   - the `tracker/**` `+`/`-` lines must be identical after ignoring only what `scripts/review_gate.py` normalises away (front-matter `status`/`pr`/`owner`/`updated`, dated note lines `- YYYY-…`, blank lines).
+3. Only if both are identical: run the tracker gates and post `APPROVED` for the new patch-id, stating that it is a post-rebase re-check of the earlier approval and what you compared. Do not repeat the full review.
+4. If anything differs: post **no** `APPROVED` marker. Post `CHANGES_REQUESTED` naming the changed hunks (or post nothing) and tell the coordinator a full review round is needed (`/kerp-run` step 4).
 
 ## Verdict
 - **APPROVED** only if 1–7 pass. Nits go in the review as optional suggestions (or a `later` TODO suggestion) — they never block.
