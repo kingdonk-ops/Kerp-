@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 312 · **Closed:** 145
+**Open:** 311 · **Closed:** 146
 
 ## decision (37)
 
@@ -122,7 +122,7 @@
 | [TD-337](../tracker/todo/TD-337.md) | Web/Android route /magic-link#<token> that redeems the e-mailed sign-in link (POST /auth/magic-link/redeem); the e-mail now links there | T-0058 | implementer |
 | [TD-388](../tracker/todo/TD-388.md) | saved_views: wire the my_teams filter op | T-0074 | reviewer |
 
-## deferred (44)
+## deferred (43)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -166,7 +166,6 @@
 | [TD-432](../tracker/todo/TD-432.md) | Digest-pin the postgis/postgis:16-3.4 CI service image (ci.yml): the implementer sandbox could not reach the Docker Hub registry API to resolve its digest (redis is pinned); resolve with docker buildx imagetools inspect and drop the strict xfail in scripts/tests/test_workflows.py | T-0033 | implementer |
 | [TD-446](../tracker/todo/TD-446.md) | E2E journey: Sign in with Microsoft against the fake OIDC provider (T-0054) lands in the project, once the Playwright harness (T-0027) exists | T-0055 | implementer |
 | [TD-448](../tracker/todo/TD-448.md) | Playwright e2e journey for T-0026 (System admin appoints a Project Admin -> they create a project -> assign a user) once T-0027 sets up e2e/; covered meanwhile by the component-level journey in frontend/src/admin/MembersPage.test.tsx | T-0026 | implementer |
-| [TD-451](../tracker/todo/TD-451.md) | Queue monitor: failed-job list and retry/abort see only job rows the caller's RLS shows until T-0274 (ADR 0016) lets a system_admin read every project's oe_jobs_job rows | T-0218 | implementer |
 | [TD-457](../tracker/todo/TD-457.md) | Playwright e2e journey for T-0041 (external user: code lookup -> request with ticket -> reject with reason -> Request again disabled -> short cooldown -> Request again without ticket -> approve via T-0051 -> project in the picker) once T-0027 sets up e2e/; covered meanwhile by the component-level journey in frontend/src/lobby/LobbyPage.test.tsx | T-0041 | implementer |
 | [TD-458](../tracker/todo/TD-458.md) | Android (Capacitor) App Links for /invite and /reset-password (verified via assetlinks.json) showing the T-0053 invite and password screens, once the Android shell exists (T-0141/T-0143) | T-0053 | implementer |
 | [TD-459](../tracker/todo/TD-459.md) | E2E journeys for invites and passwords once the Playwright harness (T-0027) exists: PER-09 invites an existing user who signs in and lands in the project; brand-new external creates the first password from the invite e-mail; forgot password -> reset -> old session refused -> sign in | T-0053 | implementer |
@@ -500,4 +499,5 @@
 | ✅ | [TD-444](../tracker/todo/TD-444.md) | Pilot-0 scope after the issues re-plan: T-0311-T-0314 replace T-0116/T-0117 in the Phase 1 pilot subset; screens T-0318-T-0320, upgrade/escalate, create_issue and pins outside the gate (planner default) | Product owner (user, 2026-11-21): T-0318 (register, raise, punch detail) and a slimmed T-0319 (NCR detail workflow up to the ncr_close_verify sign-off) join the Pilot-0 gate, with T-0311-T-0314 and the seeded starting templates T-0322 (T-0108 transitively). Flag-override, upgrade and raise-external dialogs split to T-0321 after the pilot; T-0315, T-0317 stay outside the pilot; shared template designer epic E-01-03 after Pilot-0. |
 | ✅ | [TD-445](../tracker/todo/TD-445.md) | MDR gate: mdr_effect alone governs mdr.compile (the open-Cat-A-punch clause is replaced); Cat A punch templates default to mdr_effect=blocks; Cat A always blocks work completion | Product owner (user, 2026-11-21) approved the planner default as-is: mdr_effect alone governs mdr.compile; punch templates that use Cat A (all system-default punch templates) default to mdr_effect=blocks; an open Cat A punch always blocks work_anchor.complete regardless of mdr_effect. |
 | ✅ | [TD-447](../tracker/todo/TD-447.md) | Admin → Users screen (T-0026 remainder): System admin creates / deactivates / reactivates accounts (GET/POST/PATCH /admin/users); PER-09 invites by e-mail to one of its projects with persona(s) + site + SoD confirm, shows the link once, lists / re-sends / revokes open invites |  |
+| ✅ | [TD-451](../tracker/todo/TD-451.md) | Queue monitor: failed-job list and retry/abort see only job rows the caller's RLS shows until T-0274 (ADR 0016) lets a system_admin read every project's oe_jobs_job rows | Covered by T-0274 (ADR 0016, PR #151): a system_admin without a membership lists, retries and aborts any project's failed job in its tenant; other tenants stay 404 (test_a_system_admin_without_membership_lists_retries_and_aborts_any_projects_job, SQLite and PostgreSQL). Resolved when PR #151 is on dev. |
 | ✅ | [TD-456](../tracker/todo/TD-456.md) | Template settings and project-level records: confirm the planner defaults (preset table, health_safety area, informal submit is final, allows_project_level issue categories, at most one equipment link, MDR location overlap rule) | Product owner (user, 2026-11-21): all items approved except item 7 (discipline replacing issue_category). Decided instead: inspection templates keep the optional issue_category, pointing at the issue category value list, which holds non-discipline categories (vehicle, equipment, pre-start, general, ...) alongside disciplines (painting, blasting, ...), because e.g. issues from a vehicle pre-start have no discipline; raise-time fallback is issue_category x type (none -> general). There is no separate discipline field; the Templates list filters by area and issue category. |
