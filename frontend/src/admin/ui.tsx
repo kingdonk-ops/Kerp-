@@ -6,13 +6,24 @@ export const BUTTON = "min-h-touch min-w-touch rounded border border-line bg-pan
 export const PRIMARY = "min-h-touch min-w-touch rounded bg-brand px-3 text-on-brand";
 export const INPUT = "block min-h-touch w-full rounded border border-line bg-panel px-2";
 
-/** Links between the System screens; Admin grants only for System admins (T-0026). */
+/**
+ * The System screens, in tab order (diff §6.5). `systemAdminOnly` tabs are hidden from
+ * everyone else (the API answers them 403 anyway). A new System screen adds its row here and
+ * its route in `src/app/routes.tsx`.
+ */
+export const SYSTEM_TABS = [
+  { to: "/admin/system/settings", label: "admin.system.settingsTab", systemAdminOnly: true },
+  { to: "/admin/system/grants", label: "admin.system.grantsTab", systemAdminOnly: true },
+  { to: "/admin/system/devices", label: "admin.system.devicesTab", systemAdminOnly: false },
+] as const;
+
+/** Links between the System screens; System-admin-only ones for System admins (T-0026). */
 export function SystemTabs({ systemAdmin }: { systemAdmin: boolean }) {
   const { t } = useTranslation();
-  const tabs = [
-    ...(systemAdmin ? [{ to: "/admin/system/grants", label: t("admin.system.grantsTab") }] : []),
-    { to: "/admin/system/devices", label: t("admin.system.devicesTab") },
-  ];
+  const tabs = SYSTEM_TABS.filter((tab) => systemAdmin || !tab.systemAdminOnly).map((tab) => ({
+    to: tab.to,
+    label: t(tab.label),
+  }));
   return (
     <nav aria-label={t("admin.system.tabs")} className="flex flex-wrap gap-touch-gap">
       {tabs.map((tab) => (

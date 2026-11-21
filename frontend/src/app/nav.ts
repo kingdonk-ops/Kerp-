@@ -73,8 +73,8 @@ export const NAV_ITEMS = [
   // Users: accounts (System admins) and invites by e-mail (PER-09, System admins; T-0331).
   { group: "admin", id: "users", path: "/admin/users", requires: "projectAdmin" },
   { group: "admin", id: "personas" },
-  // System = deployment settings, admin grants (T-0026), devices (T-0051); Devices is open to
-  // PER-09 too, so the item lands there.
+  // System = runtime settings (T-0232), admin grants (T-0026), devices (T-0051), as tabs
+  // (`SYSTEM_TABS`, src/admin/ui.tsx); Devices is open to PER-09 too, so the item lands there.
   { group: "admin", id: "system", path: "/admin/system/devices", requires: "projectAdmin" },
   { group: "admin", id: "accessRequests", path: "/admin/access-requests", requires: "projectAdmin" },
 ] as const satisfies readonly {

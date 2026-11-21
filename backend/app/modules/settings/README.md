@@ -130,6 +130,9 @@ nothing, which is why it is its own module and not part of `admin` (which depend
 
 ## API (`/api/v1/settings`)
 
+The Admin → System → Settings screen (`frontend/src/admin/SystemSettingsPage.tsx`, T-0232)
+edits the registry and shows the deployment configuration read-only.
+
 | Endpoint | Who | What |
 |---|---|---|
 | `GET /deployment` | any signed-in user (no membership needed) | the seven deployment settings (T-0044 contract) |
