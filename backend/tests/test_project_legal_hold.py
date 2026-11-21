@@ -219,16 +219,19 @@ def test_a_delete_waits_for_a_concurrent_hold_change(db: Database) -> None:
     # The hold change locks the row until it commits, so a delete cannot pass its check on the
     # row as it was before the hold (and the other way round).
     project_id = _project(db, "HOME")
+
+    def delete_while_held() -> None:
+        with db.unit_of_work(ROOT) as deleter:
+            deleter.execute(text("SET LOCAL lock_timeout = '200ms'"))
+            service.delete_project(deleter, project_id)
+
     with db.unit_of_work(ROOT) as holder:
         service.set_legal_hold(holder, project_id, True, "Synthetic dispute", actor_id=None)
         # It waits at its check (the locking read), not later at its own UPDATE.
-        with pytest.raises(OperationalError, match="lock timeout(?s:.*)FOR UPDATE"):
-            with db.unit_of_work(ROOT) as deleter:
-                deleter.execute(text("SET LOCAL lock_timeout = '200ms'"))
-                service.delete_project(deleter, project_id)
-    with db.unit_of_work(ROOT) as s:
-        with pytest.raises(service.LegalHoldActiveError):
-            service.delete_project(s, project_id)
+        with pytest.raises(OperationalError, match=r"lock timeout(?s:.*)FOR UPDATE"):
+            delete_while_held()
+    with db.unit_of_work(ROOT) as s, pytest.raises(service.LegalHoldActiveError):
+        service.delete_project(s, project_id)
 
 
 def test_the_database_refuses_a_hold_without_a_reason(db: Database) -> None:
