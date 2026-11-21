@@ -119,7 +119,10 @@ of work bound to that tenant/project **before** reading the row, so `oe_jobs_job
 RLS and the worker role needs no `BYPASSRLS`. Each queue has its own SAQ worker and
 concurrency (`KERP_JOBS_INTERACTIVE_CONCURRENCY`, default 4; `KERP_JOBS_BATCH_CONCURRENCY`,
 default 1), so batch work never delays an interactive job. The compose service `worker`
-runs it (`make worker`); liveness probe and re-queue on shutdown: TD-157.
+runs it (`make worker`); liveness probe and re-queue on shutdown: TD-157. Before it connects
+to Redis, `serve` runs the API's database role check (`check_database_role`,
+`app/core/startup_safety.py`, T-0342): in production a role that skips RLS or may edit the
+audit ledger refuses the start.
 
 ## Sweep
 

@@ -61,11 +61,20 @@ def migrated_sqlite_file(tmp_path: Path, *, seeded: bool = True) -> str:
     return url
 
 
-def migrate_and_seed(url: str) -> None:
-    """Upgrade the database at ``url`` to head and seed the fixture tenants' directory rows,
-    leaving no connection open (PostgreSQL copies it as a template afterwards)."""
+def _migration_config(url: str) -> Config:
+    """Alembic for the database of ``url``, as the schema owner when the suite has one
+    (``KERP_TEST_MIGRATION_URL``, T-0343), else as ``url``'s role."""
     cfg = Config(str(ALEMBIC_INI))
-    cfg.attributes.update(url=url, configure_logger=False)
+    target = pg_databases.migration_url(url) if ON_POSTGRES else url
+    cfg.attributes.update(url=target, configure_logger=False)
+    return cfg
+
+
+def migrate_and_seed(url: str) -> None:
+    """Upgrade the database at ``url`` to head and seed the fixture tenants' directory rows
+    (as ``url``'s role), leaving no connection open (PostgreSQL copies it as a template
+    afterwards)."""
+    cfg = _migration_config(url)
     command.upgrade(cfg, "head")
     db = Database(url)
     try:
@@ -101,8 +110,7 @@ def migrated_database(tmp_path: Path) -> Iterator[Database]:
             db.dispose()  # pg_databases.end_test drops the database
         return
     url = database_url(tmp_path)
-    cfg = Config(str(ALEMBIC_INI))
-    cfg.attributes.update(url=url, configure_logger=False)
+    cfg = _migration_config(url)
     command.upgrade(cfg, "head")
     db = Database(url)
     try:

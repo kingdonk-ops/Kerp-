@@ -10,11 +10,13 @@ from typing import Any
 
 import fakeredis
 import httpx
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from saq.queue.redis import RedisQueue
 
 from app.core.auth.field import MagicLink, MagicLinkSender
-from app.core.auth.keys import KeySet, generate_signing_key
+from app.core.auth.keys import KeySet, generate_signing_key, private_key_pem
 from app.core.auth.models import ProjectMembership
 from app.core.auth.passwords import hash_password
 from app.core.auth.revocation import RedisRevocationStore
@@ -26,6 +28,8 @@ from app.core.db import Database
 from app.core.module_loader.loader import DEFAULT_PACKAGE
 from app.core.tenancy.context import TenancyContext
 from app.main import create_app
+from app.modules.jobs.broker import QUEUE_NAMES, SaqBroker
+from app.modules.settings.cache import RedisSettingsCache
 
 T1 = uuid.UUID("00000000-0000-4000-8000-0000000000e1")
 T2 = uuid.UUID("00000000-0000-4000-8000-0000000000e2")
@@ -52,6 +56,39 @@ PRODUCTION_MAIL: dict[str, Any] = {
     "mail_sns_topic_arn": "arn:aws:sns:ap-southeast-2:000000000000:kerp-mail-test",
     "web_origin": "https://kerp.example.test",
 }
+# What production needs to pass the runtime startup checks (T-0342): a Redis URL and a
+# signing key generated at import time. Synthetic; nothing secret is stored. Nothing listens
+# at the URL: a test that starts a production app runs its broker and settings cache on
+# fakeredis (``fake_production_redis``). No database either (also not CI's unmigrated
+# PostgreSQL source database, which the role checks would refuse): those tests need none.
+PRODUCTION_RUNTIME: dict[str, Any] = {
+    "database_url": None,
+    "redis_url": "redis://127.0.0.1:1/0",
+    "jwt_private_key": private_key_pem(generate_signing_key("EdDSA")),
+}
+
+
+class FakeRedisBroker(SaqBroker):
+    """``SaqBroker`` on an in-process fakeredis instead of the URL's server."""
+
+    def __init__(self, _redis_url: str, *, prefix: str = "kerp") -> None:
+        self.prefix = prefix
+        server = fakeredis.FakeServer()
+        self.queues = {
+            name: RedisQueue(fakeredis.aioredis.FakeRedis(server=server), name=f"{prefix}:{name}")
+            for name in QUEUE_NAMES
+        }
+
+
+def fake_production_redis(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Start production apps without a Redis server (the SQLite job has none): the API's job
+    broker and settings cache run on fakeredis; the revocation store connects lazily."""
+    monkeypatch.setattr("app.main.SaqBroker", FakeRedisBroker)
+    monkeypatch.setattr(
+        RedisSettingsCache,
+        "from_url",
+        classmethod(lambda cls, _url, **_kwargs: cls(fakeredis.FakeRedis())),
+    )
 
 
 def make_settings(**overrides: Any) -> Settings:

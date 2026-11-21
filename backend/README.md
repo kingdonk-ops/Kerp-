@@ -43,6 +43,7 @@ hardcoded config, no `.env` file is read).
 | `KERP_VERSION` | installed package version | Reported by `/health` |
 | `KERP_DATABASE_URL` | unset | SQLAlchemy URL of the runtime role (e.g. `postgresql+psycopg://…`, `sqlite:///…`) |
 | `KERP_MIGRATION_DATABASE_URL` | unset (= `KERP_DATABASE_URL`) | Schema-owner URL Alembic runs as |
+| `KERP_RUNTIME_DB_ROLE` | `kerp_app` | Runtime role migration `0039` grants table, sequence and function rights to (ADR 0019); empty = none. Skipped when it is the migrating role |
 | `KERP_MAX_BODY_BYTES` | `1048576` (1 MiB) | Largest request body any endpoint accepts (413 above it; min 1024). File bytes go to object storage by presigned URL and are not capped by it (`app/core/body_limit.py`) |
 | `KERP_REDIS_URL` | unset | Redis URL (auth token revocation; job queue later). Required in production |
 | `KERP_JWT_*`, `KERP_ACCESS_TOKEN_MINUTES`, `KERP_REFRESH_TOKEN_HOURS`, `KERP_DEFAULT_TENANT_ID`, `KERP_WEB_ORIGIN`, `KERP_NATIVE_APP_ORIGINS`, `KERP_INTERNAL_EMAIL_DOMAINS`, `KERP_PASSWORD_MIN_LENGTH`, `KERP_PASSWORD_BREACH_CHECK`, `KERP_PASSWORD_RESET_TTL_MINUTES`, `KERP_ENTRA_*`, `KERP_ANDROID_APP_*` | see `app/core/auth/README.md` | Token signing keys and lifetimes, the deployment tenant (required in production: the app does not start without it), refresh-cookie origin (optional; set it behind a proxy, see Container image), the native field app's origins (optional; body refresh-token transport and the API's CORS list; must not contain the web origin, which must then be set, or the app does not start), the e-mail domains of internal staff (optional; comma-separated, exact match; a malformed entry refuses startup) |
@@ -166,6 +167,11 @@ KERP_ENVIRONMENT=development uvicorn app.main:create_app --factory --reload
   `scripts/shard_tests.py`); the coverage floor applies to all shards combined
   (`backend-pg-coverage`). A new test file needs nothing: it weighs the mean until the next
   rebalance (`docs/WORKFLOW.md`, "`backend-pg` shards").
+- CI's `backend-pg-roles` (T-0343, ADR 0019) runs the PostgreSQL suite once more in the
+  production layout: `infra/postgres/owner-runtime-split.sql` hands schema `public` to
+  `kerp_owner`, `KERP_TEST_MIGRATION_URL` makes the fixtures migrate every template as that
+  owner (`tests/pg_databases.py:migration_url`), and the tests run as `kerp_app`, which owns
+  nothing and has only the grants of migration `0039`.
 
 The backend defaults to `KERP_ENVIRONMENT=production` (T-0070), which refuses to sign tokens
 without a configured key, so a local server must opt in to `development` (ephemeral key,

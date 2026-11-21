@@ -66,6 +66,9 @@ class Settings(BaseSettings):
     # ``migration_database_url`` is the schema owner Alembic runs as (falls back to the former).
     database_url: str | None = Field(default=None, repr=False)
     migration_database_url: str | None = Field(default=None, repr=False)
+    # The runtime role migration ``0039`` grants table rights to (ADR 0019, T-0343): the role
+    # of ``database_url``. Empty = no grants (dev setups that migrate as the runtime role).
+    runtime_db_role: str | None = "kerp_app"
     # Redis (job queue, auth token revocation).
     redis_url: str | None = Field(default=None, repr=False)
     # SAQ worker (T-0015): concurrent jobs per queue in one worker process.
@@ -200,6 +203,20 @@ class Settings(BaseSettings):
     @classmethod
     def _upper_log_level(cls, value: object) -> object:
         return value.upper() if isinstance(value, str) else value
+
+    @field_validator("runtime_db_role", mode="before")
+    @classmethod
+    def _runtime_db_role(cls, value: object) -> object:
+        """Empty means none; anything else must be a plain lower-case PostgreSQL role name
+        (it is written into ``GRANT`` statements)."""
+        if value is None or (isinstance(value, str) and not value.strip()):
+            return None
+        if not isinstance(value, str) or not _ROLE_NAME.fullmatch(value.strip()):
+            raise ValueError(
+                "KERP_RUNTIME_DB_ROLE must be a role name of lower-case letters, digits and "
+                "underscores, starting with a letter or underscore (at most 63 characters)"
+            )
+        return value.strip()
 
     @field_validator("notification_channels")
     @classmethod
@@ -391,6 +408,7 @@ class Settings(BaseSettings):
         return self.hsts_enabled
 
 
+_ROLE_NAME = re.compile(r"^[a-z_][a-z0-9_]{0,62}$")
 _GUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 _FINGERPRINT = re.compile(r"^[0-9A-F]{2}(:[0-9A-F]{2}){31}$")
 _ORIGIN_SCHEME = re.compile(r"^[a-z][a-z0-9+.-]*$")

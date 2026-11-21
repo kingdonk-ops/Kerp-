@@ -1,8 +1,10 @@
 """The per-app auth runtime: keys, tokens, revocation store, magic-link delivery.
 
-Built lazily from the app's settings on first use and cached on ``app.state.auth``, so
-an app that never authenticates (``/health``) needs no key or Redis. Tests install their
-own runtime with ``install_auth_runtime`` (e.g. one backed by ``fakeredis``).
+Built from the app's settings and cached on ``app.state.auth``. Outside production it is
+built lazily on first use, so an app that never authenticates (``/health``) needs no key or
+Redis. In production the API ``lifespan`` builds it at startup, so a missing or invalid
+signing key refuses the start instead of failing the first sign-in (T-0342, TD-124). Tests
+install their own runtime with ``install_auth_runtime`` (e.g. one backed by ``fakeredis``).
 """
 
 from __future__ import annotations

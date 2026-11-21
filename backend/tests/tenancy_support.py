@@ -10,10 +10,18 @@ from pathlib import Path
 
 from sqlalchemy import inspect, select
 
-from app.core.db import Database
+from app.core.db import TENANTS_TABLE, Database
 from app.core.tenancy.context import TenancyContext
 from app.core.tenancy.rls import apply_rls_policies
-from tests.db_support import Gadget, ScratchBase, Widget, database_url, seed_tenants
+from tests import pg_databases
+from tests.db_support import (
+    ON_POSTGRES,
+    Gadget,
+    ScratchBase,
+    Widget,
+    database_url,
+    seed_tenants,
+)
 
 T1 = uuid.UUID("00000000-0000-4000-8000-000000000001")
 T2 = uuid.UUID("00000000-0000-4000-8000-000000000002")
@@ -46,13 +54,20 @@ DELETED_IN_A = "a-deleted"
 
 def seeded_database(tmp_path: Path) -> Iterator[Database]:
     """Create the scratch tables (under RLS on PostgreSQL), seed them, drop them after."""
-    db = Database(database_url(tmp_path))
+    url = database_url(tmp_path)
+    db = Database(url)
     # Over a migrated schema the real ``tenants`` directory already exists: reuse it and leave
     # it to the migration's downgrade (T-0079).
     existing = set(inspect(db.engine).get_table_names())
     created = [t for t in ScratchBase.metadata.sorted_tables if t.name not in existing]
-    ScratchBase.metadata.create_all(db.engine, tables=created)
-    with db.engine.begin() as conn:
+    # The scratch tables reference ``tenants``, so over a migrated schema the role that owns it
+    # creates them: in CI's backend-pg-roles that is kerp_owner, whose default privileges
+    # (migration 0039) grant them to the runtime role (T-0343). Elsewhere: the runtime role.
+    ddl = db
+    if ON_POSTGRES and TENANTS_TABLE in existing:
+        ddl = Database(pg_databases.migration_url(url))
+    ScratchBase.metadata.create_all(ddl.engine, tables=created)
+    with ddl.engine.begin() as conn:
         apply_rls_policies(conn, ScratchBase.metadata)
     try:
         seed_tenants(db, T1, T2)
@@ -72,7 +87,9 @@ def seeded_database(tmp_path: Path) -> Iterator[Database]:
             s.add(deleted)
         yield db
     finally:
-        ScratchBase.metadata.drop_all(db.engine, tables=created)
+        ScratchBase.metadata.drop_all(ddl.engine, tables=created)
+        if ddl is not db:
+            ddl.dispose()
         db.dispose()
 
 

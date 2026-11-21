@@ -6,19 +6,25 @@ from fastapi.testclient import TestClient
 from app.core.config import Settings
 from app.main import create_app
 from app.openapi import openapi_schema
-from tests.auth_support import PRODUCTION_MAIL, T1
+from tests.auth_support import PRODUCTION_MAIL, PRODUCTION_RUNTIME, T1, fake_production_redis
 
 DOCS_PATHS = ("/docs", "/redoc", "/docs/oauth2-redirect", "/openapi.json")
 
 
+@pytest.fixture(autouse=True)
+def _production_redis(monkeypatch: pytest.MonkeyPatch) -> None:
+    fake_production_redis(monkeypatch)  # production apps start with Redis (T-0342)
+
+
 def _production(api_docs_enabled: bool | None = None) -> Settings:
     """Production settings that pass the startup check (T-0037 needs the deployment tenant,
-    T-0058 the mail transport)."""
+    T-0058 the mail transport, T-0342 Redis and a signing key)."""
     return Settings(
         environment="production",
         default_tenant_id=T1,
         api_docs_enabled=api_docs_enabled,
         **PRODUCTION_MAIL,
+        **PRODUCTION_RUNTIME,
     )
 
 
