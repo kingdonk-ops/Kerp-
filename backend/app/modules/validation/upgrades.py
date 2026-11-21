@@ -231,7 +231,8 @@ def accept_update(
 
 def drift_report(session: Session) -> list[DriftEntryRead]:
     """Project rules that differ from the tenant defaults, for every project the tenant-level
-    session can read (RLS: the caller's portfolio projects, ``allowed_project_ids``).
+    session can read (RLS: the caller's portfolio projects, ``allowed_project_ids``; every project
+    of the tenant for a ``system_admin`` session, ADR 0016).
 
     ``added``: a live rule the project added (incl. every rule of a set the tenant has no
     default for). ``modified``: a copied rule whose values differ from the current default

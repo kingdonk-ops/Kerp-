@@ -308,9 +308,7 @@ def test_the_failed_list_pages_and_bounds_its_limit(api: Api) -> None:
 # --- retry and abort ------------------------------------------------------------------------
 
 
-def test_a_system_admin_retries_a_failed_job_audited(
-    api: Api, dispatched: list[JobRef]
-) -> None:
+def test_a_system_admin_retries_a_failed_job_audited(api: Api, dispatched: list[JobRef]) -> None:
     job_id = api.job(project=api.home)
     dispatched.clear()
     response = api.client.post(f"{QUEUES}/failed/{job_id}/retry", headers=api.headers(ALICE))
@@ -510,9 +508,7 @@ def test_a_job_the_admin_cannot_see_is_404_and_untouched(
     assert [q["failed"] for q in overview["queues"]] == [0, 0]
 
 
-def test_the_overview_is_503_when_the_queue_is_unreachable(
-    api: Api, monitor: FakeMonitor
-) -> None:
+def test_the_overview_is_503_when_the_queue_is_unreachable(api: Api, monitor: FakeMonitor) -> None:
     async def broken(queue: QueueName) -> QueueCounts:
         raise ConnectionError("redis down")
 

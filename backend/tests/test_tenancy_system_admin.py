@@ -15,10 +15,11 @@ from typing import Any
 import jwt
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import select
+from sqlalchemy import String, select
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 from app.core.auth.access import SYSTEM_ADMIN
-from app.core.db import Database, DbSession
+from app.core.db import GUID, NAMING_CONVENTION, TENANTS_TABLE, BaseRecordMixin, Database, DbSession
 from app.core.tenancy.context import TenancyContext
 from app.core.tenancy.rls import (
     POLICY_NAME,
@@ -28,7 +29,10 @@ from app.core.tenancy.rls import (
     SYSTEM_ADMIN_SETTING,
     SYSTEM_ADMIN_SQL,
     TENANT_SETTING,
+    RlsPolicy,
+    apply_rls_policies,
     rls_policy_sql,
+    rls_table_info,
     session_tenancy,
 )
 from app.core.tenancy.scope import OutOfScopeError, get_or_404, is_visible, site_filter
@@ -36,7 +40,7 @@ from app.modules.admin import service as admin
 from tests.audit_support import migrated_database
 from tests.auth_support import ALICE, BOB, PASSWORD, auth_app, make_settings, seed_user
 from tests.auth_support import T1 as AUTH_T1
-from tests.db_support import Widget, database_url
+from tests.db_support import Widget, database_url, seed_tenants
 from tests.tenancy_support import (
     ADMIN_A,
     ADMIN_T1,
@@ -190,6 +194,63 @@ def test_a_system_admin_never_writes_another_tenant(
     with pytest.raises(OutOfScopeError), db.unit_of_work(ctx) as s:
         s.add(Widget(tenant_id=tenant, project_id=project, name="smuggled"))
     assert "smuggled" not in _names(db, TenancyContext(tenant_id=tenant, project_id=project))
+
+
+# --- special-policy tables keep the exact write scope -------------------------------------
+
+
+class SpecialBase(DeclarativeBase):
+    pass
+
+
+SpecialBase.metadata.naming_convention = NAMING_CONVENTION
+
+
+class SpecialTenant(SpecialBase, BaseRecordMixin):
+    """This scratch schema's ``tenants`` directory (T-0079), like ``db_support.ScratchTenant``."""
+
+    __tablename__ = TENANTS_TABLE
+
+    display_name: Mapped[str] = mapped_column(String(200), nullable=False)
+
+
+class SpecialGrant(SpecialBase, BaseRecordMixin):
+    """A table under a special policy (``admin_grant``): its writes use ``SCOPE_ROW_SQL``."""
+
+    __tablename__ = "test_special_grant"
+    __table_args__ = (rls_table_info(RlsPolicy(kind="admin_grant", owner_column="user_id")),)
+
+    user_id: Mapped[uuid.UUID] = mapped_column(GUID(), nullable=False)
+
+
+@pytest.fixture
+def special_db(tmp_path: Path) -> Iterator[Database]:
+    database = Database(database_url(tmp_path))
+    SpecialBase.metadata.create_all(database.engine)
+    with database.engine.begin() as conn:
+        apply_rls_policies(conn, SpecialBase.metadata)
+    try:
+        seed_tenants(database, T1)
+        yield database
+    finally:
+        SpecialBase.metadata.drop_all(database.engine)
+        database.dispose()
+
+
+@pytest.mark.parametrize("ctx", [ADMIN_A, ADMIN_T1], ids=["project-bound", "tenant-level"])
+def test_special_policy_tables_never_get_the_admin_widening(
+    special_db: Database, ctx: TenancyContext
+) -> None:
+    # ADR 0016 widens only project_isolation_policy; the ORM guard stays exactly as strict as
+    # the special policies' SCOPE_ROW_SQL (T-0274 review): no row of another project.
+    with pytest.raises(OutOfScopeError), special_db.unit_of_work(ctx) as s:
+        s.add(SpecialGrant(tenant_id=T1, project_id=PB, user_id=uuid.uuid4()))
+    # The exact scope is still writable by a tenant-level admin (positive control).
+    with special_db.unit_of_work(ADMIN_T1) as s:
+        s.add(SpecialGrant(tenant_id=T1, project_id=None, user_id=uuid.uuid4()))
+    with special_db.unit_of_work(ADMIN_T1) as s:
+        rows = s.scalars(select(SpecialGrant.project_id)).all()
+    assert rows == [None]
 
 
 # --- site scope ---------------------------------------------------------------------------------

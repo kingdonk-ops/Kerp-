@@ -34,9 +34,11 @@ if result.blocked:
 
 - The context is KERP CEL JSON (`app/core/cel/README.md`). `params` is reserved: each rule
   sees its own `params` there.
-- The set is resolved by key among the sets the session can see, most specific layer first:
-  `project`, then `tenant`, then `system`. An unknown set raises `RuleSetNotFoundError`, so a
-  misconfigured gate never passes.
+- The set is resolved by key among the sets of the session's **own** scope (its bound
+  project's, and the tenant-level `tenant`/`system` sets), most specific layer first: `project`,
+  then `tenant`, then `system`. Another project's set is never a candidate, even when the
+  session can read it (a portfolio reader, or a `system_admin` under ADR 0016; T-0274). An
+  unknown set raises `RuleSetNotFoundError`, so a misconfigured gate never passes.
 - The enabled `check` rules run in `sort_order`, then `rule_key`. A rule passes **only** when
   its expression returns `true`; any other value or a CEL error does not pass (fail closed).
 - Every rule that does not pass becomes a finding (`outcome` `fail` or `error`), returned in

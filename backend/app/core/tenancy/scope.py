@@ -115,10 +115,15 @@ def _project_readable(context: TenancyContext, project_id: uuid.UUID | None) -> 
     )
 
 
-def _project_writable(context: TenancyContext, project_id: uuid.UUID | None) -> bool:
+def _project_writable(
+    context: TenancyContext, project_id: uuid.UUID | None, *, admin_wide: bool = True
+) -> bool:
     """Mirrors ``project_isolation_policy``'s project clause (ADR 0016): the exact scope (NULL
-    is not a wildcard), or any project row for a ``system_admin`` session."""
-    return project_id == context.project_id or (project_id is not None and context.is_system_admin)
+    is not a wildcard), or any project row for a ``system_admin`` session. ``admin_wide=False``
+    is the exact scope only, as the special policies' writes (``SCOPE_ROW_SQL``) require."""
+    if project_id == context.project_id:
+        return True
+    return admin_wide and project_id is not None and context.is_system_admin
 
 
 def _policy_of(cls: type[Any]) -> RlsPolicy | None:
@@ -343,14 +348,16 @@ def _guard_writes(session: Session, flush_context: UOWTransaction, instances: ob
             continue
         if obj.tenant_id is not None and obj.tenant_id != context.tenant_id:
             raise OutOfScopeError(f"{type(obj).__name__} not found")
+        # Special-policy tables (membership, admin grant, access request, invite, team) keep
+        # the exact write scope for everyone: ADR 0016 widens only project_isolation_policy.
+        policy = _policy_of(type(obj))
         projects = {obj.project_id, *inspect(obj).attrs.project_id.history.deleted}
-        if not all(_project_writable(context, p) for p in projects):
+        if not all(_project_writable(context, p, admin_wide=policy is None) for p in projects):
             raise OutOfScopeError(f"{type(obj).__name__} not found")
         if not _site_allows(context, obj):
             raise OutOfScopeError(f"{type(obj).__name__} not found")
         # Membership-based tables (T-0014): admin grants are written by system admins only;
         # other rows are updated or deleted only while the session can see them.
-        policy = _policy_of(type(obj))
         if policy is None:
             continue
         if policy.kind in ("admin_grant", "team") and not context.is_system_admin:

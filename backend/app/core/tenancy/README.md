@@ -50,13 +50,19 @@ project of its own tenant without a membership (user decision 2026-11-21, diff ย
 The ORM scope mirrors it: for an `is_system_admin` context the read filter keeps only the tenant
 clause (every project of the tenant plus its tenant-level rows), `get_or_404`/`is_visible` agree,
 the flush guard lets it write project rows of any project of the tenant (the old `project_id` of
-an updated or deleted row must be writable too, as RLS `USING` requires), and the Asset-Site
+an updated or deleted row must be writable too, as RLS `USING` requires), except on special-policy tables, whose writes keep the exact scope
+(`SCOPE_ROW_SQL`) for everyone, and the Asset-Site
 filter is off (`scope.site_filter(context)` is `None`). Migration `0035` replaced the policy on
 every table that had it (frozen DDL; its downgrade restores the exact rule). Internal contexts
 that bind `is_system_admin=True` for a narrow read (jobs scheduler, teams reconcile, onboarding,
 the invite token lookup) now also see every project's records of the tenant; they read only
-their own tables (TD-462). Reads by a non-member admin are not access-logged (TD-427, default
-no).
+their own tables (TD-462).
+
+**Visibility is not scope.** A service that picks one row by key from layered data (project,
+else tenant/system) must filter on the session's own project explicitly, never rely on "visible =
+own project + tenant": an admin (and a portfolio reader) can see other projects' rows. The
+validation `resolve_rule_set` does (T-0274 review). Reads by a non-member admin are not
+access-logged (TD-427, default no).
 
 ## Multi-project read scope (T-0010, TD-053, edge spec ยง6 amendments)
 
