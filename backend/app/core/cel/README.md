@@ -44,7 +44,20 @@ match result:
   predicates and restricts `string()` to the types CEL converts, and rejects at compile time
   what cel-js's checker rejects (`has(x)` without a field selection, literal non-bool `&&`/`||`
   operands and macro predicates, celpy's non-standard `min()`/`reduce()`).
-- **Limits**: expressions over 4096 UTF-8 bytes return `INVALID_ARGUMENT` before parsing.
+- **Limits** (`limits.py`, T-0341; values shared with the client through the `limits` block of
+  `tests/contract/conformance_fixtures.json`, definitions in `tests/contract/README.md`):
+  - expressions over 4096 UTF-8 bytes return `INVALID_ARGUMENT` before parsing;
+  - more than 3 nested loop macros (`all`/`exists`/`exists_one`/`map`/`filter`, counted along one
+    path through macro arguments) or a nesting depth over 100 (syntax tree or parser) is
+    `PARSE_ERROR` from `compile_expression` and `evaluate`. Measured iteratively in `_check_tree`
+    before any other walk, so 1500 nested parentheses are a parse error, never a recursion error;
+  - the strict evaluator spends one step per parse-tree node visited (shared with macro bodies)
+    and stops after 50,000 with `EVAL_ERROR` `evaluation step budget exceeded`
+    (`StepBudgetExceededError`, not a CEL error value, so `true || ...` cannot absorb it). Worst
+    case is well under a second;
+  - celpy recurses about three Python frames per parse-tree node; `evaluate` raises the
+    interpreter's recursion limit to `RECURSION_LIMIT` (10,000; celpy itself sets 2,500) so every
+    expression within the depth cap evaluates (the deepest at-cap shapes need about 4,000).
 - **Parity**: `tests/test_cel_conformance.py` runs every fixture in
   `tests/contract/conformance_fixtures.json`. Remaining celpy deviations are pinned there as
   `known_gap` fixtures (TD-041, TD-471). The TD-041 ones all fail closed. The T-0110 edge probe

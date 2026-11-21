@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 369 · **Closed:** 150
+**Open:** 370 · **Closed:** 150
 
 ## decision (40)
 
@@ -139,7 +139,7 @@
 | [TD-388](../tracker/todo/TD-388.md) | saved_views: wire the my_teams filter op | T-0074 | reviewer |
 | [TD-487](../tracker/todo/TD-487.md) | Frontend: Admin -> System grants page needs the SoD confirm step for system_admin on a hold-authority holder (POST /admin/grants 409 sod_confirmation_required, confirm_sod), plus the same warning for hold personas on system_admins in member/invite/team UIs | T-0275 | implementer |
 
-## deferred (50)
+## deferred (51)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -193,6 +193,7 @@
 | [TD-501](../tracker/todo/TD-501.md) | Playwright journey for T-0276 (system_admin without membership opens project B; non-admin sees only its projects) once the e2e harness exists (T-0027) | T-0276 | implementer |
 | [TD-508](../tracker/todo/TD-508.md) | Verify the e2e suite on the make up compose stack, and give it its own database | T-0027 | implementer |
 | [TD-510](../tracker/todo/TD-510.md) | Deployment-config view lacks the mail reply-to of diff §4.7: Settings has no reply-to field yet | T-0230 | implementer |
+| [TD-533](../tracker/todo/TD-533.md) | CEL client runtime has no evaluation step budget (cel-js exposes no step hook; server is the hard gate) | T-0341 | implementer |
 
 ## later (148)
 

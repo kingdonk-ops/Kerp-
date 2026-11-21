@@ -1,8 +1,10 @@
 // Client CEL wrapper behaviour not covered by the shared fixtures (T-0017).
+import { Environment } from "@marcbachmann/cel-js";
 import { describe, expect, it } from "vitest";
 
 import { CEL_ERROR_CODES, evaluate } from "./index";
 import { classifyCelError, compiledProgramCount } from "./evaluate";
+import { checkLimits, LimitExceededError, MAX_MACRO_NESTING, MAX_NESTING_DEPTH, measure } from "./limits";
 import { encodeValue, IntOverflowError, UnencodableValueError } from "./values";
 
 describe("CEL client wrapper", () => {
@@ -24,6 +26,27 @@ describe("CEL client wrapper", () => {
     const before = compiledProgramCount();
     expect(evaluate(`'${"é".repeat(2047)}x'`, {})).toMatchObject({ ok: false, code: "INVALID_ARGUMENT" });
     expect(compiledProgramCount()).toBe(before);
+  });
+
+  it("refuses nested loop macros over the cap before compiling them (audit item 1)", () => {
+    const four = "l.all(a, l.all(b, l.all(c, l.all(d, a + b + c + d >= 0.0))))";
+    const before = compiledProgramCount();
+    expect(evaluate(four, { l: [1, 2] })).toEqual({
+      ok: false,
+      code: "PARSE_ERROR",
+      message: `more than ${String(MAX_MACRO_NESTING)} nested loop macros`,
+    });
+    expect(compiledProgramCount()).toBe(before); // refused programs are not cached
+    expect(evaluate("l.all(a, l.all(b, l.all(c, a + b + c >= 0.0)))", { l: [1, 2] })).toEqual({ ok: true, value: true });
+  });
+
+  it("refuses 1500 nested parentheses as PARSE_ERROR (audit item 11)", () => {
+    const deep = `${"(".repeat(1500)}1${")".repeat(1500)}`;
+    expect(evaluate(deep, {})).toMatchObject({ ok: false, code: "PARSE_ERROR" });
+    expect(evaluate(`${"(".repeat(MAX_NESTING_DEPTH - 1)}1${")".repeat(MAX_NESTING_DEPTH - 1)}`, {})).toEqual({
+      ok: true,
+      value: { $int: "1" },
+    });
   });
 
   it("reports parse errors with a message instead of throwing", () => {
@@ -91,5 +114,47 @@ describe("CEL client wrapper", () => {
   it("classifies unknown errors as EVAL_ERROR", () => {
     expect(classifyCelError(new Error("boom")).code).toBe("EVAL_ERROR");
     expect(classifyCelError("not an error").code).toBe("EVAL_ERROR");
+  });
+});
+
+describe("CEL cost limits (T-0341)", () => {
+  const ast = (expression: string) => new Environment({ unlistedVariablesAreDyn: true }).parse(expression).ast;
+
+  // Same expressions and values as backend/tests/test_cel_limits.py.
+  it.each([
+    ["l.all(x, x > 0.0)", 1],
+    ["l.map(x, l.filter(y, y > x))", 2],
+    ["l.exists(a, l.exists_one(b, l.map(c, c).size() > 0))", 3],
+    ["l.all(a, true) && l.all(b, true) && l.all(c, true) && l.all(d, true)", 1],
+    ["l.filter(a, true).map(b, b).filter(c, true).all(d, true)", 1],
+    ["l.map(a, l.map(b, b)).all(x, x.all(y, y > 0.0))", 2],
+    ["l.all(a, has(a.b) && size(l) > 0 && 'x'.contains('x'))", 1],
+  ] as const)("counts macro nesting along one path: %s", (expression, macros) => {
+    expect(measure(ast(expression)).macroNesting).toBe(macros);
+  });
+
+  it.each([
+    ["1", 1],
+    ["(1)", 1],
+    ["1 + 2 + 3", 3],
+    ["-1", 2],
+    ["-x", 2],
+    ["a.b.c", 3],
+    ["a.b(1)", 2],
+    ["f(1)", 2],
+    ["[[1]]", 3],
+    ["{'k': 1}", 2],
+    ["true ? 1 : 2", 2],
+    ["l[0][1]", 3],
+  ] as const)("measures the syntax-tree depth of %s", (expression, depth) => {
+    expect(measure(ast(expression)).treeDepth).toBe(depth);
+  });
+
+  it("measures without recursion and throws LimitExceededError over a cap", () => {
+    const chain = Array.from({ length: 2000 }, () => "1").join("+");
+    expect(measure(ast(chain)).treeDepth).toBe(2000);
+    expect(() => {
+      checkLimits(ast(chain));
+    }).toThrow(LimitExceededError);
   });
 });

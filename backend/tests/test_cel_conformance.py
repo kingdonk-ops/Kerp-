@@ -13,7 +13,7 @@ from typing import Any
 
 import pytest
 
-from app.core.cel import CelError, CelErrorCode, CelOk, evaluate
+from app.core.cel import CelError, CelErrorCode, CelOk, evaluate, limits
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 FIXTURE_FILE = REPO_ROOT / "tests" / "contract" / "conformance_fixtures.json"
@@ -80,6 +80,15 @@ def test_loader_rejects_empty_fixture_list(tmp_path: Path) -> None:
 
 def test_error_code_enum_matches_shared_list() -> None:
     assert [code.value for code in CelErrorCode] == DOCUMENT["error_codes"]
+
+
+def test_limits_match_shared_block() -> None:
+    assert DOCUMENT["limits"] == {
+        "max_expression_bytes": limits.MAX_EXPRESSION_BYTES,
+        "max_macro_nesting": limits.MAX_MACRO_NESTING,
+        "max_nesting_depth": limits.MAX_NESTING_DEPTH,
+        "max_eval_steps": limits.MAX_EVAL_STEPS,
+    }
 
 
 def test_fixture_ids_are_unique() -> None:

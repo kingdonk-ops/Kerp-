@@ -13,6 +13,11 @@ Macros and ``string()`` are not table entries: ``strict_runner_class()`` returns
 ``InterpretedRunner`` whose ``Evaluator`` subclass requires bool macro predicates
 (``filter``/``exists_one`` raise, ``all``/``exists`` yield an error value that ``false`` /
 ``true`` can still absorb) and restricts ``string()`` to the types CEL converts.
+
+The same evaluator spends a step budget (T-0341): one step per parse-tree node visited, shared
+by the macro bodies of one evaluation. Past ``limits.MAX_EVAL_STEPS`` it raises
+``StepBudgetExceededError``, which no CEL operator or macro catches, so the whole evaluation
+stops (``EVAL_ERROR``) instead of an error value that ``true ||`` could absorb.
 """
 
 from __future__ import annotations
@@ -24,12 +29,29 @@ from datetime import datetime, timedelta
 from functools import lru_cache
 from typing import TYPE_CHECKING, cast
 
+from app.core.cel.limits import MAX_EVAL_STEPS
+
 if TYPE_CHECKING:
     import celpy
     from celpy.evaluation import CELFunction, Context, Result
     from lark import Token, Tree
 
 _Binary = Callable[[object, object], object]
+
+STEP_BUDGET_MESSAGE = "evaluation step budget exceeded"
+
+
+class StepBudgetExceededError(Exception):
+    """The evaluation visited more than ``MAX_EVAL_STEPS`` parse-tree nodes."""
+
+
+class _StepBudget:
+    """Steps left for one evaluation (shared with every macro body's sub-evaluator)."""
+
+    __slots__ = ("remaining",)
+
+    def __init__(self, steps: int) -> None:
+        self.remaining = steps
 
 
 def _numeric_kind(value: object) -> str | None:
@@ -162,16 +184,35 @@ def strict_string(value: object) -> object:
 def strict_runner_class() -> type[celpy.Runner]:
     """``InterpretedRunner`` using the strict evaluator (pass as ``runner_class``)."""
     import celpy
-    from celpy.evaluation import CELEvalError, Evaluator
+    from celpy.evaluation import Activation, CELEvalError, Evaluator
 
     def not_bool(macro: str, result: object) -> CELEvalError:
         message = f"{macro}() predicate must return bool, got {type(result).__name__}"
         return CELEvalError(message, TypeError, (message,))
 
     class StrictEvaluator(Evaluator):
+        def __init__(self, ast: Tree[Token], activation: Activation, budget: _StepBudget) -> None:
+            super().__init__(ast, activation=activation)
+            self.budget = budget
+
         def sub_evaluator(self, ast: Tree[Token]) -> Evaluator:
-            # Macro bodies (incl. nested macros) must use the strict evaluator too.
-            return StrictEvaluator(ast, activation=self.activation)
+            # Macro bodies (incl. nested macros) must use the strict evaluator, and the same
+            # step budget, too.
+            return StrictEvaluator(ast, activation=self.activation, budget=self.budget)
+
+        def _visit_tree(self, tree: Tree[Token]) -> object:
+            # Every node visit (``visit`` and ``visit_children``) passes here. Same body as
+            # lark's ``Interpreter._visit_tree`` rather than a ``super()`` call, so the step
+            # count adds no stack frame per tree level (deep trees stay within the limit).
+            budget = self.budget
+            if budget.remaining <= 0:
+                raise StepBudgetExceededError(STEP_BUDGET_MESSAGE)
+            budget.remaining -= 1
+            method = getattr(self, tree.data)
+            wrapper = getattr(method, "visit_wrapper", None)
+            if wrapper is not None:
+                return wrapper(method, tree.data, tree.children, tree.meta)
+            return method(tree)
 
         def member_dot_arg(self, tree: Tree[Token]) -> object:
             # A macro body raises its error (celpy's nested evaluate()); return it as a
@@ -232,7 +273,8 @@ def strict_runner_class() -> type[celpy.Runner]:
 
     class StrictRunner(celpy.InterpretedRunner):
         def evaluate(self, context: Context) -> celpy.celtypes.Value:
-            evaluator = StrictEvaluator(ast=self.ast, activation=self.new_activation())
+            budget = _StepBudget(MAX_EVAL_STEPS)
+            evaluator = StrictEvaluator(self.ast, self.new_activation(), budget)
             return evaluator.evaluate(context)
 
     return StrictRunner
