@@ -81,7 +81,7 @@ src/
   in `src/auth/sso.ts`; unknown values show the generic `SSO_FAILED`). Nothing else from the
   URL is shown or logged. `index.html` sets `<meta name="referrer" content="no-referrer">`
   (TD-334). The e2e journey against the fake OIDC provider waits for the Playwright harness
-  (T-0027): TD-445.
+  (T-0027): TD-446.
 - **Navigation (diff §6, §6.1).** 8 groups in `src/app/nav.ts`: Overview, the 4 pillars
   (Logistics, Execution, Defense & Claims, Controls & Insights), Backbone, Documents,
   Admin. `NAV_ITEMS` holds the item mapping of diff §6.1 (e.g. Execution: inspections / QMS,
