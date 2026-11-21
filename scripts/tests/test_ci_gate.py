@@ -74,12 +74,14 @@ def test_detect_not_green_makes_every_skip_a_problem() -> None:
     is known to be legitimate, so each skipped job is reported on its own, not only detect."""
     jobs = needs("false")
     jobs["detect"] = {"result": "failure", "outputs": {}}
-    for job in ("tracker", "backend", "backend-image", "backend-publish", "frontend", "perf", "e2e"):
-        jobs[job]["result"] = "skipped"
+    for job in ci_gate.EXPECTED:
+        if job != "detect":
+            jobs[job]["result"] = "skipped"
     assert ci_gate.evaluate(jobs, "push") == [
         "detect: failure (expected success)",
         "tracker: skipped (expected success)",
         "backend: skipped (expected success)",
+        "backend-pg: skipped (expected success)",
         "backend-image: skipped (expected success)",
         "backend-publish: skipped (expected success)",
         "frontend: skipped (expected success)",
@@ -91,6 +93,7 @@ def test_detect_not_green_makes_every_skip_a_problem() -> None:
     problems = ci_gate.evaluate(jobs, "pull_request")
     assert "backend-publish: skipped (expected success)" in problems
     assert "backend: skipped (expected success)" in problems
+    assert "backend-pg: skipped (expected success)" in problems
 
 
 def test_missing_job_fails() -> None:

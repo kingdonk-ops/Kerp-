@@ -110,19 +110,23 @@ def test_ci_passes_the_base_ref_through_env() -> None:
     assert 'check-ids --base "origin/$BASE_REF" --head "$HEAD_SHA"' in " ".join(tracker.split())
 
 
-def _service_images() -> dict[str, str]:
-    """``service name -> image`` of the ci.yml backend job."""
+def _service_images() -> list[tuple[str, str]]:
+    """``(service name, image)`` of every service container in ci.yml, whichever job."""
     lines = _text("ci.yml").splitlines()
-    images: dict[str, str] = {}
+    images: list[tuple[str, str]] = []
     for i, line in enumerate(lines):
         if re.match(r"^\s+image: ", line):
             key = next(k for k in reversed(lines[:i]) if not k.strip().startswith("#"))
-            images[key.strip().rstrip(":")] = line.split("image: ", 1)[1].strip()
+            images.append((key.strip().rstrip(":"), line.split("image: ", 1)[1].strip()))
     return images
 
 
-def test_ci_has_the_two_service_images() -> None:
-    assert set(_service_images()) == {"postgres", "redis"}
+def test_ci_service_containers_are_postgres_and_redis_only() -> None:
+    services = _service_images()
+    assert {name for name, _ in services} == {"postgres", "redis"}
+    # Only the PostgreSQL job has service containers since T-0081 (SQLite job runs without).
+    assert "services:" not in _jobs("ci.yml")["backend"]
+    assert "services:" in _jobs("ci.yml")["backend-pg"]
 
 
 @pytest.mark.parametrize(
@@ -140,8 +144,10 @@ def test_ci_has_the_two_service_images() -> None:
     ],
 )
 def test_ci_service_images_are_pinned_by_digest(service: str, tag: str) -> None:
-    image = _service_images()[service]
-    assert re.fullmatch(rf"{re.escape(tag)}@sha256:[0-9a-f]{{64}} # {re.escape(tag)}", image), image
+    images = [image for name, image in _service_images() if name == service]
+    assert images, service
+    for image in images:  # every definition of the service, in any job
+        assert re.fullmatch(rf"{re.escape(tag)}@sha256:[0-9a-f]{{64}} # {re.escape(tag)}", image), image
 
 
 def test_publish_pushes_the_smoke_tested_image_not_a_rebuild() -> None:
@@ -161,6 +167,8 @@ def test_publish_pushes_the_smoke_tested_image_not_a_rebuild() -> None:
     assert '[ "$loaded" = "$TESTED_ID" ]' in publish
     assert '[ "$pushed" = "$TESTED_ID" ]' in publish
     assert "GITHUB_STEP_SUMMARY" in publish
+    # It still waits for both test jobs (T-0081) and the smoke test.
+    assert "needs: [detect, backend, backend-pg, backend-image]" in publish
 
 
 def test_lock_refresh_is_weekly_least_privilege_and_app_free() -> None:
