@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 342 · **Closed:** 148
+**Open:** 343 · **Closed:** 148
 
 ## decision (40)
 
@@ -189,7 +189,7 @@
 | [TD-495](../tracker/todo/TD-495.md) | Audit explorer at scale: no ledger index for the explorer filters; verify-all is one pass (1 h timeout, no progress or resume) | T-0222 | implementer |
 | [TD-501](../tracker/todo/TD-501.md) | Playwright journey for T-0276 (system_admin without membership opens project B; non-admin sees only its projects) once the e2e harness exists (T-0027) | T-0276 | implementer |
 
-## later (136)
+## later (137)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -329,6 +329,7 @@
 | [TD-493](../tracker/todo/TD-493.md) | fields/form engine polish from the #156 review | T-0110 | reviewer |
 | [TD-498](../tracker/todo/TD-498.md) | Unskip the T-0027 module-toggle step when the first toggleable module merges | T-0027 | planner |
 | [TD-499](../tracker/todo/TD-499.md) | All-Projects for a system_admin who is a member of every project and holds no portfolio persona: /me/projects has no system_admin flag, so the picker cannot offer the scope | T-0276 | implementer |
+| [TD-506](../tracker/todo/TD-506.md) | PG test templates collide between concurrent runs on one server (kerp_tmpl_*_<worker> ignores the database name) | T-0223 | implementer |
 
 ## bug (9)
 
