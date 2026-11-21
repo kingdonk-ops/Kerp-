@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 289 · **Closed:** 135
+**Open:** 291 · **Closed:** 135
 
 ## decision (30)
 
@@ -157,7 +157,7 @@
 | [TD-365](../tracker/todo/TD-365.md) | Frontend translations of the password policy codes and the password policy in /auth/config | T-0077 | implementer |
 | [TD-394](../tracker/todo/TD-394.md) | Approve access request: site picker for PER-07 site scope once the asset hierarchy API exists | T-0051 | implementer |
 
-## later (120)
+## later (122)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -281,6 +281,8 @@
 | [TD-393](../tracker/todo/TD-393.md) | Expose is_system_admin on GET /auth/me so the client need not probe GET /admin/grants for Admin nav visibility | T-0051 | implementer |
 | [TD-403](../tracker/todo/TD-403.md) | Stats and export providers for modules that land later: NCR, punch, equipment, credentials, materials/MTR, MDR, welding | T-0219, T-0235 | planner |
 | [TD-415](../tracker/todo/TD-415.md) | Inspection follow-ups (oe_inspections_follow_up) move to the generic tasks module when E-04-07 is broken down | T-0257, T-0288, E-04-07 | planner |
+| [TD-441](../tracker/todo/TD-441.md) | Per-test PostgreSQL databases: widen the empty-source check to leftover types, sequences, views and functions (not only tables) | T-0082 | reviewer |
+| [TD-442](../tracker/todo/TD-442.md) | CI: fail the frontend job when the committed generated API client (frontend/src/api/) drifts from the backend OpenAPI schema | T-0083 | reviewer |
 
 ## bug (6)
 
