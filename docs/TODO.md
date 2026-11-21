@@ -3,9 +3,9 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 255 · **Closed:** 131
+**Open:** 253 · **Closed:** 133
 
-## decision (11)
+## decision (10)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -19,9 +19,8 @@
 | [TD-348](../tracker/todo/TD-348.md) | T-0073: deleting a project with team-derived members answers 409 (unlink teams first); T-0013 to confirm or cascade | T-0073 | implementer |
 | [TD-373](../tracker/todo/TD-373.md) | Invite acceptance and SoD: accept proceeds (audited sod_warning) when the invitee gained a conflicting persona after the inviter confirmed | T-0052 | implementer |
 | [TD-378](../tracker/todo/TD-378.md) | First password at invite acceptance: should an internal-domain account without credentials (company member who never signed in through Entra ID) be refused? | T-0059 | implementer |
-| [TD-385](../tracker/todo/TD-385.md) | T-0075 reconcile: a live link to a deleted project expects no derived rows (rows it holds are excess, --fix revokes) | T-0075 | implementer |
 
-## spec-gap (47)
+## spec-gap (46)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -71,7 +70,6 @@
 | [TD-369](../tracker/todo/TD-369.md) | SSO start with an invite: spec §4.5 has GET /start keep the invite_token, but a token must never be in a URL query; T-0052 added a form POST | T-0052 | implementer |
 | [TD-370](../tracker/todo/TD-370.md) | Magic-link eligibility by invite: by the account's e-mail (spec §4.2) or only when the request presents that invite_token (T-0052 wording)? | T-0052 | implementer |
 | [TD-379](../tracker/todo/TD-379.md) | Invite setup-preview: shape of the 'neutral answer telling the client to sign in' for an account that already has credentials | T-0059 | implementer |
-| [TD-384](../tracker/todo/TD-384.md) | T-0075 SoD fix: 'plus their existing rows' cannot keep a sod_pending user's stale row of the link | T-0075 | implementer |
 
 ## missed (8)
 
@@ -429,4 +427,6 @@
 | ✅ | [TD-295](../tracker/todo/TD-295.md) | T-0044 says module admin but the route /api/v1/settings/deployment and the projects->settings dependency need a separate settings module | Product owner, 2026-11-16: separate settings module (projects depends_on settings) confirmed |
 | ✅ | [TD-298](../tracker/todo/TD-298.md) | Rate-limit the unauthenticated wipe-confirmed endpoint (every refusal appends an audit entry) |  |
 | ✅ | [TD-300](../tracker/todo/TD-300.md) | Field PIN idle is measured from the session's last renewal (refresh token iat), not from its last authenticated request | Product owner, 2026-11-16: idle measured from the refresh token iat (as built in T-0038); early prompt of up to one access-token lifetime accepted |
+| ✅ | [TD-384](../tracker/todo/TD-384.md) | T-0075 SoD fix: 'plus their existing rows' cannot keep a sod_pending user's stale row of the link | user decision 2026-11-21: accept the implemented reading. The sync gets the expected set minus the sod_pending users; a pending user's stale rows of that link are excess and revoked; --fix --confirm-sod then adds the correct row. T-0075 AC reworded |
+| ✅ | [TD-385](../tracker/todo/TD-385.md) | T-0075 reconcile: a live link to a deleted project expects no derived rows (rows it holds are excess, --fix revokes) | user decision 2026-11-21: accept. A live link to a deleted project expects no derived rows (matches the teams service, TD-358); rows it holds are excess and --fix revokes them; after a project restore reconcile expects them again. T-0075 AC reworded |
 | ✅ | [TD-386](../tracker/todo/TD-386.md) | audit ledger: concurrent appends to one chain race on SQLite (seq unique violation → 500) | on SQLite _lock_chain takes the database write lock (a no-op UPDATE on audit_ledger) before the tail read, so a second appender waits for the first to commit and links to it (fix/audit-ledger-sqlite-race) |
