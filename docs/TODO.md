@@ -334,7 +334,7 @@
 | [TD-499](../tracker/todo/TD-499.md) | All-Projects for a system_admin who is a member of every project and holds no portfolio persona: /me/projects has no system_admin flag, so the picker cannot offer the scope | T-0276 | implementer |
 | [TD-504](../tracker/todo/TD-504.md) | Registry: reset an entry to its code default (delete the stored row) for the Settings screen T-0232 | T-0230 | implementer |
 
-## bug (8)
+## bug (9)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -346,6 +346,7 @@
 | [TD-375](../tracker/todo/TD-375.md) | mypy 2.3.1 (local toolchain) reports var-annotated in app/core/audit/guard.py:66 and app/modules/admin/service.py:122 on untouched dev code | T-0052 | implementer |
 | [TD-471](../tracker/todo/TD-471.md) | CEL parity: divergences between celpy and cel-js found by the T-0110 edge probe (pinned as known_gap fixtures) | T-0110, T-0017 | implementer |
 | [TD-490](../tracker/todo/TD-490.md) | Admin -> Users invite form: a SoD 409 that returns after the user edited the form re-arms confirm_sod for the edited form (fields stay editable while the send is pending) | T-0331 | reviewer |
+| [TD-507](../tracker/todo/TD-507.md) | Local PostgreSQL test runs of parallel worktrees collide: template databases are named per xdist worker only | T-0230 | implementer |
 
 ## risk (33)
 
