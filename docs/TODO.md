@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 340 · **Closed:** 148
+**Open:** 341 · **Closed:** 148
 
 ## decision (39)
 
@@ -49,7 +49,7 @@
 | [TD-484](../tracker/todo/TD-484.md) | RFI notification e-mail: may it carry the date/time/location, the RFI PDF attachment and an .ics invite, and go to client distribution addresses without a KERP account? | T-0335 | planner |
 | [TD-486](../tracker/todo/TD-486.md) | RFI witness check: may an unmet hold-point (H) witness requirement be overridden per record (ADR 0004 Amendment A), or is it non-overridable? | T-0333 | planner |
 
-## spec-gap (67)
+## spec-gap (68)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -119,6 +119,7 @@
 | [TD-481](../tracker/todo/TD-481.md) | oe_asset_node columns the spec does not name or type: name, planned_start/planned_finish, Numeric(18,4) quantities, list-of-ids lineage; display_code for a level missing on the path | T-0101 | implementer |
 | [TD-488](../tracker/todo/TD-488.md) | Quarantine re-check: AC says 'staging object still exists', but a stuck file's bytes may be only in the quarantine copy (scanner outage, T-0218); implemented as staging OR quarantine copy exists, else 409 OBJECT_GONE | T-0221 | implementer |
 | [TD-494](../tracker/todo/TD-494.md) | Audit explorer: which verifications are audited console actions (single-chain verify, verify-all request and outcome) | T-0222 | implementer |
+| [TD-496](../tracker/todo/TD-496.md) | Health probe 'degraded' is undefined in diff §4.7: planner default slow (> 1 s) or stub scanner | T-0219 | implementer |
 | [TD-500](../tracker/todo/TD-500.md) | GET /me/projects does not return per-project capabilities; the frontend mirrors the backend persona matrix to gate A/S actions (projects/capabilities.tsx) | T-0276 | implementer |
 
 ## missed (9)
