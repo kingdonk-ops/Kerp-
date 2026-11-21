@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 342 · **Closed:** 148
+**Open:** 343 · **Closed:** 148
 
 ## decision (39)
 
@@ -137,7 +137,7 @@
 | [TD-463](../tracker/todo/TD-463.md) | Server: refuse self-deactivation on PATCH /admin/users/{id} (Admin → Users only hides the button) | T-0331, T-0085 | implementer |
 | [TD-487](../tracker/todo/TD-487.md) | Frontend: Admin -> System grants page needs the SoD confirm step for system_admin on a hold-authority holder (POST /admin/grants 409 sod_confirmation_required, confirm_sod), plus the same warning for hold personas on system_admins in member/invite/team UIs | T-0275 | implementer |
 
-## deferred (48)
+## deferred (49)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -189,6 +189,7 @@
 | [TD-482](../tracker/todo/TD-482.md) | asset_management: node edit (code / name / attributes, with display_path and display_code rewrite of the subtree), node delete and level def delete are not built in T-0101 | T-0101 | implementer |
 | [TD-495](../tracker/todo/TD-495.md) | Audit explorer at scale: no ledger index for the explorer filters; verify-all is one pass (1 h timeout, no progress or resume) | T-0222 | implementer |
 | [TD-501](../tracker/todo/TD-501.md) | Playwright journey for T-0276 (system_admin without membership opens project B; non-admin sees only its projects) once the e2e harness exists (T-0027) | T-0276 | implementer |
+| [TD-508](../tracker/todo/TD-508.md) | Verify the e2e suite on the make up compose stack, and give it its own database | T-0027 | implementer |
 
 ## later (136)
 
