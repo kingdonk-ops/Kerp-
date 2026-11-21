@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 306 · **Closed:** 135
+**Open:** 305 · **Closed:** 136
 
 ## decision (38)
 
@@ -123,7 +123,7 @@
 | [TD-337](../tracker/todo/TD-337.md) | Web/Android route /magic-link#<token> that redeems the e-mailed sign-in link (POST /auth/magic-link/redeem); the e-mail now links there | T-0058 | implementer |
 | [TD-388](../tracker/todo/TD-388.md) | saved_views: wire the my_teams filter op | T-0074 | reviewer |
 
-## deferred (41)
+## deferred (40)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -166,7 +166,6 @@
 | [TD-394](../tracker/todo/TD-394.md) | Approve access request: site picker for PER-07 site scope once the asset hierarchy API exists | T-0051 | implementer |
 | [TD-432](../tracker/todo/TD-432.md) | Digest-pin the postgis/postgis:16-3.4 CI service image (ci.yml): the implementer sandbox could not reach the Docker Hub registry API to resolve its digest (redis is pinned); resolve with docker buildx imagetools inspect and drop the strict xfail in scripts/tests/test_workflows.py | T-0033 | implementer |
 | [TD-446](../tracker/todo/TD-446.md) | E2E journey: Sign in with Microsoft against the fake OIDC provider (T-0054) lands in the project, once the Playwright harness (T-0027) exists | T-0055 | implementer |
-| [TD-447](../tracker/todo/TD-447.md) | Admin → Users screen (T-0026 remainder): System admin creates / deactivates / reactivates accounts (GET/POST/PATCH /admin/users); PER-09 invites by e-mail to one of its projects with persona(s) + site + SoD confirm, shows the link once, lists / re-sends / revokes open invites | T-0026 | implementer |
 | [TD-448](../tracker/todo/TD-448.md) | Playwright e2e journey for T-0026 (System admin appoints a Project Admin -> they create a project -> assign a user) once T-0027 sets up e2e/; covered meanwhile by the component-level journey in frontend/src/admin/MembersPage.test.tsx | T-0026 | implementer |
 
 ## later (125)
@@ -485,3 +484,4 @@
 | ✅ | [TD-385](../tracker/todo/TD-385.md) | T-0075 reconcile: a live link to a deleted project expects no derived rows (rows it holds are excess, --fix revokes) | user decision 2026-11-21: accept. A live link to a deleted project expects no derived rows (matches the teams service, TD-358); rows it holds are excess and --fix revokes them; after a project restore reconcile expects them again. T-0075 AC reworded |
 | ✅ | [TD-386](../tracker/todo/TD-386.md) | audit ledger: concurrent appends to one chain race on SQLite (seq unique violation → 500) | on SQLite _lock_chain takes the database write lock (a no-op UPDATE on audit_ledger) before the tail read, so a second appender waits for the first to commit and links to it (fix/audit-ledger-sqlite-race) |
 | ✅ | [TD-396](../tracker/todo/TD-396.md) | System console and project archive: may a System admin see project-scoped records (upload quarantine rows, audit entries, archive contents) of projects where they hold no membership? | Answered by the user's decision of 2026-11-21: system_admin has global read/admin visibility across all projects of the tenant without a membership (docs/decisions/0016-system-admin-global-visibility.md, accepted; diff §4.1; T-0274-T-0276). Quarantine rows and audit chains of every project, archive export/download/restore of any project; count-only functions and membership gates dropped (T-0219, T-0221, T-0222, T-0224, T-0233, T-0237, T-0239, T-0240, T-0241). |
+| ✅ | [TD-447](../tracker/todo/TD-447.md) | Admin → Users screen (T-0026 remainder): System admin creates / deactivates / reactivates accounts (GET/POST/PATCH /admin/users); PER-09 invites by e-mail to one of its projects with persona(s) + site + SoD confirm, shows the link once, lists / re-sends / revokes open invites |  |
