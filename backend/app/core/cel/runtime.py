@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import sys
 from collections.abc import Collection, Mapping
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import TYPE_CHECKING
 
 from app.core.cel.errors import CelErrorCode, classify_celpy_error, short_message
+from app.core.cel.limits import MAX_EXPRESSION_BYTES, LimitExceededError, check_limits
 from app.core.cel.strict import strict_functions, strict_runner_class
 from app.core.cel.values import JsonValue, UnencodableValueError, decode_context, encode_value
 
@@ -16,8 +18,11 @@ if TYPE_CHECKING:
     from lark import Token, Tree
 
 PROGRAM_CACHE_SIZE = 1024
-# Same cap on the client (frontend/src/lib/cel/evaluate.ts), counted in UTF-8 bytes.
-MAX_EXPRESSION_BYTES = 4096
+# celpy's evaluator recurses about three Python frames per parse-tree node; an expression at
+# the nesting-depth cap (limits.py) needs up to ~4,000 (nested list literals). celpy itself
+# raises the limit to 2,500 when an Environment is created. Python frames live on the heap
+# (3.11+), so this costs no C stack.
+RECURSION_LIMIT = 10_000
 
 
 @dataclass(frozen=True, slots=True)
@@ -100,10 +105,13 @@ def _check_tree(ast: Tree[Token]) -> frozenset[str]:
 
     celpy reports an unknown function as an undeclared reference (KERP: NO_MATCHING_OVERLOAD),
     accepts ``has(x)`` on a plain variable, and evaluates ``true || 'a'`` / ``l.filter(v, 1)``
-    by truthiness; CEL / cel-js reject all of these.
+    by truthiness; CEL / cel-js reject all of these. The cost caps (``limits.py``: nested loop
+    macros, nesting depth) are checked first, iteratively, so a deep tree is refused before
+    anything walks it recursively.
     """
     from lark import Token, Tree
 
+    check_limits(ast)  # LimitExceededError
     called: set[str] = set()
     for node in ast.iter_subtrees():
         if (
@@ -168,7 +176,8 @@ def _free_identifiers(ast: Tree[Token]) -> frozenset[str]:
 def _compile(expression: str) -> _Compiled:
     """Parse + plan once per expression text.
 
-    Raises ``celpy.CELParseError``, ``_MacroArgumentError`` or ``_StaticTypeError``.
+    Raises ``celpy.CELParseError``, ``LimitExceededError``, ``_MacroArgumentError`` or
+    ``_StaticTypeError``.
     """
     environment = _environment()
     ast = environment.compile(expression)
@@ -187,7 +196,7 @@ def _compiled_or_error(expression: str) -> _Compiled | CelError:
         )
     try:
         return _compile(expression)
-    except (CELParseError, _MacroArgumentError) as exc:
+    except (CELParseError, LimitExceededError, _MacroArgumentError) as exc:
         return CelError(CelErrorCode.PARSE_ERROR, short_message(str(exc)))
     except _StaticTypeError as exc:
         return CelError(CelErrorCode.NO_MATCHING_OVERLOAD, str(exc))
@@ -227,6 +236,8 @@ def evaluate(expression: str, context: Mapping[str, JsonValue]) -> CelResult:
     compiled = _compiled_or_error(expression)
     if isinstance(compiled, CelError):
         return compiled
+    if sys.getrecursionlimit() < RECURSION_LIMIT:
+        sys.setrecursionlimit(RECURSION_LIMIT)
     try:
         result = compiled.program.evaluate(activation)
     except Exception as exc:  # celpy surfaces CELEvalError and, rarely, bare exceptions

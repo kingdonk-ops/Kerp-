@@ -30,7 +30,14 @@ if (result.ok) {
 - **Fail closed**: a rule passes **only** on `result.ok && result.value === true`. Every error and
   every non-bool value blocks (or hides / invalidates, depending on the rule type). Never use
   truthiness.
-- **Limits**: expressions over 4096 UTF-8 bytes return `INVALID_ARGUMENT` before parsing.
+- **Limits** (`limits.ts`, T-0341; same values as the server, from the `limits` block of
+  `tests/contract/conformance_fixtures.json`, definitions in `tests/contract/README.md`):
+  expressions over 4096 UTF-8 bytes return `INVALID_ARGUMENT` before parsing; more than 3 nested
+  loop macros or a nesting depth over 100 return `PARSE_ERROR` before evaluation (the parser
+  depth through cel-js's `limits.maxDepth`, the syntax-tree depth and macro nesting through
+  `checkLimits` on the parsed AST, iteratively). Refused programs are not cached. The server's
+  evaluation step budget is not applied here: cel-js has no step hook (TD-533), so the server is
+  the hard gate.
 - **Caching**: compiled programs are cached per expression text (LRU, 1024 entries).
 - Results are range-checked: an int outside int64 becomes `INT_OVERFLOW` (cel-js uses unbounded
   `bigint`). Remaining divergences are pinned `known_gap` fixtures (TD-041, TD-471): among them

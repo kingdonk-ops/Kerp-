@@ -148,13 +148,20 @@ confirmation (spec-gap TD-139).
 `save_rule` compiles before anything is written and raises `RuleCompileError` with the reason:
 
 - the engine must match the kind (`regex` only for `autolink` and `p6_grammar`);
-- CEL goes through `app.core.cel.compile_expression`: the same parser, 4096-byte cap and
-  static checks as evaluation (safe subset, TD-041), and every top-level variable must be in
+- CEL goes through `app.core.cel.compile_expression`: the same parser, 4096-byte cap, cost caps
+  (at most 3 nested loop macros, nesting depth 100; T-0341) and static checks as evaluation
+  (safe subset, TD-041), and every top-level variable must be in
   the kind's context schema. A macro variable counts as bound only inside its own macro
   call (`l.all(x, x.ok) && x` is rejected). Field-level types are not checked (no server CEL type checker);
 - regex compiles with **RE2** (`google-re2`, imported lazily): linear time, so lookaround and
   backreferences are rejected; patterns are capped at 1024 characters;
 - `params` must be valid KERP CEL JSON.
+
+Save and the "Try it" draft (`try_rule`) use this same compile step, so a rule over a cost cap
+can neither be stored nor tried (`422`, `CEL PARSE_ERROR: ...`). A rule stored before the caps
+existed that exceeds one is a `PARSE_ERROR` at evaluation, and a rule that spends the server's
+evaluation step budget an `EVAL_ERROR`: in `run_checks` both are an `error` finding that blocks
+(fail closed), as before.
 
 ### Versions and audit (ADR 0004 §3)
 
