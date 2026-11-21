@@ -37,12 +37,12 @@ Suites that load it (both fail if the file is missing, has no fixtures, or has d
 currently has: the *other* runtime is asserted against `expect`, and the named runtime is asserted
 against the pinned `actual` (not skipped), so a library upgrade that changes either behaviour fails
 the suite and the fixture must be updated. Every gap must cite an open TODO that lists `T-0017` in
-its `tasks` (currently `TD-041` and `TD-463`; both suites check this). Gap fixtures do not count
+its `tasks` (currently `TD-041` and `TD-471`; both suites check this). Gap fixtures do not count
 toward the T-0131 parity target.
 
 The `edge.*` fixtures (T-0110) cover the semantics that tend to diverge: null and absent fields,
 numeric types and overflow, strings and unicode, timestamps and time zones, list/map membership,
-short-circuiting and errors. Their gaps are summarised in `TD-463`.
+short-circuiting and errors. Their gaps are summarised in `TD-471`.
 
 **Fail closed.** A rule passes only when the result is exactly the bool `true`
 (`CelOk(value=True)` / `{ok: true, value: true}`); every error and every non-bool value blocks.

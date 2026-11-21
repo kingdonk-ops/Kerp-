@@ -117,4 +117,4 @@ callers (`actions`, tab content) must use the same tokens.
   - An answer that does not have the shape of its type is a `type_mismatch` error, checked
     before the field's `validation`.
   - `measurement`, `photo`, `signature` and `instrument_ref` have no capture control yet
-    (TD-468).
+    (TD-476).

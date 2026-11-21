@@ -47,8 +47,8 @@ match result:
 - **Limits**: expressions over 4096 UTF-8 bytes return `INVALID_ARGUMENT` before parsing.
 - **Parity**: `tests/test_cel_conformance.py` runs every fixture in
   `tests/contract/conformance_fixtures.json`. Remaining celpy deviations are pinned there as
-  `known_gap` fixtures (TD-041, TD-463). The TD-041 ones all fail closed. The T-0110 edge probe
-  (TD-463) also found places where celpy is **more lenient** than CEL and the client (`has(a.b.c)`
+  `known_gap` fixtures (TD-041, TD-471). The TD-041 ones all fail closed. The T-0110 edge probe
+  (TD-471) also found places where celpy is **more lenient** than CEL and the client (`has(a.b.c)`
   with `b` absent is `false`, `size(null)` is 0, `1 < 2 < 3` is `true`, `int(' 12')`,
   `timestamp('2024-01-01')`, `duration('1d')`, ...); they are pinned, not yet closed. Avoid
   int-left mixed ordering (`1 < 2.0`), `== null` on fields that may hold a value, and int literals

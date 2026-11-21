@@ -33,6 +33,6 @@ if (result.ok) {
 - **Limits**: expressions over 4096 UTF-8 bytes return `INVALID_ARGUMENT` before parsing.
 - **Caching**: compiled programs are cached per expression text (LRU, 1024 entries).
 - Results are range-checked: an int outside int64 becomes `INT_OVERFLOW` (cel-js uses unbounded
-  `bigint`). Remaining divergences are pinned `known_gap` fixtures (TD-041, TD-463): among them
+  `bigint`). Remaining divergences are pinned `known_gap` fixtures (TD-041, TD-471): among them
   `matches()` (JS `RegExp`, not RE2), string ordering of astral characters, impossible dates in
   `timestamp('...')` and string extensions (`trim`, `split`, ...) that the server does not have.

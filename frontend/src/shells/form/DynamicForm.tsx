@@ -202,7 +202,7 @@ function FieldControl({ field, tx, id, value, required, invalid, describedBy, on
           onChange={(e) => { onChange(e.target.value); }}
         />
       );
-    default: // measurement, photo, signature, instrument_ref: capture controls: TD-468
+    default: // measurement, photo, signature, instrument_ref: capture controls: TD-476
       return null;
   }
 }

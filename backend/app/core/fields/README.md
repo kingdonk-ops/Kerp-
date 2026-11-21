@@ -24,7 +24,7 @@ result.valid, result.errors, result.failed, result.values, result.visible, resul
 | `conformance_fixtures.json` | CEL expressions (T-0017), incl. the T-0110 edge set | `tests/test_cel_conformance.py` |
 
 `EVALUATOR_VERSION` (1) equals `evaluator_version` in `form_fixtures.json`. Change the
-semantics → bump it on both runtimes and in the file (template revisions will pin it, TD-464).
+semantics → bump it on both runtimes and in the file (template revisions will pin it, TD-472).
 
 ## Palette (`registry.py`)
 
@@ -65,7 +65,7 @@ An unanswered field is absent, `null`, `""` or `[]`; `0` and `false` are answers
   `range`), `INVALID_SECTION`. Issues come in document order with a path such as
   `fields[2].validation.error_message`.
 - CEL is compiled (`app.core.cel.compile_expression`) but not type-checked, and field
-  references are not resolved yet (TD-465).
+  references are not resolved yet (TD-473).
 
 ## Evaluation (`evaluator.py`) — same on the client
 
@@ -91,8 +91,8 @@ An unanswered field is absent, `null`, `""` or `[]`; `0` and `false` are answers
 
 Plain JSON numbers are CEL **doubles** (TD-040). Compare number fields with double literals:
 `fields.count == 2.0`, `fields.grade in [1.0, 2.0]`. `fields.count == 2` is true on the client
-and an error on the server (pinned gap, TD-463; it fails closed, but a `visible_if` written
+and an error on the server (pinned gap, TD-471; it fails closed, but a `visible_if` written
 that way hides the field on the server and drops its answer). Guard optional fields with
 `has(fields.x)`. Avoid `matches()` beyond plain ASCII patterns, string functions other than
 `contains` / `startsWith` / `endsWith` / `matches` / `size`, and `timestamp()` on text that is
-not strict RFC 3339 — each has a pinned gap in `conformance_fixtures.json` (TD-041, TD-463).
+not strict RFC 3339 — each has a pinned gap in `conformance_fixtures.json` (TD-041, TD-471).
