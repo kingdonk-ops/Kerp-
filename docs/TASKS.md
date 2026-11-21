@@ -3,16 +3,16 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 72/242 tasks done (30%) · **ready now:** 24 · **epics awaiting breakdown:** 48
+**Overall:** 72/252 tasks done (29%) · **ready now:** 24 · **epics awaiting breakdown:** 48
 
 | Phase | Tasks done | Progress |
 |---|---|---|
 | 0 · Platform foundations | 72/109 | `██████░░░░` 66% |
-| 1 · Asset & Quality backbone | 0/120 (+1 epics) | `░░░░░░░░░░` 0% |
+| 1 · Asset & Quality backbone | 0/124 (+1 epics) | `░░░░░░░░░░` 0% |
 | 2 · Welding quality | 0/10 | `░░░░░░░░░░` 0% |
 | 3 · Logistics | 0/2 (+7 epics) | `░░░░░░░░░░` 0% |
 | 4 · Execution | 0/0 (+15 epics) | `░░░░░░░░░░` 0% |
-| 5 · Documents, collaboration & AI | 0/1 (+10 epics) | `░░░░░░░░░░` 0% |
+| 5 · Documents, collaboration & AI | 0/7 (+10 epics) | `░░░░░░░░░░` 0% |
 | 6 · Defense, claims & controls | 0/0 (+8 epics) | `░░░░░░░░░░` 0% |
 | 6b · Work packaging (AWP) | 0/0 (+3 epics) | `░░░░░░░░░░` 0% |
 | 7 · Client portal | 0/0 (+4 epics) | `░░░░░░░░░░` 0% |
@@ -163,8 +163,12 @@
 | ▶ | [T-0119](../tracker/tasks/T-0119.md) | signing: append-only hash-chained sign-off ledger (internal now; pyHanko PAdES seam later) | signing | M | T-0006 |  |
 | ⬜ | [T-0120](../tracker/tasks/T-0120.md) | requirements / source_data: requirements & prerequisite-documents register | requirements | S | T-0101 |  |
 | ⬜ | [T-0121](../tracker/tasks/T-0121.md) | review_authority / project_route: external review cycles + work-type routing gate | review_authority | S | T-0111 |  |
+| ⬜ | [T-0188](../tracker/tasks/T-0188.md) | qms: rule-based scope-to-ITP assignment (itp_assignment rule kind), manual instantiation, batch auto-generation into pending_qa_review proposals, QA Approve & Activate | qms | M | T-0015, T-0018, T-0034, T-0101, T-0111, T-0113, T-0119 |  |
 | ▶ | [T-0122](../tracker/tasks/T-0122.md) | compliance DSL wired into run_checks (CEL rule sets) | compliance | M | T-0018 |  |
+| ⬜ | [T-0281](../tracker/tasks/T-0281.md) | qms: ITP instance customization (PER-06, non-signed lines only) and master-revision propagation API (auto-update unstarted lines, never signed ones, per-instance keep/apply for customized instances) | qms | M | T-0188, T-0113, T-0119 |  |
+| ⬜ | [T-0282](../tracker/tasks/T-0282.md) | Frontend: ITP manual instantiation and Activation Review Matrix (scope-to-ITP mapping, swap template, Approve & Activate) | frontend | M | T-0188, T-0025 |  |
 | ⬜ | [T-0124](../tracker/tasks/T-0124.md) | Rule sets A — completion gates: inspection.close, work_anchor.complete, asset.status_change (open Cat A/NCR blocks) as locked defaults | validation | M | T-0111, T-0114, T-0116, T-0034, T-0139 |  |
+| ⬜ | [T-0283](../tracker/tasks/T-0283.md) | Frontend: ITP Propagation Wizard (dry-run diff, keep/apply per customized instance) and instance line editing | frontend | S | T-0281, T-0282 |  |
 | ⬜ | [T-0125](../tracker/tasks/T-0125.md) | Rule sets B — P6 sync: asset.p6_fields, schedule.p6_import/export | validation | S | T-0104, T-0106 |  |
 | ⬜ | [T-0126](../tracker/tasks/T-0126.md) | Offline sync core: outbox_mutations, client_op_id idempotency, vector clock, conflict resolution (immutable approvals, per-field apply per ADR 0005) | sync | M | T-0006, T-0110 |  |
 | ⬜ | [T-0127](../tracker/tasks/T-0127.md) | Frontend: client storage contract + Dexie (web PWA) adapter, useOfflineSync tier-1 outbox + offline indicator | frontend | M | T-0126, T-0024 |  |
@@ -322,6 +326,12 @@
 | 🧩 | [E-05-09](../tracker/tasks/E-05-09.md) | RSW document ingestion: bulk/ZIP upload, combined-PDF splitting, template recognition, OCR extraction with source traceability | documents | L | T-0104, T-0105 |  |
 | 🧩 | [E-05-10](../tracker/tasks/E-05-10.md) | RSW-P6 matching & reconciliation engine: candidates, versioned weighted scoring, CEL hard/soft rules, verification queue, findings | asset_management | L | T-0104, T-0105, E-05-09 |  |
 | ⬜ | [T-0273](../tracker/tasks/T-0273.md) | materials/tq: client_tq substitution route — link to a TQ, approve automatically when the TQ is approved or with recorded client approval evidence | materials | S | E-05-04, T-0185 |  |
+| ⬜ | [T-0187](../tracker/tasks/T-0187.md) | qms/ai_agents: AI-assisted ITP template drafting from a master template and the project scope, AI section rewrite with diff preview, human publish by PER-06/PER-13 | qms | M | T-0015, T-0018, T-0101, T-0110, T-0113, T-0120, T-0281, E-05-08 |  |
+| ⬜ | [T-0284](../tracker/tasks/T-0284.md) | Frontend: two-pane AI ITP authoring (source scope/requirements beside the editable ITP table), AI rewrite with diff preview, publish | frontend | M | T-0187, T-0025 |  |
+| ⬜ | [T-0285](../tracker/tasks/T-0285.md) | Domain events for ITP alignment triggers through the transactional outbox: scope_change.agreed/implemented, p6.import.committed, asset.node.updated, task.created | integrations | S | E-05-07, E-04-14, E-04-07, T-0104, T-0101 |  |
+| ⬜ | [T-0189](../tracker/tasks/T-0189.md) | qms/ai_agents: ITP alignment watchdog — drift reviews on scope-change, P6 and task events, AI gap analysis and proposed ITP patch (proposal only), reviewer notification | qms | M | T-0015, T-0019, T-0058, T-0104, T-0187, T-0188, T-0281, T-0285, E-04-07, E-04-14, E-05-08 |  |
+| ⬜ | [T-0286](../tracker/tasks/T-0286.md) | qms: ITP alignment review actions — dismiss, mark manually updated, Apply AI proposal & approve (human-confirmed, signed lines preserved, ledgered) | qms | S | T-0189, T-0281 |  |
+| ⬜ | [T-0287](../tracker/tasks/T-0287.md) | Frontend: ITP Alignment Review drawer (what changed, AI gap analysis, proposed patch diff; dismiss / edit manually / apply & approve) and review register | frontend | M | T-0286, T-0283 |  |
 
 ## Phase 6 — Defense, claims & controls
 

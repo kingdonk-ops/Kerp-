@@ -195,3 +195,21 @@ and the drift report in Consequences. Where it is more specific than the section
   automatically by `sync_system_defaults` (a new key holds no tenant choice to keep), so new
   projects get it. A changed system set is only offered to the tenant layer, never forced (§4).
 - **Routes** are keyed by the rule set's id (as the T-0034 rule routes), not by its key.
+
+## Amendment H. Rule kind `itp_assignment` (planner default, 2026-11-21; pending TD-430)
+
+Proposed for the user's T-0188 (`quality-and-inspection.md` §ITP authoring, assignment and
+propagation). Not in force until TD-430 is confirmed; it must land before the M1 freeze (T-0131)
+or as a post-freeze amendment.
+
+| Kind | Engine | Variables | Action |
+|---|---|---|---|
+| `itp_assignment` | `cel` | `anchor` (code, level key, roles, `custom_fields`), `item` (nullable: `item_type`, `custom_fields`), `activity` (nullable: `activity_code`, `discipline`, task type), `project`, `params` | `assign` only, with `params.template_key` |
+
+- Rules evaluate in `sort_order`; the first match wins; no match leaves the anchor unassigned.
+- `template_key` names a template, never a revision; the latest **published** revision is used,
+  never a draft.
+- Editors as for `check` (§7): PER-06 on the project layer, PER-13 on the tenant layer, so
+  PER-09 never decides which ITP applies.
+- Assignment only proposes: instances it creates stay `pending_qa_review` until PER-06
+  activates them (TD-429).

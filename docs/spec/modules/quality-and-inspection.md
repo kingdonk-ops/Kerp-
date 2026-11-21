@@ -594,6 +594,69 @@ project-level types; no super admin).
 Strictly: ITP template authoring (on the one-engine), audit registers, and calibration
 records. No parallel inspection store.
 
+## ITP authoring, assignment and propagation (user, 2026-11-21; planner defaults)
+
+User-supplied tasks T-0187, T-0188 and T-0189 (ids kept). Where they disagreed with the spec,
+the spec won; open points: TD-428 (template structure, approval, instance row), TD-429
+(`pending_qa_review` and propagation semantics), TD-430 (rule kind), TD-398 (AI provider
+configuration), TD-422 (PER-13 as an approver).
+
+**ITP template and instance (TD-428 default).** An ITP template is a one-engine template of kind
+`itp` (no separate `oe_qms_itp_template` table). A revision holds ordered **stages** of **lines**:
+activity, acceptance criteria, specification/code references, the ITR form template (key and
+revision), and per party (Contractor, Principal, Client PER-15) one intervention point of `H`,
+`W`, `R`, `S`, `M`. "Approved" means **published** (frozen). Publishing an ITP revision needs
+PER-06 for a project template or PER-13 for a tenant master; never PER-09 and never
+`system_admin` alone (diff §4.1, ADR 0016). Applying a template to an anchor creates an
+**ITP instance** (`oe_qms_itp_instance`: anchor, template key, pinned revision, `is_customized`,
+status `pending_qa_review | active | superseded`) and, when active, one `kind = itp` record per
+line in `PENDING` (linked by `itp_instance_id`).
+
+**Assignment and activation (T-0188, phase 1).** Rule kind `itp_assignment` (ADR 0004
+Amendment H, pending TD-430) maps anchor, Item and activity attributes to a template key, for
+example "coatings ITP for Blast & Paint, piping welding ITP for Weld". Manual instantiation
+applies a published revision to selected anchors. **Auto-generate** evaluates the rules over a
+subtree in a `batch` job and writes **proposals only**: instances in `pending_qa_review` without
+line records, invisible to the field (TD-429; `pending_qa_review` is not a record lifecycle
+state). The **Activation Review Matrix** lets PER-06 swap or drop proposals and
+**Approve & Activate**, which creates the line records in `PENDING` and writes one ledger entry
+per batch. An unpublished revision is never instantiated (`run_checks` rule
+`itp.template_published`).
+
+**Instance edits and propagation (T-0281, phase 1).** A line is **started** once it has left
+`PENDING`, has an `inspection_request`, answers, or any sign-off ledger entry (T-0119). PER-06
+may add or retire **unstarted** lines on one instance (`is_customized = true`, audited).
+Publishing a new revision changes no instance by itself (records pin `template_revision_id`).
+The **Propagation Wizard** (dry run, then confirm by PER-06 / PER-13 for masters) re-pins, adds
+and retires unstarted lines on non-customized instances, and asks per customized instance:
+**Keep instance customizations** or **Apply master update**. Started and signed lines are
+never re-pinned, edited or retired, whatever the choice: T-0119 immutability is absolute.
+
+**AI-assisted authoring (T-0187, phase 5, E-05-08).** An `interactive` SAQ job drafts an ITP
+revision from a master template, the scope subtree and level definitions, the project
+requirements and specifications (T-0120) and the published ITR form templates. The provider is
+the deployment's configured AI provider in an **Australian region** (OpenAI, Anthropic Claude or
+a self-hosted Hugging Face model; TD-078), read-only deployment configuration (diff §4.7,
+TD-398). Output is schema-validated and saved as a **draft** revision with `source="ai"`; AI
+rewrite of selected stages or lines returns a diff that the user accepts in whole or in part.
+Only the human publish (above) makes it usable. Screen: two panes, source scope and requirements
+beside the editable ITP table (T-0284).
+
+**Alignment watchdog (T-0189, phase 5).** Outbox events (T-0285, ADR 0007, E-05-07):
+`scope_change.agreed`, `scope_change.implemented` (`change-of-scope.md` §5),
+`p6.import.committed`, `asset.node.updated`, `task.created`. Per affected anchor a `batch` job
+applies the `itp_assignment` rules, then asks the AI provider to compare the change with the
+active instance and the published templates. The result is an `oe_qms_itp_drift_review`
+(`aligned | misaligned | missing_itp | obsolete_steps`, AI summary, proposed patch with
+`source="ai"`, status `pending_review | dismissed | manual_updated | ai_patch_approved`). A patch
+may add lines from published templates, retire lines, or change intervention points of
+unstarted lines only. Anything but `aligned` notifies the reviewers (project setting, default
+PER-06 and PER-02) in-app at high priority and by e-mail (core-mail template
+`qms.itp_alignment_review`, overridable through T-0227). **Nothing changes until a human acts**
+(T-0286): dismiss, edit manually, or **Apply AI proposal & approve** (PER-06), which re-checks
+started lines at apply time, skips them, and ledgers the human confirmation of the AI proposal.
+Drawer and register: T-0287.
+
 ## `construction_control` — conformance + hold/witness evaluation
 Conformance criteria and hold / witness / surveillance / review point evaluation **via
 `run_checks`**. The legacy `construction_control._inspection` table is **dropped**.

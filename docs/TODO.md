@@ -3,9 +3,9 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 285 · **Closed:** 135
+**Open:** 288 · **Closed:** 135
 
-## decision (28)
+## decision (29)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -20,7 +20,7 @@
 | [TD-373](../tracker/todo/TD-373.md) | Invite acceptance and SoD: accept proceeds (audited sod_warning) when the invitee gained a conflicting persona after the inviter confirmed | T-0052 | implementer |
 | [TD-378](../tracker/todo/TD-378.md) | First password at invite acceptance: should an internal-domain account without credentials (company member who never signed in through Entra ID) be refused? | T-0059 | implementer |
 | [TD-397](../tracker/todo/TD-397.md) | Upload quarantine: keep the bytes of rejected (infected) uploads for re-scan and purge, or keep deleting them at rejection (T-0016)? | T-0218, T-0221 | planner |
-| [TD-398](../tracker/todo/TD-398.md) | Runtime settings: auth/security values from the 2026-11-21 paste (refresh hours, PIN idle, PIN lockout, scanner on/off, region, mail sender, AI provider) stay read-only deployment configuration? | T-0230 | planner |
+| [TD-398](../tracker/todo/TD-398.md) | Runtime settings: auth/security values from the 2026-11-21 paste (refresh hours, PIN idle, PIN lockout, scanner on/off, region, mail sender, AI provider) stay read-only deployment configuration? | T-0230, T-0187, T-0189 | planner |
 | [TD-399](../tracker/todo/TD-399.md) | Broadcast e-mail: may a System admin e-mail all users / any project's users, given diff §4.1 'only a project's PER-09 may send a notification through the API'? | T-0228 | planner |
 | [TD-400](../tracker/todo/TD-400.md) | E-mail template editor: text overrides of the i18n blocks (planner default) or full HTML body editing? | T-0227 | planner |
 | [TD-401](../tracker/todo/TD-401.md) | Project restore: audit chains when restoring as a new project (hash covers tenant/project ids), and hard deletion of projects (not in the spec) | T-0239, T-0240 | planner |
@@ -33,12 +33,13 @@
 | [TD-414](../tracker/todo/TD-414.md) | QA verification gates on existing records: which equipment, credentials and heat/MTR records count as verified when T-0260/T-0261/T-0265 land, and do imports start unverified? | T-0260, T-0261, T-0265 | planner |
 | [TD-418](../tracker/todo/TD-418.md) | SLA escalation 'grants co-review authority' to PER-02 / PER-13: widen who may approve QA verifications, or escalation notifies and reassigns only? | T-0182 | planner |
 | [TD-419](../tracker/todo/TD-419.md) | Calendar iCal feed GET /api/v1/calendar/ical/{token}.ics: a second token-authenticated no-JWT endpoint — decide with ADR 0013 (same tenant-from-JWT conflict) | E-04-15 | planner |
-| [TD-422](../tracker/todo/TD-422.md) | Shelf-life extension approver when the requester is PER-06: PER-13 Quality Director approves (user) — PER-13 has 'audit oversight', not QA approval (A), in the persona matrix | T-0184, T-0185 | planner |
+| [TD-422](../tracker/todo/TD-422.md) | Shelf-life extension approver when the requester is PER-06: PER-13 Quality Director approves (user) — PER-13 has 'audit oversight', not QA approval (A), in the persona matrix | T-0184, T-0185, T-0187, T-0188 | planner |
 | [TD-423](../tracker/todo/TD-423.md) | Internal-QA product substitution: may the Quality Engineer who raises it also approve it (user: 'raises and approves directly'), or does it need a second QE (no self-approval, as T-0184 and T-0140)? | T-0185 | planner |
 | [TD-426](../tracker/todo/TD-426.md) | System admin impersonation (user's pasted 'T-0076'): may a system_admin act as another user, or only view as them? Accept ADR 0015 with (a) full impersonation, (b) admin-member projects only, (c) read-only view-as, or (d) target consent by one-time code | T-0277, T-0278, T-0279, T-0280 | planner |
 | [TD-427](../tracker/todo/TD-427.md) | system_admin global visibility (ADR 0016): should reads of project records by a system_admin who holds no membership on that project be access-logged? | T-0274, T-0275 | planner |
+| [TD-429](../tracker/todo/TD-429.md) | Pasted 'pending_qa_review' is not an inspection lifecycle state: keep auto-generated ITPs out of oe_inspections_inspection until QA activates them (planner default), or add a new state? And re-pinning PENDING lines on master propagation | T-0188, T-0281 | planner |
 
-## spec-gap (56)
+## spec-gap (58)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -98,6 +99,8 @@
 | [TD-421](../tracker/todo/TD-421.md) | Material batch/lot entity with use-by dates is unspecified: who owns it (materials E-03-03 or site_inventory E-03-04), and original_use_by_date immutable + effective_use_by_date changed only by an approved shelf-life extension | E-03-03 | planner |
 | [TD-424](../tracker/todo/TD-424.md) | No baseline approved product list exists: define a project register of approved products per specified product code (planner default T-0269) | T-0269 | planner |
 | [TD-425](../tracker/todo/TD-425.md) | CEL helper eligibility.is_product_approved cannot do I/O and must run offline: pure function over a resolved approvals map | T-0270 | planner |
+| [TD-428](../tracker/todo/TD-428.md) | ITP templates: line-item structure, approval authority and the ITP instance on an anchor are not specified in T-0113 / quality-and-inspection.md (pasted T-0187/T-0188 assume oe_qms_itp_template, draft → approved, is_customized) | T-0113, T-0187, T-0188, T-0281 | planner |
+| [TD-430](../tracker/todo/TD-430.md) | New rule kind itp_assignment in the ADR 0004 rule store (scope → approved ITP template): context variables, action vocabulary, editors | T-0188 | planner |
 
 ## missed (7)
 

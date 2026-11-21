@@ -323,6 +323,25 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
   default: read-only "view as"). Spec: diff §4.2 *Support impersonation*, §4.7 registry entry
   `impersonation_max_minutes`, §6.5, edge spec §5. **Pilot-0 gate unchanged.**
 
+- **2026-11-21 — AI ITP authoring, rule-based ITP instantiation and propagation, scope-drift
+  watchdog (user-supplied T-0187, T-0188, T-0189; planner pass):** spec in
+  `quality-and-inspection.md` §ITP authoring, assignment and propagation, `change-of-scope.md`
+  §5 (outbox consumer), ADR 0004 Amendment H (rule kind `itp_assignment`, pending TD-430). The
+  user's ids were free on every branch and are kept. Phase 1: T-0188 (rules, manual
+  instantiation, auto-generate proposals, Approve & Activate; M), T-0281 (instance edits +
+  propagation API; M), T-0282 (activation matrix UI; M), T-0283 (propagation wizard UI; S).
+  Phase 5 (E-05-08): T-0187 (AI draft + rewrite + human publish; M), T-0284 (two-pane screen;
+  M), T-0285 (outbox events from scope changes, P6 import, assets, tasks; S), T-0189 (drift
+  detection + notification; M), T-0286 (review actions; S), T-0287 (review drawer; M). Where the
+  paste disagreed with the spec, the spec won: no `oe_qms_itp_template` table (one-engine
+  template, approved = published), `pending_qa_review` is a qms instance status, not a record
+  state, propagation never touches started or signed lines (T-0119), the AI provider stays
+  deployment configuration (TD-398, TD-078 Australian region), AI output is a `source="ai"`
+  proposal applied only by a human, `system_admin` never approves (ADR 0016), e-mail templates
+  via T-0227, events through the ADR 0007 outbox (E-05-07). **Pilot-0 gate unchanged.**
+  Raised: TD-428 (template structure/approval/instance), TD-429 (`pending_qa_review`,
+  propagation), TD-430 (rule kind). Updated: TD-398, TD-422 (task refs), E-05-08, E-04-14 (notes).
+
 ## Key engineering decisions (baked into the spec — see consolidation diff)
 
 | Area | Decision |
