@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 353 · **Closed:** 150
+**Open:** 354 · **Closed:** 150
 
 ## decision (40)
 
@@ -50,7 +50,7 @@
 | [TD-486](../tracker/todo/TD-486.md) | RFI witness check: may an unmet hold-point (H) witness requirement be overridden per record (ADR 0004 Amendment A), or is it non-overridable? | T-0333 | planner |
 | [TD-514](../tracker/todo/TD-514.md) | How is a passed or LOCKED_FOR_TURNOVER inspection corrected? Define void-and-reissue (revision suffix, supersedes link, ledger, MDR shows latest) | — | planner |
 
-## spec-gap (71)
+## spec-gap (72)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -125,6 +125,7 @@
 | [TD-503](../tracker/todo/TD-503.md) | T-0027 rule-set step: AC names a CEL variable and an API path that do not exist (context.qty, /api/v1/projects/{id}/rule-sets) | T-0027 | implementer |
 | [TD-505](../tracker/todo/TD-505.md) | Runtime settings registry: categories, the unit and ceiling of max_upload_size_mb, and client-visible flags are implementer readings | T-0230 | implementer |
 | [TD-515](../tracker/todo/TD-515.md) | Field registry has no multi-point measurement field: add measurement_set (list of values + unit) with CEL list statistics (mean/min/max/count) | — | planner |
+| [TD-516](../tracker/todo/TD-516.md) | Client bootstrap caching: 'ETag / no-store per the auth rules' has no auth rule to follow; default Cache-Control no-store + strong ETag over the values + If-None-Match -> 304 (T-0231); confirm, and that T-0248 clients revalidate with If-None-Match | T-0231 | implementer |
 
 ## missed (8)
 
