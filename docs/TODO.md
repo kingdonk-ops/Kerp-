@@ -50,7 +50,7 @@
 | [TD-486](../tracker/todo/TD-486.md) | RFI witness check: may an unmet hold-point (H) witness requirement be overridden per record (ADR 0004 Amendment A), or is it non-overridable? | T-0333 | planner |
 | [TD-502](../tracker/todo/TD-502.md) | ADR for the legal-hold columns on oe_projects_project (core-table change, T-0223) | T-0223 | implementer |
 
-## spec-gap (70)
+## spec-gap (69)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -122,7 +122,6 @@
 | [TD-494](../tracker/todo/TD-494.md) | Audit explorer: which verifications are audited console actions (single-chain verify, verify-all request and outcome) | T-0222 | implementer |
 | [TD-496](../tracker/todo/TD-496.md) | Health probe 'degraded' is undefined in diff §4.7: planner default slow (> 1 s) or stub scanner | T-0219 | implementer |
 | [TD-500](../tracker/todo/TD-500.md) | GET /me/projects does not return per-project capabilities; the frontend mirrors the backend persona matrix to gate A/S actions (projects/capabilities.tsx) | T-0276 | implementer |
-| [TD-503](../tracker/todo/TD-503.md) | T-0027 rule-set step: AC names a CEL variable and an API path that do not exist (context.qty, /api/v1/projects/{id}/rule-sets) | T-0027 | implementer |
 | [TD-505](../tracker/todo/TD-505.md) | Runtime settings registry: categories, the unit and ceiling of max_upload_size_mb, and client-visible flags are implementer readings | T-0230 | implementer |
 
 ## missed (8)
@@ -337,7 +336,7 @@
 | [TD-506](../tracker/todo/TD-506.md) | PG test templates collide between concurrent runs on one server (kerp_tmpl_*_<worker> ignores the database name) | T-0223 | implementer |
 | [TD-511](../tracker/todo/TD-511.md) | Drop the read-only oe_settings_deployment table (destructive migration, needs an ADR) | T-0230 | implementer |
 
-## bug (9)
+## bug (10)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -350,6 +349,7 @@
 | [TD-471](../tracker/todo/TD-471.md) | CEL parity: divergences between celpy and cel-js found by the T-0110 edge probe (pinned as known_gap fixtures) | T-0110, T-0017 | implementer |
 | [TD-490](../tracker/todo/TD-490.md) | Admin -> Users invite form: a SoD 409 that returns after the user edited the form re-arms confirm_sod for the edited form (fields stay editable while the send is pending) | T-0331 | reviewer |
 | [TD-507](../tracker/todo/TD-507.md) | Local PostgreSQL test runs of parallel worktrees collide: template databases are named per xdist worker only | T-0230 | implementer |
+| [TD-509](../tracker/todo/TD-509.md) | Flaky: test_auth_magic_link_field_workers lockout test asserts Retry-After == 60 on the wall clock | T-0223 | implementer |
 
 ## risk (33)
 
