@@ -12,7 +12,7 @@ entitlement gate is **not** ported; per-project enable/disable replaces it.
 | `models.py` | `project_module_setting` table (one row per project per toggled module; migration `0004`) |
 | `service.py` | `project_states()`, `is_enabled()`, `set_enabled()` |
 | `gate.py` | `module_gate(name)` route dependency (404 while off), `registry_of(app)` |
-| `router.py`, `schemas.py` | Toggle API: `GET /api/v1/modules`, `PUT /api/v1/modules/{name}` |
+| `schemas.py` | `ModuleState`, `ModuleToggle`: the shapes of the toggle API, which the `projects` module serves (T-0084) |
 
 ## Writing a module
 
@@ -33,7 +33,7 @@ MANIFEST = ModuleManifest(
 
 `router.py` defines `router = APIRouter()` with paths relative to the module. The loader
 mounts it at `/api/v1/<name>` (`_` becomes `-`, e.g. `field_time` → `/api/v1/field-time`).
-`modules` is reserved (the toggle API).
+`modules` is reserved (`/api/v1/modules` was the project-less toggle API, removed by T-0084).
 
 ## Start-up checks (fail fast)
 
@@ -67,8 +67,9 @@ in the same session and transaction with the modules the change made effectively
 copy the module's default rule sets into the project (ADR 0004 §2.3). `default_states()`
 gives the states of a project that never toggled anything.
 
-The tenant and project come from the session's tenancy binding (T-0007), never from
-arguments or the URL. `project_module_setting` has `project_id NOT NULL` and is under
+The service takes the tenant and project from the session's tenancy binding (T-0007), never
+from arguments; the toggle API binds the URL's project only after checking the caller's
+access to it (below). `project_module_setting` has `project_id NOT NULL` and is under
 project RLS, so a project can only see and change its own settings.
 
 **Gate.** Every route of a toggleable module gets `module_gate(name)` as a router dependency.
@@ -78,14 +79,23 @@ module is indistinguishable from an absent one. The gate shares the request's `D
 Requests without a project in context (tenant-level) are not gated. Modules with
 `toggleable=False` are never gated and need no database to serve.
 
-**Toggle API.** `GET /api/v1/modules` lists every module (dependency order) with its state
-for the caller's project; `PUT /api/v1/modules/{name}` with `{"enabled": bool}` changes it
-and returns the module's new state. Both require an authenticated, active user
-(`CurrentPrincipal`, 401 with `WWW-Authenticate: Bearer` otherwise), answer 404 without a
-project in context and 404 for an unknown module. The change is recorded with the
-principal's user id. The admin capability guard comes with RBAC (TD-129); the UI is TD-127.
+**Toggle API** (T-0084). The `projects` module serves it on the project path
+(`app/modules/projects/router.py`), because core never imports `app.modules`
+(`tests/test_module_loader.py::test_core_never_imports_app_modules` scans `app/core/**`).
+`GET /api/v1/projects/{project_id}/modules` lists every module (dependency order) with its
+state for that project. `PUT /api/v1/projects/{project_id}/modules/{name}` with
+`{"enabled": bool}` changes it and returns the module's new state. Both require an
+authenticated, active user (`CurrentPrincipal`, 401 with `WWW-Authenticate: Bearer`
+otherwise). Both bind the request session to the path's project with
+`projects.service.bind_project` (T-0217). Reading needs `V`; changing needs the `admin`
+capability (PER-09, or a `system_admin`, ADR 0016; TD-129). A non-member, or an unknown,
+deleted or other tenant's project, gets 404; a member without the capability gets 403. An
+unknown module is 404; the 409s are the service's (above). The change is recorded with the
+principal's user id. The UI is TD-127.
 
-**Until TD-122.** Since T-0008 the tenancy context carries the token's tenant and user but no
-project, so every authenticated request is tenant-level: the toggle API answers 404 and the
-gate never fires. Both go live when TD-122 binds the caller's authorised project. Module
-routers do not get `CurrentPrincipal` from the loader yet (TD-130): each module adds it.
+**Project binding (TD-122).** Since T-0008 the tenancy context carries the token's tenant and
+user but no project. A request is tenant-level unless a project-scoped router binds the
+path's project (`bind_project`), as the toggle API does. The gate still skips project-less
+requests: module routes that bind no project are not gated (safe while a session without a
+project cannot see project rows, T-0007). Module routers do not get `CurrentPrincipal` from
+the loader yet (TD-130): each module adds it.

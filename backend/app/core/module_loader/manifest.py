@@ -19,7 +19,8 @@ REQUIRED_FILES: Final = (
     "schemas.py",
     "README.md",
 )
-# ``/api/v1/modules`` is the toggle API, so no module may take that name.
+# ``/api/v1/modules`` was the project-less toggle API (removed by T-0084; the toggle API is
+# ``/api/v1/projects/{project_id}/modules``). It stays reserved so no module takes that path.
 RESERVED_NAMES: Final = frozenset({"modules"})
 
 _NAME: Final = re.compile(r"^[a-z][a-z0-9_]{1,39}$")

@@ -546,49 +546,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/modules": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List Modules
-         * @description Every loaded module, dependencies first, with its state for the caller's project.
-         */
-        get: operations["list_modules_api_v1_modules_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/modules/{name}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Set Module
-         * @description Enable or disable module ``name`` for the caller's project.
-         *
-         *     404 for an unknown module; 409 when the module cannot be disabled or the change would
-         *     break a dependency (the detail says which module to change first).
-         */
-        put: operations["set_module_api_v1_modules__name__put"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/settings/deployment": {
         parameters: {
             query?: never;
@@ -657,6 +614,49 @@ export interface paths {
          * @description List the project in the lobby for internal users, or not (T-0040, diff §4.1).
          */
         put: operations["set_lobby_visibility_api_v1_projects__project_id__lobby_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/modules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Project Modules
+         * @description Every loaded module, dependencies first, with its state for the project (``V``).
+         */
+        get: operations["list_project_modules_api_v1_projects__project_id__modules_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/modules/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Project Module
+         * @description Enable or disable module ``name`` for the project (``admin``); its new state.
+         *
+         *     404 for an unknown module; 409 when the module cannot be disabled or the change would
+         *     break a dependency (the detail names the module to change first).
+         */
+        put: operations["set_project_module_api_v1_projects__project_id__modules__name__put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -3742,7 +3742,7 @@ export interface components {
         };
         /**
          * ModuleState
-         * @description A loaded module and whether it is enabled for the caller's project.
+         * @description A loaded module and whether it is enabled for the project.
          */
         ModuleState: {
             /** Name */
@@ -3758,7 +3758,7 @@ export interface components {
         };
         /**
          * ModuleToggle
-         * @description Body of ``PUT /api/v1/modules/{name}``.
+         * @description Body of ``PUT /api/v1/projects/{project_id}/modules/{name}``.
          */
         ModuleToggle: {
             /** Enabled */
@@ -6246,61 +6246,6 @@ export interface operations {
             };
         };
     };
-    list_modules_api_v1_modules_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ModuleState"][];
-                };
-            };
-        };
-    };
-    set_module_api_v1_modules__name__put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                name: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ModuleToggle"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ModuleState"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     read_deployment_settings_api_v1_settings_deployment_get: {
         parameters: {
             query?: never;
@@ -6524,6 +6469,73 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProjectRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_project_modules_api_v1_projects__project_id__modules_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModuleState"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_project_module_api_v1_projects__project_id__modules__name__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ModuleToggle"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModuleState"];
                 };
             };
             /** @description Validation Error */

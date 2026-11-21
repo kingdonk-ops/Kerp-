@@ -1,4 +1,4 @@
-"""OpenAPI export for the frontend's ``npm run gen:api`` (TD-018, T-0011)."""
+"""OpenAPI export for the frontend's ``npm run gen:api`` (TD-018, T-0011, T-0084)."""
 
 import json
 from pathlib import Path
@@ -11,8 +11,9 @@ from app.openapi import main, openapi_schema, write_schema
 def test_schema_contains_the_platform_endpoints() -> None:
     paths = openapi_schema()["paths"]
     assert "/health" in paths
-    assert {"get"} <= set(paths["/api/v1/modules"])
-    assert {"put"} <= set(paths["/api/v1/modules/{name}"])
+    assert {"get"} <= set(paths["/api/v1/projects/{project_id}/modules"])
+    assert {"put"} <= set(paths["/api/v1/projects/{project_id}/modules/{name}"])
+    assert "/api/v1/modules" not in paths  # project-less toggle routes removed (T-0084)
 
 
 def test_write_schema_writes_stable_json(tmp_path: Path) -> None:

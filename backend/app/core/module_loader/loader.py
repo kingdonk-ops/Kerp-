@@ -6,8 +6,9 @@ entitlement gate is replaced by per-project enable/disable (``service.py``, ``ga
 
 ``install_modules(app)`` runs at app start-up: it reads every ``app/modules/<name>/``,
 refuses to start if any module breaks the contract (all problems in one error), mounts
-each module's ``router`` under ``/api/v1/<name>`` in dependency order, and mounts the
-toggle API at ``/api/v1/modules``.
+each module's ``router`` under ``/api/v1/<name>`` in dependency order. The per-project
+toggle API is the ``projects`` module's (``/api/v1/projects/{project_id}/modules``, T-0084):
+core never imports a module.
 """
 
 from __future__ import annotations
@@ -22,7 +23,6 @@ from fastapi import APIRouter, Depends, FastAPI
 from app.core.module_loader.gate import STATE_KEY, module_gate, registry_of
 from app.core.module_loader.manifest import REQUIRED_FILES, ModuleManifest, manifest_problems
 from app.core.module_loader.registry import ModuleLoadError, ModuleRegistry, order_by_dependencies
-from app.core.module_loader.router import router as toggle_router
 
 __all__ = [
     "API_PREFIX",
@@ -116,7 +116,6 @@ def install_modules(app: FastAPI, package: str = DEFAULT_PACKAGE) -> ModuleRegis
     """Discover the modules of ``package``, store the registry on ``app`` and mount them."""
     registry = discover_modules(package)
     setattr(app.state, STATE_KEY, registry)
-    app.include_router(toggle_router, prefix=API_PREFIX)
     mount_modules(app, registry)
     import_job_handlers(registry)
     return registry

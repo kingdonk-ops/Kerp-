@@ -23,6 +23,7 @@ from app.core.auth.runtime import AuthRuntime, build_auth_runtime, install_auth_
 from app.core.auth.service import create_user
 from app.core.config import Settings
 from app.core.db import Database
+from app.core.module_loader.loader import DEFAULT_PACKAGE
 from app.core.tenancy.context import TenancyContext
 from app.main import create_app
 
@@ -77,9 +78,11 @@ def auth_app(
     keys: KeySet | None = None,
     magic_links: MagicLinkSender | None = None,
     entra_transport: Any = None,
+    modules_package: str = DEFAULT_PACKAGE,
 ) -> tuple[FastAPI, AuthRuntime]:
-    """``create_app`` with a runtime on a fake Redis (or the given store)."""
-    app = create_app(settings)
+    """``create_app`` with a runtime on a fake Redis (or the given store); ``modules_package``
+    swaps the domain modules (``tests.module_support``)."""
+    app = create_app(settings, modules_package=modules_package)
     runtime = build_auth_runtime(
         settings,
         keys=keys or KeySet(generate_signing_key(settings.jwt_algorithm)),

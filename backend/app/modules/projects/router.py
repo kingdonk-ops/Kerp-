@@ -17,13 +17,19 @@ project is the one in the path:
 * ``PUT /{id}/lobby`` (``visible_in_lobby``): PER-09 of that project or a System admin
   (T-0040, diff §4.1); a non-member who is not a System admin gets 404, a member without
   PER-09 403. ``PATCH`` does not take the flag (422).
+* ``GET /{id}/modules``, ``PUT /{id}/modules/{name}``: the per-project module toggle (T-0084,
+  T-0011 semantics from ``app.core.module_loader.service``). The request session is bound to
+  the path's project by ``service.bind_project``: ``V`` to read, ``admin`` (PER-09, or a
+  ``system_admin``, ADR 0016) to change; a non-member, an unknown, deleted or other tenant's
+  project 404, a member without the capability 403. An unknown module is 404; a module that
+  cannot be disabled, or a change that would break a dependency, 409 naming the module.
 """
 
 from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, HTTPException, Response, status
+from fastapi import APIRouter, HTTPException, Request, Response, status
 
 from app.core.auth import memberships
 from app.core.auth.access import (
@@ -39,6 +45,10 @@ from app.core.auth.access import (
 )
 from app.core.auth.deps import CurrentPrincipal
 from app.core.db import DbSession
+from app.core.module_loader import service as modules
+from app.core.module_loader.gate import not_found, registry_of
+from app.core.module_loader.manifest import ModuleManifest
+from app.core.module_loader.schemas import ModuleState, ModuleToggle
 from app.modules.projects import service
 from app.modules.projects.models import Project
 from app.modules.projects.schemas import (
@@ -50,6 +60,8 @@ from app.modules.projects.schemas import (
 )
 
 router = APIRouter(tags=["projects"])
+
+MODULES = "/{project_id}/modules"
 
 
 def _forbidden() -> HTTPException:
@@ -169,3 +181,56 @@ def delete_project(
             status.HTTP_409_CONFLICT, {"code": "team_links_present", "message": str(exc)}
         ) from exc
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+def _module_state(manifest: ModuleManifest, enabled: bool) -> ModuleState:
+    return ModuleState(
+        name=manifest.name,
+        version=manifest.version,
+        depends_on=list(manifest.depends_on),
+        toggleable=manifest.toggleable,
+        enabled=enabled,
+    )
+
+
+@router.get(MODULES, response_model=list[ModuleState])
+def list_project_modules(
+    project_id: uuid.UUID,
+    request: Request,
+    principal: CurrentPrincipal,
+    grants: CallerGrants,
+    session: DbSession,
+) -> list[ModuleState]:
+    """Every loaded module, dependencies first, with its state for the project (``V``)."""
+    service.bind_project(session, principal, grants, project_id, require=Capability.VIEW)
+    registry = registry_of(request.app)
+    states = modules.project_states(session, registry)
+    return [_module_state(m, states[m.name]) for m in registry]
+
+
+@router.put(MODULES + "/{name}", response_model=ModuleState)
+def set_project_module(
+    project_id: uuid.UUID,
+    name: str,
+    body: ModuleToggle,
+    request: Request,
+    principal: CurrentPrincipal,
+    grants: CallerGrants,
+    session: DbSession,
+) -> ModuleState:
+    """Enable or disable module ``name`` for the project (``admin``); its new state.
+
+    404 for an unknown module; 409 when the module cannot be disabled or the change would
+    break a dependency (the detail names the module to change first).
+    """
+    service.bind_project(session, principal, grants, project_id, require=Capability.ADMINISTER)
+    registry = registry_of(request.app)
+    try:
+        states = modules.set_enabled(
+            session, registry, name, body.enabled, actor_id=principal.user_id
+        )
+    except modules.UnknownModuleError:
+        raise not_found() from None
+    except modules.ModuleToggleError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from None
+    return _module_state(registry.get(name), states[name])

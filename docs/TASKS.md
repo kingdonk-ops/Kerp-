@@ -3,11 +3,11 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 91/310 tasks done (29%) · **ready now:** 24 · **epics awaiting breakdown:** 49
+**Overall:** 92/310 tasks done (30%) · **ready now:** 24 · **epics awaiting breakdown:** 49
 
 | Phase | Tasks done | Progress |
 |---|---|---|
-| 0 · Platform foundations | 89/116 | `███████░░░` 77% |
+| 0 · Platform foundations | 90/116 | `███████░░░` 78% |
 | 1 · Asset & Quality backbone | 2/168 (+2 epics) | `░░░░░░░░░░` 1% |
 | 2 · Welding quality | 0/11 | `░░░░░░░░░░` 0% |
 | 3 · Logistics | 0/2 (+7 epics) | `░░░░░░░░░░` 0% |
@@ -87,10 +87,10 @@
 | ✅ | [T-0051](../tracker/tasks/T-0051.md) | Admin access-request inbox and devices screens: pending requests for the user's PER-09 projects (approve with persona/site scope, reject with optional reason); enrolled devices list and revoke with wipe warning (admin and own devices) | frontend | M | T-0050, T-0042, T-0043, T-0024 | #134 |
 | ✅ | [T-0053](../tracker/tasks/T-0053.md) | Invite link and password screens: one-click 'Join project' for signed-in users, invite token carried through sign-in, land in the project; create your password at invite acceptance, forgot password and reset password | frontend | M | T-0052, T-0042, T-0055, T-0026, T-0059, T-0077 | #152 |
 | ✅ | [T-0055](../tracker/tasks/T-0055.md) | Web sign-in with Microsoft (Entra ID SSO): button when enabled, callback landing, translated refusals | frontend | S | T-0054, T-0042 | #146 |
-| ▶ | [T-0084](../tracker/tasks/T-0084.md) | projects: module toggle API on the project path (/api/v1/projects/{project_id}/modules) with the admin guard, replacing the project-less core route (TD-122 for modules, TD-129) | projects | S | T-0011, T-0217, T-0014, T-0275 |  |
+| ✅ | [T-0084](../tracker/tasks/T-0084.md) | projects: module toggle API on the project path (/api/v1/projects/{project_id}/modules) with the admin guard, replacing the project-less core route (TD-122 for modules, TD-129) | projects | S | T-0011, T-0217, T-0014, T-0275 | #164 |
 | ▶ | [T-0085](../tracker/tasks/T-0085.md) | admin: the server refuses self-deactivation on PATCH /admin/users/{id} (409 CANNOT_DEACTIVATE_SELF, audited); Admin -> Users explains it (TD-463) | admin | S | T-0014, T-0331 |  |
 | ✅ | [T-0331](../tracker/tasks/T-0331.md) | Admin → Users screen: System admin creates / deactivates / reactivates accounts; PER-09 invites a user by e-mail to one of its projects (persona(s) + site + SoD confirm), link shown once, open invites listed / re-sent / revoked | frontend | S | T-0026 | #154 |
-| ⬜ | [T-0027](../tracker/tasks/T-0027.md) | Playwright setup + Phase 0 exit journey | e2e | M | T-0023, T-0024, T-0018, T-0012, T-0026, T-0034, T-0036, T-0084 |  |
+| ▶ | [T-0027](../tracker/tasks/T-0027.md) | Playwright setup + Phase 0 exit journey | e2e | M | T-0023, T-0024, T-0018, T-0012, T-0026, T-0034, T-0036, T-0084 |  |
 | ⚫ | [T-0056](../tracker/tasks/T-0056.md) | Transactional e-mails for access-request decisions (approve / reject) via the outbound e-mail service | admin | S | T-0050, T-0058 |  |
 | ⚫ | [T-0078](../tracker/tasks/T-0078.md) | Screens: create your password at invite acceptance, forgot password and reset password (web and Android) | frontend | S | T-0053, T-0059, T-0077 |  |
 | ✅ | [T-0028](../tracker/tasks/T-0028.md) | CI hardening: detect in ci-gate needs, least-privilege GHCR publish, SHA-pinned actions, base image digest + Renovate, drop empty postgres extra | platform | S | T-0004 | #18 |
