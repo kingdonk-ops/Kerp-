@@ -22,7 +22,10 @@ def needs(flags: str = "true", **results: str) -> dict:
     """``toJSON(needs)``-shaped dict; every job green unless overridden."""
     out = {"backend": flags, "frontend": flags, "e2e": flags}
     jobs = {"detect": {"result": "success", "outputs": out}}
-    for job in ("tracker", "backend", "backend-pg", "backend-image", "backend-publish", "frontend", "perf", "e2e"):
+    for job in (
+        "tracker", "backend", "backend-pg", "backend-pg-coverage", "backend-image", "backend-publish",
+        "frontend", "perf", "e2e",
+    ):
         jobs[job] = {"result": "success", "outputs": {}}
     for job, result in results.items():
         jobs[job.replace("_", "-")]["result"] = result
@@ -41,20 +44,25 @@ def test_publish_must_skip_on_pull_request() -> None:
 def test_components_absent_may_skip() -> None:
     skipped = {
         j: "skipped"
-        for j in ("backend", "backend_pg", "backend_image", "backend_publish", "frontend", "perf", "e2e")
+        for j in (
+            "backend", "backend_pg", "backend_pg_coverage", "backend_image", "backend_publish",
+            "frontend", "perf", "e2e",
+        )
     }
     assert ci_gate.evaluate(needs("false", **skipped), "push") == []
 
 
 @pytest.mark.parametrize(
-    "job", ["backend", "backend_pg", "backend_image", "backend_publish", "frontend", "perf", "e2e"]
+    "job",
+    ["backend", "backend_pg", "backend_pg_coverage", "backend_image", "backend_publish", "frontend", "perf", "e2e"],
 )
 def test_component_present_but_skipped_fails(job: str) -> None:
     assert ci_gate.evaluate(needs(**{job: "skipped"}), "push") != []
 
 
 @pytest.mark.parametrize(
-    "job", ["detect", "tracker", "backend", "backend_pg", "backend_image", "frontend", "perf", "e2e"]
+    "job",
+    ["detect", "tracker", "backend", "backend_pg", "backend_pg_coverage", "backend_image", "frontend", "perf", "e2e"],
 )
 @pytest.mark.parametrize("result", ["failure", "cancelled", "skipped"])
 def test_any_non_success_fails(job: str, result: str) -> None:
@@ -64,7 +72,7 @@ def test_any_non_success_fails(job: str, result: str) -> None:
 def test_detect_failure_without_outputs_fails() -> None:
     jobs = needs("false")
     jobs["detect"] = {"result": "failure", "outputs": {}}
-    for job in ("backend", "backend-pg", "backend-image", "backend-publish", "frontend", "perf", "e2e"):
+    for job in ("backend", "backend-pg", "backend-pg-coverage", "backend-image", "backend-publish", "frontend", "perf", "e2e"):
         jobs[job]["result"] = "skipped"
     assert ci_gate.evaluate(jobs, "push") != []
 
@@ -82,6 +90,7 @@ def test_detect_not_green_makes_every_skip_a_problem() -> None:
         "tracker: skipped (expected success)",
         "backend: skipped (expected success)",
         "backend-pg: skipped (expected success)",
+        "backend-pg-coverage: skipped (expected success)",
         "backend-image: skipped (expected success)",
         "backend-publish: skipped (expected success)",
         "frontend: skipped (expected success)",
@@ -186,12 +195,15 @@ def test_backend_suites_run_as_parallel_jobs() -> None:
     assert "postgresql+psycopg://kerp_app:" in pg  # NOSUPERUSER NOBYPASSRLS runtime role
     assert "20-kerp-app.sql" in pg
     assert "pytest -n auto --durations=25" in pg  # per-test databases (T-0082)
-    assert "--no-cov" not in pg  # the coverage floor applies on PostgreSQL too (T-0082)
+    assert "--no-cov" not in pg  # coverage is measured on PostgreSQL too (T-0082) ...
+    assert "--cov-fail-under=0" in pg  # ... and its floor enforced on all shards combined (T-0086)
     assert "ALTER SYSTEM SET fsync = off" in pg and "pg_reload_conf()" in pg
     assert ci_gate.EXPECTED["backend-pg"] == ("backend", False)
+    assert ci_gate.EXPECTED["backend-pg-coverage"] == ("backend", False)
     for job in ("backend-publish", "e2e"):
         listed = re.search(r"needs: \[([^\]]*)\]", jobs[job])
-        assert listed and {"backend", "backend-pg"} <= {n.strip() for n in listed.group(1).split(",")}
+        assert listed
+        assert {"backend", "backend-pg", "backend-pg-coverage"} <= {n.strip() for n in listed.group(1).split(",")}
 
 
 def test_pull_request_with_backend_not_needed_passes() -> None:
@@ -199,10 +211,79 @@ def test_pull_request_with_backend_not_needed_passes() -> None:
     frontend jobs still run and must be green."""
     jobs = needs()
     jobs["detect"]["outputs"]["backend"] = "false"
-    for job in ("backend", "backend-pg", "backend-image", "backend-publish"):
+    for job in ("backend", "backend-pg", "backend-pg-coverage", "backend-image", "backend-publish"):
         jobs[job]["result"] = "skipped"
     assert ci_gate.evaluate(jobs, "pull_request") == []
     jobs["frontend"]["result"] = "failure"
     assert ci_gate.evaluate(jobs, "pull_request") != []
     jobs["frontend"]["result"] = "skipped"
     assert ci_gate.evaluate(jobs, "pull_request") != []  # frontend never skips on backend=false
+
+
+# --- backend-pg shards + combined coverage floor (T-0086) ---------------------------------
+
+
+@pytest.mark.parametrize("result", ["failure", "cancelled", "skipped"])
+def test_one_shard_not_green_fails_the_gate(result: str) -> None:
+    """GitHub reports a matrix job to ``needs`` as one aggregate result: a failed, cancelled
+    or skipped shard turns ``backend-pg`` non-success, and the coverage job then skips."""
+    jobs = needs(backend_pg=result, backend_pg_coverage="skipped", backend_publish="skipped")
+    assert ci_gate.evaluate(jobs, "pull_request") == [
+        f"backend-pg: {result} (expected success)",
+        "backend-pg-coverage: skipped (expected success)",
+    ]
+    # Even with the coverage job somehow green, the shard result alone fails the gate.
+    jobs = needs(backend_pg=result, backend_publish="skipped")
+    assert ci_gate.evaluate(jobs, "pull_request") == [f"backend-pg: {result} (expected success)"]
+
+
+def test_the_combined_floor_failing_fails_the_gate() -> None:
+    problems = ci_gate.evaluate(needs(backend_pg_coverage="failure", backend_publish="skipped"), "pull_request")
+    assert problems == ["backend-pg-coverage: failure (expected success)"]
+
+
+def _pg_job() -> str:
+    return _jobs()["backend-pg"]
+
+
+def test_backend_pg_is_a_matrix_of_shards_running_only_their_slice() -> None:
+    pg = _pg_job()
+    assert "strategy:\n      fail-fast: false" in pg  # every failing shard is reported
+    assert re.search(r"^        shard: \[1, 2(, \d+)*\]", pg, flags=re.MULTILINE)
+    assert "SHARD: ${{ matrix.shard }}" in pg
+    assert "SHARDS: ${{ strategy.job-total }}" in pg
+    assert 'python ../scripts/shard_tests.py files --shard "$SHARD" --of "$SHARDS"' in pg
+    assert "set -euo pipefail" in pg
+    assert '[ "${#files[@]}" -gt 0 ]' in pg  # an empty slice must not fall back to the whole suite
+    assert '"${files[@]}"' in pg
+    assert "|| [ $? -eq 5 ]" not in pg  # "no tests collected" is a failure in a shard
+    assert "continue-on-error" not in pg
+    # Coverage data and JUnit timings leave every shard; a missing file fails the shard.
+    assert 'mv .coverage ".coverage.pg-$SHARD"' in pg
+    assert "name: coverage-pg-${{ matrix.shard }}" in pg
+    assert "include-hidden-files: true" in pg
+    assert "if-no-files-found: error" in pg
+    assert "-o junit_family=xunit1" in pg
+
+
+def test_the_coverage_job_combines_every_shard_and_enforces_the_pyproject_floor() -> None:
+    jobs = _jobs()
+    cov = jobs["backend-pg-coverage"]
+    assert "needs: [detect, backend-pg]" in cov
+    assert "if: needs.detect.outputs.backend == 'true'\n" in cov  # implicit success(): all shards green
+    assert "continue-on-error" not in cov
+    shards = re.search(r"^        shard: \[([\d, ]+)\]", jobs["backend-pg"], flags=re.MULTILINE)
+    assert shards
+    assert f"SHARDS: {len(shards.group(1).split(','))} " in cov  # = the matrix size
+    assert 'python ../scripts/shard_tests.py verify-collection --of "$SHARDS"' in cov
+    assert "pattern: coverage-pg-*" in cov and "merge-multiple: true" in cov
+    assert '[ -s "$RUNNER_TEMP/pg-coverage/.coverage.pg-$n" ]' in cov  # every shard's data
+    assert '[ "$found" -eq "$SHARDS" ]' in cov
+    assert 'floor="$(python ../scripts/shard_tests.py coverage-floor)"' in cov
+    assert 'coverage combine "$RUNNER_TEMP/pg-coverage"' in cov
+    assert 'coverage report --show-missing --fail-under="$floor"' in cov
+    assert cov.index("coverage combine") < cov.index("coverage report")
+    assert "--fail-under=0" not in cov
+    # The floor itself lives in pyproject.toml only (the SQLite job enforces it as before).
+    pyproject = (ROOT / "backend" / "pyproject.toml").read_text(encoding="utf-8")
+    assert "--cov-fail-under=90" in pyproject

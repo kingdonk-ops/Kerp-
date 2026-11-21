@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 351 · **Closed:** 150
+**Open:** 353 · **Closed:** 150
 
 ## decision (40)
 
@@ -194,7 +194,7 @@
 | [TD-508](../tracker/todo/TD-508.md) | Verify the e2e suite on the make up compose stack, and give it its own database | T-0027 | implementer |
 | [TD-510](../tracker/todo/TD-510.md) | Deployment-config view lacks the mail reply-to of diff §4.7: Settings has no reply-to field yet | T-0230 | implementer |
 
-## later (139)
+## later (141)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -337,6 +337,8 @@
 | [TD-504](../tracker/todo/TD-504.md) | Registry: reset an entry to its code default (delete the stored row) for the Settings screen T-0232 | T-0230 | implementer |
 | [TD-506](../tracker/todo/TD-506.md) | PG test templates collide between concurrent runs on one server (kerp_tmpl_*_<worker> ignores the database name) | T-0223 | implementer |
 | [TD-511](../tracker/todo/TD-511.md) | Drop the read-only oe_settings_deployment table (destructive migration, needs an ADR) | T-0230 | implementer |
+| [TD-512](../tracker/todo/TD-512.md) | Split the backend-pg CI job into parallel shards | T-0086 | coordinator |
+| [TD-513](../tracker/todo/TD-513.md) | CI: the SQLite backend job (~6.5 min) becomes the critical path once backend-pg is sharded | T-0086 | implementer |
 
 ## bug (10)
 

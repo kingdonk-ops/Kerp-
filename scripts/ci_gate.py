@@ -17,7 +17,10 @@ EXPECTED: dict[str, tuple[str | None, bool]] = {
     "detect": (None, False),
     "tracker": (None, False),
     "backend": ("backend", False),  # lint + types + SQLite suite
-    "backend-pg": ("backend", False),  # PostgreSQL + RLS suite, parallel to backend (T-0081)
+    # PostgreSQL + RLS suite, parallel to backend (T-0081), a matrix of shards (T-0086): its
+    # result is the aggregate, so any shard failing, cancelled or skipped is not "success".
+    "backend-pg": ("backend", False),
+    "backend-pg-coverage": ("backend", False),  # all shards cover the suite; combined floor
     "backend-image": ("backend", False),
     "backend-publish": ("backend", True),
     "frontend": ("frontend", False),

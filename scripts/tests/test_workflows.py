@@ -148,6 +148,32 @@ def test_e2e_runs_on_the_same_database_and_redis_as_backend_pg() -> None:
     assert "continue-on-error" not in e2e
 
 
+def test_backend_pg_shards_keep_the_postgres_setup_and_e2e_waits_for_all_of_them() -> None:
+    """T-0086: every shard is the old backend-pg job on a slice of the files (same services,
+    init script, durability settings, runtime role, Redis); e2e waits for every shard (the
+    matrix job's aggregate result) and for the combined coverage floor."""
+    jobs = _jobs("ci.yml")
+    pg = jobs["backend-pg"]
+    assert "matrix:\n        shard: [" in pg
+    assert "-f ../infra/postgres/initdb/20-kerp-app.sql" in pg
+    assert "ALTER SYSTEM SET fsync = off" in pg
+    assert "KERP_ENVIRONMENT: test" in pg
+    assert "KERP_DATABASE_URL: postgresql+psycopg://kerp_app:kerp_app@localhost:5432/kerp_test" in pg
+    assert "KERP_TEST_OWNER_URL: postgresql+psycopg://kerp:kerp@localhost:5432/kerp_test" in pg
+    assert "KERP_REDIS_URL: redis://localhost:6379/0" in pg
+    assert pg.count("persist-credentials: false") == pg.count("uses: actions/checkout@") == 1
+    # The coverage job installs the same backend and runs from the same checkout layout.
+    cov = jobs["backend-pg-coverage"]
+    assert "persist-credentials: false" in cov and 'pip install -e ".[dev]"' in cov
+    assert "working-directory: backend" in cov
+    e2e = re.search(r"needs: \[([^\]]*)\]", jobs["e2e"])
+    assert e2e
+    assert {n.strip() for n in e2e.group(1).split(",")} == {
+        "detect", "backend", "backend-pg", "backend-pg-coverage", "frontend"
+    }
+    assert "!contains(needs.*.result, 'failure')" in jobs["e2e"]
+
+
 @pytest.mark.parametrize(
     ("service", "tag"),
     [
@@ -186,8 +212,9 @@ def test_publish_pushes_the_smoke_tested_image_not_a_rebuild() -> None:
     assert '[ "$loaded" = "$TESTED_ID" ]' in publish
     assert '[ "$pushed" = "$TESTED_ID" ]' in publish
     assert "GITHUB_STEP_SUMMARY" in publish
-    # It still waits for both test jobs (T-0081) and the smoke test.
-    assert "needs: [detect, backend, backend-pg, backend-image]" in publish
+    # It still waits for both test jobs (T-0081; backend-pg as shards + combined coverage,
+    # T-0086) and the smoke test.
+    assert "needs: [detect, backend, backend-pg, backend-pg-coverage, backend-image]" in publish
 
 
 def test_lock_refresh_is_weekly_least_privilege_and_app_free() -> None:
