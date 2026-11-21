@@ -177,8 +177,8 @@
 | [TD-457](../tracker/todo/TD-457.md) | Playwright e2e journey for T-0041 (external user: code lookup -> request with ticket -> reject with reason -> Request again disabled -> short cooldown -> Request again without ticket -> approve via T-0051 -> project in the picker) once T-0027 sets up e2e/; covered meanwhile by the component-level journey in frontend/src/lobby/LobbyPage.test.tsx | T-0041 | implementer |
 | [TD-458](../tracker/todo/TD-458.md) | Android (Capacitor) App Links for /invite and /reset-password (verified via assetlinks.json) showing the T-0053 invite and password screens, once the Android shell exists (T-0141/T-0143) | T-0053 | implementer |
 | [TD-459](../tracker/todo/TD-459.md) | E2E journeys for invites and passwords once the Playwright harness (T-0027) exists: PER-09 invites an existing user who signs in and lands in the project; brand-new external creates the first password from the invite e-mail; forgot password -> reset -> old session refused -> sign in | T-0053 | implementer |
-| [TD-472](../tracker/todo/TD-472.md) | One-engine template store: revision tables, canonical schema_hash, freeze trigger, pinned EVALUATOR_VERSION (ADR 0002 scope not built in T-0110) | T-0110 | implementer |
-| [TD-473](../tracker/todo/TD-473.md) | Template lint over the CEL AST: unknown field references, forward calculated references, rules that read hidden fields, authoring-time type checks (safe CEL subset, TD-041 decision) | T-0110 | implementer |
+| [TD-472](../tracker/todo/TD-472.md) | One-engine template store: revision tables, canonical schema_hash, freeze trigger, pinned EVALUATOR_VERSION (ADR 0002 scope not built in T-0110) | T-0110, T-0113 | implementer |
+| [TD-473](../tracker/todo/TD-473.md) | Template lint over the CEL AST: unknown field references, forward calculated references, rules that read hidden fields, authoring-time type checks (safe CEL subset, TD-041 decision) | T-0110, T-0113 | implementer |
 | [TD-474](../tracker/todo/TD-474.md) | Unit registry for `measurement` fields: unit catalogue, SI storage and conversion with a shared vector file (ADR 0002 units-v1 port) | T-0110 | implementer |
 | [TD-482](../tracker/todo/TD-482.md) | asset_management: node edit (code / name / attributes, with display_path and display_code rewrite of the subtree), node delete and level def delete are not built in T-0101 | T-0101 | implementer |
 
@@ -314,7 +314,7 @@
 | [TD-453](../tracker/todo/TD-453.md) | main ruleset: require the fast-forwarded commit to be on dev (today main only requires a CI-green ci-gate on the commit, so any contents:write token could fast-forward main to an unreviewed CI-green commit; no workflow does this today) — from the PR #138 review | T-0332 | coordinator |
 | [TD-454](../tracker/todo/TD-454.md) | Dev tooling: pin mypy (and friends) in the backend dev extra or lock so local runs match CI (local mypy 2.3.1 flags core/audit/guard.py:66 and admin/service.py:122, CI's 2.4.1 does not) — from the PR #136/#138 reviews | T-0332 | coordinator |
 | [TD-461](../tracker/todo/TD-461.md) | 'Send me an e-mail to set my password' from a copied invite link: the invite is carried only within the tab, so after setting the password from the e-mail (usually a new tab) the invitee must open the invite link again | T-0053 | implementer |
-| [TD-476](../tracker/todo/TD-476.md) | Form renderer and designer follow-ups on the shared palette: capture controls, section rendering, palette labels, field-ownership map | T-0110 | implementer |
+| [TD-476](../tracker/todo/TD-476.md) | Form renderer and designer follow-ups on the shared palette: capture controls, section rendering, palette labels, field-ownership map | T-0110, T-0025 | implementer |
 | [TD-483](../tracker/todo/TD-483.md) | asset_management: display_code recompute and the project tree lock are inline; move them to a batch job / narrower lock if trees get large | T-0101 | implementer |
 | [TD-485](../tracker/todo/TD-485.md) | Cross-link inspection requests (RFIs) to TQs (Technical Queries) when the TQ module exists (E-05-04) | T-0115 | planner |
 
@@ -328,7 +328,7 @@
 | [TD-330](../tracker/todo/TD-330.md) | scripts/pr_suggestions.py rebuild fails in cloud sessions: gh api --paginate follows numeric-ID repository Link URLs that the agent proxy rejects (HTTP 403); paginate with explicit repos/{owner}/{repo} page params | — | coordinator |
 | [TD-339](../tracker/todo/TD-339.md) | jobs LoopDispatcher.drain can spin forever when the commit ran on the loop's own thread (finished tasks stay in the set until their done callbacks run) | T-0058 | implementer |
 | [TD-375](../tracker/todo/TD-375.md) | mypy 2.3.1 (local toolchain) reports var-annotated in app/core/audit/guard.py:66 and app/modules/admin/service.py:122 on untouched dev code | T-0052 | implementer |
-| [TD-471](../tracker/todo/TD-471.md) | CEL parity: divergences between celpy and cel-js found by the T-0110 edge probe (pinned as known_gap fixtures) | T-0110 | implementer |
+| [TD-471](../tracker/todo/TD-471.md) | CEL parity: divergences between celpy and cel-js found by the T-0110 edge probe (pinned as known_gap fixtures) | T-0110, T-0017 | implementer |
 
 ## risk (32)
 
