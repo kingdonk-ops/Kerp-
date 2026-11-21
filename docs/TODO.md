@@ -3,9 +3,9 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 312 · **Closed:** 146
+**Open:** 315 · **Closed:** 146
 
-## decision (37)
+## decision (39)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -46,6 +46,8 @@
 | [TD-438](../tracker/todo/TD-438.md) | Machine credentials (ADR 0017): service-account representation and who manages API keys | T-0298, T-0307, T-0308, T-0309 | planner |
 | [TD-439](../tracker/todo/TD-439.md) | Feature flags: who toggles them, project overrides, and what a flag may gate | T-0306 | planner |
 | [TD-442](../tracker/todo/TD-442.md) | Issues: may an internal punch/NCR be assigned to an external account (subcontractor) who must then see it? Planner default: no (422), internal issues are invisible to every is_internal=false caller | T-0314 | planner |
+| [TD-484](../tracker/todo/TD-484.md) | RFI notification e-mail: may it carry the date/time/location, the RFI PDF attachment and an .ics invite, and go to client distribution addresses without a KERP account? | T-0335 | planner |
+| [TD-486](../tracker/todo/TD-486.md) | RFI witness check: may an unmet hold-point (H) witness requirement be overridden per record (ADR 0004 Amendment A), or is it non-overridable? | T-0333 | planner |
 
 ## spec-gap (58)
 
@@ -171,7 +173,7 @@
 | [TD-458](../tracker/todo/TD-458.md) | Android (Capacitor) App Links for /invite and /reset-password (verified via assetlinks.json) showing the T-0053 invite and password screens, once the Android shell exists (T-0141/T-0143) | T-0053 | implementer |
 | [TD-459](../tracker/todo/TD-459.md) | E2E journeys for invites and passwords once the Playwright harness (T-0027) exists: PER-09 invites an existing user who signs in and lands in the project; brand-new external creates the first password from the invite e-mail; forgot password -> reset -> old session refused -> sign in | T-0053 | implementer |
 
-## later (128)
+## later (129)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -303,6 +305,7 @@
 | [TD-453](../tracker/todo/TD-453.md) | main ruleset: require the fast-forwarded commit to be on dev (today main only requires a CI-green ci-gate on the commit, so any contents:write token could fast-forward main to an unreviewed CI-green commit; no workflow does this today) — from the PR #138 review | T-0332 | coordinator |
 | [TD-454](../tracker/todo/TD-454.md) | Dev tooling: pin mypy (and friends) in the backend dev extra or lock so local runs match CI (local mypy 2.3.1 flags core/audit/guard.py:66 and admin/service.py:122, CI's 2.4.1 does not) — from the PR #136/#138 reviews | T-0332 | coordinator |
 | [TD-461](../tracker/todo/TD-461.md) | 'Send me an e-mail to set my password' from a copied invite link: the invite is carried only within the tab, so after setting the password from the e-mail (usually a new tab) the invitee must open the invite link again | T-0053 | implementer |
+| [TD-485](../tracker/todo/TD-485.md) | Cross-link inspection requests (RFIs) to TQs (Technical Queries) when the TQ module exists (E-05-04) | T-0115 | planner |
 
 ## bug (6)
 
