@@ -15,7 +15,7 @@ rewritten (HS256 → RS256/EdDSA + JWKS + `jti` revocation in Redis).
 | `keys.py` | Ed25519 / RSA signing key, retired verification keys, RFC 7638 `kid`, JWKS document |
 | `tokens.py` | `TokenService`: issue/verify access (15 min) and refresh tokens |
 | `revocation.py` | `RevocationStore`: Redis (prod) / in-memory (dev, tests) — `jti` + session blacklist, one-time refresh tokens |
-| `runtime.py` | `AuthRuntime` (keys + tokens + store) built lazily from settings, cached on `app.state.auth` |
+| `runtime.py` | `AuthRuntime` (keys + tokens + store) built from settings, cached on `app.state.auth`: lazily outside production; in production at startup, so a missing or invalid signing key (or a missing `KERP_REDIS_URL`) refuses the start (T-0342, `app/core/startup_safety.py`) |
 | `bearer.py` | `get_bearer`: verifies the `Authorization: Bearer` token once per request (no DB) |
 | `deps.py` | `CurrentPrincipal` (401 unless a valid token of an active user), `require_claims` |
 | `providers.py` | `AuthProvider` seam (generic over the credentials) + `LocalPasswordProvider` |

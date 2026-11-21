@@ -18,7 +18,14 @@ from app.core.auth.runtime import (
 from app.core.config import Settings
 from app.core.db import Base
 from app.main import create_app
-from tests.auth_support import PRODUCTION_MAIL, T1, auth_app, make_settings
+from tests.auth_support import (
+    PRODUCTION_MAIL,
+    PRODUCTION_RUNTIME,
+    T1,
+    auth_app,
+    fake_production_redis,
+    make_settings,
+)
 
 
 def test_defaults_follow_the_spec() -> None:
@@ -89,10 +96,12 @@ def test_production_startup_fails_without_the_deployment_tenant() -> None:
     ("environment", "tenant"), [("production", T1), ("development", None), ("test", None)]
 )
 def test_startup_with_a_tenant_or_outside_production(
-    environment: str, tenant: uuid.UUID | None
+    environment: str, tenant: uuid.UUID | None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    mail = PRODUCTION_MAIL if environment == "production" else {}  # T-0058
-    app = create_app(make_settings(environment=environment, default_tenant_id=tenant, **mail))
+    # Production needs the mail transport (T-0058), Redis and a signing key (T-0342).
+    fake_production_redis(monkeypatch)
+    extra = {**PRODUCTION_MAIL, **PRODUCTION_RUNTIME} if environment == "production" else {}
+    app = create_app(make_settings(environment=environment, default_tenant_id=tenant, **extra))
     with TestClient(app) as client:
         assert client.get("/health").status_code == 200
 

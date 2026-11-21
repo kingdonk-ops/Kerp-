@@ -55,6 +55,11 @@ def ledger_guard_problems(connection: Connection, table: str = TABLE) -> list[st
     """Why ``table`` is not append-only for the connection's role (empty = OK)."""
     if connection.dialect.name != "postgresql":
         return []
+    found = connection.execute(
+        text("SELECT to_regclass(CAST(:table AS text)) IS NOT NULL"), {"table": table}
+    ).scalar_one()
+    if not found:  # not migrated yet: a startup check reports it instead of crashing (T-0342)
+        return [f"{table}: table not found"]
     problems = [
         f"{table}: current role has {privilege}"
         for privilege in REVOKED

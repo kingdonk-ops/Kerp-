@@ -246,6 +246,9 @@ offline (`--sql`) output.
 `tests/test_rls_bypass.py` fails if a migrated model table is not covered
 (`rls_coverage_problems`) or the runtime role is SUPERUSER/BYPASSRLS
 (`rls_enforcement_problems`). Data migrations see no rows unless they bind a context (TD-055).
+Production runs both checks (with the ledger guard) at API and worker startup and refuses to
+start on any problem; elsewhere they are warnings, and SQLite skips them with a log line
+(`app/core/startup_safety.py`, T-0342; `docs/deploy/first-run.md`).
 Migration `0006` (T-0010) adds `allowed_projects_read_policy` to every table that already has
 `project_isolation_policy` (a `DO` loop over the catalog). The frozen DDL of `0002`–`0005` is
 the helper output as replayed before T-0033 (it already includes that policy), so a fresh

@@ -31,6 +31,7 @@ from app.core.module_loader.loader import (
     import_setting_defs,
 )
 from app.core.request_context import request_id_var
+from app.core.startup_safety import check_database_role
 from app.core.tenancy.context import TenancyContext, use_tenancy
 from app.modules.jobs import mail, scheduler, service
 from app.modules.jobs.broker import QUEUE_NAMES, RUN_JOB, LoopDispatcher, SaqBroker
@@ -259,13 +260,20 @@ async def serve(settings: Settings) -> None:
     """Run both workers until SIGTERM/SIGINT (or cancellation), then stop both.
 
     Every module's startup check (``register_startup_check``) runs first, before any
-    connection is made: a check that raises refuses to start the worker (T-0213)."""
+    connection is made: a check that raises refuses to start the worker (T-0213). Then the
+    database role is checked like the API's (``check_database_role``, T-0342), before Redis."""
     registry = load_registry()
     registry.run_startup_checks(settings)
     transport = transport_from_settings(settings)  # production refuses without SES (T-0058)
     if not settings.redis_url:
         raise RuntimeError("KERP_REDIS_URL is not set")
     db = Database.from_settings(settings)
+    try:
+        # T-0342: the same database role rule as the API (refused in production).
+        check_database_role(db, settings)
+    except BaseException:
+        db.dispose()
+        raise
     broker = SaqBroker(settings.redis_url)
     loop = asyncio.get_running_loop()
     service.set_dispatcher(LoopDispatcher(broker, loop))
