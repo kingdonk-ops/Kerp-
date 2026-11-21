@@ -132,6 +132,9 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
   communications T-0226–T-0229, runtime settings T-0230–T-0232), the user directory of
   diff §4.8 (T-0243–T-0246) and the project archive epic E-01-02 (T-0233–T-0242). None of
   them is in the Pilot-0 gate (T-0146; TD-404 asks about the ClamAV scanner).
+  The phase-1 enterprise governance tasks of 2026-11-21 (attestation T-0289–T-0291, delegation
+  T-0292–T-0294, external boundary T-0295, SCIM T-0298–T-0300, metering capture T-0301/T-0302,
+  feature flags T-0306) are post-Pilot-0 as well; T-0146 is unchanged.
 
 ## Plan changes
 
@@ -342,6 +345,42 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
   Raised: TD-428 (template structure/approval/instance), TD-429 (`pending_qa_review`,
   propagation), TD-430 (rule kind). Updated: TD-398, TD-422 (task refs), E-05-08, E-04-14 (notes).
 
+- **2026-11-21 — enterprise governance roadmap (user roadmap; coordinator assessment approved by
+  the user; planner pass):** e-signature attestation, narrow delegation of authority, external
+  party access, SCIM deprovisioning, usage metering, feature flags, API keys; IP allowlisting and
+  the escalation matrix as notes. Spec: `quality-and-inspection.md` §Signing attestation and
+  §Delegation of authority, diff §4.7 (*Feature flags*, two registry entries), §4.9 (SCIM,
+  external parties, API keys and service accounts, network restrictions), §4.10 (usage metering),
+  §6.5 (two admin rows), edge spec §5.2 (pending external party persona), master spec MOD-01
+  upstream line, `materials-and-traceability.md` and `documents-and-mdr.md` (attested approvals,
+  MDR signature evidence), `docs/deploy/network-access.md` (IP allowlisting as WAF / Conditional
+  Access). ADR 0017 (machine credentials: tenant bound from the SCIM token / API key under the
+  deployment tenant, accepted by the user's approval; service-account column a planner default).
+  New, phase 1: T-0289 (attestation backend, M), T-0290 (ceremony UI, M), T-0291 (consumers +
+  PDF block, M), T-0292 (delegations, M), T-0293 (delegate routing and on-behalf sign-off, M),
+  T-0294 (delegation screens, S), T-0295 (internal-commercial boundary for external accounts, S),
+  T-0296 (external inspection party persona, M, **blocked TD-435**), T-0298/T-0299 (SCIM tokens
+  and /Users, M), T-0300 (provisioning screen, S), T-0301 (storage ledger, M), T-0302 (daily usage
+  snapshot, M), T-0306 (feature flags, M). Phase 2: T-0297 (external certificate submissions, M,
+  **blocked TD-435**). Phase 5 (E-05-07): T-0307 (service accounts + API keys, M), T-0308 (key
+  authentication, A/S never, M), T-0309 (screen, S). Phase 6 (E-06-05): T-0303 (soft-quota
+  advisories + cost-centre reference, M), T-0304 (monthly statements + CSV, M), T-0305 (screens,
+  M). Where the roadmap disagreed with the spec, the spec won: attestation kept out of T-0119 so
+  it stays M and **the Pilot-0 gate (T-0146) is unchanged** (no new task is in it); attestation
+  lives inside the ledger payload (hash format unchanged); delegation never confers authority and
+  keeps SoD; no cross-tenant guests; a new persona only after a decision; metering DDL corrected
+  (no expressions in keys, `UNIQUE NULLS NOT DISTINCT` on PostgreSQL 16, partial indexes over
+  live rows, no `ON DELETE CASCADE`, soft delete, real table names, `BaseRecordMixin` + RLS, SAQ
+  cron on the batch worker, cold archives `DEEP_ARCHIVE`, seats from `last_active_at`, rollups
+  shared with T-0219, no currency, cost centre as an external reference, e-mails link +
+  code/name only); feature flags never relax authorization. Updated: T-0184 (attestation AC,
+  depends on T-0289); notes on T-0115, T-0119, T-0150, T-0158, T-0162, T-0181, T-0182, T-0185,
+  T-0219, T-0226, T-0230, T-0233, T-0237, T-0240, T-0243, T-0244, T-0247, T-0273, T-0278,
+  E-04-12, E-05-04, E-05-05, E-05-07, E-06-05, E-06-07. Raised: TD-433 (attestation details),
+  TD-434 (delegation), TD-435 (external party persona, blocking), TD-436 (metering attribution),
+  TD-437 (SCIM), TD-438 (machine credentials), TD-439 (feature flags), TD-440 (later: in-app IP
+  rules).
+
 ## Key engineering decisions (baked into the spec — see consolidation diff)
 
 | Area | Decision |
@@ -362,7 +401,8 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
 | Login & lobby (2026-11-14) | Access-request lifecycle (`pending/approved/rejected/withdrawn`, reason, 24 h re-request cooldown) shown in the lobby; lobby list for internal staff only (Entra sign-in or `KERP_INTERNAL_EMAIL_DOMAINS`); single-use invite tokens bound to the e-mail (invites in the Pilot-0 gate); offline grace 24 h after session end binds edits, 7-day window only an upper bound (TD-257); Entra ID SSO identity only (OIDC + PKCE, no group mapping, no auto-create, same 12 h session), promoted for internal staff with password sign-in kept; magic links for Field Workers (PER-14) only (TD-136); externals never SSO: password set at invite acceptance (e-mailed invite only) + self-service reset (NIST 800-63B style, min 8); invite re-send rotates tokens; outbound e-mail via SES in Pilot-0 (diff §4.1, §4.2, §4.5, §4.6) |
 | Field client (2026-11-13) | Capacitor Android 11+, SQLCipher SQLite + file-system media, managed Play/MDM; one client storage contract and a client-agnostic sync contract (diff §6.2); NFR budgets warn now, hard gate before Pilot-0 (diff §6.3) |
 | Region (2026-11-13) | Per-deployment setting: AWS `ap-southeast-2` for Australian deployments (diff §4.4) |
+| Enterprise governance (2026-11-21) | Formal sign-offs attested (re-auth + intent + device/IP in the ledger); narrow delegation that never confers authority; SCIM deprovisioning; machine credentials bind the tenant from the deployment (ADR 0017), never `A`/`S`; metering counts only, soft limits never block; feature flags gate availability only; IP allowlisting in WAF / Conditional Access |
 
 ## Open decisions (see `TODO.md`)
-TD-410 (public capture links, ADR 0013 proposed), TD-411 (equipment as an inspection anchor, ADR 0014 proposed), TD-412 (fleet in the Phase-1 equipment register), TD-418 (escalation and approval authority), TD-419 (calendar iCal feed), TD-422 (PER-13 shelf-life approval), TD-423 (self-approval of internal-QA substitutions), TD-426 (system admin impersonation, ADR 0015 proposed, blocks T-0277–T-0280), TD-427 (access logging of system_admin reads without membership, ADR 0016), TD-430 (ADR 0004 Amendment H rule kind `itp_assignment`, planner default in force until revised), TD-431 (QA reviewer self-verification of own uploads), TD-096 (coating/Grating ITR, with the client; interim confirmed 2026-11-15), TD-293 (shared tablets in the pilot, ask the pilot team before go-live), TD-004 (hosting target), TD-072 (ADR 0004 rule-set defaults per project), TD-073 (handover first-shift trigger),
+TD-433 (signing attestation details), TD-434 (delegation open points), TD-435 (external inspection party persona, blocks T-0296/T-0297), TD-436 (metering attribution), TD-437 (SCIM), TD-438 (machine credentials, ADR 0017), TD-439 (feature flags), TD-410 (public capture links, ADR 0013 proposed), TD-411 (equipment as an inspection anchor, ADR 0014 proposed), TD-412 (fleet in the Phase-1 equipment register), TD-418 (escalation and approval authority), TD-419 (calendar iCal feed), TD-422 (PER-13 shelf-life approval), TD-423 (self-approval of internal-QA substitutions), TD-426 (system admin impersonation, ADR 0015 proposed, blocks T-0277–T-0280), TD-427 (access logging of system_admin reads without membership, ADR 0016), TD-430 (ADR 0004 Amendment H rule kind `itp_assignment`, planner default in force until revised), TD-431 (QA reviewer self-verification of own uploads), TD-096 (coating/Grating ITR, with the client; interim confirmed 2026-11-15), TD-293 (shared tablets in the pilot, ask the pilot team before go-live), TD-004 (hosting target), TD-072 (ADR 0004 rule-set defaults per project), TD-073 (handover first-shift trigger),
 TD-039 (dropped AIP-proposal extras). TD-013 (review-gate ignores tracker) is resolved by T-0029. TD-002/005/007/008/009/012 are resolved by this merge; TD-001 by ADR 0001 (`docs/decisions/`). TD-002 is carried into code by ADR 0002 (`docs/decisions/0002-port-one-engine.md`). TD-034 (remaining Inspection-ERP core packages) is resolved by ADR 0007. TD-003 (SSO vs local JWT) is resolved; the SSO spec is diff §4.5 (TD-043 resolved 2026-11-14). Resolved 2026-11-14 by the product owner: TD-257 (offline grace binds; window is an upper bound), TD-136 (magic links PER-14 only, T-0057) and TD-262 (externals create their own password, reset by e-mail); TD-084 (outbound e-mail) resolved by diff §4.6. Resolved 2026-11-15 by the product owner: TD-224 (per-mailbox magic-link cap), TD-213 (object key layout), TD-271 (T-0079), TD-261 (PER-15 password/SSO) and TD-223 (PR principals; residual risk TD-276). Resolved 2026-11-15 (second batch): TD-283 (one account per device id, per-account client store; follow-up TD-293), TD-281 (rule-set upgrade permissions, ADR 0004 Amendment G) and TD-285 (native-origin allow-list); TD-286 and TD-291 (device risks) accepted for development and covered by T-0080 before pilot go-live.

@@ -311,6 +311,123 @@ three ways to co-sign (user decision); details marked (planner default) are plan
   inspector-witnessed claim until the client confirms it; a stolen client device key is stopped by
   revoking the device (T-0043), and assertions signed before the revocation stay valid.
 
+## Signing attestation (e-signature) (user, 2026-11-21, enterprise roadmap; planner defaults TD-433)
+
+Formal sign-offs are attributable electronic signatures: the signer proves presence again,
+states what the signature means, and the sign-off ledger (T-0119) keeps the evidence. Tasks
+T-0289 (backend), T-0290 (ceremony UI), T-0291 (consumers and PDF); later consumers adopt it in
+their own tasks (T-0184, E-05-04, E-05-05). Not in the Pilot-0 gate (T-0146): sign-offs made
+before it ships carry no attestation and stay valid ("no attestation recorded" on the PDF).
+
+- **Formal kinds** (code-declared registry in `signing`, each with an intent-statement i18n key
+  and an integer `intent_version`): `itp_hold_release`, `itp_witness` (single-row `H`/`W`
+  sign-off), `inspection_approve`, `substitution_approve` (internal_qa route,
+  `materials-and-traceability.md` §Product substitutions), `shelf_life_extension_approve`
+  (§Shelf-life extension, Phase 3), `tq_approve` (TQ register, Phase 5). Not attested
+  (TD-433 default): the inspector's submit signature, the bulk close-out of `R`/`S`/`M` rows
+  (TD-095) and client co-sign, which has its own verification modes (§Client co-sign).
+- **Re-authentication.** Online the signer re-authenticates for each formal sign-off with the
+  **signing PIN** (the T-0162 PIN, open to every user; same per-signer lockout) or the account
+  **password** (T-0068 lockout); SSO-only users use the signing PIN, which can be set or reset
+  only within 15 minutes of a fresh sign-in. `POST /api/v1/signing/reauth` returns a
+  **single-use signing grant** bound to user, session, kind and record id + version, valid
+  `signing_reauth_ttl_minutes` (registry, default 5, 1–15). Offline on the Android tablet (field
+  H/W sign-off) the app asks for the **device PIN again at the moment of signing**, even while
+  unlocked (local keystore check, local lockout of diff §4.2); the queued mutation carries
+  `reauth_method = device_pin_offline` and its time evidence. Its sync acceptance is the
+  **offline branch** below.
+- **Offline branch at sync (T-0310).** A queued formal sign-off with
+  `reauth_method = device_pin_offline` needs **no server signing grant** (the device-PIN
+  re-entry is the re-authentication). The server decides on the reconstructed `occurred_at`
+  (diff §6.4.1):
+  - **Device:** accepted only if the device is active, enrolled to the signer and not revoked
+    before `occurred_at`; a mutation from a revoked or foreign device is refused like any other
+    mutation from it (T-0143). Past this check the sign-off is never dropped and never answered
+    with 409.
+  - **Intent version:** accepted if the version the device showed was the current one at
+    `occurred_at` (the registry keeps every version of a kind with its `effective_from` and its
+    i18n key); otherwise kept, effective, flagged `intent_outdated` and listed for QA review. The
+    device sends only the `intent_version` it showed; the server renders that version's i18n
+    text in the signer's locale and never accepts client-supplied intent text.
+  - **Signer standing:** `signer_standing(user_id, from_ts, to_ts)` in the identity service
+    answers from durable standing events persisted in the identity table
+    `oe_identity_account_standing_event` (`deactivated | reactivated | sessions_revoked |
+    signed_in`, with `occurred_at` and, for `signed_in`, the `device_id`), written by admin
+    deactivation and reactivation (T-0014 path), force sign-out (T-0244), SCIM (T-0299) and every
+    successful sign-in; it never reads the expiring Redis session index. The window starts at the
+    signer's last successful sign-in on the mutation's `device_id` at or before `occurred_at` (no
+    such record: at the signer's earliest recorded event, fail-safe) and ends at `occurred_at`;
+    when `time_confidence` is neither `MONOTONIC_RECONSTRUCTED` nor `VERIFIED_ONLINE`, it ends at
+    the sync time instead (fail-safe against a backdated clock). If a deactivation or a session
+    revocation of the signer falls inside the window, the sign-off is **kept as evidence but not
+    effective**: it does not count as signed, releases no hold and closes no row, and it is
+    flagged `signer_inactive`. A deactivation and reactivation both before the window start do not
+    flag it; a later reactivation never makes a flagged sign-off effective.
+  - **QA routing:** a `signer_inactive` sign-off creates a QA verification item of target kind
+    `offline_signoff_signer_inactive`, whose provider is registered in `signing/service.py`.
+    Neither approve nor reject ever makes the original sign-off effective: the provider's
+    `apply_approved` records the flag as reviewed and `apply_rejected` records the entry void,
+    each only as a ledger append; the flagged entry is never altered and nothing is released or
+    closed. The point is resolved only by a fresh attested online sign-off by a qualified signer
+    through the normal consumer path, or by recording the flagged entry void.
+  - **Grace:** outside the offline grace/window of diff §4.2 it is flagged `grace_exceeded`
+    (kept, effective, as any offline mutation).
+  Flags are recorded in the attestation (`flags: [...]`) and the audit payload; `ip_source = sync`.
+- **Intent statement.** Before signing the signer sees and explicitly accepts a statement such as
+  "I, <name>, as <persona>, release hold point <code> on <anchor> and confirm the work meets the
+  stated acceptance criteria" (wording per kind in the i18n catalogue). The server renders the
+  text in the signer's locale. Online, an outdated `intent_version` → 409 (the client re-renders
+  and asks again) and not accepted → 422; offline sign-offs follow the offline branch above.
+- **Evidence in the ledger.** The sign-off ledger entry's payload carries
+  `attestation: {v, kind, intent_key, intent_version, locale, intent_text, intent_sha256,
+  reauth_method, reauth_at, signed_at, occurred_at + time evidence (diff §6.4.1) when offline,
+  device_id, ip, ip_source (request | sync), user_agent_family, on_behalf_of_user_id,
+  delegation_id, flags}`. It is inside the hashed payload, so the ledger format (`v`) is
+  unchanged. The IP is the one uvicorn resolves behind trusted proxies only
+  (`FORWARDED_ALLOW_IPS`). Privacy: the IP and the user-agent family sit in the immutable,
+  hash-chained ledger and cannot be erased later; this is accepted for evidentiary sign-offs,
+  and only these minimum fields are kept (no full user-agent string, no geolocation; TD-433).
+- **Authority is unchanged.** Attestation proves who signed and that they meant it; it never
+  grants anything. Persona, site scope, credentials (TD-099/TD-100), SoD and `run_checks` are
+  checked by the consumer as before; `system_admin` has no `A`/`S` (ADR 0016).
+- **Never under impersonation.** `/signing/reauth` and every attested sign-off refuse a request
+  context with an impersonator (`403 IMPERSONATION_ACTION_FORBIDDEN`, ADR 0015) on top of the
+  central guardrail (T-0278); the admin also never holds the target's PIN or password.
+- **On paper.** The inspection PDF (T-0158) and the MDR dossier (E-05-05) print an attestation
+  block per formal sign-off: signer and persona, "on behalf of <name>" when signed by a delegate,
+  intent text and version, method, signed time (occurred time and confidence offline), device
+  id and IP, through one shared renderer in `signing` (T-0291).
+
+## Delegation of authority (narrow; user, 2026-11-21, enterprise roadmap; planner defaults TD-434)
+
+A user who will be away names an **acting delegate** for a time window, so items addressed to
+them personally do not stall. This is the narrow slice of E-06-07 (approval_routes), pulled
+forward to Phase 1 (T-0292 model and API, T-0293 routing and on-behalf actions, T-0294 screens).
+
+- **Delegation record** `oe_delegations_delegation` (project-scoped, `BaseRecordMixin` + RLS):
+  delegator, delegate, kinds (`hold_point`, `verification`, `sla_escalation`, `tq_approval` from
+  Phase 5), start, end (at most 90 days), reason, revoked at/by. Created by the delegator, or for
+  an absent member by a PER-09 of the project or a `system_admin` (audited, delegator notified).
+  Never to oneself, never chained (a delegate's own delegations are ignored), at most one active
+  delegation per delegator, project and kind; revocable at any time. Every change audited.
+- **Routing.** Hold/witness call-outs to a named person (`inspection_requests`, T-0115),
+  verification items assigned to a user (§QA verification queue) and SLA reminders and
+  escalations addressed to a user (§Verification SLA) also go to that user's active delegate for
+  the kind. Items already assigned to the delegator when the delegation starts are included
+  (TD-434 default); the delegate gets one summary notification at start. Authority that comes
+  from a persona (any PER-06/PER-07 may approve an inspection) gains nothing from delegation.
+- **Delegation never confers authority.** To act, the delegate must themself hold the qualified
+  persona on the project, the site scope and valid credentials (TD-099/TD-100), and the action
+  runs the same `run_checks`. SoD and self-approval apply to the delegate (no approving work they
+  performed or submitted; `allow_self_approval` evaluated for them). No admin grant adds anything
+  (§4.1, ADR 0016). The delegator keeps their own authority; the first action wins.
+- **Recorded on behalf.** Every action a delegate takes on behalf of the delegator records
+  `on_behalf_of_user_id` + `delegation_id`, with `created_by` / the actor = the delegate: for
+  formal kinds in the ledger attestation (`attestation.on_behalf_of_user_id`, `delegation_id`);
+  for actions that are not attested (e.g. verification approve/reject in the QA verification
+  queue, reassignments) on the decision record itself and in its audit entry. The PDF and the
+  MDR print "Signed by X on behalf of Y". Roster awareness (who is on shift) belongs to E-04-12.
+
 ## Planning fields (Pilot-0, planner spec 2026-11-13; TD-165)
 
 Rules below are planner defaults unless marked otherwise.

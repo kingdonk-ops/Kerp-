@@ -3,17 +3,17 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 75/256 tasks done (29%) · **ready now:** 23 · **epics awaiting breakdown:** 48
+**Overall:** 75/278 tasks done (27%) · **ready now:** 26 · **epics awaiting breakdown:** 48
 
 | Phase | Tasks done | Progress |
 |---|---|---|
 | 0 · Platform foundations | 75/112 | `██████░░░░` 67% |
-| 1 · Asset & Quality backbone | 0/125 (+1 epics) | `░░░░░░░░░░` 0% |
-| 2 · Welding quality | 0/10 | `░░░░░░░░░░` 0% |
+| 1 · Asset & Quality backbone | 0/140 (+1 epics) | `░░░░░░░░░░` 0% |
+| 2 · Welding quality | 0/11 | `░░░░░░░░░░` 0% |
 | 3 · Logistics | 0/2 (+7 epics) | `░░░░░░░░░░` 0% |
 | 4 · Execution | 0/0 (+15 epics) | `░░░░░░░░░░` 0% |
-| 5 · Documents, collaboration & AI | 0/7 (+10 epics) | `░░░░░░░░░░` 0% |
-| 6 · Defense, claims & controls | 0/0 (+8 epics) | `░░░░░░░░░░` 0% |
+| 5 · Documents, collaboration & AI | 0/10 (+10 epics) | `░░░░░░░░░░` 0% |
+| 6 · Defense, claims & controls | 0/3 (+8 epics) | `░░░░░░░░░░` 0% |
 | 6b · Work packaging (AWP) | 0/0 (+3 epics) | `░░░░░░░░░░` 0% |
 | 7 · Client portal | 0/0 (+4 epics) | `░░░░░░░░░░` 0% |
 
@@ -265,6 +265,21 @@
 | ⬜ | [T-0271](../tracker/tasks/T-0271.md) | materials/inspections: substitutions in the offline reference bundle, substitution_id bound on the answer, read-only substitution note on the inspection and its PDF | materials | M | T-0270, T-0147, T-0158, T-0111 |  |
 | ⬜ | [T-0272](../tracker/tasks/T-0272.md) | Frontend: product selector shows approved substitutes badged "Approved Substitute (ref)" with the equivalency document viewable offline; selecting binds substitution_id | materials | S | T-0271, T-0165 |  |
 | 🟥 | [T-0280](../tracker/tasks/T-0280.md) | Frontend: Admin → Users 'Login as user (support)' with reason modal, persistent impersonation banner with countdown and Exit, session hand-back (blocked by TD-426) *(blocked by TD-426)* | frontend | M | T-0246, T-0026, T-0277, T-0278, T-0279 |  |
+| ⬜ | [T-0289](../tracker/tasks/T-0289.md) | signing: e-signature attestation for formal sign-offs — re-authentication grant (signing PIN or password; device PIN offline), versioned intent statement, timestamp/device/IP evidence in the sign-off ledger, refused under impersonation (offline sync branch: T-0310) | signing | M | T-0119, T-0162, T-0143, T-0177, T-0230 |  |
+| ⬜ | [T-0290](../tracker/tasks/T-0290.md) | Frontend: signing ceremony — intent statement dialog, re-authentication prompt (signing PIN or password online, device PIN on Android offline), set/reset signing PIN for every user | frontend | M | T-0289, T-0310, T-0143, T-0153 |  |
+| ⬜ | [T-0310](../tracker/tasks/T-0310.md) | signing: offline formal sign-off acceptance at sync — no grant for device_pin_offline, intent version resolved at occurred_at (intent_outdated flag, never 409), signer standing from durable identity events (signer_inactive, never effective → QA queue) | signing | M | T-0289, T-0143, T-0162, T-0177, T-0181, T-0244, T-0014 |  |
+| ⬜ | [T-0291](../tracker/tasks/T-0291.md) | signing: wire attestation into the phase-1 formal sign-offs (inspection approve, ITP hold/witness single-row sign-off, internal_qa substitution approval) and print the attestation block on the inspection PDF | signing | M | T-0289, T-0310, T-0150, T-0114, T-0185, T-0158 |  |
+| ▶ | [T-0292](../tracker/tasks/T-0292.md) | delegations: narrow delegation of authority — oe_delegations_delegation (time-bound, per project and kind), create/list/revoke API, audit, resolution service (never confers authority) | delegations | M | T-0010, T-0014, T-0006, T-0019 |  |
+| ⬜ | [T-0293](../tracker/tasks/T-0293.md) | delegations: route hold-point call-outs, verification items and SLA reminders/escalations to active delegates; act on behalf with the delegate's own persona, credentials and SoD; "signed by X on behalf of Y" in the ledger and PDF | delegations | M | T-0292, T-0289, T-0291, T-0181, T-0182, T-0115 |  |
+| ⬜ | [T-0294](../tracker/tasks/T-0294.md) | Frontend: delegations — My delegations (create, revoke), project delegations list for PER-09, "acting for" chip in queues and sign dialogs | frontend | S | T-0292, T-0031 |  |
+| ▶ | [T-0295](../tracker/tasks/T-0295.md) | identity: internal-commercial data boundary for external accounts — route and schema data class internal_commercial, 404/field omission for is_internal=false, contract test over all routes | identity | S | T-0010, T-0049 |  |
+| 🟥 | [T-0296](../tracker/tasks/T-0296.md) | identity: external inspection party persona (third-party inspector, NDT/test lab) — capabilities, individual assignment, granted subtree, witness attendance on named hold/witness points (pending TD-435) *(blocked by TD-435)* | identity | M | T-0010, T-0014, T-0115, T-0295 |  |
+| ▶ | [T-0298](../tracker/tasks/T-0298.md) | identity: SCIM bearer tokens — oe_identity_scim_token (hashed, shown once, expiry, rotation with overlap, revoke), token authentication bound to the deployment tenant, SCIM-only routes | identity | M | T-0014, T-0006, T-0068 |  |
+| ⬜ | [T-0299](../tracker/tasks/T-0299.md) | identity: SCIM 2.0 /Users for Entra provisioning — discovery endpoints, filter by userName/externalId, create without credentials, PATCH/PUT/DELETE deprovision to is_active=false with session revocation, last System admin protected | identity | M | T-0298, T-0244, T-0054, T-0310 |  |
+| ⬜ | [T-0300](../tracker/tasks/T-0300.md) | Frontend: Admin → Identity provisioning — SCIM base URL, tokens (create shown once, rotate, revoke, last used, expiry) | frontend | S | T-0298, T-0246 |  |
+| ⬜ | [T-0301](../tracker/tasks/T-0301.md) | metering: module + storage ledger oe_metering_storage_event — hooks on upload available/expired/deleted, derivatives, archive registry (DEEP_ARCHIVE tier changes, restore copies), content-addressed attribution | metering | M | T-0016, T-0247, T-0233, T-0237, T-0240 |  |
+| ⬜ | [T-0302](../tracker/tasks/T-0302.md) | metering: daily usage snapshot oe_metering_daily_snapshot — nightly SAQ cron on the batch worker, UNIQUE NULLS NOT DISTINCT (tenant, project, date, metric), storage from the ledger, seats from last_active_at, counts shared with T-0219 stats providers | metering | M | T-0301, T-0219, T-0243, T-0226 |  |
+| ⬜ | [T-0306](../tracker/tasks/T-0306.md) | settings: feature flags — registry category feature_flags (bool), per-project overrides, effective flags in the client bootstrap, FEATURE_DISABLED guard, staged rollout by pilot projects | settings | M | T-0230, T-0231, T-0248 |  |
 
 ## Phase 2 — Welding quality
 
@@ -280,6 +295,7 @@
 | ⬜ | [T-0208](../tracker/tasks/T-0208.md) | Frontend: WPS register, welder quals, weld register | frontend | M | T-0206, T-0128 |  |
 | ⬜ | [T-0209](../tracker/tasks/T-0209.md) | Phase 2 exit journey: weld cannot be accepted outside qualification/NDE rules | e2e | S | T-0208 |  |
 | ⬜ | [T-0265](../tracker/tasks/T-0265.md) | materials: material_cert.verify gate (heat/MTR pending_verification until QA verifies the MTR), blocks weld/spool release, missing-certificate alert, MTR lane provider | materials | M | T-0181, T-0205, T-0034 |  |
+| 🟥 | [T-0297](../tracker/tasks/T-0297.md) | qms: external certificate submissions — lab/NDT party uploads reports and certificates against an NDT or inspection request; lands unverified in the QA verification queue, never applied before internal QA verifies (pending TD-435) *(blocked by TD-435)* | qms | M | T-0296, T-0181, T-0204, T-0016 |  |
 
 ## Phase 3 — Logistics
 
@@ -292,7 +308,7 @@
 | 🧩 | [E-03-05](../tracker/tasks/E-03-05.md) | cutting: 1D FFD + 2D rectpack nesting, yield/waste, offcut reuse, cutting.confirm → inventory | cutting | L | E-03-04 |  |
 | 🧩 | [E-03-06](../tracker/tasks/E-03-06.md) | site_logistics: Gate Delivery edge screen + OS&D vs ERP-mirrored PO lines | site_logistics | L | T-0127, E-03-02 |  |
 | 🧩 | [E-03-07](../tracker/tasks/E-03-07.md) | equipment & fleet register (extends calibration core) | equipment | L | T-0112 |  |
-| ⬜ | [T-0184](../tracker/tasks/T-0184.md) | materials/qms: material shelf-life extension workflow — oe_material_shelf_life_extension, QA approval through the verification queue (no self-approval), effective use-by date, eligibility and readiness re-evaluation, ledger | materials | M | E-03-03, T-0016, T-0018, T-0019, T-0139, T-0181, T-0183, T-0266, T-0262 |  |
+| ⬜ | [T-0184](../tracker/tasks/T-0184.md) | materials/qms: material shelf-life extension workflow — oe_material_shelf_life_extension, QA approval through the verification queue (no self-approval), effective use-by date, eligibility and readiness re-evaluation, ledger | materials | M | E-03-03, T-0016, T-0018, T-0019, T-0139, T-0181, T-0183, T-0266, T-0262, T-0289 |  |
 | ⬜ | [T-0268](../tracker/tasks/T-0268.md) | materials/sync: material batches and approved extension documents in the offline reference bundle, client/server use-by check | materials | S | T-0184, T-0147, T-0017 |  |
 
 ## Phase 4 — Execution
@@ -336,14 +352,20 @@
 | ⬜ | [T-0189](../tracker/tasks/T-0189.md) | qms/ai_agents: ITP alignment watchdog — drift reviews on scope-change, P6 and task events, AI gap analysis and proposed ITP patch (proposal only), reviewer notification | qms | M | T-0015, T-0019, T-0058, T-0104, T-0187, T-0188, T-0281, T-0285, E-04-07, E-04-14, E-05-08 |  |
 | ⬜ | [T-0286](../tracker/tasks/T-0286.md) | qms: ITP alignment review actions — dismiss, mark manually updated, Apply AI proposal & approve (human-confirmed, signed lines preserved, ledgered) | qms | S | T-0189, T-0281 |  |
 | ⬜ | [T-0287](../tracker/tasks/T-0287.md) | Frontend: ITP Alignment Review drawer (what changed, AI gap analysis, proposed patch diff; dismiss / edit manually / apply & approve) and review register | frontend | M | T-0286, T-0283 |  |
+| ⬜ | [T-0307](../tracker/tasks/T-0307.md) | identity: service accounts (auth_user.account_type) and API keys oe_identity_api_key — tenant- or project-scoped, read/write scopes, required expiry, hashed, shown once, revocable, rotatable with ≤ 24 h overlap, audited; service accounts never hold admin grants | identity | M | T-0014, T-0006, T-0298 |  |
+| ⬜ | [T-0308](../tracker/tasks/T-0308.md) | identity: API key authentication — tenant bound from the deployment, scopes ∩ memberships, A/S always removed, interactive-only routes refused, per-key rate limit, admin grants ignored, machine writes identified by service account + key id | identity | M | T-0307, T-0010 |  |
+| ⬜ | [T-0309](../tracker/tasks/T-0309.md) | Frontend: Admin → Service accounts and API keys (create shown once, scopes, projects, expiry, rotate, revoke, last used) | frontend | S | T-0307, T-0246 |  |
 
 ## Phase 6 — Defense, claims & controls
 
 | | ID | Title | Module | Size | Depends on | PR |
 |---|---|---|---|---|---|---|
 | 🧩 | [E-06-01](../tracker/tasks/E-06-01.md) | commercial: contracts + SoR catalogs + claim milestones | commercial | L | T-0111 |  |
+| ⬜ | [T-0303](../tracker/tasks/T-0303.md) | metering: soft-quota policy and advisories (never blocking) + project cost-centre reference (external_source/external_id) | metering | M | T-0302, T-0227 |  |
 | 🧩 | [E-06-02](../tracker/tasks/E-06-02.md) | progress_claims: Pay Apps (AIA G702/G703), retention, claim.approved webhook → ERP | claims | L | E-06-01, E-04-03 |  |
+| ⬜ | [T-0304](../tracker/tasks/T-0304.md) | metering: monthly usage statements per project and tenant — retained revisions, CSV download, PM report API, e-mail with link only | metering | M | T-0303 |  |
 | 🧩 | [E-06-03](../tracker/tasks/E-06-03.md) | variations: VR/VN/VO register + delay event attribution + time-impact analysis | variations | L | E-06-01 |  |
+| ⬜ | [T-0305](../tracker/tasks/T-0305.md) | Frontend: Admin → Usage (snapshots, policies, advisories, cost centres) and the project usage report for PMs | frontend | M | T-0304, T-0246 |  |
 | 🧩 | [E-06-04](../tracker/tasks/E-06-04.md) | costmodel: physical EVM / EAC / project_controls | costmodel | L | E-04-06 |  |
 | 🧩 | [E-06-05](../tracker/tasks/E-06-05.md) | reporting / dashboards / BI (SAQ rollups → summary tables) | reporting | L | E-06-04 |  |
 | 🧩 | [E-06-06](../tracker/tasks/E-06-06.md) | risk / project_intelligence | risk | L | E-06-05 |  |
