@@ -262,6 +262,11 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
   Updated: T-0147, T-0156, T-0157, T-0158, T-0159 (note), T-0168, T-0230, T-0235, T-0239.
   Raised: TD-408 (reconciliation with the upload model, ADR 0005 path, EXIF frame).
 
+- **2026-11-20 — Phase 0 bundling (user request), bundle 3:** T-0063 absorbs T-0056 (projects
+  follow-ups + access-request decision e-mails; both small backend follow-ups on merged modules).
+  T-0056 is `dropped` (body kept); its acceptance criteria live on in T-0063. The decision e-mails
+  stay outside the Pilot-0 gate.
+
 - **2026-11-21 — standalone inspections, public capture, post-submit automation, QA
   verification workbench, verification SLA, expiry alerts, readiness conflicts, shelf-life
   extensions and the calendar (user-supplied tasks T-0179–T-0184 + E-04-15; planner pass):**

@@ -3,7 +3,146 @@
 > **Generated — do not hand-edit.** Rebuild with `python scripts/pr_suggestions.py rebuild`.
 > A running digest of everything agents surfaced on merged PRs — review notes, must-fix items, suggestions, nits, follow-ups and ideas — so nothing is lost after a squash-merge. Formal follow-ups also live as `TD-xxx` in `tracker/todo/` and on [TODO.md](TODO.md); this file is the readable skim. Each item links back to its PR or review for full context.
 
-_Repo `kingdonk-ops/Kerp-`, base `dev` · 135 merged PRs · 134 with surfaced notes._
+_Repo `kingdonk-ops/Kerp-`, base `dev` · 139 merged PRs · 138 with surfaced notes._
+
+---
+
+## PR #142 — T-0083: CI speed 3: frontend-only PRs skip the backend jobs (per-component change detection in ci.yml detect)
+task `T-0083` · merged 2026-11-21 · by `kingdonk-ops` · [PR](https://github.com/kingdonk-ops/Kerp-/pull/142)
+
+**TODOs raised**
+
+- None.
+
+**Review by `kingdonk-ops` — KERP-REVIEW: APPROVED patch-id=aee52c768ba97fce1c8bde4235d20fc261ffe980** · [full review](https://github.com/kingdonk-ops/Kerp-/pull/142#pullrequestreview-6003052500)
+
+- _Must fix_
+  None.
+
+- _Suggestions (non-blocking)_
+  - `backend/tests/pg_databases.py` `_check_empty` only looks at `pg_tables` in `public`. Leftover enum types, sequences, views or functions from an aborted run would pass. Consider also checking `pg_type`/`pg_class` in `public` (excluding PostGIS-owned objects via `pg_depend`/extension membership), or a `later` TODO.
+  - Not caused by this PR: nothing in CI checks that the committed `frontend/src/api/` matches the backend's OpenAPI schema. Backend jobs never caught a hand-edited generated client, so this skip loses nothing. A drift check in the `frontend` job (run `gen:api` and `git diff --exit-code`) would close the gap. Consider a `later` TODO.
+  - `scripts/tests/test_ci_changes.py`: you could add a dotfile root path (e.g. `.gitignore`) to the parametrized "needs backend" list. It is already covered by the prefix logic.
+
+---
+
+## PR #139 — docs(plan): standalone inspections, QA workbench, SLA/expiry/readiness, materials, calendar, system_admin visibility, impersonation, AI ITP
+task `T-0179` · merged 2026-11-21 · by `kingdonk-ops` · [PR](https://github.com/kingdonk-ops/Kerp-/pull/139)
+
+**TODOs raised**
+
+TD-410–TD-430. Decisions for the user:
+- TD-410: public links. Blocks T-0252–T-0255.
+- TD-411: equipment anchor. Blocks T-0250.
+- TD-412: fleet in the Phase-1 register. Blocks T-0249.
+- TD-413: no SMS.
+- TD-414: pre-gate records.
+- TD-418: escalation authority.
+- TD-419: iCal.
+- TD-422: PER-13 approvals.
+- TD-423: substitution self-approval.
+- TD-426: impersonation. Blocks T-0277–T-0280; default is read-only "view as".
+- TD-427: logging admin reads.
+- TD-428–TD-430: ITP defaults.
+
+TD-398 is updated.
+
+**Review by `kingdonk-ops` — KERP-REVIEW: CHANGES_REQUESTED patch-id=abc2c3b287c27f9d902e3cce20d02aba8ecf4d74** · [full review](https://github.com/kingdonk-ops/Kerp-/pull/139#pullrequestreview-6002610624)
+
+- _Must fix_
+  1. **`tracker/tasks/T-0275.md:20` has a corrupted endpoint.** The criterion reads ``GET /api/v1/projects/<built-in function id>``: the `{id}` placeholder was replaced by a Python repr, so the endpoint the criterion tests is wrong. **Fixed:** ``GET /api/v1/projects/{id}``. Also grep the PR for any other `<built-in` text.
+  2. **Self-verification by a QA reviewer contradicts the queue's SoD rule, and no TODO records it.**
+     - These lines let a QA reviewer approve the item for their own upload regardless of `allow_self_approval`:
+       - `tracker/tasks/T-0260.md:21`: "a QA reviewer's upload may verify at once (still an item, approved by them, audited)";
+       - `tracker/tasks/T-0261.md:21`, `tracker/tasks/T-0265.md:21` and `docs/spec/modules/quality-and-inspection.md:500`: the same rule.
+     - That contradicts `T-0181.md:22` and `quality-and-inspection.md:504-505`: "nobody decides an item they submitted unless the project allows self-approval (T-0140)". It also contradicts the no-self-approval default (TD-070).
+     - **Fixed:** a QA reviewer's own upload creates a pending item like any other, decided by a different QA-authority holder. It is auto-verified only when the effective `allow_self_approval` is true, and then flagged `self_approved` in the ledger.
+     - Apply the same text in T-0260, T-0261, T-0265 and spec line 500.
+     - If the user's paste asked for QA auto-verify, raise a `decision` TODO that records the override, with the safe default applied.
+  3. **ADR 0004 Amendment H conflicts with T-0188, which is unblocked.**
+     - `docs/decisions/0004-project-rule-sets-with-defaults
+
+- _Suggestions (non-blocking)_
+  - **T-0266 table name.** `oe_schedule_readiness_conflict` (`tracker/tasks/T-0266.md:3,18`, `quality-and-inspection.md:555`) is not module-prefixed. The module is `compliance`, and DEVELOPMENT-PLAN:282 and the T-0180 note rename the paste's tables to the module prefix. Consider `oe_compliance_readiness_conflict`.
+  - **TD-396 `tasks`.** The resolved TD-396 lists `[T-0221, T-0222, T-0233, T-0237, T-0239, T-0240]`. Its resolution also names T-0219, T-0224 and T-0241; consider adding them.
+  - **DEVELOPMENT-PLAN open decisions.** The list gains TD-410, 411, 412, 418, 419, 422 and 423 but not TD-426 (impersonation, blocking 4 tasks), TD-427 or TD-430. Consider adding them.
+  - **Tagout chain waits on TD-411.** T-0257 depends on T-0250, which is blocked by TD-411. The whole tagout chain (T-0257, T-0258, T-0259, T-0264) therefore waits on the equipment-anchor decision, while T-0180 already runs node/Item targets end to end. If that is not intended, make the equipment part of T-0257 a follow-up.
+  - **E-04-15 and TD-419.** Consider stating in the E-04-15 Notes that the iCal sub-task must carry `blocked_by: [TD-419]` when the epic is broken down (the T-0115 convention). It is implied today but not explicit.
+  KERP-REVIEW: CHANGES_REQUESTED patch-id=abc2c3b287c27f9d902e3cce20d02aba8ecf4d74
+  ---
+  _Generated by [Claude Code](https://claude.ai/code)_
+
+**Review by `kingdonk-ops` — KERP-REVIEW: APPROVED patch-id=26fe22b256150bc25f7b94f70362d82dd0adccb2** · [full review](https://github.com/kingdonk-ops/Kerp-/pull/139#pullrequestreview-6002649718)
+
+- _Suggestions: all applied and verified_
+  - `oe_compliance_readiness_conflict` is used in T-0266 and the spec (only the "paste:" note keeps the old name).
+  - The TD-396 `tasks` list is completed.
+  - DEVELOPMENT-PLAN's open decisions now include TD-426, TD-427, TD-430 and TD-431.
+  - The E-04-15 note requires `blocked_by: [TD-419]` on the iCal sub-task.
+
+- _Must fix_
+  None.
+
+- _Suggestions (non-blocking)_
+  - **`quality-and-inspection.md:465-469` (Tagout gate)** still says "sets the target `out_of_service`" in general terms. Consider qualifying it: equipment through T-0288; node/Item hold recorded as an open blocking follow-up (T-0257). Nothing consumes the node/Item hold yet beyond `has_open_blocking_follow_up`; a `later` TODO could name the future gate (e.g. an RSW/Item release rule set) that should read it.
+  - **Order values.** T-0288 and T-0260 both have `order: 89`, and T-0288 depends on T-0260. Consider bumping T-0288's order so the board lists it after its dependency.
+  KERP-REVIEW: APPROVED patch-id=26fe22b256150bc25f7b94f70362d82dd0adccb2
+  ---
+  _Generated by [Claude Code](https://claude.ai/code)_
+
+---
+
+## PR #141 — T-0082: CI speed 2: PostgreSQL tests on a per-test copy of a migrated template database, pytest-xdist on PostgreSQL, fsync-off CI Postgres, coverage floor on the PostgreSQL run
+task `T-0082` · merged 2026-11-21 · by `kingdonk-ops` · [PR](https://github.com/kingdonk-ops/Kerp-/pull/141)
+
+**TODOs raised**
+
+- None. The follow-up is task `T-0083` (frontend-only PRs skip the backend jobs).
+
+**Review by `kingdonk-ops` — KERP-REVIEW: APPROVED patch-id=b89bb88d91cc4bfee664608f67af4ffa865c164e** · [full review](https://github.com/kingdonk-ops/Kerp-/pull/141#pullrequestreview-6002913326)
+
+- _Must fix_
+  None.
+
+- _Suggestions (non-blocking)_
+  - `backend/tests/test_rls_bypass.py:401`: `test_superuser_role_is_reported` still connects as the owner to the source database `kerp_test`.
+    - Under `-n auto`, another worker's `CREATE DATABASE … TEMPLATE kerp_test` waits up to 5 s for that connection to close, and fails if it doesn't. The risk is small but real.
+    - Fix: use `pg_databases.owner_url(<test db>)`, or the `postgres` maintenance database, when `PER_TEST` is set.
+  - `backend/tests/pg_databases.py:101-107`: per-test mode copies whatever is in the source database.
+    - The fallback path (downgrade to base) leaves an empty `alembic_version` table in `kerp_test` (I saw this after running it). That one is harmless, but an aborted old-style run would leave a full schema, and every "empty" copy would inherit it.
+    - Fix: a one-time check in `_build_templates` that the source has no tables besides `spatial_ref_sys` / an empty `alembic_version`, with a clear error.
+  - `backend/tests/pg_databases.py:106-108`: if `migrate_and_seed` fails while building the head template, `HEAD_TEMPLATE` was never added to `_templates_built`, so it stays behind until the next run's `DROP IF EXISTS`.
+    - Fix: add it to the set before migrating.
+  - `tracker/tasks/T-0082.md` acceptance criterion 2 says `TEMPLATE kerp_tmpl_migrated`, but the code and criterion 1 use `kerp_tmpl_head`. Align the wording when the file is next touched; ticking or rewording a criterion changes the patch-id.
+  KERP-REVIEW: APPROVED patch-id=b89bb88d91cc4bfee664608f67af4ffa865c164e
+  ---
+  _Generated by [Claude Code](https://claude.ai/code)_
+
+---
+
+## PR #140 — T-0081: CI speed 1: SQLite test DB from a migrated template + pytest-xdist, SQLite and PostgreSQL backend tests as parallel jobs, docs-only PRs skip app jobs, --durations
+task `T-0081` · merged 2026-11-21 · by `kingdonk-ops` · [PR](https://github.com/kingdonk-ops/Kerp-/pull/140)
+
+**TODOs raised**
+
+- None. The PostgreSQL follow-up is task `T-0082`: per-test copies of a migrated template database, xdist on PostgreSQL, fsync-off CI Postgres, and the coverage floor moved to the PostgreSQL run. It also records why per-test SAVEPOINT rollback was rejected.
+
+**Review by `kingdonk-ops` — KERP-REVIEW: APPROVED patch-id=a48f7c44b11422a8dffab42a915028fc4a391c0d** · [full review](https://github.com/kingdonk-ops/Kerp-/pull/140#pullrequestreview-6002711234)
+
+- _Must fix_
+  None.
+
+- _Suggestions (non-blocking)_
+  - `scripts/tests/test_ci_changes.py:476`: the guard only scans `frontend/src` and a few file types. It misses `frontend/*.config.ts`, `backend/pyproject.toml`, `Dockerfile`, `*.yml`, `*.toml` and `*.sql`. Its regex also misses `"./docs/…"`. Consider scanning `frontend/` without `node_modules`, adding those types and allowing an optional `./` prefix.
+  - `backend/tests/audit_support.py:224`: the `mkdtemp` template directories are never removed. One leaks per worker per run. An `atexit` cleanup would fix it.
+  - The SQLite run no longer downgrades a database that holds data at teardown. `backend-pg` still does, so overall coverage is kept. Just noting it.
+  - T-0082:
+    - The coverage criterion "the SQLite run keeps running the full suite without it or with it" leaves the choice open. Pick one.
+    - The "Not done: SAVEPOINT" checkbox is a non-goal. Move it to Notes or an "Out of scope" line so it is never ticked.
+    - `20-kerp-app.sql` grants `GRANT ALL ON DATABASE … TO kerp_app`, and `CREATE DATABASE … TEMPLATE` does not copy database-level grants. Add a criterion to grant them again on each per-test copy, or record that they are not needed.
+  KERP-REVIEW: APPROVED patch-id=a48f7c44b11422a8dffab42a915028fc4a391c0d
+  ---
+  _Generated by [Claude Code](https://claude.ai/code)_
 
 ---
 
