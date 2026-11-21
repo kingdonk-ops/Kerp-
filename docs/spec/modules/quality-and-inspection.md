@@ -172,8 +172,8 @@ The punch or NCR is an **issue** of the `issues` module, raised through the post
   rejected as a whole (422) and nothing is signed.
 
 ### Request anchors
-A Request for Inspection or NDT request may cover several anchors (e.g. one NDT request for
-several RSWs): `oe_inspections_request_anchor(request_id, node_id | item_id)` — exactly one of
+A Request for Inspection may cover several anchors (e.g. one RFI slot for several RSWs; NDT
+requests to an NDT provider are a separate record, TD-098): `oe_inspections_request_anchor(request_id, node_id | item_id)` — exactly one of
 `node_id`/`item_id` set — replaces a single anchor FK (ADR 0003 §2). For the Request for
 Inspection the rows also carry the `slot_id` they belong to (§`inspection_requests` 2).
 
@@ -904,7 +904,7 @@ decision of 2026-11-16 (numbering and layout); everything else in this section i
 default** (planner spec 2026-11-21), written from the client sample analysis in
 `docs/research/coastal-inputs-qa-documents.md` §2. The product owner checks it against a client
 RFI sample before T-0115 ships (TD-045). Tasks: T-0115 (records, draft, issue, numbering,
-cancel), T-0333 (lifecycle after issue, outcomes, witness check), T-0334 (client delay
+cancel; discipline defaults), T-0340 (discipline configuration editing), T-0333 (lifecycle after issue, outcomes, witness check), T-0334 (client delay
 attribution), T-0335 (notifications and e-mail), T-0336 (PDF), T-0337 (calendar API and tablet
 pull scope), T-0338 (register and detail screens), T-0339 (calendar screens). Delegation routing
 is T-0293; an external inspection party as witness is T-0296 (TD-435).
@@ -1006,8 +1006,8 @@ persona), `author_user_id`, `body` (non-blank, ≤ 2,000 characters), `created_a
 `code` (`^[A-Z]{1,4}$`, unique per project), `title` (localised strings), `inspection_types`
 (ordered list of `{key, label (localised strings)}`), `location_label` (`job_location \| batch_no
 \| location_grid_level`), `max_slots` (1–10, default 4), `active`. Code-declared defaults (§10.2)
-are copied to a project on first use or by client-pack apply (T-0108, numbering and
-configuration part); PER-06 or PER-09 edit them. A code that has been used on an issued request
+are copied to a project on first use (T-0115); a client pack may later seed them (T-0108);
+PER-06 or PER-09 edit them through T-0340. A code that has been used on an issued request
 cannot be changed or deleted (only deactivated).
 
 **`oe_inspection_requests_counter`**: `project_id`, `key` (`rfi`), `last_value`; unique
@@ -1056,15 +1056,19 @@ table keeps every earlier time.
 | `draft → requested` (**issue**, request-level: all draft slots at once) | creators | every slot has type, future `scheduled_start`, ≥ 1 linked record in `PENDING` or `RE_INSPECT` (else 409 `INSPECTION_NOT_REQUESTABLE`), party rows; `run_checks(context, "inspection_request.issue")` passes | RFI no. allocated on first issue (§8); notice computed (§6); linked records → `INSPECTION_REQUESTED` (§5); call-out notifications (§9); PDF rendered (§10) |
 | `requested → confirmed` | named witness or PER-15 of the client party; PER-06/PER-07 recording on behalf (`confirmation_ref` required) | before an outcome | requester notified |
 | `requested \| confirmed \| no_show \| failed → requested` (**reschedule**) | creators; PER-15 of the client party (cause `client` set automatically) | new `scheduled_start` in the future; `reason` (non-blank) and `cause_party` required | `reschedule_count` + 1; old and new times in the event; confirmation, attendance and `reminder_sent_at` cleared; notice recomputed from now (§6); delay entry (§7); notifications; PDF re-rendered |
-| `requested \| confirmed → witnessed` | PER-06, PER-07 (site scope) | every external H/W party has `attendance` `attended` or `waived`, at least one `attended` | witness requirement satisfied (§5) |
-| `requested \| confirmed → waived` | PER-15 of the point's party (any point); PER-06 for `W` points only, with `waiver_ref` (the client's written waiver) | every external H/W party `waived` | witness requirement satisfied |
-| `requested \| confirmed → no_show` | PER-06, PER-07 | `outcome_occurred_at` ≥ `scheduled_start` + `inspection_request.no_show_grace_minutes` (default 30); ≥ 1 external H/W party `absent` | satisfied only if every absent party's point is `W` and `notice_met` (§5); delay entry (§7) |
+| **waive a party** (no slot transition) | PER-15 of that party (any point); PER-06 for a `W` point only, with `waiver_ref` (the party's written waiver) | slot `requested`/`confirmed`; the party is an external H/W party | that party's `attendance = waived` (`attendance_by_user_id`, `waiver_ref` in the event); when every external H/W party is now `waived` the slot moves to `waived` in the same action |
+| `requested \| confirmed → witnessed` | PER-06, PER-07 (site scope) | **no external H/W party `pending`**; every one `attended` or `waived`, at least one `attended` | witness requirement satisfied (§5) |
+| `requested \| confirmed → waived` | automatic, by the last **waive a party** action | every external H/W party `waived` | witness requirement satisfied |
+| `requested \| confirmed → no_show` | PER-06, PER-07 | `outcome_occurred_at` ≥ `scheduled_start` + `inspection_request.no_show_grace_minutes` (default 30); **no external H/W party `pending`**; ≥ 1 `absent` | satisfied only if every absent party's point is `W` and `notice_met` (§5); delay entry (§7) |
 | `requested \| confirmed → failed` | PER-06, PER-07 | `outcome_reason_code` required (§7): the call-out could not be held for a reason other than the witness's absence (work not ready, access, weather, permit, instrument) | not satisfied; delay entry (§7) |
 | `draft \| requested \| confirmed → cancelled` | requester, PER-06 | reason required unless `draft` | linked records revert (§5); notifications; PDF re-rendered; a draft request whose slots are all cancelled may be soft-deleted instead (no number was used) |
 
 - **Attendance.** Per external H/W party, the named witness may record their own attendance as
   `attended`; PER-06/PER-07 record `attended` or `absent` for any party; `waived` is set only by
-  the waive action. Attendance is recorded with the outcome in one action or before it.
+  the per-party **waive a party** action, so a mixed call-out is recordable (for example the
+  client waives its `W` point and the principal attends its `H` point → `witnessed`).
+  Attendance is recorded with the outcome in one action or before it; `witnessed` and `no_show`
+  are refused (422 `ATTENDANCE_PENDING`) while any external H/W party is still `pending`.
 - `witnessed`, `waived` and `cancelled` are final. `no_show` and `failed` are final unless the
   slot is rescheduled. Every transition is a conditional update on `version` and `status`: the
   first wins, a concurrent second gets 409 (this covers delegator and delegate acting together,
@@ -1092,14 +1096,26 @@ Called through `inspections.service` (the inspections module owns its lifecycle 
 | `cancelled` | back to `prior_status` if the record is still `INSPECTION_REQUESTED` and on no other live slot; a record that has moved on (submitted, returned, approved) is not touched |
 
 **Witness check on submit (T-0333).** `inspection_requests.service.witness_status(inspection_id)`
-returns `not_required | none | pending | satisfied | not_satisfied` from the latest slot linking
-the record. `construction_control` adds the system-default `check` rule `WITNESS_REQUIREMENT` to
-`inspection.submit` (§Review and return), evaluated from the ITP line's external H/W points:
-findings `RFI_REQUIRED` (no slot ever issued), `WITNESS_PENDING` (slot `requested`/`confirmed`),
-`WITNESS_NOT_SATISFIED` (`no_show` on an H point or after short notice, or `failed`). The rule is
-locked (ADR 0004 §5). A per-record override (ADR 0004 Amendment A) is possible for `W` points
-only; for `H` points it is refused (422 `OVERRIDE_NOT_ALLOWED`). An offline submit is checked at
+returns `not_required | none | pending | satisfied | not_satisfied`. It looks at the most recently
+issued slot that links **the record itself or, for an ITR
+(`kind = inspection`), the ITP line it evidences** (`kind = itp` record, resolved through
+`inspections.service`). The usual flow raises the request on the ITP line and fills the ITR in
+later, so a slot that links only the line counts for the ITR. `construction_control` adds two
+locked system-default `check` rules (ADR 0004 §5) to `inspection.submit` (§Review and return),
+evaluated from the ITP line's external H/W points: `WITNESS_REQUIREMENT_HOLD` (some external
+party has `H`) and `WITNESS_REQUIREMENT_WITNESS` (only `W`). Findings: `RFI_REQUIRED` (no slot
+ever issued), `WITNESS_PENDING` (slot `requested`/`confirmed`), `WITNESS_NOT_SATISFIED`
+(`no_show` on an H point or after short notice, or `failed`). An offline submit is checked at
 sync like every other submit check.
+
+**Override (decision TD-486, planner default applied).** A per-record override (ADR 0004
+Amendment A, T-0035) is possible for `WITNESS_REQUIREMENT_WITNESS` as for any check. For
+`WITNESS_REQUIREMENT_HOLD` it is refused: the rule carries the param `overridable: false`, and
+the override-request path of `validation.service` refuses a request naming a finding of such a
+rule with 422 `OVERRIDE_NOT_ALLOWED` (an additive rule param read by the T-0035 request path; the
+frozen `oe_validation_override` shape is unchanged; other modules call it through the validation
+service, never its tables). An internal approver cannot step over a client's hold; this is an
+exception to Amendment A pending TD-486.
 
 ### 6. Notice period
 
@@ -1154,7 +1170,7 @@ decimals, set when ended), `status` (`open \| closed`), `cause_changed_by`, `cau
   an audit entry; earlier values stay in the history.
 - **Internal only.** Delay records and their API are classed `internal_commercial` (T-0295):
   404/omitted for every `is_internal = false` account, PER-15 included. PER-15 sees the slot's
-  outcome and history, not the attribution.
+  outcome and history, not the attribution: the history is redacted for them as §13 says.
 - **Read API** `GET /api/v1/projects/{project_id}/inspection-requests/delays?cause_party=&status=&from=&to=&anchor=`
   and `inspection_requests.service.delays(...)` for the Look-Ahead blocked badge (E-04-02) and
   delay events / time-impact analysis (E-06-03). No money is computed here; hours are wall-clock
@@ -1163,23 +1179,31 @@ decimals, set when ended), `status` (`open \| closed`), `cause_changed_by`, `cau
 ### 8. Numbering
 
 - **Pattern** (product owner, 2026-11-16): `<project>-RFI-<discipline>-<seq>`, e.g.
-  `P1234-RFI-M-0001`, `P1234-RFI-C-0002`, `P1234-RFI-CV-0003`. It is the project numbering
-  pattern `inspection_request` (T-0108 numbering patterns), default
-  `{project}-RFI-{discipline}-{seq:4}`, parsed with a whitelist of placeholders: `{project}`
+  `P1234-RFI-M-0001`, `P1234-RFI-C-0002`, `P1234-RFI-CV-0003`. The pattern is the project
+  setting `inspection_request.number_pattern`, **owned by this module** (default
+  `{project}-RFI-{discipline}-{seq:4}`; PER-09 edits it; T-0108 client packs may later seed it
+  through the project-settings API, like any other setting), parsed with a whitelist of placeholders: `{project}`
   (project code), `{discipline}` (discipline code), `{seq:N}` (zero-padded to at least N digits,
   growing past 9999). Unknown placeholders are refused when the pattern is saved.
 - **Discipline code mapping:** mechanical `M`, coating `C`, civil `CV` (defaults, §10.2); a
   project may add disciplines with their own codes.
-- **Sequential per project:** one counter per project shared by all disciplines (the 2026-11-16
-  wording; per-discipline counters are a product-owner check, TD-045).
+- **Counter scope:** project setting `inspection_request.counter_scope` = `project` (default:
+  one counter per project shared by all disciplines, the 2026-11-16 wording) or `discipline` (one
+  counter per discipline, as in the client samples). It can be changed only while the project has
+  no issued request (409 otherwise). The counter row key is `rfi` or `rfi:<discipline>`.
+- **One counter mechanism:** `oe_inspection_requests_counter` is this module's own counter;
+  T-0108's numbering (when it lands) does not allocate RFI numbers.
 - **Allocation** happens in the issue transaction: `UPDATE oe_inspection_requests_counter SET
   last_value = last_value + 1 … RETURNING last_value` (row lock; the row is created with
-  `INSERT … ON CONFLICT DO NOTHING` first). Concurrent issues get distinct consecutive numbers; a
+  `INSERT … (last_value = seq_start − 1) ON CONFLICT DO NOTHING` first). Concurrent issues get distinct consecutive numbers; a
   rolled-back issue uses no number, so committed numbers have no gaps. A unique index on
   `(project_id, rfi_no)` backs it.
 - **Start value:** project setting `inspection_request.seq_start` (default 1) lets a project
-  continue a client's existing paper sequence; PER-09 may set it only to a value above the last
-  allocated number.
+  continue a client's existing paper sequence. A new counter row starts at `last_value =
+  seq_start − 1`, so the first number is `seq_start`. PER-09 may change it only to a value above
+  the last allocated number of every existing counter row of the project (422 otherwise); the
+  change sets `last_value = seq_start − 1` on those rows under the same row lock, in the same
+  transaction as the setting.
 - **Drafts have no number** (shown as "Draft"). Deleting a draft uses no number.
 - **Cancel** keeps the number; it is never reused; the request stays in the register and its PDF
   is re-rendered with a "Cancelled" mark.
@@ -1226,7 +1250,10 @@ notification per request per recipient per event (not one per slot).
 stack as the inspection report, T-0158, so no reportlab), stores the file through the storage
 service with its SHA-256 and returns a presigned link. A new revision (`pdf_revision` + 1) is
 rendered on issue, reschedule, cancel and when the request closes; the closing rendition is
-titled "<discipline title> – Results" and its key and SHA-256 are kept for the dossier. `GET
+titled "<discipline title> – Results" and its key and SHA-256 are kept for the dossier. If a
+reschedule reopens the request and it closes again, the new Results rendition replaces the
+pointer on the request; every earlier rendition stays stored (each revision's key and SHA-256 are
+in its `rendered` event) and is never deleted. `GET
 …/{id}/pdf` returns the latest; a draft renders on demand with a "Draft" watermark and is not
 stored. Fixed labels come from the backend message catalogue of T-0158 in the project's default
 language (fallback `en`; only English ships, TD-172). Empty values print blank: never `0`,
@@ -1298,10 +1325,11 @@ language (fallback `en`; only English ships, TD-172). Empty values print blank: 
 | Confirm | named witness; PER-15 of the client party; PER-06/PER-07 on behalf with `confirmation_ref` |
 | Record attendance | named witness (own `attended`); PER-06/PER-07 (any party) |
 | Record `witnessed`, `no_show`, `failed` | PER-06, PER-07 (site nodes) |
-| Waive | PER-15 of the party (any point); PER-06 for `W` points with `waiver_ref` |
+| Waive a party (per party; the slot becomes `waived` when every party is waived) | PER-15 of that party (any point); PER-06 for that party's `W` point with `waiver_ref` |
 | Cancel | requester, PER-06 |
 | Comment | the creators, PER-06, PER-07, PER-15 and named witnesses on slots they can see |
-| Discipline configuration, reason codes, settings | PER-06, PER-09 |
+| Discipline configuration, reason codes | PER-06, PER-09 |
+| Settings (`number_pattern`, `counter_scope`, `seq_start`, notice, grace, reminder, duration) | PER-09 |
 | Change a delay's cause party | PER-02, PER-06 |
 
 - These are persona actions like inspection review: a `system_admin` without one of these
@@ -1317,11 +1345,17 @@ language (fallback `en`; only English ships, TD-172). Empty values print blank: 
 
 - `oe_inspection_requests_event` is append-only (no UPDATE/DELETE grant; a trigger refuses
   them): `request_id`, `slot_id`, `action` (`created \| edited \| issued \| confirmed \|
-  attendance \| rescheduled \| witnessed \| waived \| no_show \| failed \| cancelled \| commented
-  \| cause_changed \| point_changed`), `from_status`, `to_status`, actor, `on_behalf_of_user_id`,
+  attendance \| party_waived \| rescheduled \| witnessed \| waived \| no_show \| failed \|
+  cancelled \| commented \| cause_changed \| point_changed \| rendered`), `from_status`, `to_status`, actor, `on_behalf_of_user_id`,
   `delegation_id`, `payload` (old/new `scheduled_start`, cause party, reason code, note,
   references, findings), `occurred_at` and, for offline actions, the time evidence of diff
   §6.4.1. The detail screen shows it as the request's history; nothing is ever overwritten.
+- **Redaction for external readers.** `cause_party`, `reason_code` default cause, delay ids and
+  delay hours in event payloads are fields of class `internal_commercial` (T-0295). For every
+  `is_internal = false` reader (PER-15, external inspection parties) the history and detail
+  responses **omit `cause_changed` events entirely and drop those fields from every other
+  payload** (the reason code and its label stay, as they explain the outcome). The stored event is
+  unchanged; the redaction is in the read schema.
 - Every action except draft edits also writes a T-0006 audit-ledger entry (chain
   `inspection_request:<id>`).
 - Issued requests are never deleted (cancel instead); drafts are soft-deleted.

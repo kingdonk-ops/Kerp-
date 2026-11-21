@@ -3,9 +3,9 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 314 · **Closed:** 146
+**Open:** 315 · **Closed:** 146
 
-## decision (38)
+## decision (39)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -47,6 +47,7 @@
 | [TD-439](../tracker/todo/TD-439.md) | Feature flags: who toggles them, project overrides, and what a flag may gate | T-0306 | planner |
 | [TD-442](../tracker/todo/TD-442.md) | Issues: may an internal punch/NCR be assigned to an external account (subcontractor) who must then see it? Planner default: no (422), internal issues are invisible to every is_internal=false caller | T-0314 | planner |
 | [TD-484](../tracker/todo/TD-484.md) | RFI notification e-mail: may it carry the date/time/location, the RFI PDF attachment and an .ics invite, and go to client distribution addresses without a KERP account? | T-0335 | planner |
+| [TD-486](../tracker/todo/TD-486.md) | RFI witness check: may an unmet hold-point (H) witness requirement be overridden per record (ADR 0004 Amendment A), or is it non-overridable? | T-0333 | planner |
 
 ## spec-gap (58)
 
