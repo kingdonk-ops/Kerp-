@@ -118,7 +118,8 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
   - **Also in the gate through dependencies** (T-0146 depends on them transitively): T-0102,
     T-0112, T-0113, T-0114, T-0118, T-0124, T-0128, T-0134, T-0138 (via T-0107), T-0139, T-0140
     (inspection date and self-approval, via T-0150) and T-0136 (terminology layer, via the PDF T-0158; user,
-    2026-11-13, R5a). T-0104 is no longer in the gate.
+    2026-11-13, R5a). T-0104 is no longer in the gate. T-0247 (image derivatives, via T-0147,
+    T-0157, T-0158 and T-0168; user addendum 2026-11-21).
   - **Not in the pilot:** inspection calendar, general recurrence and work orders (TD-217); the P6
     half of the checkout contract (T-0166).
   - **Deferred for the pilot:** P6 import/export (T-0104–T-0106, T-0125, T-0129, T-0166), Phase 2,
@@ -127,6 +128,10 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
 - **M2 — MVP cut line (next milestone after Pilot-0):** Phase 0 + 1 + 2 + **Documents-Lite**
   (VFS tree, presigned uploads, batch inspection PDF export) + **P6 schedule round-trip**
   (~85–95 tasks).
+  Since 2026-11-21 also the admin operations of diff §4.7 (system console T-0218–T-0225,
+  communications T-0226–T-0229, runtime settings T-0230–T-0232), the user directory of
+  diff §4.8 (T-0243–T-0246) and the project archive epic E-01-02 (T-0233–T-0242). None of
+  them is in the Pilot-0 gate (T-0146; TD-404 asks about the ClamAV scanner).
 
 ## Plan changes
 
@@ -231,6 +236,28 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
   PR per bundle; the absorbed task is `dropped` (body kept) and its acceptance criteria live on in
   the survivor. T-0051 absorbs T-0048 (devices screen; both Admin-group screens on merged
   backends; size M). T-0146 now depends on T-0051 for the devices screen.
+- **2026-11-21 — admin operations, communications, runtime settings, project archive and the
+  user directory (user-supplied spec + addendum; planner pass):** spec added as diff §4.7
+  (system console, legal hold, communications, runtime settings registry), §4.8 (account state,
+  presence, force sign-out, resend invite, memberships across projects), §6.5 (admin screens),
+  the §6.1 Admin row, and `modules/documents-and-mdr.md` §Project Export & Retention Archive.
+  The paste's ids T-0073/T-0074/T-0075 were already used by done tasks and T-0178 was size L,
+  so the work got new ids above T-0217: pasted T-0073 → T-0218–T-0225 (phase 0), T-0074 →
+  T-0226–T-0229 (phase 0), T-0075 → T-0230–T-0232 (phase 0, extends T-0044), T-0178 → epic
+  E-01-02 with T-0233–T-0242 (phase 1); the addendum to T-0014 (done) and T-0026 → T-0243–T-0246
+  (phase 1, user 2026-11-21: Pilot-0 and T-0026 do not need them; T-0026 unchanged). Where the
+  paste disagreed with the spec, the spec won: send log, not a second e-mail ledger (§4.6);
+  hashed recipients; text-only template overrides; count-only `SECURITY DEFINER` stats with an
+  ADR; System admins read no project record without a membership; auth/security values stay
+  deployment config; no magic links outside PER-14; derived user status over `is_active`; real
+  table names (`auth_user`, `oe_projects_project`, `mail_send_log`); ADRs for every core-table
+  change. Raised: TD-396–TD-407. Updated: T-0026, T-0146 (notes only), T-0140, T-0156, T-0162,
+  T-0167, T-0169, T-0174 (registry entries), TD-046, TD-175, TD-211, TD-297 (resolved by T-0232).
+  Second addendum the same day (image derivative tiers): `quality-and-inspection.md` §Image
+  derivatives and §Annotation frame, four `uploads_media` registry entries (diff §4.7). New:
+  T-0247 (uploads, M, phase 1; in the Pilot-0 gate through T-0147/T-0157/T-0158/T-0168).
+  Updated: T-0147, T-0156, T-0157, T-0158, T-0159 (note), T-0168, T-0230, T-0235, T-0239.
+  Raised: TD-408 (reconciliation with the upload model, ADR 0005 path, EXIF frame).
 
 ## Key engineering decisions (baked into the spec — see consolidation diff)
 
