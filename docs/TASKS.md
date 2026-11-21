@@ -3,11 +3,11 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 76/278 tasks done (27%) · **ready now:** 22 · **epics awaiting breakdown:** 48
+**Overall:** 77/278 tasks done (28%) · **ready now:** 23 · **epics awaiting breakdown:** 48
 
 | Phase | Tasks done | Progress |
 |---|---|---|
-| 0 · Platform foundations | 76/112 | `██████░░░░` 68% |
+| 0 · Platform foundations | 77/112 | `██████░░░░` 69% |
 | 1 · Asset & Quality backbone | 0/140 (+1 epics) | `░░░░░░░░░░` 0% |
 | 2 · Welding quality | 0/11 | `░░░░░░░░░░` 0% |
 | 3 · Logistics | 0/2 (+7 epics) | `░░░░░░░░░░` 0% |
@@ -92,7 +92,7 @@
 | ⬜ | [T-0078](../tracker/tasks/T-0078.md) | Screens: create your password at invite acceptance, forgot password and reset password (web and Android) | frontend | S | T-0053, T-0059, T-0077 |  |
 | ✅ | [T-0028](../tracker/tasks/T-0028.md) | CI hardening: detect in ci-gate needs, least-privilege GHCR publish, SHA-pinned actions, base image digest + Renovate, drop empty postgres extra | platform | S | T-0004 | #18 |
 | ⚫ | [T-0032](../tracker/tasks/T-0032.md) | CI hardening 2: weekly uv lock refresh PR, SHA-pinned promote/review-gate actions, digest-pinned service images, publish the smoke-tested image by digest | platform | S | T-0028 |  |
-| 🟪 | [T-0033](../tracker/tasks/T-0033.md) | Platform hardening: migrations inline frozen RLS/ledger DDL per revision (+ drift test against the live helpers); CI hardening 2 (weekly uv lock refresh PR, SHA-pinned promote/review-gate actions, digest-pinned service images, publish the smoke-tested image by digest) | platform | M | T-0006, T-0007, T-0028 | #138 |
+| ✅ | [T-0033](../tracker/tasks/T-0033.md) | Platform hardening: migrations inline frozen RLS/ledger DDL per revision (+ drift test against the live helpers); CI hardening 2 (weekly uv lock refresh PR, SHA-pinned promote/review-gate actions, digest-pinned service images, publish the smoke-tested image by digest) | platform | M | T-0006, T-0007, T-0028 | #138 |
 | ✅ | [T-0029](../tracker/tasks/T-0029.md) | Pipeline tooling: tracker-aware review-gate patch-id + `tracker.py set --note` date fix | platform | S | — | #62 |
 | ✅ | [T-0030](../tracker/tasks/T-0030.md) | Backend runtime hardening: quiet httpx/httpcore logs, API docs hidden in production, ASCII-safe JSON logs, client disconnect as 499, refuse debug in production | platform | M | T-0021 | #68 |
 | ✅ | [T-0031](../tracker/tasks/T-0031.md) | Frontend hardening: ESLint gate (typescript-eslint, react-hooks) + UI shell fixes (hidden-all-columns guard, encoded storage keys, required_if a11y, tab keyboard/aria, reserved audit tab id) | platform | M | T-0002, T-0025 | #63 |
@@ -127,7 +127,7 @@
 | ⬜ | [T-0225](../tracker/tasks/T-0225.md) | Frontend: Admin → System → Audit log (filters, verify chain, verify all) and legal-hold toggle on the project admin page | frontend | S | T-0026, T-0222, T-0223 |  |
 | ⬜ | [T-0229](../tracker/tasks/T-0229.md) | Frontend: Admin → Communications — broadcast composer, delivery stats and history, automated template editor | frontend | M | T-0026, T-0226, T-0227, T-0228 |  |
 | ⬜ | [T-0232](../tracker/tasks/T-0232.md) | Frontend: Admin → System → Settings — editable registry by category with bounds, read-only deployment configuration | frontend | S | T-0026, T-0230 |  |
-| ⬜ | [T-0274](../tracker/tasks/T-0274.md) | tenancy: system_admin global project visibility (ADR 0016) — additive migration replacing project_isolation_policy on every project-scoped table through the frozen-DDL helper, ORM scope mirror, RLS contract tests updated | tenancy | M | T-0007, T-0014, T-0033 |  |
+| ▶ | [T-0274](../tracker/tasks/T-0274.md) | tenancy: system_admin global project visibility (ADR 0016) — additive migration replacing project_isolation_policy on every project-scoped table through the frozen-DDL helper, ORM scope mirror, RLS contract tests updated | tenancy | M | T-0007, T-0014, T-0033 |  |
 | ⬜ | [T-0275](../tracker/tasks/T-0275.md) | identity/projects: system_admin capabilities on every project (V, C, E, administer; never A or S), all projects in GET /projects and /me/projects, SoD warning for hold personas on system_admins | identity | S | T-0274, T-0010, T-0014, T-0042 |  |
 | ⬜ | [T-0276](../tracker/tasks/T-0276.md) | Frontend: project picker and All-Projects scope show every project for a system_admin (badge for admin access without membership; no A/S actions) | frontend | S | T-0275, T-0042, T-0024 |  |
 | 🟥 | [T-0277](../tracker/tasks/T-0277.md) | identity: system_admin impersonation token — POST /admin/users/{id}/impersonate and /auth/impersonation/exit, single-session impersonation JWT (no refresh), target RLS with is_system_admin = false (blocked by TD-426) *(blocked by TD-426)* | identity | M | T-0006, T-0008, T-0010, T-0014, T-0039, T-0043, T-0230, T-0274 |  |
