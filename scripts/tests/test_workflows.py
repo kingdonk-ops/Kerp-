@@ -133,7 +133,7 @@ def test_ci_has_the_two_service_images() -> None:
             "postgis/postgis:16-3.4",
             marks=pytest.mark.xfail(
                 strict=True,
-                reason="TD-396: postgis digest not resolvable from the implementer sandbox",
+                reason="TD-408: postgis digest not resolvable from the implementer sandbox",
             ),
         ),
         ("redis", "redis:7-alpine"),
