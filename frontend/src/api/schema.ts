@@ -664,6 +664,113 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/asset-management/projects/{project_id}/level-defs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Level Defs */
+        get: operations["list_level_defs_api_v1_asset_management_projects__project_id__level_defs_get"];
+        put?: never;
+        /** Create Level Def */
+        post: operations["create_level_def_api_v1_asset_management_projects__project_id__level_defs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/asset-management/projects/{project_id}/level-defs/{level_def_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Level Def */
+        patch: operations["update_level_def_api_v1_asset_management_projects__project_id__level_defs__level_def_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/asset-management/projects/{project_id}/nodes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Nodes */
+        get: operations["list_nodes_api_v1_asset_management_projects__project_id__nodes_get"];
+        put?: never;
+        /** Create Node */
+        post: operations["create_node_api_v1_asset_management_projects__project_id__nodes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/asset-management/projects/{project_id}/nodes/{node_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Node */
+        get: operations["read_node_api_v1_asset_management_projects__project_id__nodes__node_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/asset-management/projects/{project_id}/nodes/{node_id}/move": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Move Node */
+        post: operations["move_node_api_v1_asset_management_projects__project_id__nodes__node_id__move_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/asset-management/projects/{project_id}/nodes/{node_id}/work-anchor": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Work Anchor
+         * @description The work-anchor node of the node's path (itself or an ancestor); 422 when it has none.
+         */
+        get: operations["read_work_anchor_api_v1_asset_management_projects__project_id__nodes__node_id__work_anchor_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/jobs": {
         parameters: {
             query?: never;
@@ -3047,6 +3154,90 @@ export interface components {
             keys: components["schemas"]["JsonWebKey"][];
         };
         /**
+         * LevelDefCreate
+         * @description ``POST .../level-defs``. ``allowed_parent_keys`` empty = a root level (``depth`` 0).
+         */
+        LevelDefCreate: {
+            /** Key */
+            key: string;
+            /** Depth */
+            depth: number;
+            /** Allowed Parent Keys */
+            allowed_parent_keys?: string[];
+            /** Label Key */
+            label_key: string;
+            /** Roles */
+            roles?: ("grouping" | "physical" | "work_anchor" | "inspection_anchor" | "progress_unit" | "schedule_link")[];
+            /** Code Pattern */
+            code_pattern?: string | null;
+            /**
+             * Code Uniqueness
+             * @default per_parent
+             * @enum {string}
+             */
+            code_uniqueness: "per_parent" | "per_level" | "per_project";
+            /** Field Schema Id */
+            field_schema_id?: string | null;
+            /** Display Code Template */
+            display_code_template?: string | null;
+        };
+        /** LevelDefRead */
+        LevelDefRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Key */
+            key: string;
+            /** Depth */
+            depth: number;
+            /** Allowed Parent Keys */
+            allowed_parent_keys: string[];
+            /** Label Key */
+            label_key: string;
+            /** Roles */
+            roles: ("grouping" | "physical" | "work_anchor" | "inspection_anchor" | "progress_unit" | "schedule_link")[];
+            /** Code Pattern */
+            code_pattern: string | null;
+            /**
+             * Code Uniqueness
+             * @enum {string}
+             */
+            code_uniqueness: "per_parent" | "per_level" | "per_project";
+            /** Field Schema Id */
+            field_schema_id: string | null;
+            /** Display Code Template */
+            display_code_template: string | null;
+            /** Revision */
+            revision: number;
+        };
+        /**
+         * LevelDefUpdate
+         * @description ``PATCH .../level-defs/{id}``: only the given fields change. Once nodes use the level,
+         *     changes are additive only (``service.update_level_def``).
+         */
+        LevelDefUpdate: {
+            /** Key */
+            key?: string | null;
+            /** Depth */
+            depth?: number | null;
+            /** Allowed Parent Keys */
+            allowed_parent_keys?: string[] | null;
+            /** Label Key */
+            label_key?: string | null;
+            /** Roles */
+            roles?: ("grouping" | "physical" | "work_anchor" | "inspection_anchor" | "progress_unit" | "schedule_link")[] | null;
+            /** Code Pattern */
+            code_pattern?: string | null;
+            /** Code Uniqueness */
+            code_uniqueness?: ("per_parent" | "per_level" | "per_project") | null;
+            /** Field Schema Id */
+            field_schema_id?: string | null;
+            /** Display Code Template */
+            display_code_template?: string | null;
+        };
+        /**
          * LinkPut
          * @description ``PUT /teams/{id}/projects/{project}``: the persona every member gets on the project.
          */
@@ -3362,6 +3553,116 @@ export interface components {
             personas: components["schemas"]["Persona"][];
         };
         /**
+         * NodeCreate
+         * @description ``POST .../nodes``. ``parent_id`` omitted or ``null`` = a root node. The budget fields
+         *     are for ``progress_unit`` levels only.
+         */
+        NodeCreate: {
+            /**
+             * Level Def Id
+             * Format: uuid
+             */
+            level_def_id: string;
+            /** Parent Id */
+            parent_id?: string | null;
+            /** Code */
+            code: string;
+            /** Name */
+            name?: string | null;
+            spatial_location?: components["schemas"]["PointZGeoJSON"] | null;
+            /** Custom Fields */
+            custom_fields?: {
+                [key: string]: unknown;
+            };
+            /** Budget Qty */
+            budget_qty?: number | string | null;
+            /** Uom */
+            uom?: string | null;
+            /** Budget Hours */
+            budget_hours?: number | string | null;
+        };
+        /**
+         * NodeMove
+         * @description ``POST .../nodes/{id}/move``. ``new_parent_id: null`` moves the node to the root.
+         */
+        NodeMove: {
+            /** New Parent Id */
+            new_parent_id: string | null;
+        };
+        /** NodeRead */
+        NodeRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Level Def Id
+             * Format: uuid
+             */
+            level_def_id: string;
+            /** Parent Id */
+            parent_id: string | null;
+            /** Code */
+            code: string;
+            /** Display Code */
+            display_code: string;
+            /** Display Path */
+            display_path: string;
+            /** Name */
+            name: string | null;
+            /** Discipline Code */
+            discipline_code: string | null;
+            /** Wbs Code */
+            wbs_code: string | null;
+            /** Activity Id */
+            activity_id: string | null;
+            /** External Source */
+            external_source: string | null;
+            /** External Id */
+            external_id: string | null;
+            /** Synced At */
+            synced_at: string | null;
+            /** Planned Start */
+            planned_start: string | null;
+            /** Planned Finish */
+            planned_finish: string | null;
+            spatial_location: components["schemas"]["PointZGeoJSON"] | null;
+            /** Custom Fields */
+            custom_fields: {
+                [key: string]: unknown;
+            };
+            /** Budget Qty */
+            budget_qty: string | null;
+            /** Uom */
+            uom: string | null;
+            /** Budget Hours */
+            budget_hours: string | null;
+            /** Earned Qty */
+            earned_qty: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "active" | "retired";
+            /** Superseded By */
+            superseded_by: string[];
+            /** Derived From */
+            derived_from: string[];
+            /** Revision */
+            revision: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
          * NotificationPost
          * @description ``POST /notifications/projects/{project_id}/notifications``.
          *
@@ -3653,6 +3954,23 @@ export interface components {
              * @default 0
              */
             failed_offline: number;
+        };
+        /**
+         * PointZGeoJSON
+         * @description A GeoJSON ``Point`` in WGS84 with an elevation in metres.
+         */
+        PointZGeoJSON: {
+            /**
+             * Type
+             * @constant
+             */
+            type: "Point";
+            /** Coordinates */
+            coordinates: [
+                number,
+                number,
+                number
+            ];
         };
         /**
          * PolygonGeoJSON
@@ -5851,6 +6169,279 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProjectRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_level_defs_api_v1_asset_management_projects__project_id__level_defs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LevelDefRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_level_def_api_v1_asset_management_projects__project_id__level_defs_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LevelDefCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LevelDefRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_level_def_api_v1_asset_management_projects__project_id__level_defs__level_def_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                level_def_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LevelDefUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LevelDefRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_nodes_api_v1_asset_management_projects__project_id__nodes_get: {
+        parameters: {
+            query?: {
+                parent_id?: string | null;
+                subtree_of?: string | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NodeRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_node_api_v1_asset_management_projects__project_id__nodes_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NodeCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NodeRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_node_api_v1_asset_management_projects__project_id__nodes__node_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                node_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NodeRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    move_node_api_v1_asset_management_projects__project_id__nodes__node_id__move_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                node_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NodeMove"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NodeRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_work_anchor_api_v1_asset_management_projects__project_id__nodes__node_id__work_anchor_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                node_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NodeRead"];
                 };
             };
             /** @description Validation Error */

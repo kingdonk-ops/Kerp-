@@ -638,7 +638,9 @@ def test_migration_0035_widens_only_project_isolation_policy_and_downgrades() ->
     url = postgres_url()
     cfg = Config(str(ALEMBIC_INI))
     cfg.attributes.update(url=url, configure_logger=False)
-    command.upgrade(cfg, "head")
+    # At 0035 itself, not head: later revisions create tables (0036, T-0101) that a downgrade
+    # to 0034 would drop, and this test is about what 0035 alone changes.
+    command.upgrade(cfg, "0035")
     writer = Database(url)
     try:
         seed_tenants(writer, T1)
@@ -667,7 +669,7 @@ def test_migration_0035_widens_only_project_isolation_policy_and_downgrades() ->
         assert all(before[key][0] == before[key][1] for key in changed)
         assert _admin_reads_of_b(url) == 0  # the exact rule again: no membership, no rows
     finally:
-        command.upgrade(cfg, "head")
+        command.upgrade(cfg, "0035")
     assert _policy_snapshot(url) == head
     assert _admin_reads_of_b(url) == 1
 

@@ -1773,6 +1773,532 @@
         }
       }
     },
+    "/api/v1/asset-management/projects/{project_id}/level-defs": {
+      "get": {
+        "tags": [
+          "asset_management"
+        ],
+        "summary": "List Level Defs",
+        "operationId": "list_level_defs_api_v1_asset_management_projects__project_id__level_defs_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Project Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LevelDefRead"
+                  },
+                  "title": "Response List Level Defs Api V1 Asset Management Projects  Project Id  Level Defs Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "asset_management"
+        ],
+        "summary": "Create Level Def",
+        "operationId": "create_level_def_api_v1_asset_management_projects__project_id__level_defs_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Project Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LevelDefCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LevelDefRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/asset-management/projects/{project_id}/level-defs/{level_def_id}": {
+      "patch": {
+        "tags": [
+          "asset_management"
+        ],
+        "summary": "Update Level Def",
+        "operationId": "update_level_def_api_v1_asset_management_projects__project_id__level_defs__level_def_id__patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "level_def_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Level Def Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LevelDefUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LevelDefRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/asset-management/projects/{project_id}/nodes": {
+      "get": {
+        "tags": [
+          "asset_management"
+        ],
+        "summary": "List Nodes",
+        "operationId": "list_nodes_api_v1_asset_management_projects__project_id__nodes_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "parent_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Parent Id"
+            }
+          },
+          {
+            "name": "subtree_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Subtree Of"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 2000,
+              "minimum": 1,
+              "default": 500,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NodeRead"
+                  },
+                  "title": "Response List Nodes Api V1 Asset Management Projects  Project Id  Nodes Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "asset_management"
+        ],
+        "summary": "Create Node",
+        "operationId": "create_node_api_v1_asset_management_projects__project_id__nodes_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Project Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NodeCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NodeRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/asset-management/projects/{project_id}/nodes/{node_id}": {
+      "get": {
+        "tags": [
+          "asset_management"
+        ],
+        "summary": "Read Node",
+        "operationId": "read_node_api_v1_asset_management_projects__project_id__nodes__node_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "node_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Node Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NodeRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/asset-management/projects/{project_id}/nodes/{node_id}/move": {
+      "post": {
+        "tags": [
+          "asset_management"
+        ],
+        "summary": "Move Node",
+        "operationId": "move_node_api_v1_asset_management_projects__project_id__nodes__node_id__move_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "node_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Node Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NodeMove"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NodeRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/asset-management/projects/{project_id}/nodes/{node_id}/work-anchor": {
+      "get": {
+        "tags": [
+          "asset_management"
+        ],
+        "summary": "Read Work Anchor",
+        "description": "The work-anchor node of the node's path (itself or an ancestor); 422 when it has none.",
+        "operationId": "read_work_anchor_api_v1_asset_management_projects__project_id__nodes__node_id__work_anchor_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "node_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Node Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NodeRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/jobs": {
       "post": {
         "tags": [
@@ -9291,6 +9817,351 @@
         ],
         "title": "JsonWebKeySet"
       },
+      "LevelDefCreate": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+            "title": "Key"
+          },
+          "depth": {
+            "type": "integer",
+            "maximum": 64.0,
+            "minimum": 0.0,
+            "title": "Depth"
+          },
+          "allowed_parent_keys": {
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]{0,63}$"
+            },
+            "type": "array",
+            "maxItems": 64,
+            "title": "Allowed Parent Keys"
+          },
+          "label_key": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_.]{0,119}$",
+            "title": "Label Key"
+          },
+          "roles": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "grouping",
+                "physical",
+                "work_anchor",
+                "inspection_anchor",
+                "progress_unit",
+                "schedule_link"
+              ]
+            },
+            "type": "array",
+            "uniqueItems": true,
+            "title": "Roles"
+          },
+          "code_pattern": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code Pattern"
+          },
+          "code_uniqueness": {
+            "type": "string",
+            "enum": [
+              "per_parent",
+              "per_level",
+              "per_project"
+            ],
+            "title": "Code Uniqueness",
+            "default": "per_parent"
+          },
+          "field_schema_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Field Schema Id"
+          },
+          "display_code_template": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Code Template"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "key",
+          "depth",
+          "label_key"
+        ],
+        "title": "LevelDefCreate",
+        "description": "``POST .../level-defs``. ``allowed_parent_keys`` empty = a root level (``depth`` 0)."
+      },
+      "LevelDefRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "depth": {
+            "type": "integer",
+            "title": "Depth"
+          },
+          "allowed_parent_keys": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Allowed Parent Keys"
+          },
+          "label_key": {
+            "type": "string",
+            "title": "Label Key"
+          },
+          "roles": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "grouping",
+                "physical",
+                "work_anchor",
+                "inspection_anchor",
+                "progress_unit",
+                "schedule_link"
+              ]
+            },
+            "type": "array",
+            "title": "Roles"
+          },
+          "code_pattern": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code Pattern"
+          },
+          "code_uniqueness": {
+            "type": "string",
+            "enum": [
+              "per_parent",
+              "per_level",
+              "per_project"
+            ],
+            "title": "Code Uniqueness"
+          },
+          "field_schema_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Field Schema Id"
+          },
+          "display_code_template": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Code Template"
+          },
+          "revision": {
+            "type": "integer",
+            "title": "Revision"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "key",
+          "depth",
+          "allowed_parent_keys",
+          "label_key",
+          "roles",
+          "code_pattern",
+          "code_uniqueness",
+          "field_schema_id",
+          "display_code_template",
+          "revision"
+        ],
+        "title": "LevelDefRead"
+      },
+      "LevelDefUpdate": {
+        "properties": {
+          "key": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]{0,63}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key"
+          },
+          "depth": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 64.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Depth"
+          },
+          "allowed_parent_keys": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]{0,63}$"
+                },
+                "type": "array",
+                "maxItems": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allowed Parent Keys"
+          },
+          "label_key": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_.]{0,119}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label Key"
+          },
+          "roles": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "grouping",
+                    "physical",
+                    "work_anchor",
+                    "inspection_anchor",
+                    "progress_unit",
+                    "schedule_link"
+                  ]
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Roles"
+          },
+          "code_pattern": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code Pattern"
+          },
+          "code_uniqueness": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "per_parent",
+                  "per_level",
+                  "per_project"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code Uniqueness"
+          },
+          "field_schema_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Field Schema Id"
+          },
+          "display_code_template": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Code Template"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "LevelDefUpdate",
+        "description": "``PATCH .../level-defs/{id}``: only the given fields change. Once nodes use the level,\nchanges are additive only (``service.update_level_def``)."
+      },
       "LinkPut": {
         "properties": {
           "persona": {
@@ -9957,6 +10828,407 @@
         "title": "MyProject",
         "description": "One project of the caller, for the project picker (T-0042)."
       },
+      "NodeCreate": {
+        "properties": {
+          "level_def_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Level Def Id"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "code": {
+            "type": "string",
+            "pattern": "^[^\\s\\x00-\\x1f\\x7f]([^\\x00-\\x1f\\x7f]{0,198}[^\\s\\x00-\\x1f\\x7f])?$",
+            "title": "Code"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "spatial_location": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PointZGeoJSON"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "custom_fields": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Custom Fields"
+          },
+          "budget_qty": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,14}|(?=[\\d.]{1,19}0*$)\\d{0,14}\\.\\d{0,4}0*$)"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Budget Qty"
+          },
+          "uom": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Uom"
+          },
+          "budget_hours": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,14}|(?=[\\d.]{1,19}0*$)\\d{0,14}\\.\\d{0,4}0*$)"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Budget Hours"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "level_def_id",
+          "code"
+        ],
+        "title": "NodeCreate",
+        "description": "``POST .../nodes``. ``parent_id`` omitted or ``null`` = a root node. The budget fields\nare for ``progress_unit`` levels only."
+      },
+      "NodeMove": {
+        "properties": {
+          "new_parent_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "New Parent Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "new_parent_id"
+        ],
+        "title": "NodeMove",
+        "description": "``POST .../nodes/{id}/move``. ``new_parent_id: null`` moves the node to the root."
+      },
+      "NodeRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "level_def_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Level Def Id"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "display_code": {
+            "type": "string",
+            "title": "Display Code"
+          },
+          "display_path": {
+            "type": "string",
+            "title": "Display Path"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "discipline_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Discipline Code"
+          },
+          "wbs_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wbs Code"
+          },
+          "activity_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activity Id"
+          },
+          "external_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "External Source"
+          },
+          "external_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "External Id"
+          },
+          "synced_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Synced At"
+          },
+          "planned_start": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Planned Start"
+          },
+          "planned_finish": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Planned Finish"
+          },
+          "spatial_location": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PointZGeoJSON"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "custom_fields": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Custom Fields"
+          },
+          "budget_qty": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Budget Qty"
+          },
+          "uom": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Uom"
+          },
+          "budget_hours": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Budget Hours"
+          },
+          "earned_qty": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Earned Qty"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "retired"
+            ],
+            "title": "Status"
+          },
+          "superseded_by": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Superseded By"
+          },
+          "derived_from": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Derived From"
+          },
+          "revision": {
+            "type": "integer",
+            "title": "Revision"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "level_def_id",
+          "parent_id",
+          "code",
+          "display_code",
+          "display_path",
+          "name",
+          "discipline_code",
+          "wbs_code",
+          "activity_id",
+          "external_source",
+          "external_id",
+          "synced_at",
+          "planned_start",
+          "planned_finish",
+          "spatial_location",
+          "custom_fields",
+          "budget_qty",
+          "uom",
+          "budget_hours",
+          "earned_qty",
+          "status",
+          "superseded_by",
+          "derived_from",
+          "revision",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "NodeRead"
+      },
       "NotificationPost": {
         "properties": {
           "recipient_id": {
@@ -10616,6 +11888,44 @@
         ],
         "title": "PinUnlockRequest",
         "description": "The PIN. The device's refresh token comes from the refresh cookie (the native app:\n``refresh_token`` here): both are required, a PIN alone is never a credential."
+      },
+      "PointZGeoJSON": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "Point",
+            "title": "Type"
+          },
+          "coordinates": {
+            "prefixItems": [
+              {
+                "type": "number",
+                "maximum": 180.0,
+                "minimum": -180.0
+              },
+              {
+                "type": "number",
+                "maximum": 90.0,
+                "minimum": -90.0
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "type": "array",
+            "maxItems": 3,
+            "minItems": 3,
+            "title": "Coordinates"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type",
+          "coordinates"
+        ],
+        "title": "PointZGeoJSON",
+        "description": "A GeoJSON ``Point`` in WGS84 with an elevation in metres."
       },
       "PolygonGeoJSON": {
         "properties": {
