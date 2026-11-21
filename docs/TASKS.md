@@ -3,11 +3,11 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 70/172 tasks done (41%) · **ready now:** 16 · **epics awaiting breakdown:** 47
+**Overall:** 71/172 tasks done (41%) · **ready now:** 16 · **epics awaiting breakdown:** 47
 
 | Phase | Tasks done | Progress |
 |---|---|---|
-| 0 · Platform foundations | 70/88 | `████████░░` 80% |
+| 0 · Platform foundations | 71/88 | `████████░░` 81% |
 | 1 · Asset & Quality backbone | 0/75 (+1 epics) | `░░░░░░░░░░` 0% |
 | 2 · Welding quality | 0/9 | `░░░░░░░░░░` 0% |
 | 3 · Logistics | 0/0 (+7 epics) | `░░░░░░░░░░` 0% |
@@ -72,7 +72,7 @@
 | ✅ | [T-0074](../tracker/tasks/T-0074.md) | saved_views: share a team view with several teams linked to the project (view-team link table, migrate team_id, wire teams contract) | saved_views | S | T-0013, T-0020 | #129 |
 | ✅ | [T-0077](../tracker/tasks/T-0077.md) | Local password policy (NIST 800-63B style, minimum 8) and self-service password reset by e-mail: neutral 202, single-use expiring link, sessions revoked | identity | M | T-0037, T-0058, T-0068 | #125 |
 | ✅ | [T-0021](../tracker/tasks/T-0021.md) | Observability + security headers (request id, structured logs, CSP/HSTS) | platform | S | T-0001 | #9 |
-| 🟪 | [T-0059](../tracker/tasks/T-0059.md) | Invite e-mail with setup_token and first-password set at invite acceptance for external invitees (one request: set password, accept, sign in) | admin | S | T-0052, T-0058, T-0077 | #127 |
+| ✅ | [T-0059](../tracker/tasks/T-0059.md) | Invite e-mail with setup_token and first-password set at invite acceptance for external invitees (one request: set password, accept, sign in) | admin | S | T-0052, T-0058, T-0077 | #127 |
 | ✅ | [T-0022](../tracker/tasks/T-0022.md) | Lint rule: heavy libs (fitz, cv2, rectpack, celpy, pyhanko) lazily imported | platform | S | T-0001 | #10 |
 | ✅ | [T-0023](../tracker/tasks/T-0023.md) | onboarding: first-run provisioning (the deployment's hidden tenant, first System admin, deployment settings) | onboarding | S | T-0012, T-0014, T-0044, T-0079 | #124 |
 | ✅ | [T-0024](../tracker/tasks/T-0024.md) | Frontend shell: auth, design tokens, 8-group nav (4 pillars + Backbone/Overview/Documents/Admin), project switcher + All-Projects, generated API client | frontend | M | T-0002, T-0008 | #38 |
