@@ -302,10 +302,10 @@ The job is tenant-level, and the worker binds it without any admin flag. The han
 at job start that the user who asked (`requested_by`, set by the endpoint, never by a client:
 the kind is not an `api` kind) still holds `system_admin`, and only then binds
 `is_system_admin` for the read (ADR 0016); otherwise the job fails. It runs for up to an hour
-in one pass (TD-489). The job row is tenant-level, so until the jobs API has a per-kind check
+in one pass (TD-495). The job row is tenant-level, so until the jobs API has a per-kind check
 (TD-156) a tenant user who knows the job id can poll its report (counts and one chain key).
 
-Listing is not ledgered. Both verifications are (diff §4.7: every console action; TD-488), on
+Listing is not ledgered. Both verifications are (diff §4.7: every console action; TD-494), on
 `admin-system:<tenant>` with the caller as actor: `audit_chain_verified` (chain key, project
 id, `ok`, `length`, `first_broken_seq`), `audit_verify_all_requested` (job id; same
 transaction as the job row) and `audit_verify_all_finished` (job id and the report). The

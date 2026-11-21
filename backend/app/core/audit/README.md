@@ -86,7 +86,7 @@ imports no module for them, and none of them writes.
   `sod_warning`; a `"true"` string or `1` does not match; key must match `FLAG_PATTERN`),
   `created_from` (inclusive) and `created_to` (exclusive). The payload filters are JSONB
   containment on PostgreSQL and `json_type` / `json_extract` on SQLite (TD-402: there is no
-  event column). No index serves these yet (TD-489).
+  event column). No index serves these yet (TD-495).
 - `verify_scoped_chain(session, chain_key, project_id)`: `verify_chain` for the named scope
   (`None` = tenant level). A chain the session cannot see has `length` 0.
 - `verify_readable_chains(session)`: verifies every visible chain of the tenant in one

@@ -5,7 +5,7 @@ Every ledger read goes through ``app.core.audit.service`` under the caller's nor
 its tenant (ADR 0016), never another tenant's. Nothing here updates or deletes a ledger row.
 The only writes are appended entries on the console chain ``admin-system:<tenant>``: one per
 single-chain verification, one when a full verification is requested and one with its outcome
-(diff §4.7: every console action is audited; TD-488).
+(diff §4.7: every console action is audited; TD-494).
 """
 
 from __future__ import annotations

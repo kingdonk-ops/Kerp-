@@ -117,7 +117,7 @@
 | [TD-479](../tracker/todo/TD-479.md) | code_uniqueness scopes: per_parent and per_level compare within the level, per_project across every level both ways; codes are case-sensitive, never trimmed | T-0101 | implementer |
 | [TD-480](../tracker/todo/TD-480.md) | code_pattern is a 'validation/generation pattern': T-0101 validates node codes against it as an RE2 regex; generation (and its syntax, e.g. {seq:4}) is undefined | T-0101 | implementer |
 | [TD-481](../tracker/todo/TD-481.md) | oe_asset_node columns the spec does not name or type: name, planned_start/planned_finish, Numeric(18,4) quantities, list-of-ids lineage; display_code for a level missing on the path | T-0101 | implementer |
-| [TD-488](../tracker/todo/TD-488.md) | Audit explorer: which verifications are audited console actions (single-chain verify, verify-all request and outcome) | T-0222 | implementer |
+| [TD-494](../tracker/todo/TD-494.md) | Audit explorer: which verifications are audited console actions (single-chain verify, verify-all request and outcome) | T-0222 | implementer |
 
 ## missed (9)
 
@@ -133,7 +133,7 @@
 | [TD-463](../tracker/todo/TD-463.md) | Server: refuse self-deactivation on PATCH /admin/users/{id} (Admin → Users only hides the button) | T-0331, T-0085 | implementer |
 | [TD-487](../tracker/todo/TD-487.md) | Frontend: Admin -> System grants page needs the SoD confirm step for system_admin on a hold-authority holder (POST /admin/grants 409 sod_confirmation_required, confirm_sod), plus the same warning for hold personas on system_admins in member/invite/team UIs | T-0275 | implementer |
 
-## deferred (47)
+## deferred (48)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -184,8 +184,9 @@
 | [TD-473](../tracker/todo/TD-473.md) | Template lint over the CEL AST: unknown field references, forward calculated references, rules that read hidden fields, authoring-time type checks (safe CEL subset, TD-041 decision) | T-0110, T-0113 | implementer |
 | [TD-474](../tracker/todo/TD-474.md) | Unit registry for `measurement` fields: unit catalogue, SI storage and conversion with a shared vector file (ADR 0002 units-v1 port) | T-0110 | implementer |
 | [TD-482](../tracker/todo/TD-482.md) | asset_management: node edit (code / name / attributes, with display_path and display_code rewrite of the subtree), node delete and level def delete are not built in T-0101 | T-0101 | implementer |
+| [TD-495](../tracker/todo/TD-495.md) | Audit explorer at scale: no ledger index for the explorer filters; verify-all is one pass (1 h timeout, no progress or resume) | T-0222 | implementer |
 
-## later (135)
+## later (134)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -320,7 +321,6 @@
 | [TD-476](../tracker/todo/TD-476.md) | Form renderer and designer follow-ups on the shared palette: capture controls, section rendering, palette labels, field-ownership map | T-0110, T-0025 | implementer |
 | [TD-483](../tracker/todo/TD-483.md) | asset_management: display_code recompute and the project tree lock are inline; move them to a batch job / narrower lock if trees get large | T-0101 | implementer |
 | [TD-485](../tracker/todo/TD-485.md) | Cross-link inspection requests (RFIs) to TQs (Technical Queries) when the TQ module exists (E-05-04) | T-0115 | planner |
-| [TD-489](../tracker/todo/TD-489.md) | Invite and password screens polish from the #152 review (race-fix test, wrong-user README wording, resend link cache, sessionStorage note) | T-0053 | reviewer |
 | [TD-491](../tracker/todo/TD-491.md) | Admin -> Users polish from the #154 review: test that no invite token is in the mutation cache; require a name on Create account | T-0331 | reviewer |
 | [TD-493](../tracker/todo/TD-493.md) | fields/form engine polish from the #156 review | T-0110 | reviewer |
 | [TD-498](../tracker/todo/TD-498.md) | Unskip the T-0027 module-toggle step when the first toggleable module merges | T-0027 | planner |
