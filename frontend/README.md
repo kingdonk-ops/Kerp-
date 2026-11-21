@@ -47,8 +47,9 @@ src/
   i18n/       i18next instance + message catalogues (locales/en.ts)
   lib/api/    API client (bearer token, single-flight refresh rotation + one retry on 401)
   lib/cel/    offline CEL rule evaluation (@marcbachmann/cel-js), parity with the server
+  lobby/      lobby screens: lobby list, project-code entry, Active requests panel (README.md)
   perf/       NFR performance budgets: budgets.json (single config), measurements, CI reporter
-  pages/      route components (incl. the placeholder lobby route `/lobby`)
+  pages/      route components (incl. the lobby route `/lobby`, built from `src/lobby/`)
   projects/   project scope: `/me/projects` fetch + portfolio personas, ProjectScopeProvider, top-bar ProjectSwitcher
   shells/     RegisterPage, DetailPage (gate banner, tabs, audit), Dynamic Form Renderer (README.md)
   test/       Vitest setup, fake backend (`fakeApi.ts`), axe harness (`a11y.ts`), timing budget (`timeouts.ts`: Testing Library waits up to 5 s project-wide, unit tests 20 s — do not add per-test 1 s waits)
@@ -98,8 +99,8 @@ src/
   (project gone from `/me/projects`, or All-Projects without a portfolio persona). Landing on
   `/` after sign-in: one project → it opens; several → the remembered one, else the first by
   name; none → the **lobby** (`/lobby`). Deep links are kept. The picker always shows
-  **"Browse / join another project"**, a link to the lobby. The lobby route is a placeholder
-  until the lobby screens (T-0041) replace it. Sending the scope with requests is TD-146; the
+  **"Browse / join another project"**, a link to the lobby. The lobby screens (T-0041:
+  lobby list, project-code entry, Active requests) are described in `src/lobby/README.md`. Sending the scope with requests is TD-146; the
   scope is a UI selection — the server binds the allowed projects from memberships (TD-053).
   No tenant is shown anywhere in the shell.
 - **Design tokens.** `src/index.css` `@theme` defines semantic colours (`brand`, `surface`,

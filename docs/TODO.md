@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 307 · **Closed:** 144
+**Open:** 308 · **Closed:** 144
 
 ## decision (38)
 
@@ -122,7 +122,7 @@
 | [TD-337](../tracker/todo/TD-337.md) | Web/Android route /magic-link#<token> that redeems the e-mailed sign-in link (POST /auth/magic-link/redeem); the e-mail now links there | T-0058 | implementer |
 | [TD-388](../tracker/todo/TD-388.md) | saved_views: wire the my_teams filter op | T-0074 | reviewer |
 
-## deferred (41)
+## deferred (42)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -167,6 +167,7 @@
 | [TD-446](../tracker/todo/TD-446.md) | E2E journey: Sign in with Microsoft against the fake OIDC provider (T-0054) lands in the project, once the Playwright harness (T-0027) exists | T-0055 | implementer |
 | [TD-448](../tracker/todo/TD-448.md) | Playwright e2e journey for T-0026 (System admin appoints a Project Admin -> they create a project -> assign a user) once T-0027 sets up e2e/; covered meanwhile by the component-level journey in frontend/src/admin/MembersPage.test.tsx | T-0026 | implementer |
 | [TD-451](../tracker/todo/TD-451.md) | Queue monitor: failed-job list and retry/abort see only job rows the caller's RLS shows until T-0274 (ADR 0016) lets a system_admin read every project's oe_jobs_job rows | T-0218 | implementer |
+| [TD-457](../tracker/todo/TD-457.md) | Playwright e2e journey for T-0041 (external user: code lookup -> request with ticket -> reject with reason -> Request again disabled -> short cooldown -> Request again without ticket -> approve via T-0051 -> project in the picker) once T-0027 sets up e2e/; covered meanwhile by the component-level journey in frontend/src/lobby/LobbyPage.test.tsx | T-0041 | implementer |
 
 ## later (127)
 
