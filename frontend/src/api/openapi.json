@@ -7683,95 +7683,64 @@
         }
       }
     },
-    "/api/v1/admin/system/stats": {
-      "get": {
+    "/api/v1/admin/system/projects/{project_id}/legal-hold": {
+      "put": {
         "tags": [
           "admin",
           "admin"
         ],
-        "summary": "Deployment Stats",
-        "operationId": "deployment_stats_api_v1_admin_system_stats_get",
+        "summary": "Set Legal Hold",
+        "description": "Put the project on legal hold or take it off; its hold as it now stands.",
+        "operationId": "set_legal_hold_api_v1_admin_system_projects__project_id__legal_hold_put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Project Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LegalHoldChange"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SystemStatsRead"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
-      }
-    },
-    "/api/v1/admin/system/stats/object-store/refresh": {
-      "post": {
-        "tags": [
-          "admin",
-          "admin"
-        ],
-        "summary": "Refresh Object Store",
-        "operationId": "refresh_object_store_api_v1_admin_system_stats_object_store_refresh_post",
-        "responses": {
-          "202": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ObjectStoreRefreshRead"
+                  "$ref": "#/components/schemas/LegalHoldRead"
                 }
               }
             }
           },
-          "409": {
-            "description": "a run is in progress",
+          "422": {
+            "description": "Validation Error",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ObjectStoreRefreshRead"
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
           }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
-      }
-    },
-    "/api/v1/admin/system/health": {
-      "get": {
-        "tags": [
-          "admin",
-          "admin"
-        ],
-        "summary": "System Health",
-        "operationId": "system_health_api_v1_admin_system_health_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SystemHealthRead"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
+        }
       }
     },
     "/api/v1/access-requests": {
@@ -9210,24 +9179,6 @@
         "title": "DeploymentSettingsUpdate",
         "description": "``PATCH``: only the given fields change; none may be ``null``; no unknown fields."
       },
-      "DeviceCounts": {
-        "properties": {
-          "active": {
-            "type": "integer",
-            "title": "Active"
-          },
-          "revoked": {
-            "type": "integer",
-            "title": "Revoked"
-          }
-        },
-        "type": "object",
-        "required": [
-          "active",
-          "revoked"
-        ],
-        "title": "DeviceCounts"
-      },
       "DeviceEnrolRequest": {
         "properties": {
           "device_id": {
@@ -10268,48 +10219,6 @@
         "type": "object",
         "title": "HTTPValidationError"
       },
-      "HealthProbeRead": {
-        "properties": {
-          "name": {
-            "type": "string",
-            "enum": [
-              "postgresql",
-              "redis",
-              "object_store",
-              "malware_scanner"
-            ],
-            "title": "Name"
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "ok",
-              "degraded",
-              "down"
-            ],
-            "title": "Status"
-          },
-          "latency_ms": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Latency Ms"
-          }
-        },
-        "type": "object",
-        "required": [
-          "name",
-          "status",
-          "latency_ms"
-        ],
-        "title": "HealthProbeRead",
-        "description": "One probe: status and latency only, never a host name, connection string or credential."
-      },
       "HealthResponse": {
         "properties": {
           "status": {
@@ -11045,6 +10954,86 @@
           "keys"
         ],
         "title": "JsonWebKeySet"
+      },
+      "LegalHoldChange": {
+        "properties": {
+          "on": {
+            "type": "boolean",
+            "title": "On"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "on",
+          "reason"
+        ],
+        "title": "LegalHoldChange",
+        "description": "``PUT /admin/system/projects/{id}/legal-hold`` (T-0223, diff §4.7): put the project on\nlegal hold or take it off. ``system_admin`` only; a reason (1-500 characters after\ntrimming) is required both ways and goes to the audit ledger."
+      },
+      "LegalHoldRead": {
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Project Id"
+          },
+          "legal_hold": {
+            "type": "boolean",
+            "title": "Legal Hold"
+          },
+          "legal_hold_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Legal Hold Reason"
+          },
+          "legal_hold_set_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Legal Hold Set By"
+          },
+          "legal_hold_set_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Legal Hold Set At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "project_id",
+          "legal_hold",
+          "legal_hold_reason",
+          "legal_hold_set_by",
+          "legal_hold_set_at"
+        ],
+        "title": "LegalHoldRead",
+        "description": "A project's legal hold as the System console shows it. Reason, setter and time\ndescribe the active hold; all three are ``null`` while it is off."
       },
       "LevelDefCreate": {
         "properties": {
@@ -12729,65 +12718,6 @@
         "title": "NotificationSent",
         "description": "The stored notification and each channel's outcome."
       },
-      "ObjectStoreRefreshRead": {
-        "properties": {
-          "job_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Job Id"
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "queued",
-              "running"
-            ],
-            "title": "Status"
-          }
-        },
-        "type": "object",
-        "required": [
-          "job_id",
-          "status"
-        ],
-        "title": "ObjectStoreRefreshRead",
-        "description": "``POST /admin/system/stats/object-store/refresh`` (202) or the run in progress (409)."
-      },
-      "ObjectStoreTotals": {
-        "properties": {
-          "as_of": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "As Of"
-          },
-          "refreshing": {
-            "type": "boolean",
-            "title": "Refreshing"
-          },
-          "storage_classes": {
-            "items": {
-              "$ref": "#/components/schemas/StorageClassTotals"
-            },
-            "type": "array",
-            "title": "Storage Classes"
-          }
-        },
-        "type": "object",
-        "required": [
-          "as_of",
-          "refreshing",
-          "storage_classes"
-        ],
-        "title": "ObjectStoreTotals",
-        "description": "From the last ``admin.object_store_totals`` batch run (``as_of``: when it finished;\n``null`` and no classes before the first run). ``refreshing``: a run is queued or running."
-      },
       "OverrideCreate": {
         "properties": {
           "finding_id": {
@@ -13344,24 +13274,6 @@
         "title": "ProjectAccessKind",
         "description": "How the caller reaches a project (ADR 0016, T-0275): through a membership, or only\nthrough the ``system_admin`` grant (no membership on the project)."
       },
-      "ProjectCounts": {
-        "properties": {
-          "active": {
-            "type": "integer",
-            "title": "Active"
-          },
-          "soft_deleted": {
-            "type": "integer",
-            "title": "Soft Deleted"
-          }
-        },
-        "type": "object",
-        "required": [
-          "active",
-          "soft_deleted"
-        ],
-        "title": "ProjectCounts"
-      },
       "ProjectCreate": {
         "properties": {
           "code": {
@@ -13494,6 +13406,11 @@
             "type": "boolean",
             "title": "Visible In Lobby"
           },
+          "legal_hold": {
+            "type": "boolean",
+            "title": "Legal Hold",
+            "description": "the project is on legal hold (T-0223): it cannot be deleted; the reason is shown in the System console only"
+          },
           "revision": {
             "type": "integer",
             "title": "Revision"
@@ -13524,6 +13441,7 @@
           "currency_code",
           "locale",
           "visible_in_lobby",
+          "legal_hold",
           "revision",
           "created_at",
           "updated_at",
@@ -15269,104 +15187,6 @@
         "title": "SsoOption",
         "description": "Entra ID SSO is offered: the promoted, default sign-in for company staff (diff §4.5\n*SSO promoted, password kept*). Password sign-in stays available for everyone."
       },
-      "StorageClassTotals": {
-        "properties": {
-          "storage_class": {
-            "type": "string",
-            "enum": [
-              "STANDARD",
-              "GLACIER_IR",
-              "DEEP_ARCHIVE",
-              "other"
-            ],
-            "title": "Storage Class"
-          },
-          "objects": {
-            "type": "integer",
-            "title": "Objects"
-          },
-          "bytes": {
-            "type": "integer",
-            "title": "Bytes"
-          }
-        },
-        "type": "object",
-        "required": [
-          "storage_class",
-          "objects",
-          "bytes"
-        ],
-        "title": "StorageClassTotals"
-      },
-      "SystemHealthRead": {
-        "properties": {
-          "status": {
-            "type": "string",
-            "enum": [
-              "ok",
-              "degraded",
-              "down"
-            ],
-            "title": "Status"
-          },
-          "checked_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Checked At"
-          },
-          "probes": {
-            "items": {
-              "$ref": "#/components/schemas/HealthProbeRead"
-            },
-            "type": "array",
-            "title": "Probes"
-          }
-        },
-        "type": "object",
-        "required": [
-          "status",
-          "checked_at",
-          "probes"
-        ],
-        "title": "SystemHealthRead",
-        "description": "``GET /admin/system/health``: ``status`` is the worst probe's."
-      },
-      "SystemStatsRead": {
-        "properties": {
-          "projects": {
-            "$ref": "#/components/schemas/ProjectCounts"
-          },
-          "users": {
-            "$ref": "#/components/schemas/UserCounts"
-          },
-          "devices": {
-            "$ref": "#/components/schemas/DeviceCounts"
-          },
-          "modules": {
-            "additionalProperties": {
-              "additionalProperties": {
-                "type": "integer"
-              },
-              "type": "object"
-            },
-            "type": "object",
-            "title": "Modules"
-          },
-          "object_store": {
-            "$ref": "#/components/schemas/ObjectStoreTotals"
-          }
-        },
-        "type": "object",
-        "required": [
-          "projects",
-          "users",
-          "devices",
-          "modules",
-          "object_store"
-        ],
-        "title": "SystemStatsRead",
-        "description": "``GET /admin/system/stats``: counts and byte totals only, never ids, names or rows.\n\n``modules``: per module the counts its registered stats provider returns."
-      },
       "TeamCreate": {
         "properties": {
           "name": {
@@ -15937,24 +15757,6 @@
         ],
         "title": "UploadTicket",
         "description": "The new file record and the presigned ``PUT`` for its bytes."
-      },
-      "UserCounts": {
-        "properties": {
-          "active": {
-            "type": "integer",
-            "title": "Active"
-          },
-          "deactivated": {
-            "type": "integer",
-            "title": "Deactivated"
-          }
-        },
-        "type": "object",
-        "required": [
-          "active",
-          "deactivated"
-        ],
-        "title": "UserCounts"
       },
       "UserCreate": {
         "properties": {

@@ -340,6 +340,13 @@ request sessions' setting): the check after the lock takes a fresh snapshot and 
 the previous lock holder committed. Under REPEATABLE READ or SERIALIZABLE the snapshot could
 predate that commit and a second run could be queued.
 
+Legal hold (T-0223; detail in `app/modules/projects/README.md` *Legal hold*), through the
+projects service:
+
+| Endpoint | Answer |
+|---|---|
+| `PUT /system/projects/{project_id}/legal-hold` | body `{on, reason}` (reason 1–500 characters, both ways; 422 otherwise). `{project_id, legal_hold, legal_hold_reason, legal_hold_set_by, legal_hold_set_at}`; 404 unknown, deleted or other tenant's project. While on, `DELETE /api/v1/projects/{id}` answers 409 `LEGAL_HOLD_ACTIVE` |
+
 ## Audit
 
 Tenant-level chains: `admin-user:<user>` (create, update), `admin-user-lookup:<caller>` (every
@@ -352,6 +359,9 @@ kind, queue and project id; T-0218; `upload_rechecked` with file, project and jo
 `upload_sweep_queued` with project and job id; T-0221; `stats_viewed`,
 `object_store_refresh_queued`, `object_store_refresh_running`, `health_checked`;
 T-0219). Invite entries never carry a token, a hash, a password or an e-mail address. An accepted invite also writes the usual
+
+`upload_sweep_queued` with project and job id; T-0221; `legal_hold_set`, `legal_hold_cleared`
+with project id, code and reason; T-0223). Invite entries never carry a token, a hash, a password or an e-mail address. An accepted invite also writes the usual
 `assign` entry on `project-members:<project>`.
 
 ## Audit explorer (`/api/v1/admin/system/audit`, T-0222, diff §4.7)

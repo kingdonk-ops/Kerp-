@@ -30,6 +30,7 @@ export function project(extra: Partial<Project> = {}): Project {
     currency_code: "AUD",
     locale: "en-AU",
     visible_in_lobby: false,
+    legal_hold: false,
     revision: 1,
     created_at: "2026-11-01T08:00:00Z",
     updated_at: "2026-11-01T08:00:00Z",
