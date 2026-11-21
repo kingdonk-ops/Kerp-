@@ -7,7 +7,7 @@ Defaults are ``SHIPPED_DEFAULTS`` and the bounds are the ones ``schemas.py`` che
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
-from typing import Any, Final
+from typing import Any, Final, cast
 
 from pydantic import TypeAdapter, ValidationError
 
@@ -29,7 +29,7 @@ PROJECT_DEFAULTS: Final = "project_defaults"
 
 def _checked(annotated: object) -> Callable[[str], str]:
     """The validator of an ``app.core.locale`` type as a plain ``str -> str`` check."""
-    adapter: TypeAdapter[str] = TypeAdapter(annotated)
+    adapter: TypeAdapter[str] = TypeAdapter(cast(Any, annotated))
 
     def check(value: str) -> str:
         try:
