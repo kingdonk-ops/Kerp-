@@ -63,6 +63,50 @@ def test_refresh_token_can_be_consumed_exactly_once(store: RevocationStore) -> N
     assert store.consume_refresh("never-registered") is False
 
 
+def test_consuming_with_a_moment_remembers_when_the_token_was_spent(
+    store: RevocationStore,
+) -> None:
+    """T-0345: the consumption moment is what tells a client's retry from a replay."""
+    store.register_refresh("r-1", uuid.uuid4(), TTL)
+    assert store.refresh_spent_at("r-1") is None  # live, not spent
+    assert store.consume_refresh("r-1", spent_at=1_763_715_600.25, remember=TTL) is True
+    assert store.refresh_spent_at("r-1") == 1_763_715_600.25
+    # A second consumption fails and does not move the moment.
+    assert store.consume_refresh("r-1", spent_at=1_763_715_700.0, remember=TTL) is False
+    assert store.refresh_spent_at("r-1") == 1_763_715_600.25
+    # A token that was never registered is never marked as spent.
+    assert store.consume_refresh("never", spent_at=1.0, remember=TTL) is False
+    assert store.refresh_spent_at("never") is None
+
+
+def test_the_spent_moment_expires_with_its_ttl() -> None:
+    clock = FakeClock()
+    store = InMemoryRevocationStore(clock=clock)
+    store.register_refresh("r", uuid.uuid4(), TTL)
+    store.consume_refresh("r", spent_at=5.0, remember=timedelta(seconds=60))
+    clock.now += 59
+    assert store.refresh_spent_at("r") == 5.0
+    clock.now += 2
+    assert store.refresh_spent_at("r") is None
+    client = fakeredis.FakeRedis()
+    redis_store = RedisRevocationStore(client)
+    redis_store.register_refresh("r", uuid.uuid4(), TTL)
+    redis_store.consume_refresh("r", spent_at=5.0, remember=timedelta(seconds=60))
+    assert 0 < client.ttl(f"{KEY_PREFIX}refresh-spent:r") <= 60
+    assert not client.exists(f"{KEY_PREFIX}refresh:r")
+
+
+def test_failure_count_reads_without_counting(store: RevocationStore) -> None:
+    window = timedelta(hours=1)
+    assert store.failure_count("k") == 0
+    for _ in range(3):
+        store.begin_attempt("k", window, lambda _n: timedelta(0))
+    assert store.failure_count("k") == 3
+    assert store.failure_count("k") == 3  # reading counts nothing
+    store.clear_failures("k")
+    assert store.failure_count("k") == 0
+
+
 def test_close(store: RevocationStore) -> None:
     store.close()
 
@@ -130,6 +174,9 @@ class BrokenRedis(fakeredis.FakeRedis):
         lambda s: s.is_revoked("j", uuid.uuid4()),
         lambda s: s.register_refresh("r", uuid.uuid4(), TTL),
         lambda s: s.consume_refresh("r"),
+        lambda s: s.consume_refresh("r", spent_at=1.0, remember=TTL),
+        lambda s: s.refresh_spent_at("r"),
+        lambda s: s.failure_count("k"),
     ],
 )
 def test_redis_errors_raise_unavailable(operation: Callable[[RevocationStore], object]) -> None:

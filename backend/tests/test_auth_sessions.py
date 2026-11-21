@@ -14,7 +14,10 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
+from sqlalchemy.exc import OperationalError
+from sqlalchemy.orm import Session
 
+from app.core.auth import service as service_module
 from app.core.auth.field import PIN_TTL_MARGIN
 from app.core.auth.models import User
 from app.core.auth.runtime import AuthRuntime, install_auth_runtime
@@ -153,18 +156,147 @@ def test_refresh_at_12h_fails_and_needs_a_new_sign_in(
     assert _sign_in(client)["access_token"]  # signing in again starts a new 12 h session
 
 
+@pytest.mark.parametrize("seconds_later", [31, 600])
 def test_reuse_detection_still_revokes_the_session(
-    setup: tuple[TestClient, AuthRuntime], clock: Clock
+    setup: tuple[TestClient, AuthRuntime], clock: Clock, seconds_later: int
 ) -> None:
+    """A spent token presented after the 30-second retry grace (T-0345) is a replay: the
+    whole session is revoked."""
     client, _ = setup
     now = clock.now
     clock.now = now - timedelta(hours=6)
     first = _sign_in(client)
-    clock.now = now
+    clock.now = now - timedelta(seconds=seconds_later)  # rotated ``seconds_later`` ago
     rotated = token_body(refresh(client, first["refresh_token"]))
+    clock.now = now
     assert refresh(client, first["refresh_token"]).status_code == 401  # replayed
     assert client.get(ME, headers=_bearer(rotated["access_token"])).status_code == 401
     assert refresh(client, rotated["refresh_token"]).status_code == 401
+
+
+# --- the refresh retry grace (T-0345, audit item 7) -----------------------------------------
+
+
+@pytest.mark.parametrize("seconds_later", [0, 10, 30])
+def test_a_retry_within_the_grace_is_refused_without_ending_the_session(
+    setup: tuple[TestClient, AuthRuntime], clock: Clock, seconds_later: int
+) -> None:
+    client, runtime = setup
+    now = clock.now
+    clock.now = now - timedelta(hours=1)
+    first = _sign_in(client)
+    clock.now = now - timedelta(seconds=seconds_later)
+    rotated = token_body(refresh(client, first["refresh_token"]))  # the answer the client lost
+    clock.now = now
+    for _ in range(2):  # every retry inside the grace gets the same plain answer
+        retry = refresh(client, first["refresh_token"])
+        assert retry.status_code == 401
+        assert retry.json() == {"detail": "Not authenticated"}
+        assert retry.headers["www-authenticate"] == 'Bearer error="invalid_token"'
+    session_id = runtime.tokens.verify(first["refresh_token"], "refresh").session_id
+    assert not runtime.store.is_revoked("any", session_id)
+    assert client.get(ME, headers=_bearer(rotated["access_token"])).status_code == 200
+    assert refresh(client, rotated["refresh_token"]).status_code == 200
+
+
+def test_the_grace_is_counted_from_the_consumption_not_the_sign_in(
+    setup: tuple[TestClient, AuthRuntime], clock: Clock
+) -> None:
+    client, _ = setup
+    now = clock.now
+    clock.now = now - timedelta(seconds=20)
+    first = _sign_in(client)
+    clock.now = now - timedelta(seconds=5)
+    rotated = token_body(refresh(client, first["refresh_token"]))
+    clock.now = now + timedelta(seconds=26)  # 31 s after the consumption: a replay
+    # (The clock only moves the service's reading of "now"; PyJWT checks real time.)
+    assert refresh(client, first["refresh_token"]).status_code == 401
+    clock.now = now
+    assert refresh(client, rotated["refresh_token"]).status_code == 401  # session revoked
+
+
+def test_the_lock_and_the_active_user_check_run_before_the_token_is_spent(
+    setup: tuple[TestClient, AuthRuntime], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client, runtime = setup
+    first = _sign_in(client)
+    order: list[str] = []
+    lock_user, consume = service_module.lock_user, runtime.store.consume_refresh
+
+    def recording_lock(*args: object, **kwargs: object) -> object:
+        order.append("lock_user")
+        return lock_user(*args, **kwargs)  # type: ignore[arg-type]
+
+    def recording_consume(*args: object, **kwargs: object) -> bool:
+        order.append("consume_refresh")
+        return consume(*args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(service_module, "lock_user", recording_lock)
+    monkeypatch.setattr(runtime.store, "consume_refresh", recording_consume)
+    assert refresh(client, first["refresh_token"]).status_code == 200
+    assert order == ["lock_user", "consume_refresh"]
+
+
+def test_a_lock_timeout_leaves_the_refresh_token_unspent(
+    setup: tuple[TestClient, AuthRuntime], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client, runtime = setup
+    first = _sign_in(client)
+    lock_user = service_module.lock_user
+
+    def timing_out(*_args: object, **_kwargs: object) -> object:
+        raise OperationalError("SELECT ... FOR NO KEY UPDATE", {}, Exception("lock timeout"))
+
+    monkeypatch.setattr(service_module, "lock_user", timing_out)
+    assert refresh(client, first["refresh_token"]).status_code == 500
+    monkeypatch.setattr(service_module, "lock_user", lock_user)
+    claims = runtime.tokens.verify(first["refresh_token"], "refresh")
+    assert runtime.store.refresh_spent_at(claims.jti) is None  # never consumed
+    # The client's retry with the same token simply works.
+    rotated = token_body(refresh(client, first["refresh_token"]))
+    assert client.get(ME, headers=_bearer(rotated["access_token"])).status_code == 200
+
+
+def test_a_failed_commit_after_the_rotation_does_not_end_the_session_on_retry(
+    setup: tuple[TestClient, AuthRuntime], clock: Clock, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The request's commit fails after the token was spent (the client gets a 500, not the
+    new pair): its retry within the grace is a plain 401 and the session stays alive."""
+    client, _ = setup
+    now = clock.now
+    clock.now = now - timedelta(seconds=10)
+    first = _sign_in(client)
+    commit = Session.commit
+    failed: list[bool] = []
+
+    def failing_commit(self: Session) -> None:
+        if not failed:
+            failed.append(True)
+            raise OperationalError("COMMIT", {}, Exception("connection lost"))
+        commit(self)
+
+    monkeypatch.setattr(Session, "commit", failing_commit)
+    assert refresh(client, first["refresh_token"]).status_code == 500
+    assert failed == [True]
+    monkeypatch.setattr(Session, "commit", commit)
+    clock.now = now
+    assert refresh(client, first["refresh_token"]).status_code == 401  # the retry
+    assert client.get(ME, headers=_bearer(first["access_token"])).status_code == 200
+    assert _sign_in(client)["access_token"]  # and the user signs in normally
+
+
+def test_a_deactivated_user_cannot_refresh_and_the_session_ends(
+    setup: tuple[TestClient, AuthRuntime], db: Database, alice: uuid.UUID
+) -> None:
+    client, runtime = setup
+    first = _sign_in(client)
+    with db.unit_of_work(TenancyContext(tenant_id=T1)) as session:
+        user = session.get(User, alice)
+        assert user is not None
+        user.is_active = False
+    assert refresh(client, first["refresh_token"]).status_code == 401
+    claims = runtime.tokens.verify(first["refresh_token"], "refresh")
+    assert runtime.store.is_revoked(claims.jti, claims.session_id)
 
 
 def test_pin_failure_window_follows_the_refresh_lifetime(

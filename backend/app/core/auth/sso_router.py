@@ -4,7 +4,8 @@ App Link verification file.
 * ``GET /api/v1/auth/config``: what the sign-in screen offers (SSO preferred when enabled,
   password always available).
 * ``GET /api/v1/auth/sso/entra/start``: state + nonce + PKCE, the pre-auth cookie, and a
-  redirect to the tenant-pinned authority.
+  redirect to the tenant-pinned authority. Limited per client address before the state entry
+  is stored (``SSO_START_CLIENT_POLICY``, ``429`` + ``Retry-After``; T-0345, TD-323).
 * ``POST /api/v1/auth/sso/entra/start`` (a top-level **form post**): the same, carrying an
   ``invite_token`` in the form body, so the token is never in a URL (T-0052, diff §4.1). Only
   its reference is kept with the ``state``; after the sign-in the post-authentication hook
@@ -36,11 +37,13 @@ from sqlalchemy import select
 from app.core.auth import entra, sso
 from app.core.auth.deps import get_auth_service
 from app.core.auth.device_signal import DeviceRevokedError, device_revoked_response
+from app.core.auth.lockout import SSO_START_CLIENT_POLICY, LockedOutError, ProgressiveLockout
 from app.core.auth.models import User
 from app.core.auth.post_auth import invite_reference
 from app.core.auth.revocation import RevocationUnavailableError
 from app.core.auth.router import (
     PREFIX,
+    TOO_MANY_ATTEMPTS,
     native_app_origin,
     own_origin,
     set_refresh_cookie,
@@ -55,7 +58,7 @@ from app.core.auth.schemas import (
     SsoOption,
     TokenResponse,
 )
-from app.core.auth.service import AuthService, refuse_revoked_device
+from app.core.auth.service import AMR_SSO, AuthService, client_subject, refuse_revoked_device
 from app.core.config import ENTRA_CALLBACK_PATH, Settings
 from app.core.db import DbSession
 from app.core.tenancy.context import TenancyContext
@@ -143,11 +146,17 @@ def auth_config(settings: SettingsDep, response: Response) -> AuthConfigResponse
     return AuthConfigResponse(sso=SsoOption(start_url=START_PATH) if offered else None)
 
 
+_START_RESPONSES: Final[dict[int | str, dict[str, Any]]] = {
+    404: {"description": "SSO is not offered by this deployment"},
+    429: {"description": "Too many starts from this client; retry after `Retry-After` seconds"},
+}
+
+
 @router.get(
     START_PATH,
     status_code=status.HTTP_302_FOUND,
     response_class=RedirectResponse,
-    responses={404: {"description": "SSO is not offered by this deployment"}},
+    responses=_START_RESPONSES,
 )
 def sso_start(
     runtime: RuntimeDep,
@@ -203,7 +212,7 @@ def _form_field(fields: dict[str, list[str]], name: str) -> str | None:
     START_PATH,
     status_code=status.HTTP_303_SEE_OTHER,
     response_class=RedirectResponse,
-    responses={404: {"description": "SSO is not offered by this deployment"}},
+    responses=_START_RESPONSES,
     openapi_extra=_START_FORM,
 )
 async def sso_start_form(runtime: RuntimeDep, request: Request) -> RedirectResponse:
@@ -246,6 +255,24 @@ async def sso_start_form(runtime: RuntimeDep, request: Request) -> RedirectRespo
     )
 
 
+def _count_start(runtime: AuthRuntime, request: Request, tenant: uuid.UUID) -> None:
+    """The per-client limit on SSO starts (T-0345, TD-323), before a state entry is stored:
+    ``429`` + ``Retry-After`` when the client is locked. Keyed like the password-reset
+    request (``client_subject``)."""
+    client = request.client.host if request.client else None
+    lockout = ProgressiveLockout(runtime.store, SSO_START_CLIENT_POLICY, "sso-start-client")
+    try:
+        lockout.begin(client_subject(tenant, client))
+    except LockedOutError as exc:
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            TOO_MANY_ATTEMPTS,
+            headers={"Retry-After": str(exc.retry_after)},
+        ) from exc
+    except RevocationUnavailableError as exc:
+        raise _unavailable() from exc
+
+
 def _start(
     runtime: AuthRuntime,
     request: Request,
@@ -254,9 +281,10 @@ def _start(
     app_challenge: str | None,
     redirect_status: int,
 ) -> RedirectResponse:
-    entra_sso, _tenant = _enabled(runtime)
+    entra_sso, tenant = _enabled(runtime)
     if app_challenge is not None and device_id is None:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "app_challenge needs device_id")
+    _count_start(runtime, request, tenant)
     config = entra_sso.provider.config
     state, nonce, verifier, cookie = (sso.new_secret() for _ in range(4))
     redirect_uri = _redirect_uri(runtime, request)
@@ -405,7 +433,7 @@ def _complete(
     except DeviceRevokedError:
         raise entra.SsoRefusedError(DEVICE_REVOKED_REASON, user_id=user.id) from None
     pair = service.start_session(
-        session, user, device_id=entry.device_uuid, invite_ref=entry.invite_ref
+        session, user, method=AMR_SSO, device_id=entry.device_uuid, invite_ref=entry.invite_ref
     )
     sso.audit_event(session, "sso_signed_in", flow=flow, user_id=user.id)
     # The invite's outcome (T-0052): a project id or an error code, never the token.
@@ -517,7 +545,7 @@ def sso_exchange(
             )
             return device_revoked_response()
         pair = service.start_session(
-            session, user, device_id=body.device_id, invite_ref=grant.invite_ref
+            session, user, method=AMR_SSO, device_id=body.device_id, invite_ref=grant.invite_ref
         )
     except RevocationUnavailableError as exc:
         raise _unavailable() from exc

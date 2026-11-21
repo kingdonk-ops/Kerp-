@@ -272,11 +272,14 @@ def request_magic_link(
     lookup, the eligibility check, the link and its e-mail run after the response (T-0057).
     With `invite_token` (a pending invite naming PER-14 also makes its invitee eligible) the
     invite is accepted when the link is redeemed; the link itself never carries it (T-0052).
+    Requests are limited per client address (any e-mail), then per address: `429` with
+    `Retry-After` (T-0345).
     """
     database = _database(request)
+    client = request.client.host if request.client else None
     try:
         job = service.request_magic_link(
-            email=body.email, invite_ref=invite_reference(body.invite_token)
+            email=body.email, invite_ref=invite_reference(body.invite_token), client=client
         )
     except LockedOutError as exc:
         raise _locked(exc) from exc
@@ -374,7 +377,9 @@ def refresh(
     body: Annotated[RefreshRequest | None, Body()] = None,
     kerp_refresh: CookieToken = None,
 ) -> TokenResponse:
-    """Rotate: the refresh token is spent and a new pair is issued. Reuse revokes the session.
+    """Rotate: the refresh token is spent and a new pair is issued. Reuse revokes the session,
+    except a retry within 30 seconds of the token being spent (a lost answer): a plain `401`
+    that leaves the session alive (T-0345).
 
     The new refresh token keeps the session's end (sign-in + 12 h); after it, sign in again.
     The web SPA sends the cookie; an allow-listed native app sends ``refresh_token``. A

@@ -83,6 +83,8 @@ export interface paths {
          *     lookup, the eligibility check, the link and its e-mail run after the response (T-0057).
          *     With `invite_token` (a pending invite naming PER-14 also makes its invitee eligible) the
          *     invite is accepted when the link is redeemed; the link itself never carries it (T-0052).
+         *     Requests are limited per client address (any e-mail), then per address: `429` with
+         *     `Retry-After` (T-0345).
          */
         post: operations["request_magic_link_api_v1_auth_magic_link_post"];
         delete?: never;
@@ -147,7 +149,9 @@ export interface paths {
         put?: never;
         /**
          * Refresh
-         * @description Rotate: the refresh token is spent and a new pair is issued. Reuse revokes the session.
+         * @description Rotate: the refresh token is spent and a new pair is issued. Reuse revokes the session,
+         *     except a retry within 30 seconds of the token being spent (a lost answer): a plain `401`
+         *     that leaves the session alive (T-0345).
          *
          *     The new refresh token keeps the session's end (sign-in + 12 h); after it, sign in again.
          *     The web SPA sends the cookie; an allow-listed native app sends ``refresh_token``. A
@@ -401,6 +405,11 @@ export interface paths {
          * @description Set a new field PIN for this device, from a signed-in session of the device (diff
          *     §4.2: the PIN is changed after an online sign-in; the old PIN is not needed). Clears the
          *     device's PIN failures.
+         *
+         *     At the PIN-failure limit (``PIN_EXHAUSTED``) clearing them needs a fresh online sign-in
+         *     (TD-301, product owner 2026-11-16): a session started by password, magic link or SSO at
+         *     most 5 minutes ago and never renewed by PIN unlock. Any other session gets ``401`` with
+         *     ``code: FRESH_SIGN_IN_REQUIRED`` and nothing changes (T-0345).
          */
         put: operations["change_pin_api_v1_devices__device_id__pin_put"];
         post?: never;
@@ -6163,6 +6172,13 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many starts from this client; retry after `Retry-After` seconds */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     sso_start_form_api_v1_auth_sso_entra_start_post: {
@@ -6192,6 +6208,13 @@ export interface operations {
             };
             /** @description SSO is not offered by this deployment */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Too many starts from this client; retry after `Retry-After` seconds */
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -6386,6 +6409,13 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not authenticated. With `code: FRESH_SIGN_IN_REQUIRED`: the device is at the PIN-failure limit and this session is not a fresh online sign-in (sign in again, then change the PIN within 5 minutes) */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };

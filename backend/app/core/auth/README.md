@@ -41,22 +41,22 @@ rewritten (HS256 → RS256/EdDSA + JWKS + `jti` revocation in Redis).
 |---|---|---|
 | `GET /.well-known/jwks.json` | none | `{"keys": [...]}` public JWKs (active + retired), `Cache-Control: public, max-age=300` |
 | `POST /api/v1/auth/login` | none | `{email, password, invite_token?}` → `TokenResponse` (`no-store`) + refresh cookie (native app: token in the body); a `tenant_id` field is `422`; `429` when locked |
-| `POST /api/v1/auth/refresh` | refresh cookie + Origin (native app: `{refresh_token}` body) | new `TokenResponse` + cookie (rotation); `401 {code: PIN_REQUIRED}` for a session of a device with a PIN idle `KERP_PIN_IDLE_MINUTES` or longer (token not spent); `401` for ended sessions; `403` cross-origin |
+| `POST /api/v1/auth/refresh` | refresh cookie + Origin (native app: `{refresh_token}` body) | new `TokenResponse` + cookie (rotation); `401 {code: PIN_REQUIRED}` for a session of a device with a PIN idle `KERP_PIN_IDLE_MINUTES` or longer (token not spent); `401` for ended sessions; a spent token: plain `401`, within 30 s of its use the session lives on, later the whole session is revoked (T-0345, *Tokens*); `403` cross-origin |
 | `POST /api/v1/auth/logout` | bearer | `204`; revokes the token and its whole login session; clears the refresh cookie |
 | `GET /api/v1/auth/me` | bearer | `{id, tenant_id, email, display_name, is_internal}` (`is_internal` read-only, below) |
 | `GET /api/v1/auth/config` | none | `{password: {available: true}, sso: {provider: "entra", preferred: true, start_url} \| null}` (*Entra ID SSO*) |
-| `GET /api/v1/auth/sso/entra/start` | none | `?device_id&app_challenge` → `302` to the tenant's authorize endpoint + pre-auth cookie; `404` without SSO. An `invite_token` in the query is ignored (never in a URL) |
+| `GET /api/v1/auth/sso/entra/start` | none | `?device_id&app_challenge` → `302` to the tenant's authorize endpoint + pre-auth cookie; `404` without SSO; `429` + `Retry-After` past the per-client limit (T-0345). An `invite_token` in the query is ignored (never in a URL) |
 | `POST /api/v1/auth/sso/entra/start` | none | a top-level form post (`application/x-www-form-urlencoded`: `invite_token`, `device_id?`, `app_challenge?`) → `303` to the authorize endpoint + pre-auth cookie; the sign-in then accepts the invite (T-0052); `415` other content types, `422` malformed fields |
 | `GET /api/v1/auth/sso/entra/callback` | pre-auth cookie | `303` to the web landing (refresh cookie set) or the App Link (exchange code); refusals `?error=<code>` |
 | `POST /api/v1/auth/sso/entra/exchange` | native origin | `{code, verifier, device_id}` → `TokenResponse` with `refresh_token` (native body); `401` uniform; `401 {code: DEVICE_REVOKED}`; `403` other origins |
 | `GET /.well-known/assetlinks.json` | none | Digital Asset Links of the Android app (from configuration); `404` unconfigured |
-| `POST /api/v1/auth/magic-link` | none | `{email, invite_token?}` → always the same `202`; after the response, sends a 15-min one-time link to an active **Field Worker** (PER-14) only (*Magic links for Field Workers only*); `429` when throttled |
+| `POST /api/v1/auth/magic-link` | none | `{email, invite_token?}` → always the same `202`; after the response, sends a 15-min one-time link to an active **Field Worker** (PER-14) only (*Magic links for Field Workers only*); `429` + `Retry-After` when the client or the mailbox is throttled (T-0345) |
 | `POST /api/v1/auth/magic-link/redeem` | none | `{token}` → `TokenResponse` + cookie of a new session (on an enrolled device: bound to it, PIN kept); eligibility re-checked, else the neutral `401` |
 | `POST /api/v1/auth/password-reset/request` | none | `{email}` → always the same `202` (unknown, deactivated and active accounts alike); after the response, e-mails an active account the single-use link `/reset-password#<token>` (*Self-service password reset*); `429` + `Retry-After` when the client or the mailbox is throttled |
 | `POST /api/v1/auth/password-reset/confirm` | none | `{token, new_password}` → `200 {status: "password_changed"}` (no tokens, nobody signed in; every session of the user revoked); `410 {code: RESET_LINK_INVALID}` for any dead link; `422 {detail, code, min_length, max_length}` when the policy refuses the password (link still usable); `429` when throttled |
 | `POST /api/v1/auth/pin/unlock` | refresh cookie + Origin (native app: `refresh_token` in the body) | `{pin, failed_offline?}` → rotated `TokenResponse` + cookie; `401 {code: PIN_INVALID \| PIN_EXHAUSTED}`; `429` when locked; `403` cross-origin |
 | `POST /api/v1/devices/enrol` | bearer | `{device_id, platform, os_version, app_version, pin?}` → device + `wipe_secret`; `201` new (the only response carrying the secret), `200` known (`wipe_secret: null`); binds the session to the device; sets the PIN once; `409` another account's id, a session already bound elsewhere, or `code: PIN_ALREADY_SET` |
-| `PUT /api/v1/devices/{device_id}/pin` | bearer (a session bound to the device) | `{pin}` → `204`; a new device PIN (the old one is not needed); `403` another session, `404` not the caller's active device |
+| `PUT /api/v1/devices/{device_id}/pin` | bearer (a session bound to the device) | `{pin}` → `204`; a new device PIN (the old one is not needed); at the PIN-failure limit only from a fresh online sign-in, else `401 {code: FRESH_SIGN_IN_REQUIRED}` (T-0345); `403` another session, `404` not the caller's active device |
 | `GET /api/v1/devices` | bearer | the caller's devices (last seen, last sync, status) |
 | `GET /api/v1/users/{user_id}/devices` | bearer | a user's devices: the user, a `system_admin`, or a PER-09 of a project the user belongs to; `403` a shared project without PER-09; `404` otherwise |
 | `POST /api/v1/devices/{device_id}/revoke` | bearer | `{confirm_cross_project_wipe?}` → revoked device + `role` + `cross_project_warning`; same callers as above; `409` until a PER-09 confirms the cross-project wipe |
@@ -399,7 +399,18 @@ its own: a PIN alone never starts or renews a session.
 - **Change.** `PUT /devices/{device_id}/pin` from a session bound to the device (so after an
   online sign-in there; the old PIN is not needed, so a forgotten PIN is reset by signing in).
   Audited as `pin_changed` on `device:<device_id>` (enrolment with a PIN: `pin_set`); never
-  the PIN.
+  the PIN. It clears the device's PIN failures.
+- **Fresh sign-in at the PIN-failure limit** (TD-301 point (2) as amended by the product
+  owner on 2026-11-16; T-0345). When the device is at the limit (`PIN_EXHAUSTED`: its counter
+  holds the 10th failure), the change would end that stop, so it needs a **fresh online
+  sign-in**: a session started by password, magic link or Entra ID SSO at most 5 minutes ago
+  (`FRESH_SIGN_IN_WINDOW`) and never renewed by PIN unlock. Any other bound session (older,
+  refreshed past the 5 minutes, renewed by PIN, or a token from before the sign-in claims)
+  gets `401 {"detail": "Sign in again to change the PIN", "code": "FRESH_SIGN_IN_REQUIRED"}`
+  and nothing changes (no PIN, counter or audit write); the client sends the user to sign in.
+  Below the limit any bound session may change the PIN, as before (no recent-sign-in window).
+  The session's sign-in is read from the token's `auth_time` / `amr` claims (*Tokens*); the
+  limit from the PIN counter, read without counting (`ProgressiveLockout.at_limit`).
 - **Renewal after idle.** `/auth/refresh` rotates a session of a device with a PIN normally
   while its last renewal (the refresh token's `iat`: sign-in, rotation or unlock) is less
   than `KERP_PIN_IDLE_MINUTES` ago (default 30). After a longer idle it answers
@@ -425,7 +436,8 @@ its own: a PIN alone never starts or renews a session.
 **PIN lockout per device.** The numbers are T-0009's: 4 tries back to back, then 30 s
 doubling to 15 min; the **10th wrong PIN ends PIN unlock on that device** until a sign-in
 there: a new session bound to the device (sign-in naming it, or the first enrolment of a
-session with neither a `did` claim nor a store binding) or a PIN change clears the counter.
+session with neither a `did` claim nor a store binding) or a PIN change clears the counter
+(at the limit only a PIN change from a fresh online sign-in, above).
 Re-enrolling from a session already bound clears nothing, even if its binding was evicted. Nothing is revoked: not the session (its access token keeps
 working until it expires), not the device; PIN failures never trigger a wipe. From the 10th
 failure on no lock is armed (`LockoutPolicy.lock_after`), so later attempts get
@@ -452,6 +464,19 @@ claim only after the session's first rotation).
 | Password login | tenant + e-mail + client IP | 6 | 30 s doubling to 15 min | none (no permanent lock-out) |
 | Password login backstop | tenant + e-mail, any client | 51 per 24 h | 30 s doubling to 15 min | none |
 | Magic-link request | tenant + e-mail | 4 per hour | 1 min doubling to 15 min | none |
+| Magic-link request per client (T-0345) | tenant + client IP, any e-mail | 20 per hour (`MAGIC_LINK_CLIENT_POLICY`, the numbers of `PASSWORD_RESET_CLIENT_POLICY`) | 30 s doubling to 15 min | none |
+| Entra ID SSO start per client (T-0345, TD-323) | tenant + client IP | 60 per hour (`SSO_START_CLIENT_POLICY`) | 30 s doubling to 15 min | none |
+
+**Per-client request limits** (T-0345, audit item 12). Magic-link requests and SSO starts are
+unauthenticated and each one costs a database transaction, a Redis key or an e-mail, so a
+client address is limited whatever it asks for, keyed like the password-reset request
+(`client_subject`: tenant + `request.client.host`). A magic-link request counts the client
+first, then the mailbox, so a locked client never touches an address's counter; `429` +
+`Retry-After` either way, the same neutral `202` otherwise. An SSO start (`GET` and the
+invite form `POST`) is counted before its 10-minute `state` entry is stored; a locked client
+gets `429` + `Retry-After` and no state or pre-auth cookie. Every request counts (nothing is
+"right"), nothing clears the counters early. SSO's budget is wider because it is the daily
+sign-in of company staff, who may share an office address.
 
 Password login is keyed by client (T-0068, TD-191): someone else's failures in the
 per-client lock lock only their own client. The per-account backstop caps guessing from many
@@ -687,7 +712,11 @@ sign-in's own writes are committed before the hook runs) and the response carrie
 
 Claims: `iss`, `aud`, `sub` (user), `tid` (tenant), `sid` (login session), `jti`, `type`
 (`access`|`refresh`), `iat`, `nbf`, `exp`; `did` (the session's bound device, when known:
-T-0038) is optional. Header: `kid` (RFC 7638 thumbprint), `alg`
+T-0038) is optional. `auth_time` (the session's sign-in moment, fractional like `iat`) and
+`amr` (its sign-in method: `pwd`, `magic_link` or `sso`, with `pin` appended once the session
+has been renewed by PIN unlock) are set at every sign-in and copied unchanged by every
+rotation and unlock (T-0345); they are optional on verify, so tokens issued before T-0345
+keep working and simply never count as a fresh sign-in. Header: `kid` (RFC 7638 thumbprint), `alg`
 (`EdDSA` or `RS256`, from the key), `typ` (`at+jwt` for access tokens). Verification looks
 the key up by `kid` and accepts only that key's algorithm (no `none`, no HS/RS confusion).
 
@@ -698,6 +727,17 @@ the key up by `kid` and accepts only that key's algorithm (no `none`, no HS/RS c
   + 12 h the refresh is `401` (exact, no clock leeway) and the user signs in again. Access
   tokens never outlive the session either. Replaying a used refresh token revokes the whole
   session (reuse detection).
+- **Refresh order and retry grace** (T-0345, audit item 7). The account's row is locked and
+  checked (active, password unchanged) **before** the token is consumed, so a lock timeout or
+  a database error there leaves the token usable and the client simply retries. Consuming
+  records the moment (`refresh-spent:<jti>`, written in the same Redis transaction; kept
+  60 s). A token presented again at most `REFRESH_RETRY_GRACE` (30 s) after it was consumed,
+  by the service's clock, is a client retry (lost answer, failed commit): plain
+  `401 Bearer error="invalid_token"`, the session is **not** revoked, so the user's other
+  tokens of it (e.g. the current access token) keep working. Presented later it is a replay
+  and the whole session is revoked, as before. The grace is the trade-off the audit asked
+  for: a thief who replays a token within 30 s of its use is refused but does not end the
+  victim's session either. The same applies to `/auth/pin/unlock`.
 - **Logout** revokes the access `jti` and the `sid`; every token of that login dies.
 - **Password change** (`set_password`) sets `password_changed_at` (microseconds). A token is
   valid only if its `iat` is not before it. `iat` and `exp` are fractional NumericDates with

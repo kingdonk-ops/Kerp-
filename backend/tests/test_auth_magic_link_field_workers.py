@@ -325,9 +325,10 @@ def test_every_path_does_the_same_work_before_the_response(h: Harness) -> None:
         mark = h.spy.mark()
         assert h.request(email).status_code == 202
         seen[email] = h.spy.before_response(mark)
-    # Only the per-mailbox lockout is counted in the request: no lookup-dependent store or
-    # hash call, and never the mail sender.
-    assert set(map(tuple, seen.values())) == {("store.begin_attempt",)}, seen
+    # Only the per-client and the per-mailbox lockouts are counted in the request (T-0345):
+    # no lookup-dependent store or hash call, and never the mail sender.
+    counted = ("store.begin_attempt", "store.begin_attempt")
+    assert set(map(tuple, seen.values())) == {counted}, seen
 
 
 def test_the_link_is_issued_and_sent_only_after_the_response(h: Harness) -> None:
@@ -358,7 +359,7 @@ def test_the_request_half_returns_the_same_job_for_every_address(tmp_path: Path)
         job = service.request_magic_link(email=email.upper())
         assert job == MagicLinkJob(tenant_id=T1, email=email)
         assert email not in repr(job)
-        assert spy.events[mark:] == ["store.begin_attempt"]
+        assert spy.events[mark:] == ["store.begin_attempt", "store.begin_attempt"]
     assert sender.sent == []
 
 
