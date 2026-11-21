@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 355 · **Closed:** 150
+**Open:** 354 · **Closed:** 151
 
 ## decision (40)
 
@@ -50,7 +50,7 @@
 | [TD-486](../tracker/todo/TD-486.md) | RFI witness check: may an unmet hold-point (H) witness requirement be overridden per record (ADR 0004 Amendment A), or is it non-overridable? | T-0333 | planner |
 | [TD-514](../tracker/todo/TD-514.md) | How is a passed or LOCKED_FOR_TURNOVER inspection corrected? Define void-and-reissue (revision suffix, supersedes link, ledger, MDR shows latest) | — | planner |
 
-## spec-gap (72)
+## spec-gap (71)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -125,7 +125,6 @@
 | [TD-503](../tracker/todo/TD-503.md) | T-0027 rule-set step: AC names a CEL variable and an API path that do not exist (context.qty, /api/v1/projects/{id}/rule-sets) | T-0027 | implementer |
 | [TD-505](../tracker/todo/TD-505.md) | Runtime settings registry: categories, the unit and ceiling of max_upload_size_mb, and client-visible flags are implementer readings | T-0230 | implementer |
 | [TD-515](../tracker/todo/TD-515.md) | Field registry has no multi-point measurement field: add measurement_set (list of values + unit) with CEL list statistics (mean/min/max/count) | — | planner |
-| [TD-516](../tracker/todo/TD-516.md) | Client bootstrap caching: 'ETag / no-store per the auth rules' has no auth rule to follow; default Cache-Control no-store + strong ETag over the values + If-None-Match -> 304 (T-0231); confirm, and that T-0248 clients revalidate with If-None-Match | T-0231 | implementer |
 
 ## missed (8)
 
@@ -549,3 +548,4 @@
 | ✅ | [TD-463](../tracker/todo/TD-463.md) | Server: refuse self-deactivation on PATCH /admin/users/{id} (Admin → Users only hides the button) | T-0085: the server refuses self-deactivation (409 CANNOT_DEACTIVATE_SELF, audited); the UI shows the message. |
 | ✅ | [TD-492](../tracker/todo/TD-492.md) | Phase 0 exit 'module toggled': no shipped module is toggleable yet (every manifest has toggleable=False), so the e2e journey cannot switch one off and on | User, 2026-11-21: planner default (a) accepted. T-0027 tests the refusals now (platform module 409, unknown module 404, state unchanged); the switch-off/switch-on step is test.skip with TD-492 in the reason until the first toggleable module merges, whose task removes the skip. |
 | ✅ | [TD-502](../tracker/todo/TD-502.md) | ADR for the legal-hold columns on oe_projects_project (core-table change, T-0223) | ADR 0018 (docs/decisions/0018-project-legal-hold.md), accepted 2026-11-21: legal-hold columns on oe_projects_project (additive, no RLS change); reason/set_by/set_at describe the active hold only, history in admin-system:<tenant>; ProjectRead exposes only the flag; delete 409 LEGAL_HOLD_ACTIVE; is_on_legal_hold contract for the archive (T-0233) |
+| ✅ | [TD-516](../tracker/todo/TD-516.md) | Client bootstrap caching: 'ETag / no-store per the auth rules' has no auth rule to follow; default Cache-Control no-store + strong ETag over the values + If-None-Match -> 304 (T-0231); confirm, and that T-0248 clients revalidate with If-None-Match | User, 2026-11-21: default accepted. GET /api/v1/settings/client answers Cache-Control: no-store with a strong ETag over the values; If-None-Match -> 304. T-0248 clients store the values themselves and revalidate with If-None-Match. |
