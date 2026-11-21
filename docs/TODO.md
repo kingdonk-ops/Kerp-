@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 307 · **Closed:** 136
+**Open:** 308 · **Closed:** 136
 
 ## decision (38)
 
@@ -311,7 +311,7 @@
 | [TD-339](../tracker/todo/TD-339.md) | jobs LoopDispatcher.drain can spin forever when the commit ran on the loop's own thread (finished tasks stay in the set until their done callbacks run) | T-0058 | implementer |
 | [TD-375](../tracker/todo/TD-375.md) | mypy 2.3.1 (local toolchain) reports var-annotated in app/core/audit/guard.py:66 and app/modules/admin/service.py:122 on untouched dev code | T-0052 | implementer |
 
-## risk (31)
+## risk (32)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -346,6 +346,7 @@
 | [TD-372](../tracker/todo/TD-372.md) | Invite preview/accept refusals are audited per attempt without a per-user throttle (ledger growth by a signed-in user) | T-0052 | implementer |
 | [TD-376](../tracker/todo/TD-376.md) | Password-reset and magic-link requests defer the account-dependent work to after the response: on a kept-alive connection the time until the next request is served may still differ by path (measure; move the deferred half to the SAQ worker if it does) | T-0077 | implementer |
 | [TD-377](../tracker/todo/TD-377.md) | Invite setup-preview and accept-with-password (not signed in) have no per-client or per-link throttle; every refusal writes an audit entry | T-0059 | implementer |
+| [TD-455](../tracker/todo/TD-455.md) | Queue monitor: retry/abort commit the job write before the audit entry (two transactions); an audit-commit failure leaves the action unaudited | T-0218 | implementer |
 
 ## Closed
 

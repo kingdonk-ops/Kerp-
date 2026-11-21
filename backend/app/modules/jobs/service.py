@@ -25,7 +25,7 @@ from app.core.db import Database, utcnow
 from app.core.request_context import get_request_id
 from app.core.tenancy.context import TenancyContext
 from app.core.tenancy.rls import session_tenancy
-from app.core.tenancy.scope import get_or_404, is_visible
+from app.core.tenancy.scope import OutOfScopeError, get_or_404, is_visible
 from app.modules.jobs.broker import QUEUE_NAMES, JobBroker, JobRef, QueueMonitor
 from app.modules.jobs.models import MAX_TEXT, Job
 from app.modules.jobs.registry import (
@@ -494,13 +494,33 @@ def list_failed_jobs(session: Session, *, limit: int = 50, offset: int = 0) -> l
     ]
 
 
-def _console_audit(session: Session, event: str, job: Job, actor_id: uuid.UUID | None) -> None:
+def _console_tenant(session: Session) -> uuid.UUID:
+    """The tenant of the caller's tenant-level request session (checked before any write)."""
     context = session_tenancy(session)
     if context is None or context.project_id is not None:
         raise RuntimeError("the queue monitor needs a tenant-level bound session")
+    return context.tenant_id
+
+
+def _visible_job(session: Session, job_id: uuid.UUID) -> Job:
+    """The job if the caller's session shows it (normal RLS + ORM scope), else 404.
+
+    This is the only gate before the write in the job's own scope: a job of a project outside
+    the caller's read scope, or of another tenant, is ``OutOfScopeError`` (CLAUDE.md §6).
+    """
+    tenant_id = _console_tenant(session)
+    job = get_job(session, job_id)
+    if job.tenant_id != tenant_id:  # defence in depth: RLS and the ORM scope already hide it
+        raise OutOfScopeError("Job not found")
+    return job
+
+
+def _console_audit(session: Session, event: str, job: Job, actor_id: uuid.UUID | None) -> None:
+    # Runs after the job write has committed in its own unit of work: two transactions, so a
+    # failed commit of the request session leaves the action unaudited (TD-455).
     audit.append(
         session,
-        CONSOLE_CHAIN.format(tenant_id=context.tenant_id),
+        CONSOLE_CHAIN.format(tenant_id=_console_tenant(session)),
         {
             "event": event,
             "job_id": str(job.id),
@@ -532,7 +552,7 @@ def retry_failed_job(
     under normal RLS (else ``OutOfScopeError``, 404). The row is then changed in a unit of
     work bound to the job's own scope, as the worker does. Not ``failed``: ``JobStateError``.
     """
-    job = get_job(session, job_id)
+    job = _visible_job(session, job_id)
     if job.status != "failed":
         raise JobStateError(f"the job is {job.status}")
     job_kind = _kind(registry or JOB_REGISTRY, job.kind)
@@ -559,7 +579,7 @@ def abort_job(
     (``QueueMonitor.abort``); even if that fails, the worker never starts a failed row and
     never overwrites it (``finish_job(only_running=True)``). Else ``JobStateError``.
     """
-    job = get_job(session, job_id)
+    job = _visible_job(session, job_id)
     if job.status not in ("queued", "running"):
         raise JobStateError(f"the job is {job.status}")
     with db.unit_of_work(_own_scope(job, actor_id)) as scoped:

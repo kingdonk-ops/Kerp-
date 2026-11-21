@@ -83,8 +83,14 @@ def queue_overview(session: DbSession) -> QueueOverviewRead:
     if monitor is None:
         raise _unavailable("the job queue")
     failed = jobs.failed_counts(session)
-    queues = from_thread.run(jobs.queue_statuses, monitor, failed)
-    crons = from_thread.run(jobs.cron_statuses, monitor)
+    try:
+        queues = from_thread.run(jobs.queue_statuses, monitor, failed)
+        crons = from_thread.run(jobs.cron_statuses, monitor)
+    except Exception:  # Redis unreachable: the queue backend is down, not the API
+        logger.exception("reading the job queues failed")
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE, "the job queue is unavailable"
+        ) from None
     return QueueOverviewRead(
         queues=[
             QueueRead(

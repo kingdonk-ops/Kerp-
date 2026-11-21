@@ -31,9 +31,18 @@ from app.modules.jobs.registry import CRON_SCHEDULES, JobContext, JobKind, JobRe
 from app.modules.projects import service as projects
 from app.modules.projects.schemas import ProjectCreate
 from tests.audit_support import migrated_database
-from tests.auth_support import ALICE, BOB, PASSWORD, T1, auth_app, grant_persona, make_settings
+from tests.auth_support import (
+    ALICE,
+    BOB,
+    PASSWORD,
+    T1,
+    T2,
+    auth_app,
+    grant_persona,
+    make_settings,
+)
 from tests.auth_support import seed_user as _seed_user
-from tests.db_support import database_url
+from tests.db_support import database_url, seed_tenants
 
 SYSTEM = "/api/v1/admin/system"
 QUEUES = f"{SYSTEM}/queues"
@@ -107,10 +116,15 @@ class Api:
         return self._headers[email]
 
     def job(
-        self, *, project: uuid.UUID | None = None, status: str = "failed", error: str | None = None
+        self,
+        *,
+        project: uuid.UUID | None = None,
+        status: str = "failed",
+        error: str | None = None,
+        tenant: uuid.UUID = T1,
     ) -> uuid.UUID:
         """A job row with a secret in its payload and result, then in ``status``."""
-        with self.db.unit_of_work(TenancyContext(tenant_id=T1, project_id=project)) as s:
+        with self.db.unit_of_work(TenancyContext(tenant_id=tenant, project_id=project)) as s:
             job = jobs.create_job(s, KIND, {"file_id": "x", "token": SECRET})
             job.attempts = 2
             if status != "queued":
@@ -121,8 +135,8 @@ class Api:
                 job.result = {"leak": SECRET}
             return job.id
 
-    def row(self, job_id: uuid.UUID, project: uuid.UUID | None) -> Job:
-        with self.db.unit_of_work(TenancyContext(tenant_id=T1, project_id=project)) as s:
+    def row(self, job_id: uuid.UUID, project: uuid.UUID | None, tenant: uuid.UUID = T1) -> Job:
+        with self.db.unit_of_work(TenancyContext(tenant_id=tenant, project_id=project)) as s:
             return jobs.get_job(s, job_id)
 
     def chain(self) -> list[dict[str, Any]]:
@@ -430,3 +444,54 @@ def test_the_retry_uses_the_kind_s_back_off(api: Api, dispatched: list[JobRef]) 
     with api.db.unit_of_work(TenancyContext(tenant_id=T1, user_id=api.users[ALICE])) as s:
         jobs.retry_failed_job(s, api.db, job_id, actor_id=api.users[ALICE], registry=registry)
     assert [(r.max_attempts, r.retry_delay_s) for r in dispatched[-1:]] == [(5, 2)]
+
+
+# --- invisible jobs: another project, another tenant (review round 1, CLAUDE.md §6) ---------
+
+
+@pytest.mark.parametrize("where", ["away_project", "other_tenant"])
+@pytest.mark.parametrize("state", ["failed", "queued"])
+def test_a_job_the_admin_cannot_see_is_404_and_untouched(
+    api: Api, dispatched: list[JobRef], monitor: FakeMonitor, where: str, state: str
+) -> None:
+    # AWAY is outside ALICE's read scope (until T-0274, TD-451); T2 is another tenant, never
+    # visible. Retry and abort answer 404, change nothing, enqueue and audit nothing, and
+    # the job is neither listed nor counted.
+    if where == "other_tenant":
+        seed_tenants(api.db, T2)
+        tenant, project = T2, None
+    else:
+        tenant, project = T1, api.away
+    job_id = api.job(project=project, status=state, tenant=tenant)
+    before = api.row(job_id, project, tenant)
+    dispatched.clear()
+    alice = api.headers(ALICE)
+    retry = api.client.post(f"{QUEUES}/failed/{job_id}/retry", headers=alice)
+    abort = api.client.post(f"{QUEUES}/{job_id}/abort", headers=alice)
+    assert (retry.status_code, abort.status_code) == (404, 404), (retry.text, abort.text)
+    after = api.row(job_id, project, tenant)
+    assert (after.status, after.error, after.updated_by, after.finished_at) == (
+        before.status,
+        before.error,
+        before.updated_by,
+        before.finished_at,
+    )
+    assert dispatched == []
+    assert monitor.aborted == []
+    assert api.chain() == []
+    listed = api.client.get(f"{QUEUES}/failed", headers=alice).json()
+    assert str(job_id) not in {r["id"] for r in listed}
+    overview = api.client.get(QUEUES, headers=alice).json()
+    assert [q["failed"] for q in overview["queues"]] == [0, 0]
+
+
+def test_the_overview_is_503_when_the_queue_is_unreachable(
+    api: Api, monitor: FakeMonitor
+) -> None:
+    async def broken(queue: QueueName) -> QueueCounts:
+        raise ConnectionError("redis down")
+
+    monitor.counts = broken  # type: ignore[method-assign]
+    response = api.client.get(QUEUES, headers=api.headers(ALICE))
+    assert response.status_code == 503
+    assert "redis" not in response.text.lower()
