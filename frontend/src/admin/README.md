@@ -49,12 +49,19 @@ string through `t()` (`admin.*`, `devices.*`, `personas.*`).
   enumeration). The dialog chooses persona(s) + site (`PersonaFields`, `personas.tsx`, shared with
   the access-request approval) and, optionally, more of the caller's PER-09 projects: one action
   adds the personas to the user's existing individual grants on each project (`addToProjects`:
-  read the members, merge, `PUT` the complete set, project by project).
-- **Edit personas** sets the member's complete individual set on this project; **Remove** (after
-  confirmation) revokes the individual personas; `409 managed_through_team` is explained.
+  read the members, merge, `PUT` the complete set, project by project). Grants merge by
+  **(persona, site)** (`mergeGrants`): PER-07 may be held once per site, so no site is dropped.
+  While PER-07 is chosen the other projects are disabled with a note: its site is a node of this
+  project's hierarchy. A failure part-way names the project (the ones before it were saved).
+- **Edit personas** sets the member's complete individual set on this project. Each PER-07 site
+  the member holds is its own checkbox (kept unless unticked), and ticking PER-07 above adds
+  another site, so an unrelated edit never revokes a site. **Remove** (after confirmation)
+  revokes the individual personas; `409 managed_through_team` is explained.
 - **Separation of duties** (TD-151): a `409 sod_warning` (PER-09 together with PER-02/06/07/11,
   counted by the server over the effective grants) stops the save and shows the warning naming the
-  project; only "Save anyway" re-sends the remaining projects with `confirm_sod: true`.
+  project; "Save anyway" sends `confirm_sod: true` for **that project only**, continues the rest
+  with `false` and stops again, with a warning naming it, at the next project that needs it. Any
+  change in the dialog withdraws a pending warning.
 - The account and invite screen (Admin → Users) is TD-447.
 
 ## Access requests (`AccessRequestsPage`, diff §4.1)

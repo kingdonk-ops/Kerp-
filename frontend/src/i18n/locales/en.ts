@@ -280,6 +280,11 @@ export const en = {
       addTitle: "Add {{name}}",
       personasLegend: "Persona(s)",
       projectsLegend: "Also add to these projects (besides {{project}})",
+      siteThisProject:
+        "A Site Inspector's site belongs to this project. Assign PER-07 on another project from that project's members.",
+      heldSites: "Site Inspector (PER-07) sites held",
+      heldSite: "PER-07 Site Inspector · site {{site}}",
+      failedAt: "Saving on {{project}} failed. The projects before it were saved; try again.",
       save: "Save",
       saved: "Personas saved.",
       sodWarning:

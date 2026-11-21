@@ -7,6 +7,7 @@ import { useServices } from "../app/services";
 import { useProjectScope } from "../projects/ProjectScopeProvider";
 import { useAdminAccess } from "./access";
 import {
+  AddToProjectError,
   AdminApiError,
   addToProjects,
   assignMember,
@@ -14,7 +15,9 @@ import {
   fetchMembers,
   fetchProjects,
   lookupUser,
+  mergeGrants,
   removeMember,
+  type GrantIn,
   type UserSummary,
 } from "./api";
 import { PersonaFields, SITE_PERSONA, toGrants, type Persona } from "./personas";
@@ -181,9 +184,11 @@ export function MembersPage() {
 }
 
 /**
- * Personas + site for one user. Editing sets the complete individual set on this project;
- * adding also offers the admin's other projects and adds the personas there. A `409` SoD answer
- * (PER-09 + PER-02/06/07/11) shows the warning; only "Save anyway" sends `confirm_sod`.
+ * Personas + site for one user. Editing sets the complete individual set on this project and
+ * keeps each PER-07 site it holds as its own checkbox (PER-07 may be held once per site), so an
+ * unrelated edit never drops a site. Adding also offers the admin's other projects, except
+ * while PER-07 is chosen: its site is a node of this project's hierarchy. A `409` SoD answer
+ * (PER-09 + PER-02/06/07/11) names the project; "Save anyway" confirms that project only.
  */
 function AssignDialog({
   projectId,
@@ -196,7 +201,7 @@ function AssignDialog({
   projectId: string;
   projectLabel: string;
   editing: Editing;
-  current: ReturnType<typeof directGrants>;
+  current: GrantIn[];
   onClose: () => void;
   onDone: () => void;
 }) {
@@ -205,23 +210,30 @@ function AssignDialog({
   const { projects } = useProjectScope();
   const { adminProjectIds } = useAdminAccess();
   const others = projects.filter((p) => p.id !== projectId && adminProjectIds.includes(p.id));
+  const held = editing.existing ? current : [];
+  const heldSites = held.flatMap((g) =>
+    g.persona === SITE_PERSONA && g.site_node_id ? [g.site_node_id] : [],
+  );
   const [chosen, setChosen] = useState<ReadonlySet<Persona>>(
-    new Set(editing.existing ? current.map((g) => g.persona) : []),
+    new Set(held.filter((g) => g.persona !== SITE_PERSONA).map((g) => g.persona)),
   );
-  const [site, setSite] = useState(
-    current.find((g) => g.persona === SITE_PERSONA)?.site_node_id ?? "",
-  );
+  const [kept, setKept] = useState<ReadonlySet<string>>(new Set(heldSites));
+  const [site, setSite] = useState("");
   const [targets, setTargets] = useState<ReadonlySet<string>>(new Set());
-  /** Projects still to save after a SoD answer; empty: no warning pending. */
+  /** Projects still to save after a SoD answer, the warned one first; empty: no warning. */
   const [pending, setPending] = useState<string[]>([]);
-  const grants = toGrants(chosen, site);
+  const picked = toGrants(chosen, site);
+  const keptGrants = [...kept].map((id) => ({ persona: SITE_PERSONA, site_node_id: id }));
+  const grants = picked && mergeGrants(picked, keptGrants);
+  const siteChosen = chosen.has(SITE_PERSONA);
   const save = useMutation({
     mutationFn: async (confirmSod: boolean): Promise<string[]> => {
       if (editing.existing) {
         const res = await assignMember(api, projectId, editing.user.id, grants ?? [], confirmSod);
         return res === "sod" ? [projectId] : [];
       }
-      const ids = confirmSod ? pending : [projectId, ...others.filter((p) => targets.has(p.id)).map((p) => p.id)];
+      const extra = siteChosen ? [] : others.filter((p) => targets.has(p.id)).map((p) => p.id);
+      const ids = confirmSod ? pending : [projectId, ...extra];
       return addToProjects(api, editing.user.id, ids, grants ?? [], confirmSod);
     },
     onSuccess: (left) => {
@@ -229,11 +241,21 @@ function AssignDialog({
       if (left.length === 0) onDone();
     },
   });
-  const sodProject = (id: string | undefined) => {
+  const nameOf = (id: string | undefined) => {
     const p = projects.find((x) => x.id === id);
-    return p && id !== projectId ? t("admin.accessRequests.project", { code: p.code, name: p.name }) : projectLabel;
+    return p && id !== projectId
+      ? t("admin.accessRequests.project", { code: p.code, name: p.name })
+      : projectLabel;
   };
+  /** Any change of what is saved withdraws a pending SoD warning. */
+  const changed =
+    <T,>(set: (v: T) => void) =>
+    (v: T) => {
+      set(v);
+      setPending([]);
+    };
   const sod = pending.length > 0;
+  const failedAt = save.error instanceof AddToProjectError ? save.error.projectId : null;
 
   return (
     <Dialog
@@ -255,26 +277,46 @@ function AssignDialog({
       }
     >
       <p>{editing.user.email}</p>
+      {heldSites.length > 0 && (
+        <fieldset className="space-y-1">
+          <legend className="font-semibold">{t("admin.members.heldSites")}</legend>
+          {heldSites.map((id) => (
+            <label key={id} className="flex min-h-touch items-center gap-touch-gap">
+              <input
+                type="checkbox"
+                className="size-touch shrink-0"
+                checked={kept.has(id)}
+                onChange={() => {
+                  const next = new Set(kept);
+                  if (!next.delete(id)) next.add(id);
+                  changed(setKept)(next);
+                }}
+              />
+              {t("admin.members.heldSite", { site: id })}
+            </label>
+          ))}
+        </fieldset>
+      )}
       <PersonaFields
         legend={t("admin.members.personasLegend")}
         chosen={chosen}
-        onChange={(next) => {
-          setChosen(next);
-          setPending([]);
-        }}
+        onChange={changed(setChosen)}
         site={site}
-        onSite={setSite}
+        onSite={changed(setSite)}
       />
       {!editing.existing && others.length > 0 && (
         <fieldset className="space-y-1">
-          <legend className="font-semibold">{t("admin.members.projectsLegend", { project: projectLabel })}</legend>
+          <legend className="font-semibold">
+            {t("admin.members.projectsLegend", { project: projectLabel })}
+          </legend>
+          {siteChosen && <p className="text-sm">{t("admin.members.siteThisProject")}</p>}
           {others.map((p) => (
             <label key={p.id} className="flex min-h-touch items-center gap-touch-gap">
               <input
                 type="checkbox"
                 className="size-touch shrink-0"
-                checked={targets.has(p.id)}
-                disabled={sod}
+                checked={!siteChosen && targets.has(p.id)}
+                disabled={sod || siteChosen}
                 onChange={() => {
                   const next = new Set(targets);
                   if (!next.delete(p.id)) next.add(p.id);
@@ -286,10 +328,16 @@ function AssignDialog({
           ))}
         </fieldset>
       )}
-      {save.isError && <p role="alert">{t("admin.actionError")}</p>}
+      {save.isError && (
+        <p role="alert">
+          {failedAt
+            ? t("admin.members.failedAt", { project: nameOf(failedAt) })
+            : t("admin.actionError")}
+        </p>
+      )}
       {sod && (
         <p role="alert" className="rounded border-2 border-warning p-2">
-          {t("admin.members.sodWarning", { project: sodProject(pending[0]) })}
+          {t("admin.members.sodWarning", { project: nameOf(pending[0]) })}
         </p>
       )}
     </Dialog>

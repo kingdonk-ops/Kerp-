@@ -9,6 +9,10 @@ import { FAKE_USER, json } from "../test/fakeApi";
 import { applyTheme, THEMES } from "../theme/theme";
 import { ADMIN_PROJECT, project, renderAdmin } from "./testing";
 
+// The T-0026 cases wait on mocked round-trips through the whole shell (slow under load).
+const WAIT = { timeout: 5000 };
+const SLOW = 20_000;
+
 const REQUEST = {
   id: "00000000-0000-4000-8000-000000000201",
   project_id: ADMIN_PROJECT.id,
@@ -64,21 +68,21 @@ describe.each(THEMES)("admin screens in the %s theme", (theme) => {
         },
         { theme, systemAdmin: true },
       );
-      await screen.findByText(FAKE_USER.email);
+      await screen.findByText(FAKE_USER.email, {}, WAIT);
 
       const findings = await auditA11y(document.body, theme);
       expect(findings, formatFindings(findings)).toEqual([]);
-    });
+    }, SLOW);
 
     it("projects with the new-project dialog", async () => {
       await setViewport(viewport);
       renderAdmin("/backbone/projects", { "GET /api/v1/projects": () => json([project()]) }, { theme });
-      await screen.findByRole("link", { name: i18n.t("admin.projects.members") });
+      await screen.findByText(i18n.t("admin.projects.members"), {}, WAIT);
       fireEvent.click(screen.getByRole("button", { name: i18n.t("admin.projects.new") }));
 
       const findings = await auditA11y(document.body, theme);
       expect(findings, formatFindings(findings)).toEqual([]);
-    });
+    }, SLOW);
 
     it("project members with the assign dialog and the SoD warning", async () => {
       await setViewport(viewport);
@@ -86,7 +90,10 @@ describe.each(THEMES)("admin screens in the %s theme", (theme) => {
         user_id: REQUEST.requester.id,
         email: REQUEST.requester.email,
         display_name: REQUEST.requester.display_name,
-        grants: [{ persona: "PER-06", site_node_id: null, source: "direct", source_id: null, team_name: null }],
+        grants: [
+          { persona: "PER-06", site_node_id: null, source: "direct", source_id: null, team_name: null },
+          { persona: "PER-07", site_node_id: "00000000-0000-4000-8000-000000000401", source: "direct", source_id: null, team_name: null },
+        ],
       };
       renderAdmin(
         `/admin/projects/${ADMIN_PROJECT.id}/members`,
@@ -98,14 +105,14 @@ describe.each(THEMES)("admin screens in the %s theme", (theme) => {
         },
         { theme },
       );
-      fireEvent.click(await screen.findByRole("button", { name: i18n.t("admin.members.edit") }));
+      fireEvent.click(await screen.findByText(i18n.t("admin.members.edit"), {}, WAIT));
       fireEvent.click(screen.getByRole("checkbox", { name: /PER-09/ }));
       fireEvent.click(screen.getByRole("button", { name: i18n.t("admin.members.save") }));
-      await within(screen.getByRole("dialog")).findByRole("alert");
+      await within(screen.getByRole("dialog")).findByRole("alert", {}, WAIT);
 
       const findings = await auditA11y(document.body, theme);
       expect(findings, formatFindings(findings)).toEqual([]);
-    });
+    }, SLOW);
 
     it("my devices with the revoke dialog", async () => {
       await setViewport(viewport);

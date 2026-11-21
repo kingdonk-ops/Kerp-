@@ -285,24 +285,49 @@ export async function assignMember(
 }
 
 /**
+ * Grants without repeats of (persona, site), in first-seen order: PER-07 may be held once per
+ * site (backend `MemberAssign`), so merging by persona alone would drop a site.
+ */
+export function mergeGrants(...lists: readonly GrantIn[][]): GrantIn[] {
+  const merged = new Map<string, GrantIn>();
+  for (const g of lists.flat()) merged.set(`${g.persona}|${g.site_node_id ?? ""}`, g);
+  return [...merged.values()];
+}
+
+/** A multi-project add failed at `projectId`; the projects before it were saved. */
+export class AddToProjectError extends AdminApiError {
+  constructor(
+    readonly projectId: string,
+    status: number,
+  ) {
+    super(status);
+  }
+}
+
+/**
  * Add `grants` to the user's individual grants on each project in turn (one action, several
- * of the admin's projects). Stops at the first project that needs the SoD confirmation and
- * returns the projects still to do, to re-run with `confirmSod`.
+ * of the admin's projects; merged by persona and site, so no grant is dropped). `confirmFirst`
+ * sends `confirm_sod: true` for the first project only, the one the shown warning named; the
+ * others go with `false`. Stops at the next project that needs the SoD confirmation and returns
+ * it with the projects still to do, so every confirmation follows a warning naming its project.
  */
 export async function addToProjects(
   api: ApiClient,
   userId: string,
   projectIds: readonly string[],
   grants: GrantIn[],
-  confirmSod: boolean,
+  confirmFirst: boolean,
 ): Promise<string[]> {
   for (const [i, projectId] of projectIds.entries()) {
-    const members = await fetchMembers(api, projectId);
-    const merged = new Map(
-      directGrants(members.find((m) => m.user_id === userId)).map((g) => [g.persona, g]),
-    );
-    for (const g of grants) merged.set(g.persona, g);
-    const res = await assignMember(api, projectId, userId, [...merged.values()], confirmSod);
+    let res: "ok" | "sod";
+    try {
+      const members = await fetchMembers(api, projectId);
+      const current = directGrants(members.find((m) => m.user_id === userId));
+      const confirm = confirmFirst && i === 0;
+      res = await assignMember(api, projectId, userId, mergeGrants(current, grants), confirm);
+    } catch (e) {
+      throw new AddToProjectError(projectId, e instanceof AdminApiError ? e.status : 0);
+    }
     if (res === "sod") return projectIds.slice(i);
   }
   return [];
