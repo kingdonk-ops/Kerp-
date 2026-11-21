@@ -3,14 +3,14 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 71/227 tasks done (31%) · **ready now:** 26 · **epics awaiting breakdown:** 48
+**Overall:** 71/229 tasks done (31%) · **ready now:** 26 · **epics awaiting breakdown:** 48
 
 | Phase | Tasks done | Progress |
 |---|---|---|
 | 0 · Platform foundations | 71/103 | `██████░░░░` 69% |
 | 1 · Asset & Quality backbone | 0/114 (+1 epics) | `░░░░░░░░░░` 0% |
 | 2 · Welding quality | 0/10 | `░░░░░░░░░░` 0% |
-| 3 · Logistics | 0/0 (+7 epics) | `░░░░░░░░░░` 0% |
+| 3 · Logistics | 0/2 (+7 epics) | `░░░░░░░░░░` 0% |
 | 4 · Execution | 0/0 (+15 epics) | `░░░░░░░░░░` 0% |
 | 5 · Documents, collaboration & AI | 0/0 (+10 epics) | `░░░░░░░░░░` 0% |
 | 6 · Defense, claims & controls | 0/0 (+8 epics) | `░░░░░░░░░░` 0% |
@@ -272,6 +272,8 @@
 | 🧩 | [E-03-05](../tracker/tasks/E-03-05.md) | cutting: 1D FFD + 2D rectpack nesting, yield/waste, offcut reuse, cutting.confirm → inventory | cutting | L | E-03-04 |  |
 | 🧩 | [E-03-06](../tracker/tasks/E-03-06.md) | site_logistics: Gate Delivery edge screen + OS&D vs ERP-mirrored PO lines | site_logistics | L | T-0127, E-03-02 |  |
 | 🧩 | [E-03-07](../tracker/tasks/E-03-07.md) | equipment & fleet register (extends calibration core) | equipment | L | T-0112 |  |
+| ⬜ | [T-0184](../tracker/tasks/T-0184.md) | materials/qms: material shelf-life extension workflow — oe_material_shelf_life_extension, QA approval through the verification queue (no self-approval), effective use-by date, eligibility and readiness re-evaluation, ledger | materials | M | E-03-03, T-0016, T-0018, T-0019, T-0139, T-0181, T-0183, T-0266, T-0262 |  |
+| ⬜ | [T-0268](../tracker/tasks/T-0268.md) | materials/sync: material batches and approved extension documents in the offline reference bundle, client/server use-by check | materials | S | T-0184, T-0147, T-0017 |  |
 
 ## Phase 4 — Execution
 
@@ -301,7 +303,7 @@
 | 🧩 | [E-05-02](../tracker/tasks/E-05-02.md) | markups + plan_room: PDF/drawing viewer + vector markup overlays | markups | L | E-05-01 |  |
 | 🧩 | [E-05-03](../tracker/tasks/E-05-03.md) | transmittals + correspondence | transmittals | L | E-05-01 |  |
 | 🧩 | [E-05-04](../tracker/tasks/E-05-04.md) | rfi / submittals / meetings / interface_management | rfi | L | E-05-01 |  |
-| 🧩 | [E-05-05](../tracker/tasks/E-05-05.md) | MDR collation engine: SAQ streaming PDF merge, bookmarks, TOC, pagination, SHA-256, transmittal | mdr | L | E-05-01, T-0111 |  |
+| 🧩 | [E-05-05](../tracker/tasks/E-05-05.md) | MDR collation engine: SAQ streaming PDF merge, bookmarks, TOC, pagination, SHA-256, transmittal | mdr | L | E-05-01, T-0111, T-0184, T-0265 |  |
 | 🧩 | [E-05-06](../tracker/tasks/E-05-06.md) | search / retrieval: docket OCR → full-text + vector index (SAQ) | search | L | E-05-01 |  |
 | 🧩 | [E-05-07](../tracker/tasks/E-05-07.md) | integrations: outbound event bus + webhooks (HMAC) + ERP sync bridge (SAP/Xero/P6) | integrations | L | T-0015 |  |
 | 🧩 | [E-05-08](../tracker/tasks/E-05-08.md) | erp_chat / ai_agents: operational assistant (proposals only, human-confirmed) | erp_chat | L | E-05-06 |  |
