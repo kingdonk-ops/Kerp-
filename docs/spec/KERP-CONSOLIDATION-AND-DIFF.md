@@ -630,6 +630,177 @@ Pilot-0 gate (2026-11-14), the transport is a Pilot-0 dependency. Planner defaul
 - Portal extras of TD-084 (PDF attachments, digests: `modules/portal-plan-review.md`) build on
   this service in their own epics.
 
+### 4.7 Admin operations, communications and runtime settings (user, 2026-11-21; planner defaults)
+
+The user supplied a spec for four features on 2026-11-21 (it asked for "§4.5"; numbered §4.7
+because §4.5 is Entra ID SSO). Where it disagreed with earlier sections, the earlier sections win
+and the difference is an open TODO; the planner defaults below apply until the user decides.
+Tasks: T-0218–T-0232 and T-0248; the user directory is §4.8; the project archive is in `modules/documents-and-mdr.md` (epic E-01-02).
+
+**System console** (`/api/v1/admin/system/*`, T-0219–T-0225). Only `system_admin`; every other
+caller, PER-09 included, gets **403** (an admin surface, not a project record). Every action is
+written to the audit ledger. Record reads keep project RLS: System admins read no
+project-scoped record without a membership (§4.1; TD-396), and no console endpoint widens a
+project RLS policy or uses a bypass role; where a non-member needs an overview it gets counts
+from a count-only function. The project archive follows the same rule (export, download and
+restore from a registry archive in either mode need a membership, live or held at the
+project's deletion; restore from an uploaded zip the caller already holds needs `system_admin`
+only; `modules/documents-and-mdr.md` §Access).
+
+- **Deployment stats** (T-0219): counts and byte totals only, never rows: projects (active,
+  soft-deleted), users (active, deactivated), enrolled devices, and per module the counts it
+  contributes (asset nodes, Items, inspections when those modules exist; TD-403). Each module
+  contributes through its own `service.py` (a stats-provider registry, no cross-module table
+  access). Where RLS would hide rows, the count comes from a **count-only `SECURITY DEFINER`
+  function** (pinned `search_path`, `EXECUTE` revoked from `PUBLIC`, same pattern as ADR 0012),
+  introduced with an ADR. Object-store totals (object count and bytes per storage class
+  `STANDARD | GLACIER_IR | DEEP_ARCHIVE`) come from a `batch` SAQ job (listing is slow) and are
+  shown with their "as of" time. **Health probes**: PostgreSQL, Redis, object store, malware
+  scanner (ClamAV `PING`); each with a short timeout, answering status and latency only, never
+  host names, connection strings or credentials.
+- **Queue monitor** (T-0220): KERP's own endpoints, not SAQ's web UI (it runs its own server
+  without KERP auth). Per queue (`interactive`, `batch`): depth, active, scheduled and failed
+  counts; the cron jobs (they run on the batch worker; there is no separate cron queue) with
+  last and next run; failed jobs with kind, queue, project code, attempts, error class and a
+  truncated message, **never job kwargs or payloads** (mail payloads already stay out of kwargs,
+  §4.6). Retry and abort are audited.
+- **Upload quarantine monitor** (T-0218, T-0221): uploads in `verifying` (scan running or
+  stuck), `rejected` (reason code: `infected` with the scanner signature, `size_mismatch`,
+  `type_mismatch`, `sha256_mismatch`, `missing_object`, `verify_failed`, and the media-probe codes
+  of T-0169) and `expired`. The real scanner is ClamAV (`clamd`, `INSTREAM`) in the worker,
+  replacing the stub (TD-211). Rejected bytes stay deleted at rejection (T-0016): nothing
+  infected is kept at rest, so there is nothing to purge (TD-397). Actions: re-queue the check of
+  a file stuck in `verifying` whose staging object still exists; run a project's orphan sweep
+  now. **Rows only where the admin holds a membership:** the list reads `oe_uploads_file`
+  under normal project RLS, so it shows full rows (project code, file id, original filename,
+  size, SHA-256, status, reason, signature, uploader id, times) only for projects where the
+  admin is a member. For every other project it shows **counts only**, per project and status
+  (and reason code), from a count-only `SECURITY DEFINER` function of the T-0219 pattern
+  (pinned `search_path`, `EXECUTE` revoked from `PUBLIC`, returns numbers only; ADR). The
+  uploads RLS policy is **not widened** and **no bypass role** is used; the count function
+  accepts only project, status and reason filters (never a file id, hash or filename, so it is no
+  existence oracle). To act on rows of such a project the admin first grants themselves a
+  membership (audited, T-0014; TD-396); the orphan sweep is housekeeping that returns no rows
+  and is exempt.
+- **Audit explorer** (T-0222): read-only over the hash-chain ledger (§4); no endpoint ever
+  changes a ledger row. Reads under normal RLS: tenant-level chains (grants, users, devices,
+  deployment settings, mail suppression, teams, the system console) in full; project chains
+  only of projects where the admin holds a membership (TD-396). Filters: actor, device, chain-key
+  prefix (entity type), payload `event` key or flag such as `sod_warning` (TD-402), date range.
+  **Verify chain integrity** recomputes the ledger rules (contiguous `seq`, `prev_hash` links,
+  recomputed `content_hash`): one chain synchronously, all readable chains as a `batch` SAQ job
+  with a report. Anchoring chain heads outside the database stays TD-058.
+- **Legal hold** (T-0223): a per-project `legal_hold` flag with reason, set by and set at, on the
+  project table (core-table change: ADR). Set and cleared only by a System admin, reason
+  required, audited in the tenant-level chain `admin-system:<tenant>` (like
+  `deployment-settings:<tenant>`; a System admin need not be a member of the project). While
+  it is on: soft-deleting the project answers **409 `LEGAL_HOLD_ACTIVE`**, and the project's archives (documents-and-mdr) cannot be deleted. KERP
+  has no hard purge of project data (retention rules: TD-175; TD-401).
+
+**Communications** (Admin → Communications, T-0226–T-0229), on the outbound e-mail service
+(§4.6):
+
+- **Delivery ledger** (T-0226): the §4.6 send log, extended additively (core table: ADR):
+  status `delivered` from SES delivery notifications through the same hardened SNS endpoint;
+  nullable `recipient_user_id`, `project_id`, `broadcast_id`. The recipient stays hashed plus
+  masked, never stored in clear (§4.6 wins over the pasted `recipient_email` column). Stats:
+  totals, delivery rate, bounces, complaints and failures by period and template; a searchable
+  history (template, status, date, exact-address lookup by hash). System admins see all;
+  PER-09 sees only the stats of broadcasts to its own projects.
+- **Automated templates** (T-0227): the registered templates (§4.6) stay the shipped defaults
+  in the i18n catalogues. A System admin overrides, per template and locale, the subject and the
+  text blocks (intro, outro, action label) as plain text with only the placeholders the template
+  declares (for example `{user_name}`, `{project_code}`); the renderer still escapes every value
+  and places the action link, so an admin can never move or reveal a secret; no raw HTML,
+  remote images or tracking pixels (TD-400). Revisions are kept; preview with synthetic sample
+  values; a test send goes only to the admin's own address; reset restores the shipped default;
+  the next send uses the change without a redeploy. Templates added by later tasks (handover,
+  inspection returned/overdue, co-sign confirmation/reminder, archive ready/restored) appear when
+  they are registered. The magic-link template is sent only to Field Workers (PER-14, §4.2).
+- **Broadcast e-mail** (T-0228): a System admin targets all active users, one or more projects,
+  an audience category (`internal` = `is_internal`, `external` = not internal, `client` = PER-15
+  holders) or personas (PER-01–PER-16); a PER-09 only users with an active membership on its own
+  projects, by persona or category (TD-399). The audience is resolved on the server; the sender
+  sees a count before sending, never a list of addresses. Body is plain text. Dispatch on the
+  `batch` queue, one `send_mail` per recipient (send-log rows carry the `broadcast_id`),
+  suppression respected, deactivated users excluded, rate-limited, audited. Broadcast mails
+  carry `List-Unsubscribe` (one-click) and an opt-out that applies to broadcasts only;
+  transactional mail is never opted out.
+
+**Runtime settings registry** (T-0230–T-0232) extends §4.4 (T-0044). A code-declared registry
+(key, category, type `int | float | bool | string | enum | int_list`, bounds, default,
+client-visible flag) with one stored value per tenant and key; System admins edit; values out
+of bounds get **422** (never clamped); a deployment-config value can cap an entry (the entry can
+never exceed it); every change is cached in Redis with pub/sub invalidation and audited as
+`{key: [old, new]}`. **No secret is ever a registry entry** (keys, passwords, API secrets,
+tokens): registration refuses them. The §4.4 settings become registry entries;
+`GET/PATCH /api/v1/settings/deployment` keeps its contract.
+
+| Entry | Default | Bounds (planner) | Read by |
+|---|---|---|---|
+| `offline_window_days`, `offline_grace_hours`, `max_checkout_clock_skew_s`, new-project defaults | §4.4 | §4.4 | T-0044 consumers |
+| `default_backdating_threshold_days` | 7 | 0–365 | new projects (T-0140 project setting) |
+| `max_upload_size_mb` | 100 | 1 – `KERP_UPLOAD_MAX_BYTES` | uploads (T-0016) |
+| `presigned_url_ttl_minutes` | 15 | 1 – 60 (capped by `KERP_UPLOAD_URL_SECONDS`) | uploads |
+| `max_photo_annotations` | 50 | 1–50 | forms (T-0156) |
+| `tablet_proxy_max_px`, `tablet_proxy_quality` (category `uploads_media`; user, 2026-11-21) | 1280, 72 | 640–2560, 40–95 | image derivatives (T-0247) |
+| `report_image_max_px`, `report_image_quality` (category `uploads_media`; user, 2026-11-21) | 1024, 68 | 480–2048, 40–95 | image derivatives (T-0247) |
+| `max_video_duration_s`, `max_video_size_mb` | 60, 100 | 5–600, 1–500 | forms, media probe (T-0167, T-0169) |
+| `max_audio_duration_s`, `max_audio_size_mb` | 300, 10 | 5–1800, 1–100 | forms, media probe |
+| `cosign_pin_token_ttl_minutes` | 5 | 1–15 | signing (T-0162) |
+| `provisional_cosign_client_reminder_hours`, `provisional_cosign_escalation_hours` | 24, 72 | 1–720 (client < escalation) | signing (T-0174) |
+
+Read-only **deployment configuration** (shown, never edited at runtime; TD-046, TD-398):
+refresh-token lifetime (`KERP_REFRESH_TOKEN_HOURS`, 12), PIN idle (`KERP_PIN_IDLE_MINUTES`, 30),
+the PIN lockout schedule (T-0009), the deployment region (§4.4, default `ap-southeast-2`), the
+mail sender and reply-to (§4.6), the malware scanner, and the AI provider (`none` until the
+assistant, Phase 5). **Client bootstrap** (API T-0231, phase 0; client consumption T-0248,
+phase 1): `GET /api/v1/settings/client` (the paste's
+`/api/v1/config/client`, under the settings module's mount) for any signed-in user returns the
+client-visible entries only; web and Android read it at sign-in and at every sync.
+
+### 4.8 User directory, account state and presence (user, 2026-11-21; planner defaults)
+
+User addendum of 2026-11-21 to the admin module (T-0014 is done, so new tasks T-0243–T-0246).
+The user table is the core `auth_user` (the addendum's `oe_identity_user`); new columns on it are
+additive and need an ADR (CLAUDE.md §6).
+
+- **Account state** (T-0243; TD-406). New nullable columns `first_login_at` (set once, by the
+  first successful password, SSO or magic-link sign-in), `last_login_at` (every successful
+  sign-in) and `last_active_at` (token refresh and authenticated requests, written at most once
+  per 5 minutes per user through a Redis claim, never on the request's critical path). The
+  status is **derived**, not stored: `deactivated` when `is_active` is false (deactivation
+  already blocks sign-in and every token at once, and the last active System admin cannot be
+  deactivated); `invited` when `first_login_at` is null; otherwise `active`. A PIN unlock
+  continues a session and is activity, not a sign-in.
+- **Sessions and presence** (T-0243). Core auth keeps a per-user index of live sessions in
+  Redis (session id, expiry = sign-in + 12 h, §4.2), maintained at sign-in, logout and revoke.
+  `active_session_count` = live, non-revoked sessions. `presence` is computed per request:
+  `online` when `active_session_count > 0` and `last_active_at` is within 15 minutes; `idle` when
+  sessions are live but the last activity is older; `offline` with no live session or a status
+  other than `active`. Presence is an approximation (5-minute write throttle) and is shown only
+  in the admin user directory, never to other users.
+- **User directory** (`GET /api/v1/admin/users`, `system_admin`): name, e-mail, status,
+  presence, session count, first/last login, last active, project count (live memberships of
+  live projects, any source), tenant grants; filters status, presence, grant, project; search by
+  name or e-mail.
+- **Force sign-out** (T-0244): `POST /api/v1/admin/users/{id}/revoke-sessions` (`system_admin`,
+  reason required) revokes every live session of the user in the revocation store at once; the
+  next request or refresh is `401` and the user signs in again. It is **not** a device revoke:
+  no `DEVICE_REVOKED`, no wipe (§4.3); an offline device keeps its outbox, which drains after the
+  next sign-in. Audited with `event: user_sessions_revoked`, actor and reason.
+- **Resend invite** (T-0244; TD-407): only for `invited` accounts. Re-sends the user's pending
+  project invites through the invite re-send of §4.1 (rotation, audit, rate limits unchanged),
+  else sends the set-password (reset) e-mail of §4.2 to an account without a password. Never a
+  sign-in magic link (Field Workers only, §4.2); e-mail goes through core mail (§4.6).
+- **Memberships across projects** (T-0245): `GET/POST/PUT/DELETE
+  /api/v1/admin/users/{id}/memberships` lets a System admin manage the user's individual
+  memberships on any project, and a PER-09 only on its own PER-09 projects (it never sees the
+  user's other projects: 404 for them). Same rules as the per-project members API: personas and
+  PER-07 site scope, team-derived rows shown read-only with their team, the PER-09 + hold-persona
+  SoD warning returned before commit and audited `sod_warning: true` (§4.1, TD-151), PER-15 and
+  PER-09 individual only.
+
 ---
 
 ## 5. Equipment calibration lifecycle & hard quality gate
@@ -679,7 +850,7 @@ Module screens register their nav items in these groups. Individual items may mo
 | **Documents** | documents, transmittals, CDRL, drawings |
 | **Defense & Claims** | TQs, variations, NOD / EOT, claims |
 | **Controls & Insights** | P6 schedule, reporting, money mirror |
-| **Admin** | users, personas, system (deployment settings, admin grants, devices), access requests |
+| **Admin** | users, personas, access requests, communications (broadcast e-mail, delivery stats, automated e-mail templates), project archives (export, storage tiering, download, restore), system (deployment stats, queue monitor, upload quarantine, runtime settings, admin grants, devices, audit log) (user, 2026-11-21; §4.7, §6.5) |
 
 The top-bar **Project Switcher** is the project picker of §4.1: it lists the user's projects
 (from memberships), remembers the last project per user on this client, offers All-Projects to portfolio
@@ -848,6 +1019,28 @@ submit, client co-sign, comments, NCR/punch raised in the field), not only submi
   - **iOS:** out of scope (Android only).
 - **Optional chain-of-custody hash** of offline records (SHA-256 of previous hash + payload +
   `monotonic_ms`): the user called it optional; tracked as a `later` TODO (TD-215), no task.
+
+### 6.5 Admin console screens (user, 2026-11-21; planner defaults)
+
+The Admin group of §6.1 gains three areas. Every screen uses the reusable shells (`RegisterPage`,
+`DetailPage`), every string goes through `t()`, and a screen a caller may not use is hidden from
+the navigation **and** refused by the API (403 for admin surfaces).
+
+| Area | Screens | Who | Tasks |
+|---|---|---|---|
+| **Users** | user directory (status, presence, sessions, logins, grants, filters, search; resend invite, force sign-out, activate/deactivate); user detail with memberships across projects (§4.8) | `system_admin`; PER-09 memberships tab for its own projects | T-0026, T-0246 |
+| **System** | deployment stats + health; queue monitor (retry / abort); upload quarantine (re-check, sweep now); runtime settings (editable registry + read-only deployment configuration); admin grants (T-0026); devices (T-0048); audit log (filters, verify chain); legal hold on the project admin page | `system_admin` | T-0224, T-0225, T-0232 |
+| **Communications** | broadcast composer (audience, count, send); delivery stats (cards) and history; automated e-mail templates (edit, preview, test send, reset) | `system_admin`; PER-09 composer and stats for its own projects | T-0229 |
+| **Project archives** | archive list; export; storage tier toggle; download; start a deep-archive restore; restore wizard (deleted project or new project) | `system_admin`; export, download and restore from a registry archive (either mode) also need a membership on that project (live, or held when it was deleted); restore from an uploaded zip needs `system_admin` only | T-0241 (epic E-01-02) |
+
+Numbers on these screens are counts and states only (§4.7); a screen never shows a project
+record the caller could not open in the project itself. This holds for the upload quarantine
+(rows only of member projects, counts for the rest), the audit explorer (project chains only of
+member projects) and the project archives (export, download and restore from a registry
+archive, in either mode, need a membership on that project, live or held when it was deleted;
+only a zip the caller uploads, whose bytes they already hold, restores without one; restore as
+new makes the restoring admin PER-09 of the new project, audited;
+`modules/documents-and-mdr.md` §Access; TD-396).
 
 ---
 

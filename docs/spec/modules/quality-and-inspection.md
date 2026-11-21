@@ -77,6 +77,27 @@ are planner defaults unless marked otherwise. A `photo` answer is a list of capt
   overlay on screen; it is **burned in only on export** (inspection PDF, §Inspection report).
 - Annotations can be edited until the inspection is submitted and are read-only after that, like
   the other answers. The server validates the annotation against its schema (422 for that path).
+- **Image derivatives (user, 2026-11-21; planner reconciliation TD-408; T-0247).** Every image
+  upload (JPEG, PNG, WebP: photo answers and reference images) keeps its original, untouched and
+  verified against the client SHA-256 at its content-addressed key (T-0016). After the scan
+  passes, a `batch` SAQ job (Pillow imported lazily, T-0022) writes two derivatives, both
+  auto-oriented from EXIF, EXIF stripped, sRGB JPEG:
+  - **tablet proxy**: longest edge ≤ `tablet_proxy_max_px` (default 1280), progressive, quality
+    `tablet_proxy_quality` (default 72);
+  - **report rendition**: longest edge ≤ `report_image_max_px` (default 1024), quality
+    `report_image_quality` (default 68).
+  The file becomes `available` only when the scan passed **and** both derivatives exist (an image
+  that cannot be decoded or exceeds the pixel cap is `rejected`). Width, height and each
+  derivative's key and size are stored with the file. Tablets download and show the proxy
+  (download size estimates use the proxy size); web lists and thumbnails use the proxy, the
+  lightbox and downloads the original; the PDF report embeds the report rendition; the project
+  archive exports the original.
+- **Annotation frame.** "Normalised against the original image" means the original **after its
+  EXIF orientation is applied**, which is the frame of both derivatives, so one annotation JSON
+  fits all three. Editing on a tablet over the proxy sends only the annotation path of that
+  photo (ADR 0005 per-field mutation, path keyed by `attachment_id`), never a new
+  `attachment_id` or image; overlays and burn-in are drawn at render time on whichever tier is
+  shown (TD-408).
 - Video and audio notes, barcode/QR answer fields and reference images on questions are in
   Pilot-0 too (user, 2026-11-13, R4b): §Media, barcode fields and reference images below.
 
