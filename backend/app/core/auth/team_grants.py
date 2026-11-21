@@ -179,10 +179,12 @@ def sync_team_link_grants(
     site_node_id: uuid.UUID | None,
     user_ids: Collection[uuid.UUID],
     confirm_sod: bool = False,
+    reason: str | None = None,
 ) -> None:
     """Make the live derived rows of ``link_id`` exactly one per user in ``user_ids`` with
     this project, persona and site (see the module docstring). ``ValueError`` for a persona a
-    link may not carry or an unknown user."""
+    link may not carry or an unknown user. ``reason`` (e.g. ``"reconcile"``, T-0075) is
+    recorded in the audit entry."""
     context = _admin_context(session)
     tenant_id, actor_id = context.tenant_id, context.user_id
     chosen = _link_persona(persona, site_node_id)
@@ -238,11 +240,16 @@ def sync_team_link_grants(
     }
     if sod_users:
         extra["sod_user_ids"] = _ids(sod_users)
+    if reason is not None:
+        extra["reason"] = reason
     _audit(session, "team_link_sync", link_id, added, removed, actor_id, extra)
 
 
-def revoke_team_link_grants(session: Session, *, link_id: uuid.UUID) -> None:
-    """Soft-delete every live derived row of ``link_id`` (a no-op writes nothing)."""
+def revoke_team_link_grants(
+    session: Session, *, link_id: uuid.UUID, reason: str | None = None
+) -> None:
+    """Soft-delete every live derived row of ``link_id`` (a no-op writes nothing). ``reason``
+    is recorded in the audit entry."""
     context = _admin_context(session)
     removed: dict[uuid.UUID, set[uuid.UUID]] = defaultdict(set)
     for row in _link_rows(session, context.tenant_id, link_id):
@@ -251,7 +258,8 @@ def revoke_team_link_grants(session: Session, *, link_id: uuid.UUID) -> None:
             row.updated_by = context.user_id
             removed[row.member_project_id].add(row.user_id)
     session.flush()
-    _audit(session, "team_link_revoke", link_id, {}, removed, context.user_id)
+    extra = {"reason": reason} if reason is not None else None
+    _audit(session, "team_link_revoke", link_id, {}, removed, context.user_id, extra)
 
 
 def team_link_grants(session: Session) -> Mapping[uuid.UUID, frozenset[DerivedTuple]]:

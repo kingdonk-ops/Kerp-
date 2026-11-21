@@ -4,8 +4,10 @@ These run on SQLite and on PostgreSQL against the migrated schema. The database-
 guard (REVOKE + triggers), RLS and concurrency are in ``test_audit_ledger_pg.py``.
 """
 
+import contextlib
 import dataclasses
 import hashlib
+import threading
 import uuid
 from collections.abc import Iterator
 from datetime import UTC, datetime
@@ -167,6 +169,45 @@ def test_without_the_lock_a_race_fails_instead_of_forking(
     assert raced[0].seq == 4
     assert (report.ok, report.length) == (True, 4)
     assert payloads[-1] == {"rival": True}
+
+
+def test_two_writers_racing_on_one_chain_serialise_instead_of_colliding(
+    db: Database, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Two units of work append to one chain at once. Each waits, after reading the tail and
+    # before inserting, until the other has read its tail too. Without a lock both read the
+    # same tail and one INSERT hits the unique seq (the SQLite race behind a 500 in T-0077).
+    # With the lock the second writer cannot read before the first commits, so the barrier
+    # times out, the first commits and the second links to it.
+    _append_three(db)
+    both_read = threading.Barrier(2, timeout=2)
+    real_hash = service.compute_content_hash
+
+    def hash_once_both_have_read(entry: AuditEntry) -> str:
+        with contextlib.suppress(threading.BrokenBarrierError):
+            both_read.wait()
+        return real_hash(entry)
+
+    monkeypatch.setattr(service, "compute_content_hash", hash_once_both_have_read)
+    errors: list[BaseException] = []
+
+    def writer(n: int) -> None:
+        try:
+            with db.unit_of_work(CTX_A) as s:
+                append(s, KEY, {"writer": n})
+        except BaseException as exc:  # reported below
+            errors.append(exc)
+
+    threads = [threading.Thread(target=writer, args=(n,)) for n in (1, 2)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=30)
+    assert errors == []
+    with db.unit_of_work(CTX_A) as s:
+        report = verify_chain(s, KEY)
+        seqs = [e.seq for e in chain_entries(s, KEY)]
+    assert (report.ok, report.length, seqs) == (True, 5, [1, 2, 3, 4, 5])
 
 
 def test_duplicate_seq_in_a_chain_is_rejected_by_the_database(db: Database) -> None:

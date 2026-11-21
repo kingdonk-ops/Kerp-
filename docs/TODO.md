@@ -3,9 +3,9 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 245 · **Closed:** 130
+**Open:** 255 · **Closed:** 131
 
-## decision (10)
+## decision (11)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -19,8 +19,9 @@
 | [TD-348](../tracker/todo/TD-348.md) | T-0073: deleting a project with team-derived members answers 409 (unlink teams first); T-0013 to confirm or cascade | T-0073 | implementer |
 | [TD-373](../tracker/todo/TD-373.md) | Invite acceptance and SoD: accept proceeds (audited sod_warning) when the invitee gained a conflicting persona after the inviter confirmed | T-0052 | implementer |
 | [TD-378](../tracker/todo/TD-378.md) | First password at invite acceptance: should an internal-domain account without credentials (company member who never signed in through Entra ID) be refused? | T-0059 | implementer |
+| [TD-385](../tracker/todo/TD-385.md) | T-0075 reconcile: a live link to a deleted project expects no derived rows (rows it holds are excess, --fix revokes) | T-0075 | implementer |
 
-## spec-gap (46)
+## spec-gap (47)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -70,8 +71,9 @@
 | [TD-369](../tracker/todo/TD-369.md) | SSO start with an invite: spec §4.5 has GET /start keep the invite_token, but a token must never be in a URL query; T-0052 added a form POST | T-0052 | implementer |
 | [TD-370](../tracker/todo/TD-370.md) | Magic-link eligibility by invite: by the account's e-mail (spec §4.2) or only when the request presents that invite_token (T-0052 wording)? | T-0052 | implementer |
 | [TD-379](../tracker/todo/TD-379.md) | Invite setup-preview: shape of the 'neutral answer telling the client to sign in' for an account that already has credentials | T-0059 | implementer |
+| [TD-384](../tracker/todo/TD-384.md) | T-0075 SoD fix: 'plus their existing rows' cannot keep a sod_pending user's stale row of the link | T-0075 | implementer |
 
-## missed (7)
+## missed (8)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -82,6 +84,7 @@
 | [TD-297](../tracker/todo/TD-297.md) | Admin UI screen for deployment settings (Admin > System) is not planned in any task | T-0044 | implementer |
 | [TD-327](../tracker/todo/TD-327.md) | Frontend i18n key notifications.kind.access_requests.requested for the inbox (needed when the access-request UI lands) | T-0050 | reviewer |
 | [TD-337](../tracker/todo/TD-337.md) | Web/Android route /magic-link#<token> that redeems the e-mailed sign-in link (POST /auth/magic-link/redeem); the e-mail now links there | T-0058 | implementer |
+| [TD-388](../tracker/todo/TD-388.md) | saved_views: wire the my_teams filter op | T-0074 | reviewer |
 
 ## deferred (36)
 
@@ -124,7 +127,7 @@
 | [TD-360](../tracker/todo/TD-360.md) | First-run: one-time password link for the first System admin once T-0077 ships | T-0023 | implementer |
 | [TD-365](../tracker/todo/TD-365.md) | Frontend translations of the password policy codes and the password policy in /auth/config | T-0077 | implementer |
 
-## later (109)
+## later (116)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -237,6 +240,13 @@
 | [TD-371](../tracker/todo/TD-371.md) | Error reporting (Sentry): pass events through app.core.logging.scrub in before_send so invite_token/setup_token never leave the process | T-0052 | implementer |
 | [TD-374](../tracker/todo/TD-374.md) | Invite housekeeping: credential-less accounts of invites never accepted, and a scheduled expired mark | T-0052 | implementer |
 | [TD-380](../tracker/todo/TD-380.md) | Invite e-mail: recipient locale and local-time expiry (sent in the deployment default locale, expiry shown in UTC) | T-0059 | implementer |
+| [TD-381](../tracker/todo/TD-381.md) | saved_views: drop the deprecated oe_saved_view.team_id column (destructive, needs an ADR) | T-0074 | implementer |
+| [TD-382](../tracker/todo/TD-382.md) | frontend: team picker for sharing a saved view with several teams (team_ids) | T-0074 | implementer |
+| [TD-383](../tracker/todo/TD-383.md) | Schedule teams reconcile (report-only) as a nightly SAQ batch job and alert on drift | T-0075 | implementer |
+| [TD-387](../tracker/todo/TD-387.md) | saved_views present(): batch the team-link lookups (N+1 per view) | T-0074 | reviewer |
+| [TD-389](../tracker/todo/TD-389.md) | teams reconcile _repair: pass confirm_sod only when the drift has pending SoD items | T-0075 | reviewer |
+| [TD-390](../tracker/todo/TD-390.md) | teams reconcile CLI: distinct exit code for unexpected exceptions | T-0075 | reviewer |
+| [TD-391](../tracker/todo/TD-391.md) | audit ledger: rename _SQLITE_WRITE_LOCK and document the race-test barrier timeout | T-0077 | reviewer |
 
 ## bug (6)
 
@@ -419,3 +429,4 @@
 | ✅ | [TD-295](../tracker/todo/TD-295.md) | T-0044 says module admin but the route /api/v1/settings/deployment and the projects->settings dependency need a separate settings module | Product owner, 2026-11-16: separate settings module (projects depends_on settings) confirmed |
 | ✅ | [TD-298](../tracker/todo/TD-298.md) | Rate-limit the unauthenticated wipe-confirmed endpoint (every refusal appends an audit entry) |  |
 | ✅ | [TD-300](../tracker/todo/TD-300.md) | Field PIN idle is measured from the session's last renewal (refresh token iat), not from its last authenticated request | Product owner, 2026-11-16: idle measured from the refresh token iat (as built in T-0038); early prompt of up to one access-token lifetime accepted |
+| ✅ | [TD-386](../tracker/todo/TD-386.md) | audit ledger: concurrent appends to one chain race on SQLite (seq unique violation → 500) | on SQLite _lock_chain takes the database write lock (a no-op UPDATE on audit_ledger) before the tail read, so a second appender waits for the first to commit and links to it (fix/audit-ledger-sqlite-race) |

@@ -32,6 +32,8 @@ from app.modules.saved_views.schemas import (
     ViewConfig,
 )
 from app.modules.saved_views.service import Viewer
+from app.modules.teams import service as teams
+from app.modules.teams.schemas import TeamCreate
 from tests.audit_support import migrated_database
 from tests.auth_support import ALICE, BOB, PASSWORD, T1, T2, auth_app, make_settings, seed_user
 from tests.db_support import database_url
@@ -45,12 +47,10 @@ REGISTER = "asset_management.work_anchor"
 OWNER = uuid.UUID("00000000-0000-4000-8000-00000000a001")
 OTHER = uuid.UUID("00000000-0000-4000-8000-00000000a002")
 ADMIN = uuid.UUID("00000000-0000-4000-8000-00000000a003")
-TEAM = uuid.UUID("00000000-0000-4000-8000-00000000b001")
 SITE_NODE = "00000000-0000-4000-8000-00000000c001"
 
 ME = Viewer(user_id=OWNER, can_share=True)
 PEER = Viewer(user_id=OTHER, can_share=True)
-TEAMMATE = Viewer(user_id=OTHER, team_ids=frozenset({TEAM}), can_share=True)
 PER09 = Viewer(user_id=ADMIN, can_share=True, is_admin=True)
 
 # A synthetic front-end-planning style view: RSW rows with their Site, budget hours split by
@@ -123,6 +123,28 @@ def home(db: Database) -> TenancyContext:
 
 
 @pytest.fixture
+def team(db: Database, home: TenancyContext) -> uuid.UUID:
+    """A team linked to HOME (no members needed: viewers carry their teams)."""
+    assert home.project_id is not None
+    with db.unit_of_work(CTX_T1) as s:
+        team_id = teams.create_team(s, TeamCreate(name="Crew"), actor_id=None).id
+        teams.set_link(
+            s,
+            team_id,
+            home.project_id,
+            Persona.FIELD_WORKER,
+            None,
+            confirm_sod=False,
+            actor_id=None,
+        )
+    return team_id
+
+
+def _teammate(team: uuid.UUID) -> Viewer:
+    return Viewer(user_id=OTHER, team_ids=frozenset({team}), can_share=True)
+
+
+@pytest.fixture
 def catalogue() -> Iterator[set[str]]:
     columns = set(ViewConfig.model_validate(CONFIG).referenced_columns()) | {"name"}
     service.register_catalogue(REGISTER, lambda _session: columns)
@@ -172,7 +194,7 @@ def test_view_table_meets_the_record_contract_and_is_under_rls() -> None:
 def test_saved_views_module_is_loaded() -> None:
     manifest = discover_modules().get("saved_views")
     assert manifest.toggleable is False
-    assert manifest.depends_on == ("projects",)
+    assert manifest.depends_on == ("projects", "teams")
     assert manifest.route_prefix == "/saved-views"
 
 
@@ -398,30 +420,34 @@ def test_another_tenant_never_sees_a_view(db: Database, home: TenancyContext) ->
             _load(db, ctx, view_id, PEER)
 
 
-def test_visibility_private_team_project_portal(db: Database, home: TenancyContext) -> None:
+def test_visibility_private_team_project_portal(
+    db: Database, home: TenancyContext, team: uuid.UUID
+) -> None:
     _save(db, home, name="1 private")
-    _save(db, home, PER09, name="2 team", visibility="team", team_id=str(TEAM))
+    _save(db, home, PER09, name="2 team", visibility="team", team_ids=[str(team)])
     _save(db, home, name="3 project", visibility="project")
     _save(db, home, name="4 portal", visibility="portal")
     assert _visible(db, home, ME) == ["1 private", "3 project", "4 portal"]
     assert _visible(db, home, PEER) == ["3 project"]
-    assert _visible(db, home, TEAMMATE) == ["2 team", "3 project"]
+    assert _visible(db, home, _teammate(team)) == ["2 team", "3 project"]
     assert _visible(db, home, PER09) == ["2 team", "3 project", "4 portal"]
 
 
-def test_sharing_rules(db: Database, home: TenancyContext) -> None:
+def test_sharing_rules(db: Database, home: TenancyContext, team: uuid.UUID) -> None:
     reader = Viewer(user_id=OTHER)  # view-only member (e.g. a client representative)
     _save(db, home, reader, name="mine")
     for visibility in ("project", "portal"):
         with pytest.raises(service.ViewPermissionError, match="share"):
             _save(db, home, reader, visibility=visibility)
-    with pytest.raises(service.ViewPermissionError, match="team you belong to"):
-        _save(db, home, ME, visibility="team", team_id=str(TEAM))
-    _save(db, home, TEAMMATE, name="team", visibility="team", team_id=str(TEAM))
-    with pytest.raises(service.InvalidViewError, match="team_id"):
+    with pytest.raises(service.ViewPermissionError, match="share"):
+        _save(db, home, reader, visibility="team", team_ids=[str(team)])
+    # Sharing with a linked team needs ``C``, not membership of the team (T-0074).
+    _save(db, home, ME, name="not a member", visibility="team", team_ids=[str(team)])
+    _save(db, home, _teammate(team), name="team", visibility="team", team_ids=[str(team)])
+    with pytest.raises(service.InvalidViewError, match="team_ids"):
         _save(db, home, PER09, visibility="team")
-    with pytest.raises(service.InvalidViewError, match="team_id"):
-        _save(db, home, PER09, visibility="project", team_id=str(TEAM))
+    with pytest.raises(service.InvalidViewError, match="team_ids"):
+        _save(db, home, PER09, visibility="project", team_ids=[str(team)])
     with pytest.raises(service.InvalidViewError, match="default"):
         _save(db, home, PER09, visibility="portal", is_default=True)
 
@@ -482,19 +508,18 @@ def test_an_admin_sharing_a_personal_default_leaves_the_project_default_alone(
     assert _default(db, home, PEER) == "Project"
 
 
-@pytest.mark.parametrize(
-    ("visibility", "team"), [("project", None), ("portal", None), ("team", str(TEAM))]
-)
+@pytest.mark.parametrize("visibility", ["project", "portal", "team"])
 def test_a_member_shares_a_personal_default_as_a_plain_view(
-    db: Database, home: TenancyContext, visibility: str, team: str | None
+    db: Database, home: TenancyContext, team: uuid.UUID, visibility: str
 ) -> None:
-    mine = _save(db, home, TEAMMATE, name="Mine", is_default=True)
+    teammate = _teammate(team)
+    mine = _save(db, home, teammate, name="Mine", is_default=True)
     fields: dict[str, Any] = {"visibility": visibility}
-    if team is not None:
-        fields["team_id"] = team
-    shared = _update(db, home, mine, TEAMMATE, **fields)
+    if visibility == "team":
+        fields["team_ids"] = [str(team)]
+    shared = _update(db, home, mine, teammate, **fields)
     assert (shared.visibility, shared.is_default) == (visibility, False)
-    assert _default(db, home, TEAMMATE) is None
+    assert _default(db, home, teammate) is None
 
 
 def test_an_admin_unsharing_the_project_default_leaves_the_owners_default_alone(
