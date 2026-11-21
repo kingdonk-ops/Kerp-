@@ -1,9 +1,10 @@
-"""Tests for scripts/ci_changes.py: which PRs are tracker-only (app CI jobs skipped)."""
+"""Tests for scripts/ci_changes.py: which PRs are docs-or-tracker-only (app CI jobs skipped)."""
 from __future__ import annotations
 
 import importlib.util
 import io
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -37,7 +38,7 @@ def fixtures(tmp_path: Path) -> Path:
     return path
 
 
-def test_tracker_and_boards_only_is_tracker_only(fixtures: Path) -> None:
+def test_tracker_and_boards_only_is_docs_or_tracker_only(fixtures: Path) -> None:
     paths = [
         "tracker/tasks/T-0001.md",
         "tracker/todo/TD-123.md",
@@ -46,7 +47,7 @@ def test_tracker_and_boards_only_is_tracker_only(fixtures: Path) -> None:
         "docs/TODO.md",
         "docs/pr-suggestions.md",
     ]
-    assert ci_changes.is_tracker_only(paths, fixtures) is True
+    assert ci_changes.is_docs_or_tracker_only(paths, fixtures) is True
 
 
 @pytest.mark.parametrize(
@@ -58,50 +59,82 @@ def test_tracker_and_boards_only_is_tracker_only(fixtures: Path) -> None:
         ".github/workflows/ci.yml",
         "tests/contract/conformance_fixtures.json",
         "CLAUDE.md",
-        "docs/WORKFLOW.md",
+        "README.md",
+        "e2e/tests/a.spec.ts",
     ],
 )
 def test_mixed_change_is_not_tracker_only(fixtures: Path, other: str) -> None:
-    assert ci_changes.is_tracker_only(["tracker/tasks/T-0001.md", other], fixtures) is False
+    assert ci_changes.is_docs_or_tracker_only(["tracker/tasks/T-0001.md", other], fixtures) is False
 
 
-def test_docs_spec_change_is_not_tracker_only(fixtures: Path) -> None:
-    assert ci_changes.is_tracker_only(["docs/spec/README.md"], fixtures) is False
-    assert ci_changes.is_tracker_only(["docs/TASKS.md", "docs/spec/x.md"], fixtures) is False
+def test_planner_docs_and_agent_changes_skip_app_jobs(fixtures: Path) -> None:
+    """T-0081: planner PRs (spec, plan, decisions, workflow docs) and agent definitions."""
+    paths = [
+        "docs/spec/README.md",
+        "docs/DEVELOPMENT-PLAN.md",
+        "docs/decisions/0099-synthetic.md",
+        "docs/WORKFLOW.md",
+        "docs/TASKS.md",
+        ".claude/agents/kerp-planner.md",
+        "tracker/tasks/T-0001.md",
+    ]
+    assert ci_changes.is_docs_or_tracker_only(paths, fixtures) is True
+    for path in paths:
+        assert ci_changes.is_docs_or_tracker_only([path], fixtures) is True, path
 
 
-def test_lookalike_paths_are_not_tracker_only(fixtures: Path) -> None:
-    for path in ("trackerx/a.md", "docs/tracker/a.md", "docs/TASKS.md.bak", "x/docs/TODO.md"):
-        assert ci_changes.is_tracker_only([path], fixtures) is False, path
+def test_no_app_test_reads_the_skippable_trees() -> None:
+    """The skip is only safe while backend/frontend/e2e code never opens docs/ or .claude/."""
+    # A string literal that starts a relative path into the trees: "docs", "docs/…",
+    # "../docs/…", ".claude…". URL routes such as "/docs" (FastAPI's Swagger UI) do not match.
+    pattern = re.compile(r"""["'](\.\./)*(docs|\.claude)(["'/])""")
+    roots = [ROOT / "backend", ROOT / "frontend" / "src", ROOT / "e2e", ROOT / "tests"]
+    offenders = []
+    for root in roots:
+        if not root.exists():
+            continue
+        for path in root.rglob("*"):
+            if path.suffix not in {".py", ".ts", ".tsx", ".js", ".mjs", ".json"}:
+                continue
+            if "node_modules" in path.parts or "__pycache__" in path.parts:
+                continue
+            if pattern.search(path.read_text(encoding="utf-8", errors="ignore")):
+                offenders.append(str(path.relative_to(ROOT)))
+    assert offenders == []
+
+
+def test_lookalike_paths_are_not_skippable(fixtures: Path) -> None:
+    for path in ("trackerx/a.md", "docsx/a.md", ".claudex/a.md", "x/docs/TODO.md", "x/tracker/a.md"):
+        assert ci_changes.is_docs_or_tracker_only([path], fixtures) is False, path
 
 
 def test_conformance_cited_todo_is_not_tracker_only(fixtures: Path) -> None:
-    assert ci_changes.is_tracker_only(["tracker/todo/TD-900.md"], fixtures) is False
-    assert ci_changes.is_tracker_only(["docs/TODO.md", "tracker/todo/TD-900.md"], fixtures) is False
+    assert ci_changes.is_docs_or_tracker_only(["tracker/todo/TD-900.md"], fixtures) is False
+    assert ci_changes.is_docs_or_tracker_only(["docs/TODO.md", "tracker/todo/TD-900.md"], fixtures) is False
     # An uncited TODO is still fine.
-    assert ci_changes.is_tracker_only(["tracker/todo/TD-901.md"], fixtures) is True
+    assert ci_changes.is_docs_or_tracker_only(["tracker/todo/TD-901.md"], fixtures) is True
 
 
 def test_real_fixture_citations_are_found() -> None:
     cited = ci_changes.cited_todos(ci_changes.FIXTURES)
     assert cited  # the real file cites at least one TODO (TD-041 today)
     for todo in cited:
-        assert ci_changes.is_tracker_only([f"tracker/todo/{todo}.md"]) is False
+        assert ci_changes.is_docs_or_tracker_only([f"tracker/todo/{todo}.md"]) is False
 
 
 def test_missing_or_broken_fixtures_fail_safe(tmp_path: Path) -> None:
     missing = tmp_path / "absent.json"
     with pytest.raises(OSError):
-        ci_changes.is_tracker_only(["tracker/todo/TD-001.md"], missing)
+        ci_changes.is_docs_or_tracker_only(["tracker/todo/TD-001.md"], missing)
     broken = tmp_path / "broken.json"
     broken.write_text("{", encoding="utf-8")
     with pytest.raises(ValueError):
-        ci_changes.is_tracker_only(["tracker/todo/TD-001.md"], broken)
+        ci_changes.is_docs_or_tracker_only(["tracker/todo/TD-001.md"], broken)
 
 
 def test_empty_change_list_is_not_tracker_only(fixtures: Path) -> None:
-    assert ci_changes.is_tracker_only([], fixtures) is False
-    assert ci_changes.is_tracker_only(["", "  "], fixtures) is False
+    assert ci_changes.is_docs_or_tracker_only([], fixtures) is False
+    assert ci_changes.is_docs_or_tracker_only(["", "  "], fixtures) is False
 
 
 def test_cli_args_and_stdin(
@@ -109,15 +142,15 @@ def test_cli_args_and_stdin(
 ) -> None:
     monkeypatch.setattr(ci_changes, "FIXTURES", fixtures)
     assert ci_changes.main(["tracker/tasks/T-0001.md", "docs/TODO.md"]) == 0
-    assert capsys.readouterr().out == "tracker_only=true\n"
+    assert capsys.readouterr().out == "docs_or_tracker_only=true\n"
     assert ci_changes.main(["backend/app/main.py"]) == 0
-    assert capsys.readouterr().out == "tracker_only=false\n"
+    assert capsys.readouterr().out == "docs_or_tracker_only=false\n"
     monkeypatch.setattr(sys, "stdin", io.StringIO("tracker/tasks/T-0001.md\ndocs/TASKS.md\n"))
     assert ci_changes.main([]) == 0
-    assert capsys.readouterr().out == "tracker_only=true\n"
+    assert capsys.readouterr().out == "docs_or_tracker_only=true\n"
     monkeypatch.setattr(sys, "stdin", io.StringIO(""))
     assert ci_changes.main([]) == 0
-    assert capsys.readouterr().out == "tracker_only=false\n"
+    assert capsys.readouterr().out == "docs_or_tracker_only=false\n"
 
 
 def test_detect_job_uses_the_script_on_pull_requests_only() -> None:

@@ -1,7 +1,9 @@
 """Shared database test helpers: the target URL and an isolated test model.
 
 The suite runs on a throwaway SQLite file by default. CI's PostgreSQL step sets
-``KERP_DATABASE_URL`` and the same tests run against PostgreSQL 16.
+``KERP_DATABASE_URL`` and the same tests run against PostgreSQL 16, each test on its own copy
+of a template database when ``KERP_TEST_OWNER_URL`` is set too (``tests/pg_databases.py``,
+T-0082).
 """
 
 import os
@@ -20,8 +22,22 @@ ON_POSTGRES = POSTGRES_URL.startswith("postgresql")
 
 def database_url(tmp_path: Path) -> str:
     if ON_POSTGRES:
-        return POSTGRES_URL
+        return postgres_url()
     return "sqlite:///" + (tmp_path / "kerp.db").as_posix()
+
+
+def postgres_url() -> str:
+    """The running test's PostgreSQL database as the runtime role.
+
+    With an owner URL: the test's own copy of the empty template (created on first use,
+    dropped after the test). Without one: the shared database of ``KERP_DATABASE_URL``.
+    """
+    from tests import pg_databases
+    from tests.audit_support import migrate_and_seed
+
+    if pg_databases.PER_TEST:
+        return pg_databases.test_database_url(migrate_and_seed)
+    return POSTGRES_URL
 
 
 class ScratchBase(DeclarativeBase):

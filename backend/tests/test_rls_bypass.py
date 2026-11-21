@@ -51,7 +51,7 @@ from app.modules.jobs.models import Job
 from app.modules.jobs.registry import JobContext, JobKind, JobRegistry
 from app.modules.jobs.worker import build_workers
 from tests.audit_support import migrated_database
-from tests.db_support import ON_POSTGRES, POSTGRES_URL, Gadget, Widget
+from tests.db_support import ON_POSTGRES, Gadget, Widget, postgres_url
 from tests.tenancy_support import (
     CTX_A,
     CTX_B,
@@ -248,7 +248,7 @@ def test_job_context_survives_commits(db: Database) -> None:
 
 @pytest.mark.parametrize("reset", [True, False], ids=["with-reset", "without-reset"])
 def test_pooled_connection_never_carries_a_context(db: Database, reset: bool) -> None:
-    engine = create_engine(POSTGRES_URL, poolclass=QueuePool, pool_size=1, max_overflow=0)
+    engine = create_engine(postgres_url(), poolclass=QueuePool, pool_size=1, max_overflow=0)
     if reset:
         install_pool_reset(engine)
     try:
@@ -407,9 +407,9 @@ def test_superuser_role_is_reported() -> None:
 
 def test_migrated_schema_has_rls_on_every_model_table() -> None:
     cfg = Config(str(ALEMBIC_INI))
-    cfg.attributes.update(url=POSTGRES_URL, configure_logger=False)
+    cfg.attributes.update(url=postgres_url(), configure_logger=False)
     command.upgrade(cfg, "head")
-    engine = create_engine(POSTGRES_URL)
+    engine = create_engine(postgres_url())
     try:
         import_all_models()
         with engine.connect() as conn:
@@ -428,7 +428,7 @@ def test_a_migration_that_forgets_rls_is_caught() -> None:
         Column("tenant_id", GUID(), nullable=False),
         Column("project_id", GUID()),
     )
-    engine = create_engine(POSTGRES_URL)
+    engine = create_engine(postgres_url())
     try:
         with engine.begin() as conn:
             md.create_all(conn)

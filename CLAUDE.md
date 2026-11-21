@@ -40,7 +40,7 @@ Run what exists (CI auto-detects `backend/`, `frontend/`, `e2e/`):
 
 ```bash
 python scripts/tracker.py validate && python scripts/tracker.py render --check && python -m pytest -q scripts/tests
-cd backend  && ruff check . && mypy app && pytest                 # full suite, not only new tests
+cd backend  && ruff check . && mypy app && pytest -n auto         # full suite (parallel), not only new tests
 cd frontend && npm run lint && npm run typecheck && npm run test && npm run build # + npm run gen:api if the API changed (commit it)
 cd e2e      && npx playwright test                                # affected suites for user-facing changes
 ```
