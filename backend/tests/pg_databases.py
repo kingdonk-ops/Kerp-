@@ -8,7 +8,8 @@ and back down again (~1 s per test, strictly serial). Now:
   ``infra/postgres/initdb/20-kerp-app.sql`` leaves it) is only ever used as a template;
 * each test process (each xdist worker) builds two templates once: ``kerp_tmpl_empty_<worker>``
   (a copy of the source) and ``kerp_tmpl_head_<worker>`` (migrated to head **as the runtime
-  role**, fixture tenants seeded);
+  role**, or as the schema owner of ``KERP_TEST_MIGRATION_URL`` when set (T-0343, CI's
+  ``backend-pg-roles``); fixture tenants seeded as the runtime role);
 * each test that touches the database gets its own ``CREATE DATABASE … TEMPLATE …`` copy
   (empty by default, migrated for ``migrated_database``), dropped at teardown.
 
@@ -33,6 +34,9 @@ from sqlalchemy.pool import NullPool
 
 RUNTIME_URL = os.environ.get("KERP_DATABASE_URL", "")
 OWNER_URL = os.environ.get("KERP_TEST_OWNER_URL", "")
+# T-0343 (ADR 0019): the schema owner the fixtures migrate as, when it is not the runtime role
+# (CI's ``backend-pg-roles``). Unset: the runtime role migrates and owns the tables (TD-056).
+MIGRATION_URL = os.environ.get("KERP_TEST_MIGRATION_URL", "")
 PER_TEST = RUNTIME_URL.startswith("postgresql") and OWNER_URL.startswith("postgresql")
 
 # "gw0", "gw1", … under pytest-xdist; "main" in a plain run.
@@ -57,6 +61,16 @@ def runtime_url(name: str) -> str:
 def owner_url(name: str) -> str:
     """URL of database ``name`` as the owner role (tamper helpers, role checks)."""
     return _with_database(OWNER_URL, name)
+
+
+def migration_url(url: str) -> str:
+    """Where the fixtures run Alembic for the database of ``url``: as the schema owner of
+    ``KERP_TEST_MIGRATION_URL`` when set (T-0343), else as ``url`` itself."""
+    if not MIGRATION_URL.startswith("postgresql"):
+        return url
+    name = make_url(url).database
+    assert name, url
+    return _with_database(MIGRATION_URL, name)
 
 
 def _admin() -> Engine:

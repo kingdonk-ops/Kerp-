@@ -43,7 +43,7 @@ def test_upgrade_head_then_check_is_clean(url: str) -> None:
         engine = create_engine(url)
         try:
             with engine.connect() as conn:
-                assert MigrationContext.configure(conn).get_current_revision() == "0038"
+                assert MigrationContext.configure(conn).get_current_revision() == "0039"
         finally:
             engine.dispose()
     finally:
@@ -113,6 +113,41 @@ def test_offline_sql_commits_each_revision_apart() -> None:
         "-- Running upgrade 0026 -> 0027",
         "COMMIT;",
     ]
+
+
+def test_offline_runtime_role_grants_carry_the_role_and_the_ledger_rule(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """``0039`` (T-0343, ADR 0019): the role checks run when the script is applied; the
+    runtime role never gets more than ``SELECT, INSERT`` on ``audit_ledger``."""
+    monkeypatch.setenv("KERP_RUNTIME_DB_ROLE", "kerp_runtime_x")
+    get_settings.cache_clear()
+    cfg = _config("postgresql+psycopg://offline@localhost/offline")
+    cfg.output_buffer = io.StringIO()
+    command.upgrade(cfg, "0038:0039", sql=True)
+    out = cfg.output_buffer.getvalue()
+    assert "rolname = 'kerp_runtime_x'" in out
+    assert "'kerp_runtime_x' = current_user" in out
+    assert out.count("ALTER DEFAULT PRIVILEGES") == 3
+    assert "WHEN r.relname = 'audit_ledger' THEN ARRAY['SELECT', 'INSERT']" in out
+    assert "TRUNCATE" not in out
+    cfg.output_buffer = io.StringIO()
+    command.downgrade(cfg, "0039:0038", sql=True)
+    down = cfg.output_buffer.getvalue()
+    assert down.count("ALTER DEFAULT PRIVILEGES") == 3
+    assert "REVOKE EXECUTE ON FUNCTIONS FROM" in down
+    assert "GRANT " not in down
+
+
+def test_offline_runtime_role_grants_skip_an_empty_role(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("KERP_RUNTIME_DB_ROLE", "")
+    get_settings.cache_clear()
+    cfg = _config("postgresql+psycopg://offline@localhost/offline")
+    cfg.output_buffer = io.StringIO()
+    command.upgrade(cfg, "0038:0039", sql=True)
+    out = cfg.output_buffer.getvalue()
+    assert "-- Running upgrade 0038 -> 0039" in out
+    assert "GRANT" not in out
 
 
 def test_unknown_revision_is_an_error(url: str) -> None:

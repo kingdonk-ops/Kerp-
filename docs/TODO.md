@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 369 · **Closed:** 150
+**Open:** 369 · **Closed:** 153
 
 ## decision (40)
 
@@ -50,7 +50,7 @@
 | [TD-486](../tracker/todo/TD-486.md) | RFI witness check: may an unmet hold-point (H) witness requirement be overridden per record (ADR 0004 Amendment A), or is it non-overridable? | T-0333 | planner |
 | [TD-514](../tracker/todo/TD-514.md) | How is a passed or LOCKED_FOR_TURNOVER inspection corrected? Define void-and-reissue (revision suffix, supersedes link, ledger, MDR shows latest) | — | planner |
 
-## spec-gap (71)
+## spec-gap (72)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -125,6 +125,7 @@
 | [TD-503](../tracker/todo/TD-503.md) | T-0027 rule-set step: AC names a CEL variable and an API path that do not exist (context.qty, /api/v1/projects/{id}/rule-sets) | T-0027 | implementer |
 | [TD-505](../tracker/todo/TD-505.md) | Runtime settings registry: categories, the unit and ceiling of max_upload_size_mb, and client-visible flags are implementer readings | T-0230 | implementer |
 | [TD-515](../tracker/todo/TD-515.md) | Field registry has no multi-point measurement field: add measurement_set (list of values + unit) with CEL list statistics (mean/min/max/count) | — | planner |
+| [TD-536](../tracker/todo/TD-536.md) | T-0342: production KERP_REDIS_URL is a startup refusal of the API and worker, not a Settings validation error (Settings also serves alembic and the first-run CLI) | T-0342 | implementer |
 
 ## missed (8)
 
@@ -194,7 +195,7 @@
 | [TD-508](../tracker/todo/TD-508.md) | Verify the e2e suite on the make up compose stack, and give it its own database | T-0027 | implementer |
 | [TD-510](../tracker/todo/TD-510.md) | Deployment-config view lacks the mail reply-to of diff §4.7: Settings has no reply-to field yet | T-0230 | implementer |
 
-## later (148)
+## later (146)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -207,15 +208,12 @@
 | [TD-048](../tracker/todo/TD-048.md) | SHA-pin actions in promote.yml and review-gate.yml (persist-credentials:false where no push is needed) and digest-pin the CI service images (postgis, redis) | T-0028, T-0032 | implementer |
 | [TD-051](../tracker/todo/TD-051.md) | CI: backend-publish rebuilds the image instead of pushing the smoke-tested one; export/push the tested image by digest | T-0028, T-0032 | reviewer |
 | [TD-055](../tracker/todo/TD-055.md) | Data migrations under FORCE RLS see no rows: add a per-tenant/project backfill helper or a dedicated BYPASSRLS migration role (ADR) | T-0007 | implementer |
-| [TD-056](../tracker/todo/TD-056.md) | Deploy: runtime DB role must never own RLS tables (owner can disable FORCE); migrations run as a separate owner role | T-0007 | reviewer |
 | [TD-058](../tracker/todo/TD-058.md) | Audit ledger: anchor chain heads outside the database (tail truncation / re-hashed forgery by the table owner or a DB superuser is undetectable by in-DB verification) | T-0006 | implementer |
-| [TD-059](../tracker/todo/TD-059.md) | Deploy: runtime role must not own audit_ledger and gets only SELECT, INSERT; assert ledger_guard_problems at startup | T-0006 | implementer |
 | [TD-060](../tracker/todo/TD-060.md) | Migrations: freeze DDL helpers (rls_policy_sql, ledger_guard_sql) in each revision instead of importing live app code | T-0006, T-0033 | implementer |
 | [TD-068](../tracker/todo/TD-068.md) | Importer for legacy inspection-system exports (template, usecase, itemcat, issuetype) | T-0113 | planner |
 | [TD-110](../tracker/todo/TD-110.md) | Recurring inspection due dates, earned quantity from partial inspections, create Items from an inspection (weld location) | E-06b-01, E-04-03, T-0103 | planner |
 | [TD-115](../tracker/todo/TD-115.md) | P6 supply formats deferred by TD-077: Excel schedule exports via import mapping profiles, and a direct P6 API connector | T-0105 | planner |
 | [TD-123](../tracker/todo/TD-123.md) | Password login has no throttling yet; extend T-0009's Redis lockout to /api/v1/auth/login | T-0008 | implementer |
-| [TD-124](../tracker/todo/TD-124.md) | Fail fast at startup when production auth config (JWT key, KERP_REDIS_URL) is missing | T-0008 | implementer |
 | [TD-126](../tracker/todo/TD-126.md) | CI drift check: fail when frontend/src/api/ (openapi.json, schema.ts) is stale against the backend OpenAPI schema | T-0011, T-0083 | implementer |
 | [TD-127](../tracker/todo/TD-127.md) | Frontend: project module settings screen (toggle via /api/v1/projects/{project_id}/modules) and hide disabled modules in the navigation | T-0011 | implementer |
 | [TD-128](../tracker/todo/TD-128.md) | Concurrent first toggle of the same module in one project races on uq_project_module_setting_module and returns 500; retry or upsert | T-0011 | implementer |
@@ -346,8 +344,9 @@
 | [TD-529](../tracker/todo/TD-529.md) | Two list endpoints have no paging (unbounded list responses) | T-0348 | planner |
 | [TD-530](../tracker/todo/TD-530.md) | Database pool size and overflow cannot be configured (create_engine accepts pool_size/max_overflow but settings do not expose them) | T-0348 | planner |
 | [TD-531](../tracker/todo/TD-531.md) | Job rows (jobs table) are never deleted: add a retention purge for finished jobs | T-0346 | planner |
+| [TD-535](../tracker/todo/TD-535.md) | Startup role check: also refuse a runtime role that owns any app table (owner can drop FORCE or re-grant), once every deployment runs the owner/runtime split | T-0342 | implementer |
 
-## bug (18)
+## bug (19)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -369,6 +368,7 @@
 | [TD-525](../tracker/todo/TD-525.md) | Some Redis errors surface as 500 instead of 503 (raw redis ConnectionError/TimeoutError outside RevocationUnavailableError) | T-0349 | planner |
 | [TD-527](../tracker/todo/TD-527.md) | Published upload files can be orphaned (object kept with no live owner row, or row pointing at a deleted object) | T-0346 | planner |
 | [TD-528](../tracker/todo/TD-528.md) | Two concurrent adds of the same user to a team return 500 (unique violation) instead of the already-a-member answer | — | planner |
+| [TD-534](../tracker/todo/TD-534.md) | API shutdown raises when Redis is unreachable: SaqBroker.close() (SAQ RedisQueue.disconnect) connects to close its pub/sub | T-0342 | implementer |
 
 ## risk (34)
 
@@ -450,7 +450,9 @@
 | ✅ | [TD-052](../tracker/todo/TD-052.md) | PostgreSQL-only RLS tests skip in the SQLite run and on machines without Postgres: add a local Postgres (compose/testcontainers) recipe | T-0003: docker-compose PG16 (CI's postgis image) + shared infra/postgres/initdb/20-kerp-app.sql (kerp_app NOSUPERUSER NOBYPASSRLS, also run by CI) + make test-pg (fails on any skip); documented in backend/README.md. End-to-end local run tracked by TD-132. |
 | ✅ | [TD-053](../tracker/todo/TD-053.md) | Tenant-wide (cross-project) reads under project RLS: portfolio views, admin, and the visibility of tenant-level rows such as the project row | Explicit multi-project scope (session binds a list of allowed project ids) plus a stricter membership-based policy on the projects table and other tenant-level tables.  Implement in T-0010/T-0014. (user, 2026-11-10); follow-up edits in TD-112 |
 | ✅ | [TD-054](../tracker/todo/TD-054.md) | Edge spec §6 policy targets 'TO kerp_app_role'; T-0007 applies it to PUBLIC | Confirm policy without a TO clause (PUBLIC); amend edge spec section 6. (user, 2026-11-10); follow-up edits in TD-112 |
+| ✅ | [TD-056](../tracker/todo/TD-056.md) | Deploy: runtime DB role must never own RLS tables (owner can disable FORCE); migrations run as a separate owner role | T-0342 + T-0343 (2026-11-21): ADR 0019 splits the roles. Migration 0039 grants the runtime role (KERP_RUNTIME_DB_ROLE, default kerp_app) SELECT/INSERT/UPDATE/DELETE on every table, USAGE/SELECT on sequences, EXECUTE on functions and default privileges for later objects, so it owns nothing; production API and worker refuse to start when rls_enforcement_problems or rls_coverage_problems report anything (T-0342). CI job backend-pg-roles migrates as kerp_owner and runs the full PostgreSQL suite as kerp_app; the backend-pg shards keep the old layout. docs/deploy/first-run.md documents both roles. Follow-up: refusing a runtime role that owns tables is TD-535. |
 | ✅ | [TD-057](../tracker/todo/TD-057.md) | Audit ledger: diff §4 names the columns only; chain_key scope, hash algorithm, canonical serialisation and verification are implementer defaults | Accept the T-0006 implementer design (backend/app/core/audit/README.md) into the spec. (user, 2026-11-10); follow-up edits in TD-112 |
+| ✅ | [TD-059](../tracker/todo/TD-059.md) | Deploy: runtime role must not own audit_ledger and gets only SELECT, INSERT; assert ledger_guard_problems at startup | T-0342 + T-0343 (2026-11-21): migration 0039 grants the runtime role SELECT, INSERT only on audit_ledger (never UPDATE, DELETE, TRUNCATE; it owns nothing, ADR 0019), tested as permission denied in tests/test_runtime_role_grants_pg.py and asserted in CI's backend-pg-roles; production API and worker refuse to start when ledger_guard_problems reports anything (T-0342). |
 | ✅ | [TD-061](../tracker/todo/TD-061.md) | Legacy inspection-system 'items' vs KERP anchors: where do personnel/material/equipment registers live? | Hybrid: dedicated modules for personnel (competency), materials and test equipment (QMS calibration); a generic register on item types for the rest (WPS etc.). (user, 2026-11-10); follow-up edits in TD-112 |
 | ✅ | [TD-066](../tracker/todo/TD-066.md) | Issue types (defect / observation) as versioned configuration with their own fields and close-out form | Specified in docs/spec/modules/issues.md §2 (user decisions 2026-11-21 + planner defaults): issue templates are one-engine templates of kind issue with frozen revisions (type punch\|ncr, category, flag defaults, step per section); close-out form = rectify/verify (punch) or NCR step sections; prefix = per-type numbering pattern; required photo count = template field rules; auto-raise on a field option = create_issue post-submit action with trigger_cel (T-0316). Tasks T-0311, T-0316. |
 | ✅ | [TD-070](../tracker/todo/TD-070.md) | Segregation of duties: may an inspector approve or delete their own inspection? | Configurable per project; default forbids self-approval; soft-delete only. (user, 2026-11-10); follow-up edits in TD-112 |
@@ -479,6 +481,7 @@
 | ✅ | [TD-119](../tracker/todo/TD-119.md) | CLAUDE.md section 6 anchor bullet still says 'work anchors to an RSW': apply the ADR 0003 amended wording (human edit; agents may not change CLAUDE.md) | CLAUDE.md section 6 anchor bullet updated to the ADR 0003 wording with 'at most one per root-to-leaf path' (TD-113) (user, 2026-11-10) |
 | ✅ | [TD-120](../tracker/todo/TD-120.md) | Login tenant resolution: how a user picks the tenant at sign-in (multi-tenant accounts, MOD-01 cross-tenant collaboration) | 3a: tenant_id + RLS kept but hidden (one tenant per deployment); System admins appoint Project Admins (create_projects grant) who create projects and get PER-09 on them; PER-09 assigns users to its projects; admin roles never confer hold release or sign-off; one URL, top-bar project picker (one project -> in, several -> last used), lobby of visible-in-lobby projects with access requests decided by the project's admins, other projects by invite or project code. Spec diff §4.1, edge §5/§6, master §1.1/MOD-01; tasks T-0014, T-0023, T-0026, T-0037, T-0039..T-0042 (user, 2026-11-13) |
 | ✅ | [TD-121](../tracker/todo/TD-121.md) | Refresh-token lifetime, absolute session lifetime and SPA refresh-token transport are unspecified | 4c: access 15 min, refresh 12 h from sign-in (rotation never extends it, KERP_REFRESH_TOKEN_HOURS=12), daily re-login; offline local PIN unlock does not depend on a valid refresh token, so the 7-14 day offline window still works. Spec diff §4.2; task T-0037. SPA cookie transport decided in TD-203 (user, 2026-11-13) |
+| ✅ | [TD-124](../tracker/todo/TD-124.md) | Fail fast at startup when production auth config (JWT key, KERP_REDIS_URL) is missing | T-0342 (2026-11-21): the API lifespan builds the auth runtime at startup in production (app_auth_runtime), so a missing or invalid KERP_JWT_PRIVATE_KEY(_FILE) refuses the start, and app.core.startup_safety.require_redis refuses production without KERP_REDIS_URL (the worker already required it). The backend-image smoke test checks both refusals. /health stays a liveness check. |
 | ✅ | [TD-129](../tracker/todo/TD-129.md) | Guard the module toggle API (PUT /api/v1/modules/{name}) with the admin capability tier once RBAC lands (T-0010/T-0014) | T-0084: toggle API moved to /api/v1/projects/{project_id}/modules; PUT requires the project admin capability, GET view. |
 | ✅ | [TD-135](../tracker/todo/TD-135.md) | Field-worker PIN semantics: confirm server-checked PIN per session that gates every refresh, and the lockout/magic-link numbers | 8a: hybrid PIN per enrolled device: local unlock against a keystore key (offline, no token needed); server asks for the PIN only on renewal after idle (KERP_PIN_IDLE_MINUTES, default 30); lockout numbers and server-side per-device counter kept. Spec diff §4.2; rework in T-0038 (server) and T-0143 (client) (user, 2026-11-13) |
 | ✅ | [TD-136](../tracker/todo/TD-136.md) | Restrict magic-link sign-in to the Field Worker persona (PER-14) once T-0010 personas exist | Product owner, 2026-11-14: KERP sign-in magic links are limited to Field Workers (PER-14 on at least one project, or a pending invite naming PER-14); anyone else gets the same neutral 202 and no link. Spec diff §4.2 (Magic links for Field Workers only); task T-0057, invite carry-through in T-0052; PER-15 / phase-7 portal question in TD-261 |

@@ -254,3 +254,33 @@ def test_image_smoke_test_checks_startup_fails_without_the_tenant() -> None:
     script = _smoke_script()
     assert re.search(r"docker run --rm --name kerp-no-tenant kerp-backend:ci", script)
     assert "KERP_DEFAULT_TENANT_ID must be set" in script
+
+
+def test_image_smoke_test_starts_production_with_redis_and_a_key(
+    ci_backend: dict[str, Any],
+) -> None:
+    """T-0342: production refuses to start without Redis or a JWT signing key."""
+    script = _smoke_script()
+    started = re.search(r"docker run -d --name kerp-smoke (.*?) kerp-backend:ci", script)
+    assert started
+    assert '"${runtime[@]}"' in started.group(1)
+    runtime = re.search(r"runtime=\((.*?)\)", script)
+    assert runtime
+    assert "-e KERP_REDIS_URL=redis://kerp-smoke-redis:6379/0" in runtime.group(1)
+    assert '-e KERP_JWT_PRIVATE_KEY="$jwt_key"' in runtime.group(1)
+    assert 'jwt_key="$(openssl genpkey -algorithm ed25519)"' in script  # per run, never stored
+    # The smoke Redis is the CI service image, digest and all.
+    ci_redis = str(ci_backend["services"]["redis"]["image"]).split(" ")[0]
+    assert f"--network kerp-smoke-net {ci_redis}" in script
+
+
+def test_image_smoke_test_checks_startup_fails_without_redis_or_a_key() -> None:
+    script = _smoke_script()
+    no_redis = re.search(r"docker run --rm --name kerp-no-redis (.*?) kerp-backend:ci", script)
+    assert no_redis
+    assert "KERP_REDIS_URL" not in no_redis.group(1)
+    assert "KERP_REDIS_URL must be set in production" in script
+    no_key = re.search(r"docker run --rm --name kerp-no-key (.*?) kerp-backend:ci", script)
+    assert no_key
+    assert "KERP_JWT_PRIVATE_KEY" not in no_key.group(1)
+    assert "KERP_JWT_PRIVATE_KEY or KERP_JWT_PRIVATE_KEY_FILE must be set" in script

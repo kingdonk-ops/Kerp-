@@ -133,3 +133,29 @@ def test_debug_is_allowed_outside_production(environment: str) -> None:
 
 def test_production_without_debug_is_fine() -> None:
     assert Settings(environment="production", debug=False).debug is False
+
+
+# --- the runtime database role (T-0343, ADR 0019) -------------------------------------------
+
+
+def test_runtime_db_role_defaults_to_kerp_app(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("KERP_RUNTIME_DB_ROLE", raising=False)
+    assert Settings(environment="test").runtime_db_role == "kerp_app"
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"), [("", None), ("  ", None), (" kerp_rt_2 ", "kerp_rt_2")]
+)
+def test_runtime_db_role_from_env(
+    monkeypatch: pytest.MonkeyPatch, raw: str, expected: str | None
+) -> None:
+    monkeypatch.setenv("KERP_RUNTIME_DB_ROLE", raw)
+    assert Settings(environment="test").runtime_db_role == expected
+
+
+@pytest.mark.parametrize(
+    "bad", ["Kerp_App", "kerp-app", "kerp app", "kerp_app; DROP TABLE x", "9kerp", "k" * 64]
+)
+def test_runtime_db_role_must_be_a_plain_role_name(bad: str) -> None:
+    with pytest.raises(ValidationError, match="KERP_RUNTIME_DB_ROLE"):
+        Settings(environment="test", runtime_db_role=bad)

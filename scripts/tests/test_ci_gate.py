@@ -23,7 +23,8 @@ def needs(flags: str = "true", **results: str) -> dict:
     out = {"backend": flags, "frontend": flags, "e2e": flags}
     jobs = {"detect": {"result": "success", "outputs": out}}
     for job in (
-        "tracker", "backend", "backend-pg", "backend-pg-coverage", "backend-image", "backend-publish",
+        "tracker", "backend", "backend-pg", "backend-pg-coverage", "backend-pg-roles", "backend-image",
+        "backend-publish",
         "frontend", "perf", "e2e",
     ):
         jobs[job] = {"result": "success", "outputs": {}}
@@ -45,7 +46,8 @@ def test_components_absent_may_skip() -> None:
     skipped = {
         j: "skipped"
         for j in (
-            "backend", "backend_pg", "backend_pg_coverage", "backend_image", "backend_publish",
+            "backend", "backend_pg", "backend_pg_coverage", "backend_pg_roles", "backend_image",
+            "backend_publish",
             "frontend", "perf", "e2e",
         )
     }
@@ -54,7 +56,10 @@ def test_components_absent_may_skip() -> None:
 
 @pytest.mark.parametrize(
     "job",
-    ["backend", "backend_pg", "backend_pg_coverage", "backend_image", "backend_publish", "frontend", "perf", "e2e"],
+    [
+        "backend", "backend_pg", "backend_pg_coverage", "backend_pg_roles", "backend_image", "backend_publish",
+        "frontend", "perf", "e2e",
+    ],
 )
 def test_component_present_but_skipped_fails(job: str) -> None:
     assert ci_gate.evaluate(needs(**{job: "skipped"}), "push") != []
@@ -62,7 +67,10 @@ def test_component_present_but_skipped_fails(job: str) -> None:
 
 @pytest.mark.parametrize(
     "job",
-    ["detect", "tracker", "backend", "backend_pg", "backend_pg_coverage", "backend_image", "frontend", "perf", "e2e"],
+    [
+        "detect", "tracker", "backend", "backend_pg", "backend_pg_coverage", "backend_pg_roles", "backend_image",
+        "frontend", "perf", "e2e",
+    ],
 )
 @pytest.mark.parametrize("result", ["failure", "cancelled", "skipped"])
 def test_any_non_success_fails(job: str, result: str) -> None:
@@ -72,7 +80,10 @@ def test_any_non_success_fails(job: str, result: str) -> None:
 def test_detect_failure_without_outputs_fails() -> None:
     jobs = needs("false")
     jobs["detect"] = {"result": "failure", "outputs": {}}
-    for job in ("backend", "backend-pg", "backend-pg-coverage", "backend-image", "backend-publish", "frontend", "perf", "e2e"):
+    for job in (
+        "backend", "backend-pg", "backend-pg-coverage", "backend-pg-roles", "backend-image", "backend-publish",
+        "frontend", "perf", "e2e",
+    ):
         jobs[job]["result"] = "skipped"
     assert ci_gate.evaluate(jobs, "push") != []
 
@@ -91,6 +102,7 @@ def test_detect_not_green_makes_every_skip_a_problem() -> None:
         "backend: skipped (expected success)",
         "backend-pg: skipped (expected success)",
         "backend-pg-coverage: skipped (expected success)",
+        "backend-pg-roles: skipped (expected success)",
         "backend-image: skipped (expected success)",
         "backend-publish: skipped (expected success)",
         "frontend: skipped (expected success)",
@@ -211,7 +223,7 @@ def test_pull_request_with_backend_not_needed_passes() -> None:
     frontend jobs still run and must be green."""
     jobs = needs()
     jobs["detect"]["outputs"]["backend"] = "false"
-    for job in ("backend", "backend-pg", "backend-pg-coverage", "backend-image", "backend-publish"):
+    for job in ("backend", "backend-pg", "backend-pg-coverage", "backend-pg-roles", "backend-image", "backend-publish"):
         jobs[job]["result"] = "skipped"
     assert ci_gate.evaluate(jobs, "pull_request") == []
     jobs["frontend"]["result"] = "failure"
@@ -287,3 +299,58 @@ def test_the_coverage_job_combines_every_shard_and_enforces_the_pyproject_floor(
     # The floor itself lives in pyproject.toml only (the SQLite job enforces it as before).
     pyproject = (ROOT / "backend" / "pyproject.toml").read_text(encoding="utf-8")
     assert "--cov-fail-under=90" in pyproject
+
+
+# --- backend-pg-roles: the owner/runtime split (T-0343, ADR 0019) --------------------------
+
+
+def test_the_roles_job_is_gated_and_publish_waits_for_it() -> None:
+    jobs = _jobs()
+    assert ci_gate.EXPECTED["backend-pg-roles"] == ("backend", False)
+    for job in ("ci-gate", "backend-publish"):
+        listed = re.search(r"needs: \[([^\]]*)\]", jobs[job])
+        assert listed
+        assert "backend-pg-roles" in {n.strip() for n in listed.group(1).split(",")}, job
+    problems = ci_gate.evaluate(needs(backend_pg_roles="failure", backend_publish="skipped"), "pull_request")
+    assert problems == ["backend-pg-roles: failure (expected success)"]
+
+
+def test_the_roles_job_migrates_as_the_owner_and_tests_as_kerp_app() -> None:
+    roles = _jobs()["backend-pg-roles"]
+    assert "needs: detect\n" in roles
+    assert "if: needs.detect.outputs.backend == 'true'\n" in roles
+    assert "strategy:" not in roles and "matrix:" not in roles  # one job, not sharded
+    assert "continue-on-error" not in roles
+    # The runtime role first (shared init script), then the split, in that order.
+    assert roles.index("20-kerp-app.sql") < roles.index("owner-runtime-split.sql")
+    # The pre-flight: migrated as kerp_owner, the T-0342 checks pass as kerp_app, which owns
+    # nothing, may create nothing and cannot change the ledger.
+    assert "KERP_MIGRATION_DATABASE_URL: postgresql+psycopg://kerp_owner:" in roles
+    assert "alembic upgrade head" in roles
+    assert "python -m app.core.startup_safety" in roles
+    assert '[ "$owned" = "0" ] && [ "$create" = "f" ] && [ "$ledger" = "f" ]' in roles
+    # The suite: templates migrated by kerp_owner, tests connected as kerp_app.
+    assert "KERP_DATABASE_URL: postgresql+psycopg://kerp_app:kerp_app@localhost:5432/kerp_test" in roles
+    assert "KERP_TEST_MIGRATION_URL: postgresql+psycopg://kerp_owner:kerp_owner@" in roles
+    assert "KERP_RUNTIME_DB_ROLE: kerp_app" in roles
+    assert "KERP_TEST_OWNER_URL: postgresql+psycopg://kerp:kerp@" in roles
+    assert "run: pytest -n auto --durations=25" in roles
+    assert "--no-cov" not in roles
+    assert "--cov-fail-under" not in roles  # the pyproject.toml floor applies here too
+    pytest_line = next(line for line in roles.splitlines() if "run: pytest" in line)
+    assert pytest_line.strip() == "run: pytest -n auto --durations=25"  # the full suite
+    # Scratch-table CREATE for the tests comes only after the production-layout check.
+    grant = roles.index('-c "GRANT CREATE ON SCHEMA public TO kerp_app"')
+    assert roles.index("python -m app.core.startup_safety") < grant
+    assert "-d kerp_test" in roles[grant - 120 : grant]  # the test source, never kerp_roles
+
+
+def test_the_split_script_takes_the_schema_from_kerp_app() -> None:
+    sql = (ROOT / "infra" / "postgres" / "owner-runtime-split.sql").read_text(encoding="utf-8")
+    statements = [line for line in sql.splitlines() if line and not line.startswith("--")]
+    body = "\n".join(statements)
+    assert "CREATE ROLE kerp_owner LOGIN" in body
+    assert "NOSUPERUSER NOBYPASSRLS" in body
+    assert "ALTER SCHEMA public OWNER TO kerp_owner;" in body
+    assert "REVOKE CREATE ON SCHEMA public FROM PUBLIC;" in body
+    assert "kerp_app" not in body  # nothing is granted to the runtime role here: 0039 does it

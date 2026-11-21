@@ -5,9 +5,47 @@ pick or type it; the API takes it from `KERP_DEFAULT_TENANT_ID`. First-run provi
 (T-0023) creates that tenant, its deployment settings (diff §4.4) and the **first System
 admin**. Projects come later, from Project Admins (`create_projects`) in the app.
 
+## Database roles (ADR 0019)
+
+Two roles, never one (ADR 0001, ADR 0019):
+
+| Role | Setting | Owns | Does |
+|---|---|---|---|
+| owner, e.g. `kerp_owner` | `KERP_MIGRATION_DATABASE_URL` | schema `public` and every table, sequence and function | runs `alembic upgrade`; never serves requests |
+| runtime, `kerp_app` by default | `KERP_DATABASE_URL`, named in `KERP_RUNTIME_DB_ROLE` | nothing | the API, the worker and the first-run command |
+
+Both are `NOSUPERUSER NOBYPASSRLS`. Create them once, as the database administrator (e.g. the
+RDS master user), with passwords from the secret store:
+
+```sql
+CREATE ROLE kerp_owner LOGIN PASSWORD '<secret>' NOSUPERUSER NOBYPASSRLS;
+CREATE ROLE kerp_app LOGIN PASSWORD '<secret>' NOSUPERUSER NOBYPASSRLS;
+GRANT CONNECT, TEMPORARY ON DATABASE kerp TO kerp_owner, kerp_app;
+-- connected to the kerp database:
+CREATE EXTENSION IF NOT EXISTS ltree;
+CREATE EXTENSION IF NOT EXISTS postgis;
+ALTER SCHEMA public OWNER TO kerp_owner;
+REVOKE CREATE ON SCHEMA public FROM PUBLIC;
+```
+
+The runtime role needs no further `GRANT`: migration `0039` grants it `SELECT, INSERT, UPDATE,
+DELETE` on every table (`audit_ledger`: `SELECT, INSERT` only), `USAGE` on the schema and the
+sequences, and `EXECUTE` on the app's functions (lobby, access requests, censuses), and sets
+default privileges so later migrations' objects get the same. It reads the role name from
+`KERP_RUNTIME_DB_ROLE` **in the migration run**; with another name, set it there. The migration
+logs `runtime role grants skipped: …` when the setting is empty, the role does not exist yet
+(create it first, then downgrade to `0038` and upgrade again) or it is the migrating role
+itself (local dev, where one role does both). Running the app as the owner is never needed.
+CI proves this layout in the job `backend-pg-roles` (`infra/postgres/owner-runtime-split.sql`).
+
+Pre-flight, after migrating: `python -m app.core.startup_safety` with the runtime
+`KERP_DATABASE_URL` prints `database role checks passed`, or each problem (exit code `1`): the
+same checks the API and the worker run at startup (below).
+
 ## Steps
 
-1. **Migrate** as the schema owner: `alembic upgrade head` (`KERP_MIGRATION_DATABASE_URL`).
+1. **Migrate** as the schema owner: `alembic upgrade head` (`KERP_MIGRATION_DATABASE_URL`;
+   `KERP_RUNTIME_DB_ROLE` if the runtime role is not `kerp_app`).
    If you already chose the tenant id, set `KERP_DEFAULT_TENANT_ID` here too
    ([tenants.md](tenants.md)).
 2. **First run**, as the runtime role (`KERP_DATABASE_URL`), e.g. as a one-off task with the
@@ -38,6 +76,37 @@ admin**. Projects come later, from Project Admins (`create_projects`) in the app
    one-time password link for deployments without SSO
    comes with the self-service password reset (T-0077, TD-360).
 5. The System admin appoints Project Admins and further System admins in the app.
+
+## Startup refusals (production)
+
+With `KERP_ENVIRONMENT=production` (the default) the API and the SAQ worker refuse to start,
+instead of failing later on the first request or silently running unprotected (T-0342):
+
+| Log / error text | Cause | Fix |
+|---|---|---|
+| `KERP_DEFAULT_TENANT_ID must be set in production` | no deployment tenant | step 3 |
+| `KERP_MAIL_TRANSPORT=ses …` | no outbound e-mail | mail settings (`backend/app/core/mail/README.md`) |
+| `KERP_REDIS_URL must be set in production` | no Redis (token revocation, job queue, settings cache) | set `KERP_REDIS_URL` (API only; the worker always needs it) |
+| `KERP_JWT_PRIVATE_KEY or KERP_JWT_PRIVATE_KEY_FILE must be set in production`, or another `AuthConfigError` | no or unusable JWT signing key (API) | set the key from the secret store |
+| `refusing to start: the database role in KERP_DATABASE_URL is unsafe (N problem(s)): …` | the role checks below | connect as the runtime role, not the owner or a superuser |
+
+The database refusal names every problem, and each is also logged on its own line as
+`unsafe database role: <problem>` (logger `kerp.startup`):
+
+- `database role '<role>' is a SUPERUSER (bypasses RLS)` / `… has BYPASSRLS`: row-level
+  security is skipped for this role. Use a `NOSUPERUSER NOBYPASSRLS` role.
+- `<table>: row level security not enabled` / `not forced` / `policy … missing` /
+  `unexpected policy …` / `table not found`: the schema is not at `alembic upgrade head`, or
+  someone changed the policies (`ALTER TABLE … NO FORCE ROW LEVEL SECURITY` lets the table's
+  owner skip them). Migrate; never run the app as the table owner.
+- `audit_ledger: current role has UPDATE` (`DELETE`, `TRUNCATE`) or `trigger … missing or
+  disabled`: the role could rewrite the audit ledger. The runtime role gets `SELECT, INSERT`
+  on it only.
+
+Outside production the same problems are logged as warnings
+(`unsafe database role (refused in production): …`) and the process starts; on SQLite the
+checks are skipped (`database role checks skipped: sqlite has no row-level security`). `/health`
+stays a liveness check and reports none of this: a process that refused never serves it.
 
 ## Safety
 

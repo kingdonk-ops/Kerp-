@@ -148,6 +148,19 @@ def test_e2e_runs_on_the_same_database_and_redis_as_backend_pg() -> None:
     assert "continue-on-error" not in e2e
 
 
+def test_the_roles_job_runs_on_the_same_database_and_redis_as_backend_pg() -> None:
+    """T-0343: the owner/runtime split job uses the very services of the PostgreSQL shards and
+    their throwaway-database durability settings."""
+    assert _services_block("backend-pg-roles") == _services_block("backend-pg")
+    roles = _jobs("ci.yml")["backend-pg-roles"]
+    assert "-f ../infra/postgres/initdb/20-kerp-app.sql" in roles
+    assert "-f ../infra/postgres/owner-runtime-split.sql" in roles
+    assert "ALTER SYSTEM SET fsync = off" in roles
+    assert "KERP_ENVIRONMENT: test" in roles
+    assert "KERP_REDIS_URL: redis://localhost:6379/0" in roles
+    assert roles.count("persist-credentials: false") == roles.count("uses: actions/checkout@") == 1
+
+
 def test_backend_pg_shards_keep_the_postgres_setup_and_e2e_waits_for_all_of_them() -> None:
     """T-0086: every shard is the old backend-pg job on a slice of the files (same services,
     init script, durability settings, runtime role, Redis); e2e waits for every shard (the
@@ -214,7 +227,11 @@ def test_publish_pushes_the_smoke_tested_image_not_a_rebuild() -> None:
     assert "GITHUB_STEP_SUMMARY" in publish
     # It still waits for both test jobs (T-0081; backend-pg as shards + combined coverage,
     # T-0086) and the smoke test.
-    assert "needs: [detect, backend, backend-pg, backend-pg-coverage, backend-image]" in publish
+    # And for the owner/runtime split job (T-0343).
+    assert (
+        "needs: [detect, backend, backend-pg, backend-pg-coverage, backend-pg-roles, backend-image]"
+        in publish
+    )
 
 
 def test_lock_refresh_is_weekly_least_privilege_and_app_free() -> None:
