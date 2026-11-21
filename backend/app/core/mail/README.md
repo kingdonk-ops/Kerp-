@@ -36,12 +36,21 @@ send_mail(session, "auth.magic_link", user.email, {"token": token, "expires_minu
   **interactive** queue with ids only, so a token never lands in SAQ job kwargs (which SAQ
   logs), in the database or in a log line. Without Redis (no enqueuer) the row stays `queued`
   and a warning is logged.
+- A row still `queued` an hour past the 24 h payload lifetime can never be sent (its enqueue
+  was lost, or the payload expired before a job ran; the payload is never persisted, so it
+  cannot be re-enqueued). The jobs module's hourly cron `expire_mail_cron` (batch worker)
+  marks it `failed` with `payload_expired` through `expire_queued` / `fail_unavailable`, per
+  scope under RLS (T-0346, TD-336). `fail_unavailable` only changes a row still `queued`: a
+  send that was already settled keeps its status.
 - The worker (`deliver`) skips a suppressed address (`suppressed`), renders the template,
   sends, and records `sent` with the provider message id. A transient error (throttling,
   5xx, network) is retried by SAQ with exponential back-off (6 attempts, 15 s doubling to
   10 min); a permanent error or the last attempt records `failed` with a short code
   (`ses:MessageRejected`). The caller's business action committed long before: a failed send
   never rolls it back.
+- The SES client is bounded (T-0346): 5 s connect, 20 s read, at most 2 attempts, so one send
+  ends well inside the mail job's 60 s timeout and never goes out again after the job timed
+  out and SAQ retried it.
 - Delivery is at-least-once: a second run of a send that is no longer `queued` does nothing.
 
 ## Templates

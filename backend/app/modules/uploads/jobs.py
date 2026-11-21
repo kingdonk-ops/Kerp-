@@ -63,6 +63,7 @@ async def verify(job: JobContext) -> dict[str, Any]:
             file_id,
             storage=get_storage(),
             scanner=get_scanner(),
+            job_id=job.job_id,  # a stale job of the file does nothing (T-0346)
         )
     except ScannerUnavailableError as exc:
         # The message never names the scanner's host or socket (``scan.py``).

@@ -20,6 +20,7 @@ import logging
 import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any, Final
 
 from sqlalchemy import event, select
@@ -193,11 +194,16 @@ def _settle(
     *,
     message_id: str | None = None,
     error_code: str | None = None,
+    only_queued: bool = False,
 ) -> None:
     with db.unit_of_work(_scope(mail)) as session:
         row = session.get(MailSend, mail.send_id)
         if row is None:
             return
+        if only_queued:
+            session.refresh(row, with_for_update=True)
+            if row.status != "queued":
+                return  # settled meanwhile (sent, suppressed, failed): never overwritten
         now = utcnow()
         row.error_code = error_code
         if status == "queued":  # a transient error: stays queued for the retry
@@ -251,8 +257,50 @@ def _fail(delivery: Delivery, mail: QueuedMail, code: str) -> str:
 
 
 def fail_unavailable(db: Database, mail_ref: QueuedMail, code: str) -> None:
-    """Mark a send ``failed`` whose payload the worker could not load (expired, lost)."""
-    _settle(db, mail_ref, "failed", error_code=code)
+    """Mark a send ``failed`` whose payload the worker could not load (expired, lost).
+
+    Only a row still ``queued``: a send already settled (e.g. ``sent``, then its job ran
+    again after the payload was deleted) keeps its status."""
+    _settle(db, mail_ref, "failed", error_code=code, only_queued=True)
+
+
+def _ref(row: MailSend) -> QueuedMail:
+    """Ids only: what ``fail_unavailable`` needs (the payload is gone)."""
+    return QueuedMail(
+        send_id=row.id,
+        tenant_id=row.tenant_id,
+        project_id=row.project_id,
+        template_key=row.template_key,
+        to="",
+        locale=row.locale,
+        context={},
+        request_id=row.request_id,
+    )
+
+
+def expire_queued(db: Database, scope: TenancyContext, cutoff: datetime, code: str) -> int:
+    """Fail every send of ``scope`` still ``queued`` that was created before ``cutoff``.
+
+    For rows whose mail can no longer go out: the enqueue after the commit failed (Redis
+    down, a crash) or the payload expired before a job ran (T-0346, TD-336). The payload
+    (with any link token) is never persisted, so a re-enqueue is impossible; the callers
+    (magic link, reset) already answered neutrally. Returns how many rows were failed.
+    """
+    with db.unit_of_work(scope) as session:
+        query = select(MailSend).where(
+            MailSend.tenant_id == scope.tenant_id,
+            MailSend.project_id.is_(None)
+            if scope.project_id is None
+            else MailSend.project_id == scope.project_id,
+            MailSend.status == "queued",
+            MailSend.created_at < cutoff,
+        )
+        refs = [_ref(row) for row in session.scalars(query)]
+    for ref in refs:
+        fail_unavailable(db, ref, code)
+    if refs:
+        logger.error("%d queued e-mail(s) never sent; marked failed (%s)", len(refs), code)
+    return len(refs)
 
 
 def _dev_origin(settings: Settings) -> str:

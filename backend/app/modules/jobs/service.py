@@ -15,7 +15,7 @@ import re
 import uuid
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any, Final
 
 from sqlalchemy import event, func, select, text
@@ -80,6 +80,13 @@ __all__ = [
 
 PENDING_KEY: Final = "kerp_jobs_pending"
 DEFAULT_SWEEP_AGE: Final = timedelta(minutes=2)
+# A ``running`` row this long past its kind's timeout, unknown to SAQ, lost its worker
+# (T-0346). SAQ cancels a job at its timeout; the margin covers the cancel and the write.
+RUNNING_MARGIN: Final = timedelta(minutes=5)
+# What the worker writes on a cancel or timeout (``worker.CANCELLED``); the sweep writes it
+# for a lost ``running`` row on its last attempt.
+TIMED_OUT: Final = "Job timed out or was cancelled"
+LOST_RETRY: Final = "The worker stopped while running the job; it is retried"
 
 Dispatcher = Callable[[list[JobRef]], None]
 
@@ -306,6 +313,74 @@ def _stuck(db: Database, scope: TenancyContext, cutoff: datetime) -> list[Job]:
         return list(session.scalars(query))
 
 
+def _running_since(db: Database, scope: TenancyContext, cutoff: datetime) -> list[Job]:
+    with db.unit_of_work(scope) as session:
+        query = select(Job).where(
+            Job.tenant_id == scope.tenant_id,
+            Job.project_id.is_(None)
+            if scope.project_id is None
+            else Job.project_id == scope.project_id,
+            Job.status == "running",
+            Job.started_at < cutoff,
+        )
+        return list(session.scalars(query))
+
+
+def _aware(moment: datetime) -> datetime:
+    """SQLite hands back naive datetimes; every stored timestamp is UTC."""
+    return moment if moment.tzinfo is not None else moment.replace(tzinfo=UTC)
+
+
+def _recover(
+    db: Database, scope: TenancyContext, job_id: uuid.UUID, attempts: int, max_attempts: int
+) -> str | None:
+    """Requeue (attempts left) or fail a ``running`` row its worker lost; its new status.
+
+    Re-checked under a row lock: a row that finished or started another attempt since the
+    sweep read it is left alone (``None``)."""
+    with db.unit_of_work(scope) as session:
+        row = get_or_404(session, Job, job_id)
+        session.refresh(row, with_for_update=True)
+        if row.status != "running" or row.attempts != attempts:
+            return None
+        if row.attempts < max_attempts:
+            row.status, row.message = "queued", _bounded(LOST_RETRY)
+        else:
+            row.status, row.error, row.finished_at = "failed", TIMED_OUT, utcnow()
+        return row.status
+
+
+async def _recover_running(
+    db: Database,
+    broker: JobBroker,
+    scope: TenancyContext,
+    registry: JobRegistry,
+    moment: datetime,
+    margin: timedelta,
+) -> list[uuid.UUID]:
+    """Recover the scope's ``running`` rows past their timeout plus ``margin`` that SAQ no
+    longer knows (the worker was killed: OOM, a hard crash). Returns the re-enqueued ids."""
+    requeued: list[uuid.UUID] = []
+    for job in await asyncio.to_thread(_running_since, db, scope, moment - margin):
+        job_kind = _kind(registry, job.kind)
+        ref = _ref(job, job_kind)
+        started = _aware(job.started_at) if job.started_at is not None else moment
+        if started + timedelta(seconds=ref.timeout_s) + margin > moment:
+            continue  # may still be running within its timeout
+        if await broker.has_job(ref.queue, ref.key):
+            continue  # SAQ still has it (running, or about to retry): SAQ decides
+        status = await asyncio.to_thread(
+            _recover, db, scope, job.id, job.attempts, ref.max_attempts
+        )
+        if status == "queued":
+            await broker.enqueue(ref)
+            requeued.append(job.id)
+            logger.warning("re-enqueued a lost running job", extra={"job_id": ref.key})
+        elif status == "failed":
+            logger.error("failed a lost running job", extra={"job_id": ref.key})
+    return requeued
+
+
 async def sweep(
     db: Database,
     broker: JobBroker,
@@ -313,14 +388,19 @@ async def sweep(
     *,
     registry: JobRegistry | None = None,
     older_than: timedelta = DEFAULT_SWEEP_AGE,
+    running_margin: timedelta = RUNNING_MARGIN,
 ) -> list[uuid.UUID]:
-    """Re-enqueue rows ``queued`` for longer than ``older_than`` that SAQ does not know.
+    """Re-enqueue rows ``queued`` for longer than ``older_than`` that SAQ does not know, and
+    recover rows still ``running`` past their kind's timeout plus ``running_margin`` that SAQ
+    does not know either (T-0346): requeued while the kind allows more attempts, else
+    ``failed``. So a single-run job killed mid-run never blocks the next one.
 
     Runs per scope, each in a bound unit of work: the table stays under RLS and the sweep
     needs no bypass. Returns the ids it re-enqueued.
     """
     registry = registry or JOB_REGISTRY
-    cutoff = utcnow() - older_than
+    moment = utcnow()
+    cutoff = moment - older_than
     requeued: list[uuid.UUID] = []
     for scope in scopes:
         for job in await asyncio.to_thread(_stuck, db, scope, cutoff):
@@ -330,6 +410,7 @@ async def sweep(
             await broker.enqueue(ref)
             requeued.append(job.id)
             logger.warning("re-enqueued a stuck job", extra={"job_id": ref.key})
+        requeued += await _recover_running(db, broker, scope, registry, moment, running_margin)
     return requeued
 
 
@@ -349,7 +430,7 @@ MAX_FAILED_LIST: Final = 200
 _INTERNAL = re.compile(r"^Internal error \(([A-Za-z_][A-Za-z0-9_.]*)\)$")
 # Error texts the worker writes itself, by class (``worker.CANCELLED``, ``ABORTED``).
 _KNOWN_ERRORS: Final = {
-    "Job timed out or was cancelled": "Cancelled",
+    TIMED_OUT: "Cancelled",
     ABORTED: "Aborted",
 }
 

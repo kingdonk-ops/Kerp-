@@ -34,7 +34,9 @@ the bytes; it signs, checks and records. Helpers adapted from Inspection-ERP
    bytes against the declared type. This is early feedback only. A mismatch makes the file
    `rejected` (`size_mismatch` / `type_mismatch`) and deletes the object; otherwise the
    file is `verifying` and `uploads.verify` is queued after commit (`uploads.verify_large`
-   on the batch queue above 50 MiB).
+   on the batch queue above 50 MiB). The file row is locked (`SELECT ... FOR UPDATE` on
+   PostgreSQL) before the status check, so a client retry of `complete` while the first is in
+   flight waits and then gets 409 (`verifying`): one upload, one verify job (T-0346).
 4. The presigned `PUT` is still valid after `complete`, so the job never trusts staging:
    it first copies staging to `quarantine/{tenant}/{project}/{file_id}` (no URL is ever
    issued for that key) and deletes staging. Size, magic bytes, SHA-256 (streamed, no
@@ -45,7 +47,10 @@ the bytes; it signs, checks and records. Helpers adapted from Inspection-ERP
    `infected`). Staging and quarantine are deleted in every outcome, errors included. A
    re-`PUT` racing the job therefore either lands before the quarantine copy (and is
    checked in full) or after it (and is an orphan for the sweep); it never reaches a
-   content key.
+   content key. A verify job that is not the file's current `job_id` (a stale duplicate)
+   does nothing, storage included (T-0346). A scan cut by a deploy or a job timeout goes
+   back to `queued` while attempts are left (jobs module, T-0346) and SAQ's retry finishes
+   it; it is no longer left `failed` for the sweep to reject as `verify_failed`.
 5. `GET .../files/{id}` (`V`) polls; `GET .../files/{id}/download` (`V`) returns a
    presigned `GET` that forces the served type and `Content-Disposition` (H-10: HTML,
    SVG and anything unknown are `application/octet-stream` attachments).
@@ -120,7 +125,8 @@ The System console (`/api/v1/admin/system/uploads...`, `admin/system_uploads_rou
   `verify_upload` only makes one of them write the outcome, not the right one. Both use the
   same quarantine object and each deletes it before writing, so a job that finds it already
   gone rejects a clean file as `missing_object` and the other leaves an orphan content object.
-  A job whose worker died stays `running`: abort it in the queue monitor first. That abort
+  A job whose worker died stays `running` until the jobs sweep recovers it (past its timeout
+  plus a margin, T-0346), or abort it in the queue monitor first. That abort
   (and a queue-monitor retry of a replaced failed job) can still overlap a worker thread that
   is mid-check: TD-497 (fail-safe: nothing is published unscanned).
 * `queue_project_sweep`: queues `uploads.sweep_orphans` for one live project now (housekeeping

@@ -16,7 +16,11 @@ from sqlalchemy import update
 
 from app.core.config import Settings
 from app.core.db import Database, utcnow
+from app.core.mail import service as mail_service
+from app.core.mail.models import MailSend
+from app.core.mail.service import send_mail
 from app.core.tenancy.context import TenancyContext
+from app.modules.jobs import mail as jobs_mail
 from app.modules.jobs import scheduler, service
 from app.modules.jobs.broker import JobRef, SaqBroker
 from app.modules.jobs.models import Job
@@ -155,6 +159,7 @@ def test_the_batch_worker_runs_the_sweep_every_five_minutes(db: Database) -> Non
         "t:batch": [
             (scheduler.sweep_cron, scheduler.SWEEP_CRON, scheduler.CRON_TIMEOUT_S),
             (scheduler.hourly_project_jobs, scheduler.HOURLY_CRON, scheduler.CRON_TIMEOUT_S),
+            (scheduler.expire_mail_cron, scheduler.MAIL_EXPIRY_CRON, scheduler.CRON_TIMEOUT_S),
         ],
     }
     assert scheduler.SWEEP_CRON == "*/5 * * * *"
@@ -271,3 +276,74 @@ def test_job_status_is_none_outside_the_sessions_scope(db: Database) -> None:
         assert service.job_status(s, job_id) is None
     with db.unit_of_work(TenancyContext(tenant_id=TENANT, project_id=here)) as s:
         assert service.job_status(s, uuid.uuid4()) is None
+
+
+# --- mail stuck queued past its payload lifetime (T-0346, TD-336) -----------------------------
+
+_MAGIC_LINK = {"token": "tok-SYNTHETIC-expiry-0123456789", "expires_minutes": 15}
+
+
+def _mail(db: Database, scope: TenancyContext, age: timedelta, status: str = "queued") -> uuid.UUID:
+    """A send-log row whose enqueue was lost (no mail queue installed), ``age`` old."""
+    with db.unit_of_work(scope) as s:
+        send_id = send_mail(s, "auth.magic_link", "someone@example.test", _MAGIC_LINK)
+    with db.unit_of_work(scope) as s:
+        s.execute(
+            update(MailSend)
+            .where(MailSend.id == send_id, MailSend.tenant_id == scope.tenant_id)
+            .values(created_at=utcnow() - age, status=status)
+        )
+    return send_id
+
+
+def _mail_status(db: Database, scope: TenancyContext, send_id: uuid.UUID) -> tuple[str, str | None]:
+    with db.unit_of_work(scope) as s:
+        row = s.get(MailSend, send_id)
+        assert row is not None
+        return row.status, row.error_code
+
+
+def test_the_mail_expiry_cron_fails_sends_stuck_queued_past_the_payload_lifetime(
+    db: Database,
+) -> None:
+    tenant = TenancyContext(tenant_id=TENANT)
+    project = TenancyContext(tenant_id=TENANT, project_id=_project(db, TENANT, "MLX"))
+    past = scheduler.MAIL_EXPIRE_AFTER + timedelta(minutes=5)
+    lost_tenant = _mail(db, tenant, past)
+    lost_project = _mail(db, project, past)
+    young = _mail(db, tenant, timedelta(hours=2))  # its payload may still be in Redis
+    sent = _mail(db, tenant, past, status="sent")
+    ctx: Any = {"db": db, "settings": Settings(environment="test", default_tenant_id=TENANT)}
+    asyncio.run(scheduler.expire_mail_cron(ctx))
+    assert _mail_status(db, tenant, lost_tenant) == ("failed", "payload_expired")
+    assert _mail_status(db, project, lost_project) == ("failed", "payload_expired")
+    assert _mail_status(db, tenant, young) == ("queued", None)
+    assert _mail_status(db, tenant, sent) == ("sent", None)
+    assert timedelta(seconds=jobs_mail.PAYLOAD_TTL_S) < scheduler.MAIL_EXPIRE_AFTER
+
+
+def test_the_mail_expiry_cron_does_nothing_without_a_deployment_tenant(db: Database) -> None:
+    tenant = TenancyContext(tenant_id=TENANT)
+    lost = _mail(db, tenant, scheduler.MAIL_EXPIRE_AFTER + timedelta(minutes=5))
+    ctx: Any = {"db": db, "settings": Settings(environment="test", default_tenant_id=None)}
+    asyncio.run(scheduler.expire_mail_cron(ctx))
+    assert _mail_status(db, tenant, lost) == ("queued", None)
+
+
+def test_one_scope_failing_does_not_stop_the_mail_expiry_of_the_others(
+    db: Database, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    tenant = TenancyContext(tenant_id=TENANT)
+    project = TenancyContext(tenant_id=TENANT, project_id=_project(db, TENANT, "MLY"))
+    lost = _mail(db, project, scheduler.MAIL_EXPIRE_AFTER + timedelta(minutes=5))
+    real = mail_service.expire_queued
+
+    def flaky(db: Database, scope: TenancyContext, *args: Any) -> int:
+        if scope.project_id is None:
+            raise RuntimeError("database went away")
+        return real(db, scope, *args)
+
+    monkeypatch.setattr(mail_service, "expire_queued", flaky)
+    cutoff = utcnow() - scheduler.MAIL_EXPIRE_AFTER
+    assert scheduler._expire_mail(db, [tenant, project], cutoff) == 1
+    assert _mail_status(db, project, lost) == ("failed", "payload_expired")

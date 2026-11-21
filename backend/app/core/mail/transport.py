@@ -31,6 +31,13 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger("kerp.mail")
 
+# One send attempt (connect + read, two tries at most) ends well inside the mail job's 60 s
+# timeout (``jobs/mail.py``), so a slow SES never outlives the job and sends again on its
+# retry (T-0346). botocore's defaults (60 s each, more retries) could.
+SES_CONNECT_TIMEOUT_S: Final = 5
+SES_READ_TIMEOUT_S: Final = 20
+SES_MAX_ATTEMPTS: Final = 2
+
 # SES / AWS error codes worth another try; every other client error is permanent.
 TRANSIENT_CODES: Final = frozenset(
     {
@@ -142,8 +149,14 @@ class SesTransport:
     def _ses(self) -> SesClient:
         if self._client is None:
             import boto3  # heavy: worker only (T-0022)
+            from botocore.config import Config
 
-            client: SesClient = boto3.client("sesv2", region_name=self.region)
+            config = Config(
+                connect_timeout=SES_CONNECT_TIMEOUT_S,
+                read_timeout=SES_READ_TIMEOUT_S,
+                retries={"total_max_attempts": SES_MAX_ATTEMPTS},
+            )
+            client: SesClient = boto3.client("sesv2", region_name=self.region, config=config)
             self._client = client
         return self._client
 

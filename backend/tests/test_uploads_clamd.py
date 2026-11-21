@@ -479,7 +479,10 @@ def test_the_verify_job_asks_for_a_retry_when_the_scanner_is_down(
         return None
 
     payload = {"file_id": str(file_id)}
-    context = JobContext(uuid.uuid4(), service.VERIFY_KIND, home, payload, None, update, db)
+    with db.unit_of_work(home) as s:
+        job_id = service.get_file(s, file_id).job_id  # the file's own job (T-0346)
+    assert job_id is not None
+    context = JobContext(job_id, service.VERIFY_KIND, home, payload, None, update, db)
     try:
         with pytest.raises(jobs.RetryLaterError, match="malware scanner unavailable") as exc:
             asyncio.run(upload_jobs.verify(context))

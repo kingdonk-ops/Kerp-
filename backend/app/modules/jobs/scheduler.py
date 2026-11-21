@@ -22,12 +22,15 @@ import functools
 import logging
 import uuid
 from collections.abc import Awaitable, Callable, Mapping
+from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any, Final
 
 from app.core.db import utcnow
+from app.core.mail import service as mail_service
 from app.core.tenancy.context import TenancyContext
 from app.modules.jobs import service
 from app.modules.jobs.broker import CronRun
+from app.modules.jobs.mail import PAYLOAD_TTL_S
 from app.modules.jobs.registry import CRON_SCHEDULES, UnknownJobKindError
 from app.modules.projects import service as projects
 
@@ -41,6 +44,11 @@ SWEEP_CRON: Final = CRON_SCHEDULES["sweep_cron"]
 CRON_TIMEOUT_S: Final = 120
 # Hourly per-project jobs (T-0215), off the full hour so they do not pile up with other crons.
 HOURLY_CRON: Final = CRON_SCHEDULES["hourly_project_jobs"]
+# Stuck queued mail (T-0346, TD-336): hourly; a send still ``queued`` an hour past the payload
+# lifetime (``mail.PAYLOAD_TTL_S``, 24 h) can never be delivered.
+MAIL_EXPIRY_CRON: Final = CRON_SCHEDULES["expire_mail_cron"]
+MAIL_EXPIRE_AFTER: Final = timedelta(seconds=PAYLOAD_TTL_S) + timedelta(hours=1)
+MAIL_EXPIRED: Final = "payload_expired"
 
 logger = logging.getLogger("kerp.jobs")
 
@@ -67,6 +75,34 @@ async def sweep_cron(ctx: Mapping[str, Any]) -> None:
     requeued = await service.sweep(ctx["db"], ctx["broker"], scopes, registry=ctx["registry"])
     if requeued:
         logger.warning("jobs sweep re-enqueued %d stuck job(s)", len(requeued))
+
+
+def _expire_mail(db: Database, scopes: list[TenancyContext], cutoff: datetime) -> int:
+    expired = 0
+    for scope in scopes:
+        try:
+            expired += mail_service.expire_queued(db, scope, cutoff, MAIL_EXPIRED)
+        except Exception:  # one scope's failure must not skip every scope after it
+            logger.exception(
+                "expiring queued mail failed for a scope",
+                extra={"project_id": str(scope.project_id) if scope.project_id else None},
+            )
+    return expired
+
+
+async def expire_mail_cron(ctx: Mapping[str, Any]) -> None:
+    """SAQ cron: fail the sends still ``queued`` past the payload lifetime (T-0346, TD-336).
+
+    Their mail can never go out: the enqueue after the commit was lost (Redis down, a crash)
+    or the payload expired before a job ran. Reuses ``fail_unavailable``
+    (``payload_expired``), per scope as the jobs sweep, under RLS without a bypass."""
+    tenant_id = ctx["settings"].default_tenant_id
+    if tenant_id is None:
+        logger.warning("mail expiry skipped: KERP_DEFAULT_TENANT_ID is not set")
+        return
+    cutoff = utcnow() - MAIL_EXPIRE_AFTER
+    scopes = await asyncio.to_thread(deployment_scopes, ctx["db"], tenant_id)
+    await asyncio.to_thread(_expire_mail, ctx["db"], scopes, cutoff)
 
 
 def _queue_hourly(

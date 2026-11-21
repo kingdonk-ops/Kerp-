@@ -7,6 +7,7 @@ PostgreSQL under project RLS. All data is synthetic.
 
 import asyncio
 import hashlib
+import threading
 import uuid
 from collections.abc import Iterator
 from datetime import timedelta
@@ -32,12 +33,12 @@ from app.modules.projects.schemas import ProjectCreate
 from app.modules.uploads import jobs as upload_jobs
 from app.modules.uploads import service
 from app.modules.uploads.models import TABLE, UploadedFile
-from app.modules.uploads.scan import set_scanner
+from app.modules.uploads.scan import ScannerUnavailableError, set_scanner
 from app.modules.uploads.schemas import UploadCreate
 from app.modules.uploads.storage import LocalStorage, Storage, set_storage
 from tests.audit_support import migrated_database
 from tests.auth_support import ALICE, BOB, PASSWORD, T1, T2, auth_app, make_settings, seed_user
-from tests.db_support import database_url
+from tests.db_support import ON_POSTGRES, database_url
 
 # Provisioning context: a System admin session reads every project row (T-0014, TD-053).
 CTX_T1 = TenancyContext(tenant_id=T1, is_system_admin=True)
@@ -521,11 +522,13 @@ def test_schedule_sweep_queues_a_batch_job(
 # --- job handlers ---------------------------------------------------------------------------
 
 
-def _context(db: Database, ctx: TenancyContext, payload: dict[str, Any]) -> JobContext:
+def _context(
+    db: Database, ctx: TenancyContext, payload: dict[str, Any], job_id: uuid.UUID | None = None
+) -> JobContext:
     async def update(progress: int, message: str | None = None) -> None:
         return None
 
-    return JobContext(uuid.uuid4(), service.VERIFY_KIND, ctx, payload, None, update, db)
+    return JobContext(job_id or uuid.uuid4(), service.VERIFY_KIND, ctx, payload, None, update, db)
 
 
 def test_the_job_handlers_run_the_service(
@@ -533,8 +536,10 @@ def test_the_job_handlers_run_the_service(
 ) -> None:
     file_id = _presign(db, home, storage)
     storage.write(_load(db, home, file_id).staging_key, PNG)
-    _complete(db, home, storage, file_id)
-    result = asyncio.run(upload_jobs.verify(_context(db, home, {"file_id": str(file_id)})))
+    job_id = _complete(db, home, storage, file_id).job_id
+    assert job_id is not None
+    payload = {"file_id": str(file_id)}
+    result = asyncio.run(upload_jobs.verify(_context(db, home, payload, job_id)))
     assert result["status"] == "available"
     swept = asyncio.run(upload_jobs.sweep_orphans(_context(db, home, {})))
     assert swept == {"expired": 0, "deleted": 0, "rejected": 0}
@@ -686,7 +691,6 @@ def test_the_body_limit_does_not_cap_presigned_uploads(
     assert api.client.post(api.files(), json=oversized, headers=alice).status_code == 413
 
 
-
 # --- stuck 'verifying' files and the hourly schedule (T-0215, TD-212, TD-209) ----------------
 
 
@@ -734,6 +738,136 @@ def test_the_sweep_leaves_a_healthy_verifying_file_alone(
 
 def test_the_orphan_sweep_is_scheduled_hourly_for_every_project() -> None:
     assert service.SWEEP_KIND in JOB_REGISTRY.hourly_project_kinds()
+
+
+# --- one scan per upload, and scans that survive a deploy (T-0346) ----------------------------
+
+
+class _SaqJob:
+    """The part of SAQ's job the worker reads: whether SAQ will run it again."""
+
+    def __init__(self, retryable: bool) -> None:
+        self.retryable = retryable
+
+
+def test_a_verify_job_that_is_not_the_files_job_does_nothing(
+    db: Database, home: TenancyContext, storage: LocalStorage, dispatched: list[JobRef]
+) -> None:
+    file = _verifying(db, home, storage)
+    stale = uuid.uuid4()  # e.g. a duplicate job from a retried /complete
+    payload = {"file_id": str(file.id)}
+    result = asyncio.run(upload_jobs.verify(_context(db, home, payload, stale)))
+    assert result == {"file_id": str(file.id), "status": "verifying"}
+    after = _load(db, home, file.id)
+    assert (after.status, after.job_id) == ("verifying", file.job_id)
+    # Storage untouched: the upload is still in staging, no quarantine copy was made.
+    assert storage.head(file.staging_key) is not None
+    assert storage.head(file.quarantine_key) is None
+    # The file's own job then publishes it.
+    result = asyncio.run(upload_jobs.verify(_context(db, home, payload, file.job_id)))
+    assert result["status"] == "available"
+
+
+def test_a_second_complete_is_refused_after_the_lock_and_queues_no_job(
+    db: Database, home: TenancyContext, storage: LocalStorage, dispatched: list[JobRef]
+) -> None:
+    file = _verifying(db, home, storage)
+    with pytest.raises(service.UploadStateError, match="verifying"):
+        _complete(db, home, storage, file.id)
+    assert len(dispatched) == 1
+    assert _load(db, home, file.id).job_id == file.job_id
+
+
+@pytest.mark.skipif(
+    not ON_POSTGRES, reason="needs PostgreSQL row locks; runs in CI's PostgreSQL step (TD-052)"
+)
+def test_two_concurrent_completes_create_one_verify_job(
+    db: Database, home: TenancyContext, storage: LocalStorage, dispatched: list[JobRef]
+) -> None:
+    """Audit item 15: a client retry of ``/complete`` while the first is still in flight
+    waits for the first one's row lock, then sees ``verifying``: one job, never two."""
+    file_id = _presign(db, home, storage)
+    storage.write(_load(db, home, file_id).staging_key, PNG)
+    outcome: dict[str, Any] = {}
+    done = threading.Event()
+
+    def retry() -> None:
+        try:
+            outcome["value"] = _complete(db, home, storage, file_id)
+        except Exception as exc:
+            outcome["error"] = exc
+        finally:
+            done.set()
+
+    thread = threading.Thread(target=retry)
+    with db.unit_of_work(home) as s:
+        first = service.complete_upload(s, storage, file_id)
+        thread.start()
+        assert not done.wait(0.5), f"the retry did not wait for the row lock: {outcome}"
+    thread.join(20)
+    assert done.is_set()
+    assert isinstance(outcome.get("error"), service.UploadStateError), outcome
+    assert "verifying" in str(outcome["error"])
+    assert [r.job_id for r in dispatched] == [first.job_id]
+    assert _load(db, home, file_id).job_id == first.job_id
+
+
+def test_a_scan_cancelled_by_a_deploy_is_retried_and_the_clean_file_is_accepted(
+    db: Database, home: TenancyContext, storage: LocalStorage, dispatched: list[JobRef]
+) -> None:
+    """Audit item 8: the worker stops mid-scan (SAQ cancels the job and runs it again later).
+
+    The row goes back to ``queued``, so the hourly sweep does not reject the file as
+    ``verify_failed`` and SAQ's retry publishes the clean file."""
+    from app.modules.jobs.worker import run_job
+
+    file = _verifying(db, home, storage)
+    [ref] = dispatched
+    scanning, release, done = threading.Event(), threading.Event(), threading.Event()
+
+    class RestartingScanner:
+        """clamd restarts with the deploy: the scan in flight never answers."""
+
+        def scan(self, storage: Storage, key: str) -> str:
+            try:
+                scanning.set()
+                assert release.wait(10)
+                raise ScannerUnavailableError("the malware scanner is unavailable")
+            finally:
+                done.set()
+
+    async def deploy() -> None:
+        ctx: Any = {"db": db, "registry": JOB_REGISTRY, "job": _SaqJob(retryable=True)}
+        task = asyncio.create_task(run_job(ctx, **ref.kwargs()))
+        assert await asyncio.to_thread(scanning.wait, 10)
+        task.cancel()  # SAQ's worker shutdown
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        release.set()
+        assert await asyncio.to_thread(done.wait, 10)
+
+    set_scanner(RestartingScanner())
+    try:
+        asyncio.run(deploy())
+    finally:
+        set_scanner(None)
+    with db.unit_of_work(home) as s:
+        assert jobs.job_status(s, ref.job_id) == "queued"
+    later = utcnow() + timedelta(hours=2)
+    assert service.sweep_orphans(db, home, storage=storage, now=later)["rejected"] == 0
+    assert _load(db, home, file.id).status == "verifying"
+
+    ctx: Any = {"db": db, "registry": JOB_REGISTRY, "job": _SaqJob(retryable=True)}
+    asyncio.run(run_job(ctx, **ref.kwargs()))  # SAQ's retry after the deploy
+    after = _load(db, home, file.id)
+    assert (after.status, after.rejection_reason, after.scan_result) == (
+        "available",
+        None,
+        "clean",
+    )
+    assert storage.read(after.storage_key or "") == PNG
+    with db.unit_of_work(home) as s:
+        assert jobs.job_status(s, ref.job_id) == "succeeded"
 
 
 # --- production refuses the always-clean stub scanner (T-0213) ---------------------------------
