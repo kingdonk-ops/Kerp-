@@ -463,8 +463,8 @@ async def cron_statuses(monitor: QueueMonitor) -> list[CronStatus]:
 def list_failed_jobs(session: Session, *, limit: int = 50, offset: int = 0) -> list[FailedJob]:
     """Failed job rows the caller's RLS shows, newest first, with the project code.
 
-    Under ADR 0016 (T-0274) a ``system_admin`` reads every project's rows; until then the
-    tenant-level rows and those of the caller's read scope (normal RLS, never a bypass; TD-451).
+    Under ADR 0016 (T-0274) a ``system_admin`` session reads the rows of every project of its
+    tenant without a membership (normal RLS, never a bypass role; TD-451).
     """
     limit = max(1, min(limit, MAX_FAILED_LIST))
     jobs = list(

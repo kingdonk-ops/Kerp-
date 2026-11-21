@@ -2,6 +2,12 @@
 raw-SQL aggregation and DB migration (T-0007; the worker runs through real SAQ since
 T-0060).
 
+Since ADR 0016 (T-0274) each path also asserts the system_admin rule exactly: a session bound
+with ``app.is_system_admin`` reads and writes the project rows of every project of its own
+tenant without a membership, never a tenant-level row from a project-bound session and never
+another tenant's row; a non-admin stays project-exact, an unbound session sees nothing, and a
+worker job never inherits the flag of the session that enqueued it.
+
 Each path skips the ORM scope in some way, so only PostgreSQL RLS stands between it and
 another project's rows. These tests need real PostgreSQL and a role that is neither
 SUPERUSER nor BYPASSRLS (CI's ``kerp_app``). RLS does not exist on SQLite. The SAQ worker
@@ -9,6 +15,7 @@ tests also need Redis (``KERP_REDIS_URL``), which CI's PostgreSQL step provides.
 """
 
 import asyncio
+import dataclasses
 import os
 import uuid
 from collections.abc import Iterator
@@ -52,8 +59,11 @@ from app.modules.jobs.registry import JobContext, JobKind, JobRegistry
 from app.modules.jobs.worker import build_workers
 from tests import pg_databases
 from tests.audit_support import migrated_database
-from tests.db_support import ON_POSTGRES, Gadget, Widget, postgres_url
+from tests.db_support import ON_POSTGRES, Gadget, Widget, postgres_url, seed_tenants
 from tests.tenancy_support import (
+    ADMIN_A,
+    ADMIN_T1,
+    ADMIN_T2,
     CTX_A,
     CTX_B,
     CTX_C,
@@ -64,6 +74,7 @@ from tests.tenancy_support import (
     T1,
     T2,
     VISIBLE_TO_A,
+    VISIBLE_TO_T1_ADMIN,
     seeded_database,
 )
 
@@ -237,6 +248,91 @@ def test_a_saq_job_cannot_read_or_write_another_tenants_or_projects_rows(
         assert set(s.execute(text("SELECT name FROM test_widget")).scalars()) == {"c1"}
 
 
+@pytest.mark.skipif(not REDIS_URL, reason="needs Redis (KERP_REDIS_URL); CI's PG step (TD-052)")
+def test_a_job_enqueued_by_a_system_admin_stays_project_exact(
+    jobs_db: Database, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The worker binds the job's own tenant/project only: a job enqueued from an admin session
+    # does not inherit app.is_system_admin (ADR 0016: a job binds it only explicitly, after
+    # re-checking the requester's grant at job start).
+    seen: dict[str, object] = {}
+    params = {"pb": PB}
+
+    async def probe(job: JobContext) -> None:
+        seen["tenancy"] = job.tenancy
+        with job.db.unit_of_work(job.tenancy) as s:
+            seen["flag"] = s.execute(
+                text("SELECT NULLIF(current_setting('app.is_system_admin', true), '')")
+            ).scalar_one()
+            seen["names"] = set(s.scalars(select(Widget.name)))
+            seen["b"] = s.execute(
+                text("SELECT count(*) FROM test_widget WHERE project_id = :pb"), params
+            ).scalar_one()
+            seen["renamed"] = s.execute(
+                text("UPDATE test_widget SET name = 'x' WHERE project_id = :pb"), params
+            ).rowcount
+        try:
+            with job.db.unit_of_work(job.tenancy) as s:
+                s.execute(Widget.__table__.insert().values(**_raw_row(PB), name="smuggled"))
+        except DBAPIError as exc:
+            seen["insert_refused"] = RLS_ERROR in str(exc)
+
+    job = _run_through_saq(jobs_db, monkeypatch, JobKind("rls.admin", "batch", probe), ADMIN_A)
+
+    assert (job.status, job.error) == ("succeeded", None)
+    assert seen == {
+        "tenancy": CTX_A,
+        "flag": None,
+        "names": VISIBLE_TO_A,
+        "b": 0,
+        "renamed": 0,
+        "insert_refused": True,
+    }
+
+
+@pytest.mark.skipif(not REDIS_URL, reason="needs Redis (KERP_REDIS_URL); CI's PG step (TD-052)")
+def test_a_job_that_binds_a_system_admin_spans_its_tenant_only(
+    jobs_db: Database, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # A job that binds the flag itself (after re-checking the requester's grant, ADR 0016)
+    # reads and writes every project of its tenant, and still nothing of tenant T2.
+    seen: dict[str, object] = {}
+    others = {"t2": T2}
+
+    async def admin_job(job: JobContext) -> None:
+        elevated = dataclasses.replace(job.tenancy, is_system_admin=True)
+        with job.db.unit_of_work(elevated) as s:
+            seen["names"] = set(s.scalars(select(Widget.name)))
+            seen["t2"] = s.execute(
+                text("SELECT count(*) FROM test_widget WHERE tenant_id = :t2"), others
+            ).scalar_one()
+            seen["t2_renamed"] = s.execute(
+                text("UPDATE test_widget SET name = 'x' WHERE tenant_id = :t2"), others
+            ).rowcount
+            s.execute(Widget.__table__.insert().values(**_raw_row(PB), name="b-by-admin-job"))
+        try:
+            with job.db.unit_of_work(elevated) as s:
+                row = {**_raw_row(PC), "tenant_id": T2}
+                s.execute(Widget.__table__.insert().values(**row, name="smuggled"))
+        except DBAPIError as exc:
+            seen["t2_insert_refused"] = RLS_ERROR in str(exc)
+
+    kind = JobKind("rls.elevated", "batch", admin_job)
+    job = _run_through_saq(jobs_db, monkeypatch, kind, CTX_A)
+
+    assert (job.status, job.error) == ("succeeded", None)
+    assert seen == {
+        "names": VISIBLE_TO_T1_ADMIN,
+        "t2": 0,
+        "t2_renamed": 0,
+        "t2_insert_refused": True,
+    }
+    with jobs_db.unit_of_work(CTX_B) as s:
+        assert "b-by-admin-job" in set(s.execute(text("SELECT name FROM test_widget")).scalars())
+    with jobs_db.unit_of_work(CTX_C) as s:
+        assert set(s.execute(text("SELECT name FROM test_widget")).scalars()) == {"c1"}
+
+
 def test_job_context_survives_commits(db: Database) -> None:
     with db.sessionmaker() as s:
         bind_tenancy(s, CTX_A)
@@ -301,6 +397,29 @@ def test_cross_module_call_stays_in_the_callers_project(db: Database) -> None:
 def test_cross_module_write_into_another_project_is_rejected(db: Database) -> None:
     with pytest.raises(DBAPIError, match=RLS_ERROR), db.unit_of_work(CTX_A) as s:
         s.execute(Gadget.__table__.insert().values(**_raw_row(PB), label="smuggled"))
+
+
+def test_cross_module_call_of_a_system_admin_spans_its_tenants_projects(db: Database) -> None:
+    with db.unit_of_work(ADMIN_A) as s:
+        assert _beta_count_gadgets(s) == 3  # ga, gb1, gb2: never T2's gc
+        assert sorted(s.scalars(select(Gadget.label))) == ["ga", "gb1", "gb2"]
+        assert _beta_count_gadgets_own_session(db) == 0  # the side session is still unbound
+        s.execute(Gadget.__table__.insert().values(**_raw_row(PB), label="gb-by-admin"))
+    with db.unit_of_work(CTX_B) as s:
+        assert sorted(s.scalars(select(Gadget.label))) == ["gb-by-admin", "gb1", "gb2"]
+    # A non-admin member of A still gets project A only.
+    with db.unit_of_work(CTX_A) as s:
+        assert _beta_count_gadgets(s) == 1
+
+
+def test_cross_module_write_of_a_system_admin_into_another_tenant_is_rejected(
+    db: Database,
+) -> None:
+    row = {**_raw_row(PC), "tenant_id": T2}
+    with pytest.raises(DBAPIError, match=RLS_ERROR), db.unit_of_work(ADMIN_A) as s:
+        s.execute(Gadget.__table__.insert().values(**row, label="smuggled"))
+    with db.unit_of_work(CTX_C) as s:
+        assert s.scalars(select(Gadget.label)).all() == ["gc"]
 
 
 # --- 3. raw-SQL aggregation ---------------------------------------------------------------------
@@ -390,6 +509,67 @@ def test_project_session_cannot_write_tenant_level_rows_in_raw_sql(db: Database)
     assert names == {"a1", "a2", "a-deleted", "t1-shared"}
 
 
+def test_raw_sql_aggregation_of_a_system_admin_spans_its_tenant_only(db: Database) -> None:
+    group = "SELECT project_id, count(*) FROM test_widget GROUP BY project_id"
+    union = "SELECT tenant_id FROM test_widget UNION SELECT tenant_id FROM test_gadget"
+    for ctx in (ADMIN_A, ADMIN_T1):
+        with db.unit_of_work(ctx) as s:
+            # Raw SQL has no soft-delete filter: a1, a2, a-deleted; b1-b3; the library row.
+            assert dict(s.execute(text(group)).all()) == {PA: 3, PB: 3, None: 1}
+            assert set(s.execute(text(union)).scalars()) == {T1}
+    # The admin of T2 sees T2 only: the flag never crosses tenants.
+    with db.unit_of_work(ADMIN_T2) as s:
+        assert dict(s.execute(text(group)).all()) == {PC: 1}
+    # The flag alone (no tenant bound) sees nothing; a non-admin still sees its project only.
+    with db.engine.begin() as conn:
+        conn.execute(text("SELECT set_config('app.is_system_admin', 'true', true)"))
+        assert conn.execute(text("SELECT count(*) FROM test_widget")).scalar_one() == 0
+    with db.unit_of_work(CTX_A) as s:
+        assert dict(s.execute(text(group)).all()) == {PA: 3, None: 1}
+
+
+def test_raw_sql_of_a_system_admin_writes_project_rows_of_its_tenant_only(db: Database) -> None:
+    params = {"pb": PB, "t2": T2}
+    with db.engine.begin() as conn:
+        bind_connection(conn, ADMIN_A)
+        mark_b = text("UPDATE test_widget SET name = concat(name, '!') WHERE project_id = :pb")
+        assert conn.execute(mark_b, params).rowcount == 3
+        # Tenant-level rows: read-only to a project-bound session, admin or not.
+        library = text("UPDATE test_widget SET name = 'x' WHERE project_id IS NULL")
+        assert conn.execute(library).rowcount == 0
+        assert conn.execute(text("DELETE FROM test_widget WHERE project_id IS NULL")).rowcount == 0
+        # Another tenant: invisible, untouchable.
+        other = text("UPDATE test_widget SET name = 'x' WHERE tenant_id = :t2")
+        assert conn.execute(other, params).rowcount == 0
+        drop_t2 = text("DELETE FROM test_widget WHERE tenant_id = :t2")
+        assert conn.execute(drop_t2, params).rowcount == 0
+        assert conn.execute(text("DELETE FROM test_widget WHERE name = 'b3!'")).rowcount == 1
+    t2_row = {**_raw_row(PC), "tenant_id": T2}
+    refused: list[tuple[Any, dict[str, object] | None]] = [
+        (Widget.__table__.insert().values(**_raw_row(None), name="t1-smuggled"), None),
+        (text("UPDATE test_widget SET project_id = NULL WHERE name = 'a1'"), None),
+        (Widget.__table__.insert().values(**t2_row, name="smuggled"), None),
+        (text("UPDATE test_widget SET tenant_id = :t2 WHERE name = 'a1'"), params),
+    ]
+    for statement, values in refused:
+        with pytest.raises(DBAPIError, match=RLS_ERROR), db.unit_of_work(ADMIN_A) as s:
+            s.execute(statement, values)
+    with db.unit_of_work(CTX_B) as s:
+        names = set(s.execute(text("SELECT name FROM test_widget")).scalars())
+    assert names == {"b1!", "b2!", "t1-library"}
+    with db.unit_of_work(CTX_C) as s:
+        assert set(s.execute(text("SELECT name FROM test_widget")).scalars()) == {"c1"}
+    # A tenant-level admin session keeps the tenant-level write rule (it may write them), and
+    # moves a project row between projects of its tenant.
+    move = text("UPDATE test_widget SET name = 'a1-moved', project_id = :pb WHERE name = 'a1'")
+    with db.unit_of_work(ADMIN_T1) as s:
+        s.execute(Widget.__table__.insert().values(**_raw_row(None), name="t1-shared"))
+        s.execute(move, params)
+    with db.unit_of_work(CTX_B) as s:
+        names = set(s.execute(text("SELECT name FROM test_widget")).scalars())
+    assert names == {"a1-moved", "b1!", "b2!", "t1-library", "t1-shared"}
+
+
 # --- 4. DB migration ------------------------------------------------------------------------------
 
 
@@ -421,6 +601,75 @@ def test_migrated_schema_has_rls_on_every_model_table() -> None:
     finally:
         engine.dispose()
         command.downgrade(cfg, "base")
+
+
+_POLICIES = (
+    "SELECT c.relname, p.polname, pg_get_expr(p.polqual, p.polrelid),"
+    " pg_get_expr(p.polwithcheck, p.polrelid) FROM pg_policy p"
+    " JOIN pg_class c ON c.oid = p.polrelid ORDER BY 1, 2"
+)
+_ADMIN_RECORDS = "SELECT count(*) FROM audit_ledger WHERE project_id = :pb"
+
+
+def _policy_snapshot(url: str) -> dict[tuple[str, str], tuple[str | None, str | None]]:
+    engine = create_engine(url)
+    try:
+        with engine.connect() as conn:
+            return {(r[0], r[1]): (r[2], r[3]) for r in conn.execute(text(_POLICIES))}
+    finally:
+        engine.dispose()
+
+
+def _admin_reads_of_b(url: str) -> int:
+    """How many of project B's audit entries a T1 system_admin session (no membership) reads."""
+    database = Database(url)
+    try:
+        with database.unit_of_work(ADMIN_T1) as s:
+            return int(s.execute(text(_ADMIN_RECORDS), {"pb": PB}).scalar_one())
+    finally:
+        database.dispose()
+
+
+def test_migration_0035_widens_only_project_isolation_policy_and_downgrades() -> None:
+    """ADR 0016 (T-0274): ``0035`` replaces ``project_isolation_policy`` on every table that has
+    it, changes no other policy, and its downgrade restores the exact rule."""
+    from app.core.audit import service as audit
+
+    url = postgres_url()
+    cfg = Config(str(ALEMBIC_INI))
+    cfg.attributes.update(url=url, configure_logger=False)
+    command.upgrade(cfg, "head")
+    writer = Database(url)
+    try:
+        seed_tenants(writer, T1)
+        with writer.unit_of_work(CTX_B) as s:
+            audit.append(s, f"widget:{uuid.uuid4()}", {"note": "synthetic"})
+    finally:
+        writer.dispose()
+    head = _policy_snapshot(url)
+    isolation = {t: e for (t, name), e in head.items() if name == "project_isolation_policy"}
+    assert len(isolation) >= 18
+    # One rule on every table, the same in USING and WITH CHECK, with the admin disjunct.
+    assert len(set(isolation.values())) == 1
+    (using, check), *_ = isolation.values()
+    assert using == check
+    assert using is not None
+    assert "app.is_system_admin" in using
+    assert "project_id IS NOT NULL" in using
+    assert _admin_reads_of_b(url) == 1
+    try:
+        command.downgrade(cfg, "0034")
+        before = _policy_snapshot(url)
+        assert before.keys() == head.keys()
+        changed = {key for key in head if head[key] != before[key]}
+        assert changed == {(t, "project_isolation_policy") for t in isolation}
+        assert all("is_system_admin" not in (before[key][0] or "") for key in changed)
+        assert all(before[key][0] == before[key][1] for key in changed)
+        assert _admin_reads_of_b(url) == 0  # the exact rule again: no membership, no rows
+    finally:
+        command.upgrade(cfg, "head")
+    assert _policy_snapshot(url) == head
+    assert _admin_reads_of_b(url) == 1
 
 
 def test_a_migration_that_forgets_rls_is_caught() -> None:

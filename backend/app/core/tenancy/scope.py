@@ -8,15 +8,21 @@ same on SQLite (where it is the only filter) and on PostgreSQL (where RLS backs 
   the statement carries ``execution_options(include_deleted=True)``.
 * **Tenancy scope**: for a session bound with ``bind_tenancy``, every ORM ``SELECT`` sees
   only rows of the bound tenant whose ``project_id`` is ``NULL``, the bound project or one
-  of the allowed projects (T-0010, TD-053).
+  of the allowed projects (T-0010, TD-053); an ``is_system_admin`` session sees the rows of
+  every project of the bound tenant (ADR 0016, T-0274).
   Out-of-scope rows do not exist for the caller: lists omit them, lookups by id 404.
 * **Write guard**: a bound session refuses to flush (insert, update or delete) a row
   outside its exact scope with ``OutOfScopeError``: another tenant, another project, or a
   tenant-level row from a project session. The API answers 404 (never 403, so the
   existence of another project's data is not revealed). Allowed projects are read-only.
+  An ``is_system_admin`` session also writes project rows of every project of its tenant
+  (ADR 0016), never another tenant's, and its tenant-level writes keep the exact rule. The
+  row's old ``project_id`` (an update or delete) must be writable too, as RLS ``USING``
+  requires.
 * **Asset-Site scope** (T-0010, diff §4, PER-07): for a session whose context carries
   ``site_node_ids``, rows of ``SiteScopedMixin`` models are visible and writable only when
   their ``site_node_id`` is one of those sites. This filter is ORM-only (no RLS policy).
+  An ``is_system_admin`` session is never site-filtered (ADR 0016).
 * **Membership-based tables** (T-0014, TD-053): models whose table declares an ``RlsPolicy``
   (``rls.rls_table_info``) get the same rule as their PostgreSQL policy: a ``membership``
   row (project row, membership) is visible when its described project is in
@@ -88,10 +94,31 @@ class SiteScopedMixin:
     site_node_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), nullable=True, index=True)
 
 
+def site_filter(context: TenancyContext) -> frozenset[uuid.UUID] | None:
+    """The sites ``context`` is limited to, or ``None`` (unrestricted). A ``system_admin``
+    context is never site-filtered (ADR 0016, T-0274)."""
+    return None if context.is_system_admin else context.site_node_ids
+
+
 def _site_allows(context: TenancyContext, record: object) -> bool:
-    if context.site_node_ids is None or not isinstance(record, SiteScopedMixin):
+    sites = site_filter(context)
+    if sites is None or not isinstance(record, SiteScopedMixin):
         return True
-    return record.site_node_id in context.site_node_ids
+    return record.site_node_id in sites
+
+
+def _project_readable(context: TenancyContext, project_id: uuid.UUID | None) -> bool:
+    """Mirrors the read policies' project clause (``project_isolation_policy``,
+    ``tenant_level_read_policy``, ``allowed_projects_read_policy``)."""
+    return (
+        project_id is None or context.is_system_admin or project_id in context.readable_project_ids
+    )
+
+
+def _project_writable(context: TenancyContext, project_id: uuid.UUID | None) -> bool:
+    """Mirrors ``project_isolation_policy``'s project clause (ADR 0016): the exact scope (NULL
+    is not a wildcard), or any project row for a ``system_admin`` session."""
+    return project_id == context.project_id or (project_id is not None and context.is_system_admin)
 
 
 def _policy_of(cls: type[Any]) -> RlsPolicy | None:
@@ -214,7 +241,7 @@ def is_visible(session: Session, record: BaseRecordMixin, *, include_deleted: bo
         return True
     return (
         record.tenant_id == context.tenant_id
-        and (record.project_id is None or record.project_id in context.readable_project_ids)
+        and _project_readable(context, record.project_id)
         and _site_allows(context, record)
         and _policy_allows(context, record)
         and _team_allows(session, context, record)
@@ -253,7 +280,14 @@ def _filter_reads(state: ORMExecuteState) -> None:
     context = session_tenancy(state.session)
     if context is not None:
         tenant_id, readable = context.tenant_id, sorted(context.readable_project_ids)
-        if not readable:
+        if context.is_system_admin:
+            # Every project of the bound tenant (ADR 0016, T-0274), never another tenant.
+            options.append(
+                with_loader_criteria(
+                    BaseRecordMixin, lambda cls: cls.tenant_id == tenant_id, include_aliases=True
+                )
+            )
+        elif not readable:
             options.append(
                 with_loader_criteria(
                     BaseRecordMixin,
@@ -272,8 +306,9 @@ def _filter_reads(state: ORMExecuteState) -> None:
                     include_aliases=True,
                 )
             )
-        if context.site_node_ids is not None:
-            sites = sorted(context.site_node_ids)
+        site_ids = site_filter(context)
+        if site_ids is not None:
+            sites = sorted(site_ids)
             options.append(
                 with_loader_criteria(
                     SiteScopedMixin,
@@ -301,12 +336,17 @@ def _guard_writes(session: Session, flush_context: UOWTransaction, instances: ob
     # writes only its project, a tenant-level session only tenant-level rows. NULL is not
     # a wildcard here, so a row cannot be created as, or demoted to, a tenant-level row.
     # Allowed projects are read-only; a site-scoped session writes only its sites' rows.
+    # A system_admin session also writes project rows of every project of its tenant (ADR
+    # 0016). The old project of an updated or deleted row must be writable too (RLS USING).
     for obj in (*session.new, *session.dirty, *session.deleted):
         if not isinstance(obj, BaseRecordMixin):
             continue
         if obj.tenant_id is not None and obj.tenant_id != context.tenant_id:
             raise OutOfScopeError(f"{type(obj).__name__} not found")
-        if obj.project_id != context.project_id or not _site_allows(context, obj):
+        projects = {obj.project_id, *inspect(obj).attrs.project_id.history.deleted}
+        if not all(_project_writable(context, p) for p in projects):
+            raise OutOfScopeError(f"{type(obj).__name__} not found")
+        if not _site_allows(context, obj):
             raise OutOfScopeError(f"{type(obj).__name__} not found")
         # Membership-based tables (T-0014): admin grants are written by system admins only;
         # other rows are updated or deleted only while the session can see them.

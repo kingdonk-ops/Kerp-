@@ -35,6 +35,7 @@ from app.core.tenancy.rls import (
     PROJECT_SETTING,
     READ_POLICY_NAME,
     SESSION_INFO_KEY,
+    SYSTEM_ADMIN_SETTING,
     TENANT_SETTING,
     bind_tenancy,
     rls_policy_sql,
@@ -284,10 +285,14 @@ def test_policy_sql_forces_rls_and_guards_empty_settings() -> None:
         f"project_id IS NOT DISTINCT FROM NULLIF(current_setting('{PROJECT_SETTING}', true), '')"
         "::uuid"
     )
-    # Writes: exact scope in both USING and WITH CHECK; NULL project is not a wildcard.
+    admin = (
+        f"COALESCE(NULLIF(current_setting('{SYSTEM_ADMIN_SETTING}', true), '')::boolean, false)"
+    )
+    # Writes: exact scope in both USING and WITH CHECK; NULL project is not a wildcard. A
+    # system_admin session also reads and writes project rows of its tenant (ADR 0016).
+    scope = f"{tenant} AND ({project} OR (project_id IS NOT NULL AND {admin}))"
     assert create == (
-        f"CREATE POLICY {POLICY_NAME} ON test_widget FOR ALL "
-        f"USING ({tenant} AND {project}) WITH CHECK ({tenant} AND {project})"
+        f"CREATE POLICY {POLICY_NAME} ON test_widget FOR ALL USING ({scope}) WITH CHECK ({scope})"
     )
     # Reads only: the tenant's tenant-level rows.
     assert create_read == (

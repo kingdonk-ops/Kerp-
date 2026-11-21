@@ -34,6 +34,13 @@ SEED: list[tuple[TenancyContext, list[str], list[str]]] = [
     (CTX_C, ["c1"], ["gc"]),
 ]
 VISIBLE_TO_A = {"a1", "a2", "t1-library"}
+# System admin sessions (ADR 0016, T-0274): bound to project A, tenant-level, and an admin of
+# the other tenant. None holds a membership; the flag alone widens their project scope.
+ADMIN_A = TenancyContext(tenant_id=T1, project_id=PA, is_system_admin=True)
+ADMIN_T1 = TenancyContext(tenant_id=T1, is_system_admin=True)
+ADMIN_T2 = TenancyContext(tenant_id=T2, is_system_admin=True)
+# Every live widget of tenant T1 (projects A and B, and the tenant-level row).
+VISIBLE_TO_T1_ADMIN = {"a1", "a2", "b1", "b2", "b3", "t1-library"}
 DELETED_IN_A = "a-deleted"
 
 

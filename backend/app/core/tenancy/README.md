@@ -12,6 +12,51 @@ Ported from Inspection-ERP `core/tenancy/` (ADR 0001) and extended from tenant t
 |---|---|---|
 | Reads | rows of P + rows of every project in L + T's tenant-level rows (`project_id IS NULL`) | rows of every project in L + T's tenant-level rows |
 | Inserts, updates, deletes | rows of P only | T's tenant-level rows only |
+| … with `app.is_system_admin` (ADR 0016) | reads **and writes** rows of every project of T; tenant-level rows read-only as above | reads and writes rows of every project of T; T's tenant-level rows as above |
+
+## System admin global project visibility (ADR 0016, T-0274)
+
+`project_isolation_policy` (`FOR ALL`, the same rule in `USING` and `WITH CHECK`) is
+
+```
+tenant_id = app.current_tenant_id
+AND (project_id IS NOT DISTINCT FROM app.current_project_id
+     OR (project_id IS NOT NULL AND app.is_system_admin))
+```
+
+(`rls.PROJECT_ISOLATION_SQL`, the flag read as `rls.SYSTEM_ADMIN_SQL`). A session bound with
+`app.is_system_admin` therefore reads, inserts, updates and deletes the **project** rows of every
+project of its own tenant without a membership (user decision 2026-11-21, diff §4.1, edge spec
+§6). What does not change:
+
+- **Tenants.** The tenant clause is outside the `OR`: an admin of tenant A sees and writes
+  nothing of tenant B (404 / zero rows / `WITH CHECK` violation), and the flag with no tenant
+  bound matches nothing. An unbound session still sees nothing.
+- **Tenant-level rows.** The admin disjunct requires `project_id IS NOT NULL`, so a project-bound
+  session, admin or not, still cannot create, change, delete or demote-to a tenant-level row; a
+  tenant-level session writes them as before.
+- **Other policies.** `tenant_level_read_policy`, `allowed_projects_read_policy` and the special
+  policies below (membership, admin grant, access request, invite, team, tenants census) are
+  unchanged; their writes still use the exact scope (`rls.SCOPE_ROW_SQL`).
+- **Where the flag comes from.** Only `resolve_request_scope` sets it for a request, from the
+  caller's own `system_admin` grant row looked up by the verified token's `sub` + `tid`; never
+  from token claims, headers, query parameters or bodies
+  (`tests/test_tenancy_system_admin.py::test_a_forged_claim_header_query_or_body_never_sets_the_flag`).
+  A worker job never inherits it: `run_job` binds the job's bare tenant/project; a job that
+  needs it binds it explicitly after re-checking the requester's grant at job start.
+- **Authority.** RLS visibility is not capability: `V`/`C`/`E`/administer on every project and
+  never `A`/`S` without a qualified persona are T-0275 (`app/core/auth/access.py`).
+
+The ORM scope mirrors it: for an `is_system_admin` context the read filter keeps only the tenant
+clause (every project of the tenant plus its tenant-level rows), `get_or_404`/`is_visible` agree,
+the flush guard lets it write project rows of any project of the tenant (the old `project_id` of
+an updated or deleted row must be writable too, as RLS `USING` requires), and the Asset-Site
+filter is off (`scope.site_filter(context)` is `None`). Migration `0035` replaced the policy on
+every table that had it (frozen DDL; its downgrade restores the exact rule). Internal contexts
+that bind `is_system_admin=True` for a narrow read (jobs scheduler, teams reconcile, onboarding,
+the invite token lookup) now also see every project's records of the tenant; they read only
+their own tables (TD-457). Reads by a non-member admin are not access-logged (TD-427, default
+no).
 
 ## Multi-project read scope (T-0010, TD-053, edge spec §6 amendments)
 
@@ -27,7 +72,7 @@ L comes **only** from the user's memberships (`auth_project_membership`,
 `app/core/auth/access.py`), never from request parameters: `get_tenancy_context` reads the
 caller's memberships in a short tenant-level unit of work and puts the projects of their
 **portfolio** personas (PER-01/10/11/12/13) into L. Other personas read only the bound
-project. There is no implicit "every project of the tenant" scope.
+project. The only "every project of the tenant" scope is `app.is_system_admin` (ADR 0016, above).
 
 **Asset-Site scope** (`TenancyContext.site_node_ids`, PER-07): models that mix in
 `SiteScopedMixin` (`site_node_id`) are filtered to those sites by the ORM read filters,
@@ -35,7 +80,8 @@ project. There is no implicit "every project of the tenant" scope.
 
 `project_isolation_policy` (`FOR ALL`, `USING` and `WITH CHECK`) requires the exact scope:
 `tenant_id = app.current_tenant_id AND project_id IS NOT DISTINCT FROM app.current_project_id`
-(edge spec §6). `tenant_level_read_policy` (`FOR SELECT` only) adds read access to tenant-level
+(edge spec §6), or, for project rows only, `app.is_system_admin` (ADR 0016, above).
+`tenant_level_read_policy` (`FOR SELECT` only) adds read access to tenant-level
 rows. A project session therefore cannot create a tenant-level row, demote a project row to
 tenant level (which would leak it to every project), or change or delete a tenant-level row.
 An unset setting reads as `NULL` (`NULLIF(..., '')`), so an unbound session sees no rows and
@@ -65,8 +111,8 @@ ORM scope mirrors the rule with `EXISTS` subqueries on the link and member table
 
 So a client-portal user who is a member of project A reads A's project row and memberships but
 not B's (404); a plain tenant-level session (no user, no flag) reads no project row at all; a
-System admin reads every project row and membership but, because the project-scoped tables keep
-the standard policies, **no project-scoped record** of a project without a membership.
+System admin reads every project row and membership and, through `project_isolation_policy`
+(ADR 0016, T-0274), every project-scoped record of its tenant without a membership.
 
 **Membership sources (T-0073, ADR 0008).** `auth_project_membership` rows carry a source:
 `direct` (an individual assignment) or `team_link` (derived from a team-project link,
@@ -91,7 +137,7 @@ Settings bound per transaction (all from the server, never from the request):
 | `app.member_project_ids` | every project of the caller's memberships, whatever the persona (T-0014); it widens only the `membership` tables |
 | `app.admin_project_ids` | the projects where the caller holds PER-09 (T-0050); it widens only the `access_request` and `project_invite` (T-0052) tables |
 | `app.current_user_id` | token `sub` (T-0014) |
-| `app.is_system_admin` | `true` or unset: the caller's own `system_admin` grant, loaded at authentication through the admin module's lookup (`access.register_admin_grant_lookup`; on PostgreSQL the `SECURITY DEFINER` function `kerp_caller_admin_grants()`) in the same unit of work that reads the memberships (T-0014). The only other writer: the narrow lobby read functions of migration `0021` (T-0040) raise it transaction-locally for their own three-column read and restore the caller's value before returning |
+| `app.is_system_admin` | `true` or unset (widens `project_isolation_policy` to every project row of the tenant, ADR 0016): the caller's own `system_admin` grant, loaded at authentication through the admin module's lookup (`access.register_admin_grant_lookup`; on PostgreSQL the `SECURITY DEFINER` function `kerp_caller_admin_grants()`) in the same unit of work that reads the memberships (T-0014). The only other writer: the narrow lobby read functions of migration `0021` (T-0040) raise it transaction-locally for their own three-column read and restore the caller's value before returning |
 
 The scope resolver runs bound to the caller (`TenancyContext(tid, user_id=sub)`), so the
 own-rows clauses let it read the caller's memberships and grants without depending on what it
@@ -202,8 +248,13 @@ the helper output as replayed before T-0033 (it already includes that policy), s
 ## Contract tests
 
 `tests/test_rls_bypass.py` covers the four bypass paths: SAQ worker, cross-module service
-call, raw-SQL aggregation, DB migration. It needs PostgreSQL and runs in CI's PostgreSQL step
-as the `NOSUPERUSER NOBYPASSRLS` role `kerp_app` (skipped elsewhere, TD-052).
+call, raw-SQL aggregation, DB migration, each for a non-admin and a `system_admin` session (ADR
+0016: every project of its tenant, no tenant-level writes from a project session, never another
+tenant; a job never inherits the flag; migration `0035` up and down). It needs PostgreSQL and
+runs in CI's PostgreSQL step as the `NOSUPERUSER NOBYPASSRLS` role `kerp_app` (skipped
+elsewhere, TD-052). `tests/test_rls_system_admin.py` checks every project table's policy at
+head and real audit/job records; `tests/test_tenancy_system_admin.py` the ORM mirror on both
+dialects and the forged-flag cases.
 `tests/test_rls_multi_project.py` covers the allowed list under RLS the same way, and
 `tests/test_rls_admin.py` the membership-based and admin-grant policies (T-0014),
 `tests/test_rls_team_grants.py` the derived-row write rule and the census function (T-0073).

@@ -4,9 +4,9 @@
 outage between the request's commit and its enqueue). The rows stay under RLS, so the sweep
 runs per scope; ``deployment_scopes`` lists them: the deployment tenant's tenant-level scope
 plus one per live project. The project list is read in a tenant-level unit of work bound with
-``is_system_admin=True`` (owner decision 2026-11-15): that flag reads every project row and
-never a project-scoped record, so no BYPASSRLS is needed. The sweep's own sessions carry the
-bare scope only.
+``is_system_admin=True`` (owner decision 2026-11-15): that flag reads every project row (and,
+since ADR 0016, every project's records of the tenant; the read touches only the project rows),
+so no BYPASSRLS is needed. The sweep's own sessions carry the bare scope only.
 
 ``hourly_project_jobs`` (T-0215) queues, once an hour, every kind a module registered with
 ``registry.schedule_hourly_per_project`` (e.g. the uploads orphan sweep) in every live project.
