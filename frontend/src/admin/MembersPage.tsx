@@ -20,6 +20,7 @@ import {
   type GrantIn,
   type UserSummary,
 } from "./api";
+import { PendingInvites } from "./PendingInvites";
 import { PersonaFields, SITE_PERSONA, toGrants, type Persona } from "./personas";
 import { PROJECTS_KEY } from "./ProjectsPage";
 import { BUTTON, Dialog, INPUT, PRIMARY } from "./ui";
@@ -179,6 +180,7 @@ export function MembersPage() {
           );
         })}
       </ul>
+      {!forbidden && <PendingInvites projectId={projectId} />}
     </section>
   );
 }

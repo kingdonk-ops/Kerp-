@@ -7,6 +7,10 @@ import { ProjectsPage } from "../admin/ProjectsPage";
 import { SystemGrantsPage } from "../admin/SystemGrantsPage";
 import { RequireAuth } from "../auth/RequireAuth";
 import { SSO_RETURN_PATH } from "../auth/sso";
+import { InvitePage } from "../invite/InvitePage";
+import { INVITE_PATH } from "../invite/pendingInvite";
+import { FORGOT_PASSWORD_PATH, PasswordEmailPage } from "../password/PasswordEmailPage";
+import { RESET_PASSWORD_PATH, ResetPasswordPage } from "../password/ResetPasswordPage";
 import { HomePage } from "../pages/HomePage";
 import { LobbyPage } from "../pages/LobbyPage";
 import { LoginPage } from "../pages/LoginPage";
@@ -19,6 +23,10 @@ import { LOBBY_PATH, NAV_GROUPS } from "./nav";
 export const routes: RouteObject[] = [
   { path: "/login", element: <LoginPage /> },
   { path: SSO_RETURN_PATH, element: <SsoReturnPage /> },
+  // Invite and password screens (T-0053): outside the guard, they serve signed-out users too.
+  { path: INVITE_PATH, element: <InvitePage /> },
+  { path: FORGOT_PASSWORD_PATH, element: <PasswordEmailPage /> },
+  { path: RESET_PASSWORD_PATH, element: <ResetPasswordPage /> },
   {
     element: <RequireAuth />,
     children: [
