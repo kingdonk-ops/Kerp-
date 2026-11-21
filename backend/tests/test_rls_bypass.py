@@ -50,6 +50,7 @@ from app.modules.jobs.broker import LoopDispatcher, SaqBroker
 from app.modules.jobs.models import Job
 from app.modules.jobs.registry import JobContext, JobKind, JobRegistry
 from app.modules.jobs.worker import build_workers
+from tests import pg_databases
 from tests.audit_support import migrated_database
 from tests.db_support import ON_POSTGRES, Gadget, Widget, postgres_url
 from tests.tenancy_support import (
@@ -398,7 +399,10 @@ def test_runtime_role_cannot_bypass_rls(db: Database) -> None:
 
 @pytest.mark.skipif(not OWNER_URL, reason="needs KERP_TEST_OWNER_URL (set in CI) (TD-052)")
 def test_superuser_role_is_reported() -> None:
-    engine = create_engine(OWNER_URL)
+    # Role attributes are cluster-wide; with per-test databases use the maintenance database,
+    # never the template source another worker may be copying (T-0083, PR #141 review).
+    url = pg_databases.owner_url("postgres") if pg_databases.PER_TEST else OWNER_URL
+    engine = create_engine(url)
     try:
         assert any("SUPERUSER" in p for p in rls_enforcement_problems(engine))
     finally:

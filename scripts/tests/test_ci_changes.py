@@ -142,15 +142,57 @@ def test_cli_args_and_stdin(
 ) -> None:
     monkeypatch.setattr(ci_changes, "FIXTURES", fixtures)
     assert ci_changes.main(["tracker/tasks/T-0001.md", "docs/TODO.md"]) == 0
-    assert capsys.readouterr().out == "docs_or_tracker_only=true\n"
+    assert capsys.readouterr().out == "docs_or_tracker_only=true\nbackend_needed=false\n"
     assert ci_changes.main(["backend/app/main.py"]) == 0
-    assert capsys.readouterr().out == "docs_or_tracker_only=false\n"
+    assert capsys.readouterr().out == "docs_or_tracker_only=false\nbackend_needed=true\n"
+    assert ci_changes.main(["frontend/src/App.tsx"]) == 0
+    assert capsys.readouterr().out == "docs_or_tracker_only=false\nbackend_needed=false\n"
     monkeypatch.setattr(sys, "stdin", io.StringIO("tracker/tasks/T-0001.md\ndocs/TASKS.md\n"))
     assert ci_changes.main([]) == 0
-    assert capsys.readouterr().out == "docs_or_tracker_only=true\n"
+    assert capsys.readouterr().out == "docs_or_tracker_only=true\nbackend_needed=false\n"
     monkeypatch.setattr(sys, "stdin", io.StringIO(""))
     assert ci_changes.main([]) == 0
-    assert capsys.readouterr().out == "docs_or_tracker_only=false\n"
+    assert capsys.readouterr().out == "docs_or_tracker_only=false\nbackend_needed=true\n"
+
+
+# --- T-0083: frontend-only PRs skip the backend jobs -------------------------------------
+
+
+def test_frontend_only_change_does_not_need_the_backend(fixtures: Path) -> None:
+    paths = ["frontend/src/App.tsx", "frontend/package.json", "frontend/vite.config.ts"]
+    assert ci_changes.needs_backend(paths, fixtures) is False
+    with_docs = [*paths, "docs/spec/README.md", "tracker/tasks/T-0001.md", ".claude/a.md"]
+    assert ci_changes.needs_backend(with_docs, fixtures) is False
+
+
+@pytest.mark.parametrize(
+    "other",
+    [
+        "backend/app/main.py",
+        "infra/postgres/initdb/20-kerp-app.sql",
+        "tests/contract/conformance_fixtures.json",
+        ".github/workflows/ci.yml",
+        "scripts/ci_gate.py",
+        "docker-compose.yml",
+        "Makefile",
+        "e2e/tests/a.spec.ts",
+        "README.md",
+        "frontendx/a.ts",
+    ],
+)
+def test_anything_else_needs_the_backend(fixtures: Path, other: str) -> None:
+    assert ci_changes.needs_backend(["frontend/src/App.tsx", other], fixtures) is True
+    assert ci_changes.needs_backend([other], fixtures) is True
+
+
+def test_conformance_cited_todo_needs_the_backend(fixtures: Path) -> None:
+    assert ci_changes.needs_backend(["frontend/src/a.ts", "tracker/todo/TD-900.md"], fixtures)
+    assert not ci_changes.needs_backend(["frontend/src/a.ts", "tracker/todo/TD-901.md"], fixtures)
+
+
+def test_empty_change_list_needs_the_backend(fixtures: Path) -> None:
+    assert ci_changes.needs_backend([], fixtures) is True
+    assert ci_changes.needs_backend(["  "], fixtures) is True
 
 
 def test_detect_job_uses_the_script_on_pull_requests_only() -> None:
@@ -162,3 +204,11 @@ def test_detect_job_uses_the_script_on_pull_requests_only() -> None:
     assert "BASE_REF: ${{ github.base_ref }}" in detect
     run = detect.split("run: |", 1)[1]
     assert "${{" not in run  # inputs reach the shell through env only
+    # T-0083: the backend flag also depends on backend_needed; frontend/e2e do not.
+    assert "backend_needed=false" in run
+    backend_flag = next(line for line in run.splitlines() if "backend_flag() {" in line)
+    assert '[ "$backend_needed" = true ] && flag backend/pyproject.toml' in backend_flag
+    assert 'echo "backend=$(backend_flag)"' in run
+    for other in ('echo "frontend=', 'echo "e2e='):
+        line = next(line for line in run.splitlines() if other in line)
+        assert "backend_needed" not in line

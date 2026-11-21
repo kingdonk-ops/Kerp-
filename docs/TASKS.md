@@ -3,11 +3,11 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 74/278 tasks done (27%) · **ready now:** 27 · **epics awaiting breakdown:** 48
+**Overall:** 75/278 tasks done (27%) · **ready now:** 26 · **epics awaiting breakdown:** 48
 
 | Phase | Tasks done | Progress |
 |---|---|---|
-| 0 · Platform foundations | 74/112 | `██████░░░░` 66% |
+| 0 · Platform foundations | 75/112 | `██████░░░░` 67% |
 | 1 · Asset & Quality backbone | 0/140 (+1 epics) | `░░░░░░░░░░` 0% |
 | 2 · Welding quality | 0/11 | `░░░░░░░░░░` 0% |
 | 3 · Logistics | 0/2 (+7 epics) | `░░░░░░░░░░` 0% |
@@ -114,7 +114,7 @@
 | ✅ | [T-0082](../tracker/tasks/T-0082.md) | CI speed 2: PostgreSQL tests on a per-test copy of a migrated template database, pytest-xdist on PostgreSQL, fsync-off CI Postgres, coverage floor on the PostgreSQL run | platform | M | T-0081 | #141 |
 | ⬜ | [T-0219](../tracker/tasks/T-0219.md) | admin: deployment stats (counts + byte totals via module stats providers under normal RLS) and health probes at /api/v1/admin/system | admin | M | T-0014, T-0015, T-0016, T-0039, T-0218, T-0274 |  |
 | ▶ | [T-0220](../tracker/tasks/T-0220.md) | jobs: queue monitor API for System admins (queue depths, cron runs, failed jobs without payloads, retry/abort) | jobs | S | T-0015, T-0214, T-0039 |  |
-| ▶ | [T-0083](../tracker/tasks/T-0083.md) | CI speed 3: frontend-only PRs skip the backend jobs (per-component change detection in ci.yml detect) | platform | S | T-0082 |  |
+| ✅ | [T-0083](../tracker/tasks/T-0083.md) | CI speed 3: frontend-only PRs skip the backend jobs (per-component change detection in ci.yml detect) | platform | S | T-0082 | #142 |
 | ⬜ | [T-0221](../tracker/tasks/T-0221.md) | uploads: quarantine monitor API — rejected/verifying/expired upload rows and counts of every project, re-check stuck files, sweep now | uploads | S | T-0218, T-0215, T-0039, T-0274 |  |
 | ⬜ | [T-0222](../tracker/tasks/T-0222.md) | admin: read-only audit explorer over the hash-chain ledger (filters, verify one chain, verify all as a batch job) | admin | M | T-0006, T-0043, T-0039, T-0015, T-0274 |  |
 | ▶ | [T-0223](../tracker/tasks/T-0223.md) | projects: per-project legal hold (flag + reason, System admin only, audited) blocking soft delete with 409 LEGAL_HOLD_ACTIVE (ADR) | projects | S | T-0012, T-0039 |  |
