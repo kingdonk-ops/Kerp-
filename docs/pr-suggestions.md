@@ -3,7 +3,58 @@
 > **Generated — do not hand-edit.** Rebuild with `python scripts/pr_suggestions.py rebuild`.
 > A running digest of everything agents surfaced on merged PRs — review notes, must-fix items, suggestions, nits, follow-ups and ideas — so nothing is lost after a squash-merge. Formal follow-ups also live as `TD-xxx` in `tracker/todo/` and on [TODO.md](TODO.md); this file is the readable skim. Each item links back to its PR or review for full context.
 
-_Repo `kingdonk-ops/Kerp-`, base `dev` · 144 merged PRs · 143 with surfaced notes._
+_Repo `kingdonk-ops/Kerp-`, base `dev` · 145 merged PRs · 144 with surfaced notes._
+
+---
+
+## PR #147 — T-0026: Admin UI: System admin grants (appoint Project Admins), user manager, project creation, persona + site scope assignment with SoD warning
+task `T-0026` · merged 2026-11-21 · by `kingdonk-ops` · [PR](https://github.com/kingdonk-ops/Kerp-/pull/147)
+
+**TODOs raised**
+
+- TD-447 (deferred) — Users screen
+- TD-448 (deferred) — Playwright journey after T-0027
+- TD-449 (later) — expose `create_projects` on `/auth/me` (New project is shown to everyone today; a 403 is explained)
+- TD-450 (later) — edit project code and spatial bounds in Settings
+
+**Review by `kingdonk-ops` — KERP-REVIEW: CHANGES_REQUESTED patch-id=1b3a9022e24eb9c9ce0ea8a8f2580e0a5af2c3f7** · [full review](https://github.com/kingdonk-ops/Kerp-/pull/147#pullrequestreview-6003748492)
+
+- _Must fix_
+  1. **`frontend/src/admin/api.ts:301-304` and `frontend/src/admin/MembersPage.tsx:211` — a user's PER-07 grants for other sites are silently revoked.** The backend allows one PER-07 grant per site: `MemberAssign` only rejects repeats of the pair (persona, site_node_id) (`backend/app/modules/admin/schemas.py:116`), and `PUT` replaces the user's whole individual set (`service.assign_member`). The client loses these grants in two places:
+     - `addToProjects` stores the merged grants in a map keyed by persona only, so the new PER-07 grant replaces any existing PER-07 grant for another site.
+     - The Edit dialog has a single site field. A member with PER-07 on sites X and Y who gets any unrelated persona edited is saved with only one PER-07 grant, and the other site is revoked.
+     Fixed means: merge by `(persona, site_node_id)`; Edit keeps PER-07 grants it does not show (or lists each site so it can be removed separately); and a test with two PER-07 sites proves both are still in the `PUT` body after an unrelated edit and after "add to projects".
+  2. **`frontend/src/admin/MembersPage.tsx:224-225`, `:268` and `api.ts:292` — the PER-07 site id is copied into other projects.** `site_node_id` is an asset node in the current project's hierarchy. "Add to several projects" sends the same id to every ticked project, and `assign_member` does not check that the node belongs to the project, so those projects end up with a wrong site scope. Fixed means: while PER-07 is chosen, the other-projects choice is disabled or hidden (with a short explanation), or each project needs its own site. Add 
+
+- _Suggestions (non-blocking)_
+  - `AssignDialog` can show its own warning: `onSite` does not clear `pending`, so changing the site after a SoD warning and then pressing "Save anyway" sends the new site with `confirm_sod: true`. SoD depends only on the personas, so this is harmless, but clearing `pending` on a site change would keep the dialog consistent.
+  - If a multi-project add fails part-way with an error other than SoD (for example a 403 on one project), the generic error does not say which projects were already saved. Retrying is safe because the merge gives the same result, but naming the failed project would help.
+  - Already flaky on `dev` (not this PR's tests): `AccessRequestsPage.test.tsx` and `ProjectSwitcher.test.tsx` also fail under 3-way parallel load. This is worth a `later` TODO.
+
+**Review by `kingdonk-ops` — KERP-REVIEW: APPROVED patch-id=6ffd02636dcae075dae4290a2e5418bebe240ca8** · [full review](https://github.com/kingdonk-ops/Kerp-/pull/147#pullrequestreview-6003874225)
+
+- _Must fix_
+  None.
+
+- _Suggestions (non-blocking)_
+  - `MembersPage.tsx:156`: the grant list key is `${g.persona}-${g.source_id ?? "direct"}`. A member with two direct PER-07 sites (now a supported case) therefore renders duplicate keys. React logs "Encountered two children with the same key, `PER-07-direct`" in the "keeps every PER-07 site" test. Add `site_node_id` to the key. I could not produce a visible rendering error, so this does not block.
+  - No test covers "any dialog change clears a pending SoD warning" (`MembersPage.tsx:256-261`): removing `setPending([])` keeps all tests green. A short test would be: warn, toggle a persona, assert the warning is gone and the button reads Save.
+  - `MembersPage.test.tsx`: the first test no longer asserts the title is an `h1` (now `findByText`). Consider keeping a cheap `getByRole("heading", { level: 1 })` check after the text wait.
+  - T-0331 is sized S, but it covers two audiences, invite listing / re-send / revoke, and SoD. The planner may want M, or a split if it grows past ~300 lines.
+  - AccessRequestsPage tests still use the 5 s default timeout and flake under parallel load. The same `testTimeout`/`WAIT` treatment would help (separate PR / `later` TODO).
+  KERP-REVIEW: APPROVED patch-id=6ffd02636dcae075dae4290a2e5418bebe240ca8
+  ---
+  _Generated by [Claude Code](https://claude.ai/code)_
+
+**Review by `kingdonk-ops` — KERP-REVIEW: APPROVED patch-id=32191a80556ed6b7c6fb40b2d12d8077cb868912** · [full review](https://github.com/kingdonk-ops/Kerp-/pull/147#pullrequestreview-6004018083)
+
+## KERP review - post-rebase re-check (not a full round)
+
+This is a re-check of the round-2 approval of 06396a3 (marker `APPROVED patch-id=6ffd0263...`, present on the PR). The branch was rebased onto dev a9d2ba0 (adds #146) and the coordinator added merge bookkeeping, so the patch-id changed.
+
+Compared:
+- `git range-diff 8d765ff..06396a3 origin/dev..HEAD`: commits 1 and 4 differ only by moved context/hunk offsets. Commits 2 and 3 are equal. Commits 5 and 6 are new bookkeeping (T-0026 done + pr-suggestions).
+- Non-tracker diff (excluding docs/TASKS.md, docs/TODO.md, docs/pr-suggestions.md), `+`/`-` lines at -U0: byte-identical between `8d765ff..06396a3` and `origin/dev...HEAD` (19 files, 171 …
 
 ---
 
