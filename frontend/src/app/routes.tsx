@@ -2,6 +2,9 @@ import type { RouteObject } from "react-router";
 
 import { AccessRequestsPage } from "../admin/AccessRequestsPage";
 import { AdminDevicesPage, MyDevicesPage } from "../admin/DevicesPage";
+import { MembersPage } from "../admin/MembersPage";
+import { ProjectsPage } from "../admin/ProjectsPage";
+import { SystemGrantsPage } from "../admin/SystemGrantsPage";
 import { RequireAuth } from "../auth/RequireAuth";
 import { SSO_RETURN_PATH } from "../auth/sso";
 import { HomePage } from "../pages/HomePage";
@@ -31,6 +34,9 @@ export const routes: RouteObject[] = [
           })),
           { path: "admin/access-requests", element: <AccessRequestsPage /> },
           { path: "admin/system/devices", element: <AdminDevicesPage /> },
+          { path: "admin/system/grants", element: <SystemGrantsPage /> },
+          { path: "admin/projects/:projectId/members", element: <MembersPage /> },
+          { path: "backbone/projects", element: <ProjectsPage /> },
           { path: MY_DEVICES_PATH.slice(1), element: <MyDevicesPage /> },
           { path: "*", element: <NotFoundPage /> },
         ],

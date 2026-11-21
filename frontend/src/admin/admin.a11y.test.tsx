@@ -1,4 +1,4 @@
-// Admin access-request inbox and device screens (T-0051) with their dialogs open: WCAG 2.1
+// Admin screens (T-0051, T-0026) with their dialogs open: WCAG 2.1
 // AA, contrast and 48 px glove targets in both themes on the field breakpoints (diff §6.3).
 import { fireEvent, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
@@ -7,7 +7,11 @@ import { i18n } from "../i18n";
 import { auditA11y, FIELD_VIEWPORTS, formatFindings, setViewport } from "../test/a11y";
 import { FAKE_USER, json } from "../test/fakeApi";
 import { applyTheme, THEMES } from "../theme/theme";
-import { ADMIN_PROJECT, renderAdmin } from "./testing";
+import { ADMIN_PROJECT, project, renderAdmin } from "./testing";
+
+// The T-0026 cases wait on mocked round-trips through the whole shell (slow under load).
+const WAIT = { timeout: 5000 };
+const SLOW = 20_000;
 
 const REQUEST = {
   id: "00000000-0000-4000-8000-000000000201",
@@ -53,6 +57,62 @@ describe.each(THEMES)("admin screens in the %s theme", (theme) => {
       const findings = await auditA11y(document.body, theme);
       expect(findings, formatFindings(findings)).toEqual([]);
     });
+
+    it("admin grants", async () => {
+      await setViewport(viewport);
+      renderAdmin(
+        "/admin/system/grants",
+        {
+          "GET /api/v1/admin/users": () => json([{ ...FAKE_USER, is_active: true, is_internal: true }]),
+          "GET /api/v1/admin/grants": () => json([{ ...FAKE_USER, user_id: FAKE_USER.id, grant: "system_admin" }]),
+        },
+        { theme, systemAdmin: true },
+      );
+      await screen.findByText(FAKE_USER.email, {}, WAIT);
+
+      const findings = await auditA11y(document.body, theme);
+      expect(findings, formatFindings(findings)).toEqual([]);
+    }, SLOW);
+
+    it("projects with the new-project dialog", async () => {
+      await setViewport(viewport);
+      renderAdmin("/backbone/projects", { "GET /api/v1/projects": () => json([project()]) }, { theme });
+      await screen.findByText(i18n.t("admin.projects.members"), {}, WAIT);
+      fireEvent.click(screen.getByRole("button", { name: i18n.t("admin.projects.new") }));
+
+      const findings = await auditA11y(document.body, theme);
+      expect(findings, formatFindings(findings)).toEqual([]);
+    }, SLOW);
+
+    it("project members with the assign dialog and the SoD warning", async () => {
+      await setViewport(viewport);
+      const member = {
+        user_id: REQUEST.requester.id,
+        email: REQUEST.requester.email,
+        display_name: REQUEST.requester.display_name,
+        grants: [
+          { persona: "PER-06", site_node_id: null, source: "direct", source_id: null, team_name: null },
+          { persona: "PER-07", site_node_id: "00000000-0000-4000-8000-000000000401", source: "direct", source_id: null, team_name: null },
+        ],
+      };
+      renderAdmin(
+        `/admin/projects/${ADMIN_PROJECT.id}/members`,
+        {
+          "GET /api/v1/projects": () => json([project()]),
+          [`GET /api/v1/admin/projects/${ADMIN_PROJECT.id}/members`]: () => json([member]),
+          [`PUT /api/v1/admin/projects/${ADMIN_PROJECT.id}/members/${member.user_id}`]: () =>
+            json({ detail: { code: "sod_confirmation_required", sod_warning: true } }, 409),
+        },
+        { theme },
+      );
+      fireEvent.click(await screen.findByText(i18n.t("admin.members.edit"), {}, WAIT));
+      fireEvent.click(screen.getByRole("checkbox", { name: /PER-09/ }));
+      fireEvent.click(screen.getByRole("button", { name: i18n.t("admin.members.save") }));
+      await within(screen.getByRole("dialog")).findByRole("alert", {}, WAIT);
+
+      const findings = await auditA11y(document.body, theme);
+      expect(findings, formatFindings(findings)).toEqual([]);
+    }, SLOW);
 
     it("my devices with the revoke dialog", async () => {
       await setViewport(viewport);

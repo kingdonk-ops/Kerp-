@@ -112,8 +112,13 @@ describe("app shell", () => {
     renderApp("/", setup());
 
     const nav = await screen.findByRole("navigation", { name: i18n.t("nav.label") });
-    const links = within(nav).getAllByRole("link");
+    // The group links, then the built items under them (Backbone → Projects, T-0026).
+    const all = within(nav).getAllByRole("link");
+    const links = all.filter((l) => NAV_GROUPS.some((g) => l.getAttribute("href") === g.path));
     expect(links).toHaveLength(8);
+    expect(all.filter((l) => !links.includes(l)).map((l) => l.getAttribute("href"))).toEqual([
+      "/backbone/projects",
+    ]);
     expect(NAV_GROUPS).toHaveLength(8);
     expect(NAV_GROUPS.filter((g) => g.pillar).map((g) => g.id)).toEqual([
       "logistics",
