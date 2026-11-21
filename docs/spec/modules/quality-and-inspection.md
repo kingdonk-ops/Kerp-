@@ -1269,8 +1269,8 @@ language (fallback `en`; only English ships, TD-172). Empty values print blank: 
 ### 11. Calendar
 
 - **API** `GET /api/v1/projects/{project_id}/inspection-requests/calendar?from=&to=&discipline=&status=&mine=`
-  (range ≤ 62 days, else 422): one event per slot of issued requests (drafts only for their
-  creator): slot and request ids, RFI no., discipline, inspection type, status, start, end
+  (range ≤ 62 days, else 422): one event per slot of issued requests (draft slots only for
+  internal members): slot and request ids, RFI no., discipline, inspection type, status, start, end
   (`start + duration_minutes`), anchor codes, `location_ref`, strongest external point, result
   label; times in UTC with the project's IANA time zone. `mine=true` limits to slots where the
   caller is requester, named witness or (PER-15) call-out recipient. Several slots on one day and
