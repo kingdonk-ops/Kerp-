@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 345 · **Closed:** 148
+**Open:** 349 · **Closed:** 149
 
 ## decision (39)
 
@@ -49,7 +49,7 @@
 | [TD-484](../tracker/todo/TD-484.md) | RFI notification e-mail: may it carry the date/time/location, the RFI PDF attachment and an .ics invite, and go to client distribution addresses without a KERP account? | T-0335 | planner |
 | [TD-486](../tracker/todo/TD-486.md) | RFI witness check: may an unmet hold-point (H) witness requirement be overridden per record (ADR 0004 Amendment A), or is it non-overridable? | T-0333 | planner |
 
-## spec-gap (69)
+## spec-gap (70)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -122,8 +122,9 @@
 | [TD-496](../tracker/todo/TD-496.md) | Health probe 'degraded' is undefined in diff §4.7: planner default slow (> 1 s) or stub scanner | T-0219 | implementer |
 | [TD-500](../tracker/todo/TD-500.md) | GET /me/projects does not return per-project capabilities; the frontend mirrors the backend persona matrix to gate A/S actions (projects/capabilities.tsx) | T-0276 | implementer |
 | [TD-503](../tracker/todo/TD-503.md) | T-0027 rule-set step: AC names a CEL variable and an API path that do not exist (context.qty, /api/v1/projects/{id}/rule-sets) | T-0027 | implementer |
+| [TD-505](../tracker/todo/TD-505.md) | Runtime settings registry: categories, the unit and ceiling of max_upload_size_mb, and client-visible flags are implementer readings | T-0230 | implementer |
 
-## missed (9)
+## missed (8)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -134,10 +135,9 @@
 | [TD-327](../tracker/todo/TD-327.md) | Frontend i18n key notifications.kind.access_requests.requested for the inbox (needed when the access-request UI lands) | T-0050 | reviewer |
 | [TD-337](../tracker/todo/TD-337.md) | Web/Android route /magic-link#<token> that redeems the e-mailed sign-in link (POST /auth/magic-link/redeem); the e-mail now links there | T-0058 | implementer |
 | [TD-388](../tracker/todo/TD-388.md) | saved_views: wire the my_teams filter op | T-0074 | reviewer |
-| [TD-463](../tracker/todo/TD-463.md) | Server: refuse self-deactivation on PATCH /admin/users/{id} (Admin → Users only hides the button) | T-0331, T-0085 | implementer |
 | [TD-487](../tracker/todo/TD-487.md) | Frontend: Admin -> System grants page needs the SoD confirm step for system_admin on a hold-authority holder (POST /admin/grants 409 sod_confirmation_required, confirm_sod), plus the same warning for hold personas on system_admins in member/invite/team UIs | T-0275 | implementer |
 
-## deferred (49)
+## deferred (50)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -190,8 +190,9 @@
 | [TD-495](../tracker/todo/TD-495.md) | Audit explorer at scale: no ledger index for the explorer filters; verify-all is one pass (1 h timeout, no progress or resume) | T-0222 | implementer |
 | [TD-501](../tracker/todo/TD-501.md) | Playwright journey for T-0276 (system_admin without membership opens project B; non-admin sees only its projects) once the e2e harness exists (T-0027) | T-0276 | implementer |
 | [TD-508](../tracker/todo/TD-508.md) | Verify the e2e suite on the make up compose stack, and give it its own database | T-0027 | implementer |
+| [TD-510](../tracker/todo/TD-510.md) | Deployment-config view lacks the mail reply-to of diff §4.7: Settings has no reply-to field yet | T-0230 | implementer |
 
-## later (138)
+## later (140)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -331,10 +332,12 @@
 | [TD-493](../tracker/todo/TD-493.md) | fields/form engine polish from the #156 review | T-0110 | reviewer |
 | [TD-498](../tracker/todo/TD-498.md) | Unskip the T-0027 module-toggle step when the first toggleable module merges | T-0027 | planner |
 | [TD-499](../tracker/todo/TD-499.md) | All-Projects for a system_admin who is a member of every project and holds no portfolio persona: /me/projects has no system_admin flag, so the picker cannot offer the scope | T-0276 | implementer |
+| [TD-504](../tracker/todo/TD-504.md) | Registry: reset an entry to its code default (delete the stored row) for the Settings screen T-0232 | T-0230 | implementer |
+| [TD-511](../tracker/todo/TD-511.md) | Drop the read-only oe_settings_deployment table (destructive migration, needs an ADR) | T-0230 | implementer |
 | [TD-512](../tracker/todo/TD-512.md) | Split the backend-pg CI job into parallel shards | T-0086 | coordinator |
 | [TD-513](../tracker/todo/TD-513.md) | CI: the SQLite backend job (~6.5 min) becomes the critical path once backend-pg is sharded | T-0086 | implementer |
 
-## bug (8)
+## bug (9)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -346,6 +349,7 @@
 | [TD-375](../tracker/todo/TD-375.md) | mypy 2.3.1 (local toolchain) reports var-annotated in app/core/audit/guard.py:66 and app/modules/admin/service.py:122 on untouched dev code | T-0052 | implementer |
 | [TD-471](../tracker/todo/TD-471.md) | CEL parity: divergences between celpy and cel-js found by the T-0110 edge probe (pinned as known_gap fixtures) | T-0110, T-0017 | implementer |
 | [TD-490](../tracker/todo/TD-490.md) | Admin -> Users invite form: a SoD 409 that returns after the user edited the form re-arms confirm_sod for the edited form (fields stay editable while the send is pending) | T-0331 | reviewer |
+| [TD-507](../tracker/todo/TD-507.md) | Local PostgreSQL test runs of parallel worktrees collide: template databases are named per xdist worker only | T-0230 | implementer |
 
 ## risk (33)
 
@@ -536,4 +540,5 @@
 | ✅ | [TD-447](../tracker/todo/TD-447.md) | Admin → Users screen (T-0026 remainder): System admin creates / deactivates / reactivates accounts (GET/POST/PATCH /admin/users); PER-09 invites by e-mail to one of its projects with persona(s) + site + SoD confirm, shows the link once, lists / re-sends / revokes open invites |  |
 | ✅ | [TD-451](../tracker/todo/TD-451.md) | Queue monitor: failed-job list and retry/abort see only job rows the caller's RLS shows until T-0274 (ADR 0016) lets a system_admin read every project's oe_jobs_job rows | Covered by T-0274 (ADR 0016, PR #151): a system_admin without a membership lists, retries and aborts any project's failed job in its tenant; other tenants stay 404 (test_a_system_admin_without_membership_lists_retries_and_aborts_any_projects_job, SQLite and PostgreSQL). Resolved when PR #151 is on dev. |
 | ✅ | [TD-456](../tracker/todo/TD-456.md) | Template settings and project-level records: confirm the planner defaults (preset table, health_safety area, informal submit is final, allows_project_level issue categories, at most one equipment link, MDR location overlap rule) | Product owner (user, 2026-11-21): all items approved except item 7 (discipline replacing issue_category). Decided instead: inspection templates keep the optional issue_category, pointing at the issue category value list, which holds non-discipline categories (vehicle, equipment, pre-start, general, ...) alongside disciplines (painting, blasting, ...), because e.g. issues from a vehicle pre-start have no discipline; raise-time fallback is issue_category x type (none -> general). There is no separate discipline field; the Templates list filters by area and issue category. |
+| ✅ | [TD-463](../tracker/todo/TD-463.md) | Server: refuse self-deactivation on PATCH /admin/users/{id} (Admin → Users only hides the button) | T-0085: the server refuses self-deactivation (409 CANNOT_DEACTIVATE_SELF, audited); the UI shows the message. |
 | ✅ | [TD-492](../tracker/todo/TD-492.md) | Phase 0 exit 'module toggled': no shipped module is toggleable yet (every manifest has toggleable=False), so the e2e journey cannot switch one off and on | User, 2026-11-21: planner default (a) accepted. T-0027 tests the refusals now (platform module 409, unknown module 404, state unchanged); the switch-off/switch-on step is test.skip with TD-492 in the reason until the first toggleable module merges, whose task removes the skip. |

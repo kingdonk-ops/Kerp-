@@ -3,11 +3,11 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 94/311 tasks done (30%) · **ready now:** 23 · **epics awaiting breakdown:** 49
+**Overall:** 96/311 tasks done (31%) · **ready now:** 23 · **epics awaiting breakdown:** 49
 
 | Phase | Tasks done | Progress |
 |---|---|---|
-| 0 · Platform foundations | 92/117 | `███████░░░` 79% |
+| 0 · Platform foundations | 94/117 | `████████░░` 80% |
 | 1 · Asset & Quality backbone | 2/168 (+2 epics) | `░░░░░░░░░░` 1% |
 | 2 · Welding quality | 0/11 | `░░░░░░░░░░` 0% |
 | 3 · Logistics | 0/2 (+7 epics) | `░░░░░░░░░░` 0% |
@@ -88,7 +88,7 @@
 | ✅ | [T-0053](../tracker/tasks/T-0053.md) | Invite link and password screens: one-click 'Join project' for signed-in users, invite token carried through sign-in, land in the project; create your password at invite acceptance, forgot password and reset password | frontend | M | T-0052, T-0042, T-0055, T-0026, T-0059, T-0077 | #152 |
 | ✅ | [T-0055](../tracker/tasks/T-0055.md) | Web sign-in with Microsoft (Entra ID SSO): button when enabled, callback landing, translated refusals | frontend | S | T-0054, T-0042 | #146 |
 | ✅ | [T-0084](../tracker/tasks/T-0084.md) | projects: module toggle API on the project path (/api/v1/projects/{project_id}/modules) with the admin guard, replacing the project-less core route (TD-122 for modules, TD-129) | projects | S | T-0011, T-0217, T-0014, T-0275 | #164 |
-| ▶ | [T-0085](../tracker/tasks/T-0085.md) | admin: the server refuses self-deactivation on PATCH /admin/users/{id} (409 CANNOT_DEACTIVATE_SELF, audited); Admin -> Users explains it (TD-463) | admin | S | T-0014, T-0331 |  |
+| ✅ | [T-0085](../tracker/tasks/T-0085.md) | admin: the server refuses self-deactivation on PATCH /admin/users/{id} (409 CANNOT_DEACTIVATE_SELF, audited); Admin -> Users explains it (TD-463) | admin | S | T-0014, T-0331 | #165 |
 | ✅ | [T-0331](../tracker/tasks/T-0331.md) | Admin → Users screen: System admin creates / deactivates / reactivates accounts; PER-09 invites a user by e-mail to one of its projects (persona(s) + site + SoD confirm), link shown once, open invites listed / re-sent / revoked | frontend | S | T-0026 | #154 |
 | ✅ | [T-0027](../tracker/tasks/T-0027.md) | Playwright setup + Phase 0 exit journey | e2e | M | T-0023, T-0024, T-0018, T-0012, T-0026, T-0034, T-0036, T-0084 | #166 |
 | ⚫ | [T-0056](../tracker/tasks/T-0056.md) | Transactional e-mails for access-request decisions (approve / reject) via the outbound e-mail service | admin | S | T-0050, T-0058 |  |
@@ -125,13 +125,13 @@
 | 🟦 | [T-0086](../tracker/tasks/T-0086.md) | CI speed 4: split backend-pg into parallel shards (deterministic file split, combined coverage floor) | platform | S | T-0083 |  |
 | ▶ | [T-0226](../tracker/tasks/T-0226.md) | core mail: delivery ledger — delivered status from SES delivery events, recipient_user_id/project_id/broadcast_id, stats and searchable history (ADR) | platform | M | T-0058 |  |
 | ▶ | [T-0227](../tracker/tasks/T-0227.md) | core mail: automated template overrides — per template + locale subject/text blocks with revisions, preview, test send to self, reset to shipped default | platform | M | T-0058, T-0039 |  |
-| ▶ | [T-0230](../tracker/tasks/T-0230.md) | settings: typed runtime settings registry extending T-0044 (code-declared entries, per-key storage, Redis cache + pub/sub invalidation, bounds 422, audit, no secrets) | settings | M | T-0044, T-0039, T-0006 |  |
+| ✅ | [T-0230](../tracker/tasks/T-0230.md) | settings: typed runtime settings registry extending T-0044 (code-declared entries, per-key storage, Redis cache + pub/sub invalidation, bounds 422, audit, no secrets) | settings | M | T-0044, T-0039, T-0006 | #167 |
 | ⬜ | [T-0228](../tracker/tasks/T-0228.md) | notifications: broadcast e-mail — server-side audience resolution (System admin tenant-wide, PER-09 own projects), batch dispatch, broadcast opt-out, per-broadcast stats | notifications | M | T-0019, T-0058, T-0226, T-0014, T-0049 |  |
-| ⬜ | [T-0231](../tracker/tasks/T-0231.md) | settings: client bootstrap config API GET /api/v1/settings/client (client-visible entries only) | settings | S | T-0230 |  |
+| ▶ | [T-0231](../tracker/tasks/T-0231.md) | settings: client bootstrap config API GET /api/v1/settings/client (client-visible entries only) | settings | S | T-0230 |  |
 | ▶ | [T-0224](../tracker/tasks/T-0224.md) | Frontend: Admin → System console — deployment stats + health, queue monitor, upload quarantine | frontend | M | T-0026, T-0219, T-0218, T-0221 |  |
 | ⬜ | [T-0225](../tracker/tasks/T-0225.md) | Frontend: Admin → System → Audit log (filters, verify chain, verify all) and legal-hold toggle on the project admin page | frontend | S | T-0026, T-0222, T-0223 |  |
 | ⬜ | [T-0229](../tracker/tasks/T-0229.md) | Frontend: Admin → Communications — broadcast composer, delivery stats and history, automated template editor | frontend | M | T-0026, T-0226, T-0227, T-0228 |  |
-| ⬜ | [T-0232](../tracker/tasks/T-0232.md) | Frontend: Admin → System → Settings — editable registry by category with bounds, read-only deployment configuration | frontend | S | T-0026, T-0230 |  |
+| ▶ | [T-0232](../tracker/tasks/T-0232.md) | Frontend: Admin → System → Settings — editable registry by category with bounds, read-only deployment configuration | frontend | S | T-0026, T-0230 |  |
 | ✅ | [T-0274](../tracker/tasks/T-0274.md) | tenancy: system_admin global project visibility (ADR 0016) — additive migration replacing project_isolation_policy on every project-scoped table through the frozen-DDL helper, ORM scope mirror, RLS contract tests updated | tenancy | M | T-0007, T-0014, T-0033 | #151 |
 | ✅ | [T-0275](../tracker/tasks/T-0275.md) | identity/projects: system_admin capabilities on every project (V, C, E, administer; never A or S), all projects in GET /projects and /me/projects, SoD warning for hold personas on system_admins | identity | S | T-0274, T-0010, T-0014, T-0042 | #158 |
 | ✅ | [T-0276](../tracker/tasks/T-0276.md) | Frontend: project picker and All-Projects scope show every project for a system_admin (badge for admin access without membership; no A/S actions) | frontend | S | T-0275, T-0042, T-0024 | #163 |

@@ -83,8 +83,9 @@ accounts) and T-0052 (invites). Everything goes through the generated client (`a
   credentials; the dialog says the person sets a password from an invite. **Deactivate** asks
   first (signed out at once), **Reactivate** does not; both `PATCH /admin/users/{id}` with
   `is_active` only. The caller's own row shows *(you)* and no button ("You cannot deactivate
-  your own account"; the server does not refuse it yet unless it is the last System admin,
-  TD-463). A `409` (the last active System admin) says so and the list is re-read.
+  your own account"). The server refuses it anyway (T-0085): a `409` with
+  `code: CANNOT_DEACTIVATE_SELF` (stale list, second tab) shows `admin.users.cannotDeactivateSelf`;
+  any other `409` (the last active System admin) says so. Either way the list is re-read.
 - **Invite to a project** (PER-09 holders and System admins): the project (a PER-09 sees only
   the projects it administers, from `/me/projects`; a System admin every project of
   `GET /projects`), the e-mail and persona(s) + site (`PersonaFields`, PER-07 needs its site).

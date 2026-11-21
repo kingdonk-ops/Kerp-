@@ -1,4 +1,4 @@
-"""Request and response shapes of ``/api/v1/settings/deployment`` (T-0044, diff §4.4).
+"""Request and response shapes of ``/api/v1/settings`` (T-0044, T-0230; diff §4.4, §4.7).
 
 Integers are strict (a JSON integer, never a boolean, float or numeric string). The project
 defaults use the same validation as a project's own settings (``app.core.locale``).
@@ -8,7 +8,16 @@ from __future__ import annotations
 
 from typing import Annotated, Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StrictBool,
+    StrictFloat,
+    StrictInt,
+    StrictStr,
+    model_validator,
+)
 
 from app.core.locale import Currency, Locale, TimeZone
 from app.modules.settings.models import (
@@ -79,3 +88,65 @@ def grace_error(window: int) -> str:
         f"offline_grace_hours may be at most 24 x offline_window_days"
         f" ({HOURS_PER_DAY * window} for a {window}-day window)"
     )
+
+
+# --- runtime settings registry (T-0230, diff §4.7) ------------------------------------------
+
+# A registry value as JSON. Strict, so ``true`` stays a boolean and ``"7"`` a string; the
+# entry's own type and bounds are checked by the registry.
+SettingJson = StrictBool | StrictInt | StrictFloat | StrictStr | list[StrictInt]
+SettingKind = Literal["int", "float", "bool", "string", "enum", "int_list"]
+
+
+class SettingEntryRead(BaseModel):
+    """One registry entry with the deployment's effective value."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    key: str
+    category: str
+    type: SettingKind
+    description: str
+    value: SettingJson = Field(description="The effective value (the default while not set)")
+    default: SettingJson
+    is_default: bool = Field(description="No value is stored: the code default applies")
+    minimum: int | float | None = Field(description="Lowest number (each item of an int_list)")
+    maximum: int | float | None = Field(description="Highest number (each item of an int_list)")
+    choices: list[str] = Field(description="The values of an enum entry")
+    max_length: int | None = Field(description="Longest string, or most items of an int_list")
+    client_visible: bool = Field(description="Returned to signed-in clients at bootstrap")
+    cap: int | float | None = Field(
+        description="The deployment-configuration limit the value can never exceed"
+    )
+    cap_source: str | None = Field(description="The environment variable that sets the cap")
+
+
+class SettingValueUpdate(BaseModel):
+    """``PATCH /registry/{key}``: the new value. Out of bounds is 422, never clamped."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    value: SettingJson
+
+
+class LockoutScheduleRead(BaseModel):
+    free_attempts: int = Field(description="Wrong PINs before the first delay")
+    base_delay_seconds: int
+    max_delay_seconds: int
+    max_attempts: int | None = Field(description="Wrong PINs before the device must sign in")
+
+
+class DeploymentConfigRead(BaseModel):
+    """Read-only deployment configuration: set by the environment, never a secret."""
+
+    refresh_token_hours: int
+    pin_idle_minutes: int
+    pin_lockout: LockoutScheduleRead
+    region: str = Field(description="AWS region of the deployment (SES, SNS)")
+    storage_region: str = Field(description="AWS region of the object storage")
+    mail_transport: Literal["ses", "log"]
+    mail_from_address: str | None
+    upload_scanner: Literal["stub", "clamd"]
+    upload_max_bytes: int
+    upload_url_seconds: int
+    ai_provider: Literal["none"]

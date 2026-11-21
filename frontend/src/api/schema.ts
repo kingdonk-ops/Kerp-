@@ -564,6 +564,57 @@ export interface paths {
         patch: operations["update_deployment_settings_api_v1_settings_deployment_patch"];
         trace?: never;
     };
+    "/api/v1/settings/registry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Registry */
+        get: operations["read_registry_api_v1_settings_registry_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/settings/registry/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Registry Entry */
+        patch: operations["update_registry_entry_api_v1_settings_registry__key__patch"];
+        trace?: never;
+    };
+    "/api/v1/settings/deployment-config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Deployment Config */
+        get: operations["read_deployment_config_api_v1_settings_deployment_config_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects": {
         parameters: {
             query?: never;
@@ -2568,6 +2619,48 @@ export interface components {
             detail: string | null;
         };
         /**
+         * DeploymentConfigRead
+         * @description Read-only deployment configuration: set by the environment, never a secret.
+         */
+        DeploymentConfigRead: {
+            /** Refresh Token Hours */
+            refresh_token_hours: number;
+            /** Pin Idle Minutes */
+            pin_idle_minutes: number;
+            pin_lockout: components["schemas"]["LockoutScheduleRead"];
+            /**
+             * Region
+             * @description AWS region of the deployment (SES, SNS)
+             */
+            region: string;
+            /**
+             * Storage Region
+             * @description AWS region of the object storage
+             */
+            storage_region: string;
+            /**
+             * Mail Transport
+             * @enum {string}
+             */
+            mail_transport: "ses" | "log";
+            /** Mail From Address */
+            mail_from_address: string | null;
+            /**
+             * Upload Scanner
+             * @enum {string}
+             */
+            upload_scanner: "stub" | "clamd";
+            /** Upload Max Bytes */
+            upload_max_bytes: number;
+            /** Upload Url Seconds */
+            upload_url_seconds: number;
+            /**
+             * Ai Provider
+             * @constant
+             */
+            ai_provider: "none";
+        };
+        /**
          * DeploymentSettingsRead
          * @description The effective deployment settings (the shipped defaults until a System admin edits).
          */
@@ -3625,6 +3718,23 @@ export interface components {
         LobbyVisibility: {
             /** Visible In Lobby */
             visible_in_lobby: boolean;
+        };
+        /** LockoutScheduleRead */
+        LockoutScheduleRead: {
+            /**
+             * Free Attempts
+             * @description Wrong PINs before the first delay
+             */
+            free_attempts: number;
+            /** Base Delay Seconds */
+            base_delay_seconds: number;
+            /** Max Delay Seconds */
+            max_delay_seconds: number;
+            /**
+             * Max Attempts
+             * @description Wrong PINs before the device must sign in
+             */
+            max_attempts: number | null;
         };
         /** LoginRequest */
         LoginRequest: {
@@ -4977,6 +5087,78 @@ export interface components {
             /** Density */
             density?: ("compact" | "standard" | "comfortable") | null;
         };
+        /**
+         * SettingEntryRead
+         * @description One registry entry with the deployment's effective value.
+         */
+        SettingEntryRead: {
+            /** Key */
+            key: string;
+            /** Category */
+            category: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "int" | "float" | "bool" | "string" | "enum" | "int_list";
+            /** Description */
+            description: string;
+            /**
+             * Value
+             * @description The effective value (the default while not set)
+             */
+            value: boolean | number | string | number[];
+            /** Default */
+            default: boolean | number | string | number[];
+            /**
+             * Is Default
+             * @description No value is stored: the code default applies
+             */
+            is_default: boolean;
+            /**
+             * Minimum
+             * @description Lowest number (each item of an int_list)
+             */
+            minimum: number | null;
+            /**
+             * Maximum
+             * @description Highest number (each item of an int_list)
+             */
+            maximum: number | null;
+            /**
+             * Choices
+             * @description The values of an enum entry
+             */
+            choices: string[];
+            /**
+             * Max Length
+             * @description Longest string, or most items of an int_list
+             */
+            max_length: number | null;
+            /**
+             * Client Visible
+             * @description Returned to signed-in clients at bootstrap
+             */
+            client_visible: boolean;
+            /**
+             * Cap
+             * @description The deployment-configuration limit the value can never exceed
+             */
+            cap: number | null;
+            /**
+             * Cap Source
+             * @description The environment variable that sets the cap
+             */
+            cap_source: string | null;
+        };
+        /**
+         * SettingValueUpdate
+         * @description ``PATCH /registry/{key}``: the new value. Out of bounds is 422, never clamped.
+         */
+        SettingValueUpdate: {
+            /** Value */
+            value: boolean | number | string | number[];
+        };
         /** SortKey */
         SortKey: {
             /** Column */
@@ -5411,6 +5593,18 @@ export interface components {
             display_name?: string | null;
             /** Is Active */
             is_active?: boolean | null;
+        };
+        /**
+         * UserUpdateRefusal
+         * @description A 409 from ``PATCH /admin/users/{id}``. With ``code: CANNOT_DEACTIVATE_SELF`` the
+         *     caller tried to deactivate their own account (T-0085); the last-active-System-admin
+         *     refusal answers ``detail`` only, so ``code`` is optional.
+         */
+        UserUpdateRefusal: {
+            /** Detail */
+            detail: string;
+            /** Code */
+            code?: "CANNOT_DEACTIVATE_SELF" | null;
         };
         /** ValidationError */
         ValidationError: {
@@ -6462,6 +6656,81 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_registry_api_v1_settings_registry_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingEntryRead"][];
+                };
+            };
+        };
+    };
+    update_registry_entry_api_v1_settings_registry__key__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SettingValueUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingEntryRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_deployment_config_api_v1_settings_deployment_config_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeploymentConfigRead"];
                 };
             };
         };
@@ -8993,6 +9262,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UserRead"];
+                };
+            };
+            /** @description `code: CANNOT_DEACTIVATE_SELF`: the caller tried to deactivate their own account (refused and audited, T-0085); or, with a plain `detail` and no `code`, the last active System admin cannot be deactivated */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserUpdateRefusal"];
                 };
             };
             /** @description Validation Error */

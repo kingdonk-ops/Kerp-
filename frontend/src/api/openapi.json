@@ -1408,6 +1408,119 @@
         ]
       }
     },
+    "/api/v1/settings/registry": {
+      "get": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Read Registry",
+        "operationId": "read_registry_api_v1_settings_registry_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SettingEntryRead"
+                  },
+                  "type": "array",
+                  "title": "Response Read Registry Api V1 Settings Registry Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/settings/registry/{key}": {
+      "patch": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Update Registry Entry",
+        "operationId": "update_registry_entry_api_v1_settings_registry__key__patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettingValueUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingEntryRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/settings/deployment-config": {
+      "get": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Read Deployment Config",
+        "operationId": "read_deployment_config_api_v1_settings_deployment_config_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeploymentConfigRead"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/projects": {
       "get": {
         "tags": [
@@ -5853,6 +5966,16 @@
               }
             }
           },
+          "409": {
+            "description": "`code: CANNOT_DEACTIVATE_SELF`: the caller tried to deactivate their own account (refused and audited, T-0085); or, with a plain `detail` and no `code`, the last active System admin cannot be deactivated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserUpdateRefusal"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -8854,6 +8977,87 @@
         ],
         "title": "DeliveryRead"
       },
+      "DeploymentConfigRead": {
+        "properties": {
+          "refresh_token_hours": {
+            "type": "integer",
+            "title": "Refresh Token Hours"
+          },
+          "pin_idle_minutes": {
+            "type": "integer",
+            "title": "Pin Idle Minutes"
+          },
+          "pin_lockout": {
+            "$ref": "#/components/schemas/LockoutScheduleRead"
+          },
+          "region": {
+            "type": "string",
+            "title": "Region",
+            "description": "AWS region of the deployment (SES, SNS)"
+          },
+          "storage_region": {
+            "type": "string",
+            "title": "Storage Region",
+            "description": "AWS region of the object storage"
+          },
+          "mail_transport": {
+            "type": "string",
+            "enum": [
+              "ses",
+              "log"
+            ],
+            "title": "Mail Transport"
+          },
+          "mail_from_address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mail From Address"
+          },
+          "upload_scanner": {
+            "type": "string",
+            "enum": [
+              "stub",
+              "clamd"
+            ],
+            "title": "Upload Scanner"
+          },
+          "upload_max_bytes": {
+            "type": "integer",
+            "title": "Upload Max Bytes"
+          },
+          "upload_url_seconds": {
+            "type": "integer",
+            "title": "Upload Url Seconds"
+          },
+          "ai_provider": {
+            "type": "string",
+            "const": "none",
+            "title": "Ai Provider"
+          }
+        },
+        "type": "object",
+        "required": [
+          "refresh_token_hours",
+          "pin_idle_minutes",
+          "pin_lockout",
+          "region",
+          "storage_region",
+          "mail_transport",
+          "mail_from_address",
+          "upload_scanner",
+          "upload_max_bytes",
+          "upload_url_seconds",
+          "ai_provider"
+        ],
+        "title": "DeploymentConfigRead",
+        "description": "Read-only deployment configuration: set by the environment, never a secret."
+      },
       "DeploymentSettingsRead": {
         "properties": {
           "offline_window_days": {
@@ -11326,6 +11530,43 @@
         ],
         "title": "LobbyVisibility",
         "description": "``PUT /projects/{id}/lobby``: list the project in the lobby for internal users or not\n(T-0040, diff §4.1). PER-09 of the project or a System admin only."
+      },
+      "LockoutScheduleRead": {
+        "properties": {
+          "free_attempts": {
+            "type": "integer",
+            "title": "Free Attempts",
+            "description": "Wrong PINs before the first delay"
+          },
+          "base_delay_seconds": {
+            "type": "integer",
+            "title": "Base Delay Seconds"
+          },
+          "max_delay_seconds": {
+            "type": "integer",
+            "title": "Max Delay Seconds"
+          },
+          "max_attempts": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Attempts",
+            "description": "Wrong PINs before the device must sign in"
+          }
+        },
+        "type": "object",
+        "required": [
+          "free_attempts",
+          "base_delay_seconds",
+          "max_delay_seconds",
+          "max_attempts"
+        ],
+        "title": "LockoutScheduleRead"
       },
       "LoginRequest": {
         "properties": {
@@ -14733,6 +14974,221 @@
         "title": "SavedViewUpdate",
         "description": "``PATCH .../views/{id}``: edit, rename, share, make default; only given fields change.\n\n``filter`` and ``group_by`` may be ``null`` (clears them). ``team_ids`` replaces the\nview's teams; a change of ``visibility`` away from ``team`` without it drops them. The\nregister of a view never changes."
       },
+      "SettingEntryRead": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "category": {
+            "type": "string",
+            "title": "Category"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "int",
+              "float",
+              "bool",
+              "string",
+              "enum",
+              "int_list"
+            ],
+            "title": "Type"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              }
+            ],
+            "title": "Value",
+            "description": "The effective value (the default while not set)"
+          },
+          "default": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              }
+            ],
+            "title": "Default"
+          },
+          "is_default": {
+            "type": "boolean",
+            "title": "Is Default",
+            "description": "No value is stored: the code default applies"
+          },
+          "minimum": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimum",
+            "description": "Lowest number (each item of an int_list)"
+          },
+          "maximum": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maximum",
+            "description": "Highest number (each item of an int_list)"
+          },
+          "choices": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Choices",
+            "description": "The values of an enum entry"
+          },
+          "max_length": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Length",
+            "description": "Longest string, or most items of an int_list"
+          },
+          "client_visible": {
+            "type": "boolean",
+            "title": "Client Visible",
+            "description": "Returned to signed-in clients at bootstrap"
+          },
+          "cap": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cap",
+            "description": "The deployment-configuration limit the value can never exceed"
+          },
+          "cap_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cap Source",
+            "description": "The environment variable that sets the cap"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "category",
+          "type",
+          "description",
+          "value",
+          "default",
+          "is_default",
+          "minimum",
+          "maximum",
+          "choices",
+          "max_length",
+          "client_visible",
+          "cap",
+          "cap_source"
+        ],
+        "title": "SettingEntryRead",
+        "description": "One registry entry with the deployment's effective value."
+      },
+      "SettingValueUpdate": {
+        "properties": {
+          "value": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "value"
+        ],
+        "title": "SettingValueUpdate",
+        "description": "``PATCH /registry/{key}``: the new value. Out of bounds is 422, never clamped."
+      },
       "SortKey": {
         "properties": {
           "column": {
@@ -15631,6 +16087,32 @@
         "type": "object",
         "title": "UserUpdate",
         "description": "``PATCH /admin/users/{id}``: rename, deactivate (``is_active: false``) or reactivate."
+      },
+      "UserUpdateRefusal": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "CANNOT_DEACTIVATE_SELF"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "UserUpdateRefusal",
+        "description": "A 409 from ``PATCH /admin/users/{id}``. With ``code: CANNOT_DEACTIVATE_SELF`` the\ncaller tried to deactivate their own account (T-0085); the last-active-System-admin\nrefusal answers ``detail`` only, so ``code`` is optional."
       },
       "ValidationError": {
         "properties": {

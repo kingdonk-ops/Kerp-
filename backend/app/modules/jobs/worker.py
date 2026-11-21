@@ -25,12 +25,17 @@ from app.core.db import Database
 from app.core.logging import configure_logging
 from app.core.mail.service import Delivery
 from app.core.mail.transport import MailTransport, transport_from_settings
-from app.core.module_loader.loader import discover_modules, import_job_handlers
+from app.core.module_loader.loader import (
+    discover_modules,
+    import_job_handlers,
+    import_setting_defs,
+)
 from app.core.request_context import request_id_var
 from app.core.tenancy.context import TenancyContext, use_tenancy
 from app.modules.jobs import mail, scheduler, service
 from app.modules.jobs.broker import QUEUE_NAMES, RUN_JOB, LoopDispatcher, SaqBroker
 from app.modules.jobs.registry import JOB_REGISTRY, JobContext, JobRegistry
+from app.modules.settings import cache as settings_cache
 
 logger = logging.getLogger("kerp.jobs")
 STOP_SIGNALS: Final = (signal.SIGINT, signal.SIGTERM)
@@ -180,8 +185,11 @@ def _finish(
 
 
 def load_registry() -> JobRegistry:
-    """Import every module's ``jobs.py`` so its ``register_job`` handlers are known."""
-    import_job_handlers(discover_modules())
+    """Import every module's ``jobs.py`` so its ``register_job`` handlers are known, and its
+    ``setting_defs.py`` so its runtime settings are declared (T-0230)."""
+    modules = discover_modules()
+    import_job_handlers(modules)
+    import_setting_defs(modules)
     return JOB_REGISTRY
 
 
@@ -262,6 +270,9 @@ async def serve(settings: Settings) -> None:
     loop = asyncio.get_running_loop()
     service.set_dispatcher(LoopDispatcher(broker, loop))
     mail_dispatcher = mail.install(broker.queues["interactive"], loop)
+    # Runtime settings (T-0230): this process drops its cached values when one changes.
+    cached_settings = settings_cache.open_cache(settings.redis_url)
+    settings_cache.install(cached_settings)
     workers = build_workers(
         settings, db=db, registry=registry, broker=broker, mail_transport=transport
     )
@@ -285,6 +296,8 @@ async def serve(settings: Settings) -> None:
         service.set_dispatcher(None)
         mail.uninstall()
         await mail_dispatcher.drain()
+        settings_cache.install(None)
+        cached_settings.close()
         await broker.close()
         db.dispose()
 
