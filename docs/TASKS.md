@@ -3,12 +3,12 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 75/278 tasks done (27%) · **ready now:** 26 · **epics awaiting breakdown:** 48
+**Overall:** 75/288 tasks done (26%) · **ready now:** 26 · **epics awaiting breakdown:** 48
 
 | Phase | Tasks done | Progress |
 |---|---|---|
 | 0 · Platform foundations | 75/112 | `██████░░░░` 67% |
-| 1 · Asset & Quality backbone | 0/140 (+1 epics) | `░░░░░░░░░░` 0% |
+| 1 · Asset & Quality backbone | 0/150 (+1 epics) | `░░░░░░░░░░` 0% |
 | 2 · Welding quality | 0/11 | `░░░░░░░░░░` 0% |
 | 3 · Logistics | 0/2 (+7 epics) | `░░░░░░░░░░` 0% |
 | 4 · Execution | 0/0 (+15 epics) | `░░░░░░░░░░` 0% |
@@ -159,8 +159,14 @@
 | ⬜ | [T-0114](../tracker/tasks/T-0114.md) | construction_control: conformance criteria + hold/witness evaluation via run_checks (no own inspection table) | construction_control | M | T-0113 |  |
 | 🟥 | [T-0115](../tracker/tasks/T-0115.md) | inspection_requests: RFI/call-out workflow (draft→requested→confirmed→witnessed\|waived\|no_show\|failed) + client delay attribution *(blocked by TD-045)* | inspection_requests | M | T-0111 |  |
 | ⬜ | [T-0247](../tracker/tasks/T-0247.md) | uploads: image derivative tiers — tablet proxy and report rendition (SAQ batch, Pillow lazy), derivative rows, file available only after scan + derivatives | uploads | M | T-0016, T-0169 |  |
-| ⬜ | [T-0116](../tracker/tasks/T-0116.md) | ncr: Non-Conformance Reports + dispositions (scrap/rework/repair/use-as-is) anchored to any node or Item (anchor_role recorded) | ncr | S | T-0111 |  |
-| ⬜ | [T-0117](../tracker/tasks/T-0117.md) | punchlist: Cat A/B/C punch items + spatial pins on drawings | punchlist | S | T-0111 |  |
+| ⚫ | [T-0116](../tracker/tasks/T-0116.md) | ncr: Non-Conformance Reports + dispositions (scrap/rework/repair/use-as-is) anchored to any node or Item (anchor_role recorded) | ncr | S | T-0111 |  |
+| ⬜ | [T-0311](../tracker/tasks/T-0311.md) | issues: issue templates (one-engine kind issue) — revision metadata (type, category, flag defaults, step per section), categories value list, default template per category × type, system → tenant/pack → project copy layers | issues | M | T-0110, T-0108, T-0034 |  |
+| ⬜ | [T-0312](../tracker/tasks/T-0312.md) | issues: issue record oe_issues_issue — fixed system fields, per-type numbering, anchors by role with work-anchor resolution, punch workflow (open → rectified → verified → closed), void, offline raise with server-assigned number | issues | M | T-0311, T-0101, T-0134, T-0111, T-0126, T-0147, T-0148, T-0006 |  |
+| ⬜ | [T-0313](../tracker/tasks/T-0313.md) | issues: NCR workflow — containment, disposition (scrap/rework/repair/use-as-is + concession ref), root cause, corrective/preventive actions (oe_issues_action), effectiveness verification sign-off ncr_close_verify; verifier ≠ resolver | issues | M | T-0312, T-0119 |  |
+| ⚫ | [T-0117](../tracker/tasks/T-0117.md) | punchlist: Cat A/B/C punch items + spatial pins on drawings | punchlist | S | T-0111 |  |
+| ⬜ | [T-0314](../tracker/tasks/T-0314.md) | issues: visibility / mdr_effect / completion_effect flags — template defaults, audited per-issue override (QA authority or PER-09), client-raised always client, internal issues hidden (404) from external accounts, gate context for work_anchor.complete and mdr.compile | issues | M | T-0312, T-0313, T-0049 |  |
+| ⬜ | [T-0315](../tracker/tasks/T-0315.md) | issues: upgrade punch → NCR and "raise external NCR from this" — new linked record dated now, chosen carry-over of answers/photos (original capture times), source closes upgraded/escalated, internal-only escalation link | issues | M | T-0313, T-0314 |  |
+| ⬜ | [T-0317](../tracker/tasks/T-0317.md) | issues: spatial pins on drawings (oe_issues_pin — drawing file, revision label, page, normalised x/y) + pin API | issues | S | T-0312, T-0016 |  |
 | ▶ | [T-0118](../tracker/tasks/T-0118.md) | credentials: qualification-type catalogue + credential records with certificate/VOC uploads + expiry (feeds eligibility) | credentials | M | T-0012, T-0016 |  |
 | ⬜ | [T-0139](../tracker/tasks/T-0139.md) | eligibility: stateless as-of-date validity service over credentials, calibration, WPS and materials registers (fail closed) | eligibility | M | T-0118 |  |
 | ▶ | [T-0119](../tracker/tasks/T-0119.md) | signing: append-only hash-chained sign-off ledger (internal now; pyHanko PAdES seam later) | signing | M | T-0006 |  |
@@ -170,7 +176,7 @@
 | ▶ | [T-0122](../tracker/tasks/T-0122.md) | compliance DSL wired into run_checks (CEL rule sets) | compliance | M | T-0018 |  |
 | ⬜ | [T-0281](../tracker/tasks/T-0281.md) | qms: ITP instance customization (PER-06, non-signed lines only) and master-revision propagation API (auto-update unstarted lines, never signed ones, per-instance keep/apply for customized instances) | qms | M | T-0188, T-0113, T-0119 |  |
 | ⬜ | [T-0282](../tracker/tasks/T-0282.md) | Frontend: ITP manual instantiation and Activation Review Matrix (scope-to-ITP mapping, swap template, Approve & Activate) | frontend | M | T-0188, T-0025 |  |
-| ⬜ | [T-0124](../tracker/tasks/T-0124.md) | Rule sets A — completion gates: inspection.close, work_anchor.complete, asset.status_change (open Cat A/NCR blocks) as locked defaults | validation | M | T-0111, T-0114, T-0116, T-0034, T-0139 |  |
+| ⬜ | [T-0124](../tracker/tasks/T-0124.md) | Rule sets A — completion gates: inspection.close, work_anchor.complete, asset.status_change (open Cat A/NCR blocks) as locked defaults | validation | M | T-0111, T-0114, T-0314, T-0034, T-0139 |  |
 | ⬜ | [T-0283](../tracker/tasks/T-0283.md) | Frontend: ITP Propagation Wizard (dry-run diff, keep/apply per customized instance) and instance line editing | frontend | S | T-0281, T-0282 |  |
 | ⬜ | [T-0125](../tracker/tasks/T-0125.md) | Rule sets B — P6 sync: asset.p6_fields, schedule.p6_import/export | validation | S | T-0104, T-0106 |  |
 | ⬜ | [T-0126](../tracker/tasks/T-0126.md) | Offline sync core: outbox_mutations, client_op_id idempotency, vector clock, conflict resolution (immutable approvals, per-field apply per ADR 0005) | sync | M | T-0006, T-0110 |  |
@@ -193,9 +199,9 @@
 | ⬜ | [T-0155](../tracker/tasks/T-0155.md) | Frontend: scan-to-locate — camera barcode/QR and Android NFC, offline lookup over downloaded Items, online fallback, manual tag search | frontend | M | T-0154, T-0141, T-0149 |  |
 | ⬜ | [T-0156](../tracker/tasks/T-0156.md) | forms: photo answer value — capture time, location and versioned annotation JSON, validated server-side, read-only after submit | forms | S | T-0110, T-0016 |  |
 | ⬜ | [T-0157](../tracker/tasks/T-0157.md) | Frontend: photo capture with location and time + annotation editor (arrow, ellipse, rectangle, freehand, text), offline | frontend | M | T-0156, T-0127, T-0046, T-0247 |  |
-| ⬜ | [T-0158](../tracker/tasks/T-0158.md) | inspections: inspection PDF report (SAQ batch job, PyMuPDF lazy) with annotations burned in, signatures and review history | inspections | M | T-0150, T-0156, T-0116, T-0117, T-0016, T-0136, T-0167, T-0247 |  |
+| ⬜ | [T-0158](../tracker/tasks/T-0158.md) | inspections: inspection PDF report (SAQ batch job, PyMuPDF lazy) with annotations burned in, signatures and review history | inspections | M | T-0150, T-0156, T-0312, T-0016, T-0136, T-0167, T-0247 |  |
 | ⬜ | [T-0159](../tracker/tasks/T-0159.md) | inspections: batch inspection PDF export (ZIP + index.csv, max 500) + export action on the review queue | inspections | S | T-0158, T-0153 |  |
-| ⬜ | [T-0160](../tracker/tasks/T-0160.md) | reporting: Pilot-0 dashboard tiles — progress, overdue, open defects (API + Overview screen) | reporting | M | T-0150, T-0152, T-0116, T-0117, T-0024, T-0025 |  |
+| ⬜ | [T-0160](../tracker/tasks/T-0160.md) | reporting: Pilot-0 dashboard tiles — progress, overdue, open defects (API + Overview screen) | reporting | M | T-0150, T-0152, T-0312, T-0313, T-0024, T-0025 |  |
 | ▶ | [T-0162](../tracker/tasks/T-0162.md) | identity: client online signing PIN — own table, server-side per-signer rate limit and lockout, single-use co-sign token | identity | S | T-0010, T-0038 |  |
 | ⬜ | [T-0163](../tracker/tasks/T-0163.md) | signing: client co-signature ledger entries — online_pin and client_device_signed (QR assertion verified at sync), record-version binding, requires_client_signature check | signing | M | T-0119, T-0150, T-0158, T-0162, T-0173, T-0177 |  |
 | ⬜ | [T-0164](../tracker/tasks/T-0164.md) | Frontend: hand to client on the inspector's tablet — online PIN, challenge/assertion QR exchange with offline verify, provisional wet signature; PIN-gated hand-back | frontend | M | T-0162, T-0163, T-0174, T-0143, T-0165 |  |
@@ -213,7 +219,10 @@
 | ⬜ | [T-0248](../tracker/tasks/T-0248.md) | Frontend: consume client bootstrap config (GET /api/v1/settings/client) at sign-in and sync, stored through the client storage contract, replacing limit constants | frontend | S | T-0231, T-0127 |  |
 | ⬜ | [T-0129](../tracker/tasks/T-0129.md) | Frontend: P6 import wizard UI (upload, map, unmatched-row linking, commit) | frontend | M | T-0104, T-0128 |  |
 | ⬜ | [T-0130](../tracker/tasks/T-0130.md) | Frontend: inspections register + raise/close + calibration-gated tool pick + gate findings | frontend | M | T-0111, T-0112, T-0124, T-0128 |  |
-| ⬜ | [T-0132](../tracker/tasks/T-0132.md) | Phase 1 exit journey: P6→hierarchy→inspection gates→completion blocked by open NCR; expired tool blocked | e2e | S | T-0129, T-0130 |  |
+| ⬜ | [T-0318](../tracker/tasks/T-0318.md) | Frontend: issues register, raise (type + category → default template, anchor pick, photos; offline with number pending) and punch detail (rectify, verify, void) | frontend | M | T-0312, T-0025, T-0127, T-0157, T-0136 |  |
+| ⬜ | [T-0319](../tracker/tasks/T-0319.md) | Frontend: NCR detail (step panels, corrective/preventive actions with evidence, effectiveness verify through the signing ceremony), flag override, upgrade and "Raise external NCR from this" dialogs | frontend | M | T-0318, T-0313, T-0314, T-0315, T-0290, T-0291 |  |
+| ⬜ | [T-0320](../tracker/tasks/T-0320.md) | Frontend: issue template settings — categories value list, default template per category × type, template list with flag defaults, copy from the tenant library and adopt updates | frontend | S | T-0311, T-0025 |  |
+| ⬜ | [T-0132](../tracker/tasks/T-0132.md) | Phase 1 exit journey: P6→hierarchy→inspection gates→completion blocked by open NCR; expired tool blocked | e2e | S | T-0129, T-0130, T-0318 |  |
 | ⬜ | [T-0133](../tracker/tasks/T-0133.md) | Field checkout lease + per-field sync-back contract: office edits blocked during checkout, expired-lease and force-release paths (P6 re-import tests in T-0166) | sync | M | T-0126 |  |
 | ⬜ | [T-0166](../tracker/tasks/T-0166.md) | sync: P6 re-import during a field checkout — tests 10 and 12 and checked-out records on the change-impact report (split from T-0133) | sync | S | T-0133, T-0104 |  |
 | 🧩 | [E-01-01](../tracker/tasks/E-01-01.md) | register views: column catalogue (level/item-type fields, ancestors, rollups, cross-module providers), filter AST, shared saved views, grouped totals, bulk actions | saved_views | L | T-0020, T-0025, T-0102 |  |
@@ -235,6 +244,7 @@
 | ⬜ | [T-0179](../tracker/tasks/T-0179.md) | inspections: standalone inspection categories (qa_itp, safety_prestart, equipment_check, repair_fault, general) on templates and records, no parent ITP, node/Item anchors | inspections | M | T-0110, T-0111 |  |
 | ⬜ | [T-0180](../tracker/tasks/T-0180.md) | inspections: post-submit automation rules on the template revision (CEL trigger, update_target_fields through the owning service), action log, ledger source automation | inspections | M | T-0179, T-0150, T-0015, T-0018, T-0019, T-0006 |  |
 | ⬜ | [T-0181](../tracker/tasks/T-0181.md) | qms: unified QA verification queue oe_qms_verification_item (equipment calibration, staff credential, material MTR) with target-provider seam, approve/reject/reassign API, QA reviewer role per project | qms | M | T-0016, T-0018, T-0019, T-0006, T-0140 |  |
+| ⬜ | [T-0316](../tracker/tasks/T-0316.md) | inspections: create_issue post-submit action on the inspection result (template, type, answer mapping), auto-raise from INSPECTED_FAILED, issue_category on inspection templates, raise from an inspection | inspections | M | T-0180, T-0150, T-0312, T-0313 |  |
 | ⬜ | [T-0182](../tracker/tasks/T-0182.md) | qms: verification SLA rule set verification.sla (ADR 0004 notify kind), due/reminder/escalation columns, 15-minute SAQ reminder and escalation cron, pending-item summary and reminder nudge API | qms | M | T-0181, T-0015, T-0018, T-0019, T-0227 |  |
 | 🟥 | [T-0249](../tracker/tasks/T-0249.md) | equipment: fleet vehicles and plant in the equipment register — equipment_class, requires_calibration, asset_number, custodian (blocked by TD-412) *(blocked by TD-412)* | equipment | S | T-0112 |  |
 | 🟥 | [T-0250](../tracker/tasks/T-0250.md) | inspections: equipment as the anchor of standalone inspections (equipment_id, exactly one of node/Item/equipment; ADR 0014, blocked by TD-411) *(blocked by TD-411)* | inspections | S | T-0179, T-0249 |  |
@@ -268,7 +278,7 @@
 | ⬜ | [T-0289](../tracker/tasks/T-0289.md) | signing: e-signature attestation for formal sign-offs — re-authentication grant (signing PIN or password; device PIN offline), versioned intent statement, timestamp/device/IP evidence in the sign-off ledger, refused under impersonation (offline sync branch: T-0310) | signing | M | T-0119, T-0162, T-0143, T-0177, T-0230 |  |
 | ⬜ | [T-0290](../tracker/tasks/T-0290.md) | Frontend: signing ceremony — intent statement dialog, re-authentication prompt (signing PIN or password online, device PIN on Android offline), set/reset signing PIN for every user | frontend | M | T-0289, T-0310, T-0143, T-0153 |  |
 | ⬜ | [T-0310](../tracker/tasks/T-0310.md) | signing: offline formal sign-off acceptance at sync — no grant for device_pin_offline, intent version resolved at occurred_at (intent_outdated flag, never 409), signer standing from durable identity events (signer_inactive, never effective → QA queue) | signing | M | T-0289, T-0143, T-0162, T-0177, T-0181, T-0244, T-0014 |  |
-| ⬜ | [T-0291](../tracker/tasks/T-0291.md) | signing: wire attestation into the phase-1 formal sign-offs (inspection approve, ITP hold/witness single-row sign-off, internal_qa substitution approval) and print the attestation block on the inspection PDF | signing | M | T-0289, T-0310, T-0150, T-0114, T-0185, T-0158 |  |
+| ⬜ | [T-0291](../tracker/tasks/T-0291.md) | signing: wire attestation into the phase-1 formal sign-offs (inspection approve, ITP hold/witness single-row sign-off, internal_qa substitution approval) and print the attestation block on the inspection PDF | signing | M | T-0289, T-0310, T-0150, T-0114, T-0185, T-0158, T-0313 |  |
 | ▶ | [T-0292](../tracker/tasks/T-0292.md) | delegations: narrow delegation of authority — oe_delegations_delegation (time-bound, per project and kind), create/list/revoke API, audit, resolution service (never confers authority) | delegations | M | T-0010, T-0014, T-0006, T-0019 |  |
 | ⬜ | [T-0293](../tracker/tasks/T-0293.md) | delegations: route hold-point call-outs, verification items and SLA reminders/escalations to active delegates; act on behalf with the delegate's own persona, credentials and SoD; "signed by X on behalf of Y" in the ledger and PDF | delegations | M | T-0292, T-0289, T-0291, T-0181, T-0182, T-0115 |  |
 | ⬜ | [T-0294](../tracker/tasks/T-0294.md) | Frontend: delegations — My delegations (create, revoke), project delegations list for PER-09, "acting for" chip in queues and sign dialogs | frontend | S | T-0292, T-0031 |  |
@@ -289,7 +299,7 @@
 | ⬜ | [T-0202](../tracker/tasks/T-0202.md) | Welders + welder qualifications (range, expiry, continuity) → eligibility | wps | M | T-0201, T-0118 |  |
 | ⬜ | [T-0203](../tracker/tasks/T-0203.md) | Welds as Items (kind weld) + weld state machine | wps | M | T-0202, T-0103 |  |
 | ⬜ | [T-0204](../tracker/tasks/T-0204.md) | NDE results (oe_weld_nde_result): RT/UT/MT/PT | wps | S | T-0203, T-0016 |  |
-| ⬜ | [T-0205](../tracker/tasks/T-0205.md) | Heat/MTR traceability: heat_number + MTR OCR (SAQ) → weld joint properties | materials | M | T-0204, T-0015, T-0016, T-0116 |  |
+| ⬜ | [T-0205](../tracker/tasks/T-0205.md) | Heat/MTR traceability: heat_number + MTR OCR (SAQ) → weld joint properties | materials | M | T-0204, T-0015, T-0016, T-0313 |  |
 | ⬜ | [T-0206](../tracker/tasks/T-0206.md) | Rules weld.accept / welder.assign (R-WPS-1..4) via run_checks + logged findings | wps | M | T-0204, T-0124 |  |
 | ⬜ | [T-0207](../tracker/tasks/T-0207.md) | Continuity watch report + expiry notifications (SAQ cron) | wps | S | T-0206, T-0019, T-0015 |  |
 | ⬜ | [T-0208](../tracker/tasks/T-0208.md) | Frontend: WPS register, welder quals, weld register | frontend | M | T-0206, T-0128 |  |
@@ -339,7 +349,7 @@
 | 🧩 | [E-05-02](../tracker/tasks/E-05-02.md) | markups + plan_room: PDF/drawing viewer + vector markup overlays | markups | L | E-05-01 |  |
 | 🧩 | [E-05-03](../tracker/tasks/E-05-03.md) | transmittals + correspondence | transmittals | L | E-05-01 |  |
 | 🧩 | [E-05-04](../tracker/tasks/E-05-04.md) | rfi / submittals / meetings / interface_management | rfi | L | E-05-01 |  |
-| 🧩 | [E-05-05](../tracker/tasks/E-05-05.md) | MDR collation engine: SAQ streaming PDF merge, bookmarks, TOC, pagination, SHA-256, transmittal | mdr | L | E-05-01, T-0111, T-0184, T-0265, T-0185, T-0271 |  |
+| 🧩 | [E-05-05](../tracker/tasks/E-05-05.md) | MDR collation engine: SAQ streaming PDF merge, bookmarks, TOC, pagination, SHA-256, transmittal | mdr | L | E-05-01, T-0111, T-0184, T-0265, T-0185, T-0271, T-0314 |  |
 | 🧩 | [E-05-06](../tracker/tasks/E-05-06.md) | search / retrieval: docket OCR → full-text + vector index (SAQ) | search | L | E-05-01 |  |
 | 🧩 | [E-05-07](../tracker/tasks/E-05-07.md) | integrations: outbound event bus + webhooks (HMAC) + ERP sync bridge (SAP/Xero/P6) | integrations | L | T-0015 |  |
 | 🧩 | [E-05-08](../tracker/tasks/E-05-08.md) | erp_chat / ai_agents: operational assistant (proposals only, human-confirmed) | erp_chat | L | E-05-06 |  |
@@ -376,7 +386,7 @@
 
 | | ID | Title | Module | Size | Depends on | PR |
 |---|---|---|---|---|---|---|
-| 🧩 | [E-06b-01](../tracker/tasks/E-06b-01.md) | asset_integrity: preservation routines + hydrotest/pneumatic test packs (blinds, test exec, reinstatement) | asset_integrity | L | T-0101, T-0117 |  |
+| 🧩 | [E-06b-01](../tracker/tasks/E-06b-01.md) | asset_integrity: preservation routines + hydrotest/pneumatic test packs (blinds, test exec, reinstatement) | asset_integrity | L | T-0101, T-0312 |  |
 | 🧩 | [E-06b-02](../tracker/tasks/E-06b-02.md) | awp: EWP→CWP→IWP constraint engine (7 gates incl. scaffolding green-tag) + Technical Queries | awp | L | E-05-01, E-04-01, E-03-04 |  |
 | 🧩 | [E-06b-03](../tracker/tasks/E-06b-03.md) | workpacks: live field dossier, offline stage sign-off, QR MDR compile | workpacks | L | E-06b-02 |  |
 
@@ -386,5 +396,5 @@
 |---|---|---|---|---|---|---|
 | 🧩 | [E-07-01](../tracker/tasks/E-07-01.md) | portal v1: client read-only hierarchy + registers (PER-15 password / SSO sign-in) | portal | L | T-0131 |  |
 | 🧩 | [E-07-02](../tracker/tasks/E-07-02.md) | portal v2: client co-sign reports & ITPs (report.cosign / itp.cosign, pyHanko) | portal | L | E-07-01, T-0119 |  |
-| 🧩 | [E-07-03](../tracker/tasks/E-07-03.md) | portal v3: visit scheduler (witness/final) + client NCR input/sign-off | portal | L | E-07-02 |  |
+| 🧩 | [E-07-03](../tracker/tasks/E-07-03.md) | portal v3: visit scheduler (witness/final) + client NCR input/sign-off | portal | L | E-07-02, T-0314, T-0315 |  |
 | 🧩 | [E-07-04](../tracker/tasks/E-07-04.md) | portal v4: plan review - layouts per client role, distribution matrix, send with PDF + magic link, anchored comment threads, multi-session review with attendance, revision-bound approvals + absent-approver override, commit on approval | portal | L | E-07-01, E-04-12, E-06-07, T-0009, T-0019, T-0119 |  |

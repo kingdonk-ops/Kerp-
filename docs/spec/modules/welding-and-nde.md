@@ -55,8 +55,8 @@ Rules (testable):
   `supplied_by` (`kaefer` / `client`) and `heat_number`;
 - an `existing` side needs no heat number and is reported as "existing steel" in the MDR heat
   trace;
-- a `new` + `kaefer` side without a heat number raises an NCR (`ncr` service) when the weld is
-  submitted;
+- a `new` + `kaefer` side without a heat number raises an NCR (`issues` service, [issues.md](issues.md); user,
+  2026-11-21) when the weld is submitted;
 - a `new` + `client` side without a heat number puts a hard lock on the weld (its inspection
   cannot pass the `check` gate) until a heat number is entered **or** a signed client-rep waiver
   record (signer, date, reason, scope) is attached to the inspection; the waiver is included in

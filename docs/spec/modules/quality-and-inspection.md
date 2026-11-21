@@ -57,7 +57,8 @@ where no separate request form is issued. The record and state keep their confir
 remain open on TD-045.
 
 ## One field-type registry (`core/fields`)
-Shared palette of field types used by every form, ITP and asset-schema field:
+Shared palette of field types used by every form, ITP, issue template ([issues.md](issues.md)) and
+asset-schema field:
 `numeric`, `text`, unit-bound **`measurement`** (value + unit), `photo`, `signature`,
 **`instrument reference`** (binds a calibrated tool, gated by calibration), `calculated`
 (CEL expression). No per-module field designers.
@@ -138,6 +139,8 @@ work under it yet (ADR 0003 Amendment 5). Holds responses authored against a tem
 hash, UTC timestamp, geolocation). Lifecycle (master spec §4.2):
 `PENDING → INSPECTION_REQUESTED → INSPECTED_PASSED → LOCKED_FOR_TURNOVER`, with
 `INSPECTED_FAILED → (Cat A punch | NCR) → RE_INSPECT` (state name confirmed on TD-045). Every transition calls `run_checks`.
+The punch or NCR is an **issue** of the `issues` module, raised through the post-submit action
+`create_issue` or by the reviewer ([issues.md](issues.md) §8; user, 2026-11-21).
 **Review (Pilot-0, TD-165):** the result is reached through `SUBMITTED` and, when returned,
 `RETURNED`: `PENDING | INSPECTION_REQUESTED → SUBMITTED → INSPECTED_PASSED | INSPECTED_FAILED`,
 `SUBMITTED → RETURNED → SUBMITTED` (§Review and return).
@@ -221,7 +224,7 @@ planner defaults unless marked otherwise.
   the user and device match the pushing session (T-0126 note) and the device is not revoked.
 - **Approve.** A reviewer approves with `run_checks(context, "inspection.approve")`. The record
   moves to `INSPECTED_PASSED` (proposed `pass`) or `INSPECTED_FAILED` (proposed `fail`, which then
-  raises the Cat A punch or NCR as before). The reviewer cannot change the result; to disagree they
+  raises the Cat A punch or NCR as before, through `create_issue`, [issues.md](issues.md) §8). The reviewer cannot change the result; to disagree they
   return the inspection. The approval is a sign-off ledger entry (reviewer, persona, UTC time;
   geolocation optional for office users, because the geolocation master spec §4.2 requires on
   `INSPECTED_PASSED` is the one on the inspector's submit signature).
@@ -323,7 +326,9 @@ before it ships carry no attestation and stay valid ("no attestation recorded" o
   and an integer `intent_version`): `itp_hold_release`, `itp_witness` (single-row `H`/`W`
   sign-off), `inspection_approve`, `substitution_approve` (internal_qa route,
   `materials-and-traceability.md` §Product substitutions), `shelf_life_extension_approve`
-  (§Shelf-life extension, Phase 3), `tq_approve` (TQ register, Phase 5). Not attested
+  (§Shelf-life extension, Phase 3), `tq_approve` (TQ register, Phase 5), `ncr_close_verify`
+  (NCR effectiveness verification, [issues.md](issues.md) §4.2; user, 2026-11-21; T-0313, wired
+  in T-0291). Not attested
   (TD-433 default): the inspector's submit signature, the bulk close-out of `R`/`S`/`M` rows
   (TD-095) and client co-sign, which has its own verification modes (§Client co-sign).
 - **Re-authentication.** Online the signer re-authenticates for each formal sign-off with the
@@ -495,8 +500,8 @@ only, with the time they were computed:
   rejected + locked) / all. Filter "all" or "assigned to me".
 - **Overdue:** count of overdue inspections (§Planning fields) and the ten most overdue with
   assignee and due date.
-- **Open defects:** open NCRs and open punch items by category A/B/C, through the `ncr` and
-  `punchlist` services.
+- **Open defects:** open NCRs and open punch items by category A/B/C, through the `issues`
+  service (NCR and punch are the two issue types, [issues.md](issues.md); user, 2026-11-21).
 Each tile opens the matching filtered list. Soft-deleted records are not counted.
 
 ## Standalone inspections (user, 2026-11-21; planner reconciliation)
@@ -559,7 +564,8 @@ links for Field Workers only (diff §4.2), so it needs an explicit, documented e
 Template-level rules that run after an inspection reaches `SUBMITTED` (authenticated and, once
 accepted, public). Tasks: T-0180 (store, engine, `update_target_fields`), T-0256
 (`notify_users`), T-0257 (`create_action_task`, tagout gate for node/Item), T-0288 (equipment follow-ups and
-the `equipment.activate` tagout provider; waits on TD-411), T-0258/T-0259 (screens).
+the `equipment.activate` tagout provider; waits on TD-411), T-0258/T-0259 (screens), T-0316
+(`create_issue`).
 
 - **Rule** `oe_inspections_post_action` (paste: `oe_inspection_post_action`): `sort_order`,
   `name`, `enabled`, `trigger_cel` (CEL bool over `answers`, `result`, `category`, `inspection`,
@@ -584,6 +590,14 @@ the `equipment.activate` tagout provider; waits on TD-411), T-0258/T-0259 (scree
   (PER-04/PER-03) gets a pinned high-priority "Confirm physical tagout applied" (timestamp, user,
   optional tag photo, notes); returning to `active` fails `run_checks(context,
   "equipment.activate")` with 422 while a blocking follow-up is open.
+- **`create_issue` (user, 2026-11-21; [issues.md](issues.md) §8):** names the issue template
+  (or the project's default for category × type), the type, optional `punch_category`,
+  `severity` and an answer mapping. Runs when the inspection reaches its result
+  (`INSPECTED_PASSED` / `INSPECTED_FAILED`), not at `SUBMITTED` (planner default), so a failed
+  painting inspection raises the painting punch or NCR. The `INSPECTED_FAILED` auto-raise of the
+  lifecycle goes through it. A site audit is a standalone inspection template whose findings
+  raise issues through audit issue templates. Inspection template revisions may carry an
+  `issue_category` that pre-filters manual raise (planner default).
 - **Execution and audit:** database actions run in the submit transaction; remote notification
   channels after commit on the SAQ `interactive` queue. Each action writes
   `oe_inspections_action_log` and a T-0006 ledger entry with `source = "automation"` (new
@@ -794,7 +808,8 @@ Decided (TD-045, 2026-11-10; full spec pending there): the Request for Inspectio
 Client-asset findings (CUI, water ingress, cladding damage) go to a **separate findings
 register** — not NCR, not punch — with an **assessment step**. Per project: the register's name,
 its finding types, and whether follow-up work may be raised from an assessed finding. Detailed
-spec and task: TD-117.
+spec and task: TD-117. It stays separate from the issues engine (another department, not
+trialled yet; user, 2026-11-21) but could later be built as issue templates ([issues.md](issues.md) §11).
 
 ## Coatings & environmental criteria (preserved)
 Recorded as measurement fields with CEL validation:

@@ -24,14 +24,17 @@ adapter** `app/core/integrations/parsers.py` handles neutral formats (`.dxf`, `.
 ## Automated MDR / turnover collation engine
 Batch pipeline (**SAQ `batch`** queue, heavy libs lazy):
 1. subsystem scope query → **dependency-graph verification** (100 % ITPs passed, 0 open Cat A
-   punches, 100 % heat MTRs attached);
+   punches, 0 open issues with `mdr_effect = blocks`, 100 % heat MTRs attached);
 2. stream S3 inspection PDFs / MTRs / NDE plates;
 3. transform: dynamic pagination, client cover sheets/title stamps, hierarchical bookmark
    tree, hyperlinked TOC;
 4. atomic output: store compiled PDF, compute **SHA-256**, generate outgoing transmittal.
 
-**Gating invariant:** a compile cannot run while `Σ open Cat A punches > 0` or
-`Σ unsigned ITP hold points > 0`. Final dossiers and commercial Delay Notices are signed with
+**Gating invariant:** a compile cannot run while `Σ open Cat A punches > 0`,
+`Σ open issues with mdr_effect = blocks > 0` (extended by the user, 2026-11-21; [issues.md](issues.md)
+§5–§6) or `Σ unsigned ITP hold points > 0`. The check is the `mdr.compile` rule set (CEL, ADR 0004
+locked defaults) over the facts the `issues` service returns for the dossier scope; it is
+separate from the work-completion gate (`work_anchor.complete`). Final dossiers and commercial Delay Notices are signed with
 **pyHanko** (ETSI **PAdES-B-LTA** + **RFC 3161** timestamp).
 
 **Signature evidence (enterprise roadmap, 2026-11-21).** The dossier prints, for every formal
@@ -39,6 +42,18 @@ sign-off it contains, the attestation block of `quality-and-inspection.md` §Sig
 (signer, persona, "on behalf of" for a delegate, intent statement and version, re-auth method,
 time, device id, IP) through the shared `signing` renderer (T-0291); sign-offs without an
 attestation (Pilot-0) say so.
+
+### NCR / concession register in the MDR (user, 2026-11-21; E-05-05, from T-0314)
+Every dossier carries an **NCR / concession register** section (its own Level 4 bookmark under
+the discipline dossier, planner default) listing the scope's issues with `mdr_effect = blocks`
+(all closed by then) or `register_only`: number, type, template name, category, origin,
+severity / punch category, anchor in project terminology, disposition and `concession_ref`
+(NCR), root-cause category, raised and closed dates, verifier and the `ncr_close_verify`
+attestation block. Issues with `mdr_effect = excluded` and `void` issues are never listed.
+Because the dossier goes to the client, **`internal` issues are never printed** (clients never
+see internal issues, issues.md §5); an internal issue with `mdr_effect = blocks` still blocks the
+compile while open (planner default). Rows and photos come from the issues service; the MDR
+engine reads no issues table.
 
 ### Material traceability in the MDR (user, 2026-11-21; E-05-05, from T-0184)
 For every subsystem or asset where a material batch with an approved shelf-life extension was

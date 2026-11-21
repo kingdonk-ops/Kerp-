@@ -3,9 +3,9 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 298 · **Closed:** 135
+**Open:** 299 · **Closed:** 137
 
-## decision (37)
+## decision (40)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -46,8 +46,11 @@
 | [TD-437](../tracker/todo/TD-437.md) | SCIM 2.0 provisioning: users only, create allowed, deactivate never delete, last System admin, device handling | T-0298, T-0299, T-0307, T-0310 | planner |
 | [TD-438](../tracker/todo/TD-438.md) | Machine credentials (ADR 0017): service-account representation and who manages API keys | T-0298, T-0307, T-0308, T-0309 | planner |
 | [TD-439](../tracker/todo/TD-439.md) | Feature flags: who toggles them, project overrides, and what a flag may gate | T-0306 | planner |
+| [TD-442](../tracker/todo/TD-442.md) | Issues: may an internal punch/NCR be assigned to an external account (subcontractor) who must then see it? Planner default: no (422), internal issues are invisible to every is_internal=false caller | T-0314 | planner |
+| [TD-443](../tracker/todo/TD-443.md) | Issues on a path with no work-anchor node (audit findings above the work-anchor level, condition surveys): create_issue skips + notifies (planner default) vs allowing issues without a work anchor | T-0316, T-0312 | planner |
+| [TD-444](../tracker/todo/TD-444.md) | Pilot-0 scope after the issues re-plan: T-0311-T-0314 replace T-0116/T-0117 in the Phase 1 pilot subset; screens T-0318-T-0320, upgrade/escalate, create_issue and pins outside the gate (planner default) | T-0311, T-0312, T-0313, T-0314 | planner |
 
-## spec-gap (58)
+## spec-gap (56)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -59,7 +62,6 @@
 | [TD-063](../tracker/todo/TD-063.md) | Hold / witness / review points should be first-class signed ITP steps, not signature cells | T-0113, T-0114, T-0119 | planner |
 | [TD-064](../tracker/todo/TD-064.md) | Lookup fields must bind to a typed item + attribute and snapshot values at inspection time | T-0110 | planner |
 | [TD-065](../tracker/todo/TD-065.md) | CEL rules need a severity (block vs warn) and parameterised acceptance limits tied to a spec/TQ reference | T-0110 | planner |
-| [TD-066](../tracker/todo/TD-066.md) | Issue types (defect / observation) as versioned configuration with their own fields and close-out form | T-0111 | planner |
 | [TD-067](../tracker/todo/TD-067.md) | Inspection report layout configuration (header rows from anchor attributes, photo layout) is not specified | T-0113 | planner |
 | [TD-083](../tracker/todo/TD-083.md) | Resource pool for planning (named workers without a login, crews, rosters, availability) vs the HR/payroll cull | E-04-12, T-0118, E-03-01 | planner |
 | [TD-085](../tracker/todo/TD-085.md) | Distribution / communication matrix as shared project config (formats x contacts, To/Cc, frequency, due rule) reused by reports, transmittals and plan review | E-07-04, E-05-03, E-03-01 | planner |
@@ -79,8 +81,7 @@
 | [TD-105](../tracker/todo/TD-105.md) | Template applicability by anchor attribute value (e.g. the test technique on the line picks the template) | T-0110, T-0111 | planner |
 | [TD-108](../tracker/todo/TD-108.md) | field_time: headcount mode, delay-code catalogue in the client pack, NPT vs coded delay, mob/demob allowance, equipment hours from the register, derived totals, roster crew pickers | E-04-05, E-04-04, E-06-03 | planner |
 | [TD-109](../tracker/todo/TD-109.md) | Equipment availability (onsite / in use) and required operator credential per equipment type; resource demand counts equipment units | E-03-07, T-0112, E-04-08 | planner |
-| [TD-117](../tracker/todo/TD-117.md) | Findings register (TD-106 decision) has no spec section or task: assessment step, configurable name/types per project, follow-up work, priority derivation | T-0116, T-0117 | planner |
-| [TD-167](../tracker/todo/TD-167.md) | Defect close-out loop: open -> action assigned (owner, due) -> rectified -> verified closed by a re-inspection (closed_by_inspection link); extends TD-066 | T-0117 | clean-room-gap-analysis |
+| [TD-117](../tracker/todo/TD-117.md) | Findings register (TD-106 decision) has no spec section or task: assessment step, configurable name/types per project, follow-up work, priority derivation | T-0311 | planner |
 | [TD-205](../tracker/todo/TD-205.md) | NFR budgets need a reference device and a 4G network profile before they become a hard gate for Pilot-0 | T-0045, T-0146 | planner |
 | [TD-220](../tracker/todo/TD-220.md) | Client QR co-sign (mode ii): judge 'key active at occurred_at' by the tablet's reconstructed scan time, not the client device clock | T-0163 | reviewer |
 | [TD-221](../tracker/todo/TD-221.md) | Client wet signature (mode iii): outcome when the client rejects after the inspection is already approved (INSPECTED_PASSED/INSPECTED_FAILED) or LOCKED_FOR_TURNOVER | T-0174 | reviewer |
@@ -115,7 +116,7 @@
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
 | [TD-094](../tracker/todo/TD-094.md) | Per-RSW area handover sheet required by the ITP closeout (not the shift handover module) | T-0113, E-04-10 | planner |
-| [TD-125](../tracker/todo/TD-125.md) | Booking modules must call work_anchor_for and return 422 when the path has no work anchor (progress, time lines against a work anchor, completion gate) | T-0101, T-0116, T-0124, E-04-03, E-04-05 | reviewer |
+| [TD-125](../tracker/todo/TD-125.md) | Booking modules must call work_anchor_for and return 422 when the path has no work anchor (progress, time lines against a work anchor, completion gate) | T-0101, T-0312, T-0124, E-04-03, E-04-05 | reviewer |
 | [TD-131](../tracker/todo/TD-131.md) | Add a root .env.example for the dev stack (the implementer agent's permission rules block writing .env* files) | T-0003 | implementer |
 | [TD-208](../tracker/todo/TD-208.md) | Uploads infra: provision the kerp-vault bucket (CORS for browser PUT/GET, lifecycle on staging/), wire KERP_S3_* in compose, add MinIO to CI for the gated round-trip test | T-0016 | implementer |
 | [TD-327](../tracker/todo/TD-327.md) | Frontend i18n key notifications.kind.access_requests.requested for the inbox (needed when the access-request UI lands) | T-0050 | reviewer |
@@ -286,7 +287,7 @@
 | [TD-391](../tracker/todo/TD-391.md) | audit ledger: rename _SQLITE_WRITE_LOCK and document the race-test barrier timeout | T-0077 | reviewer |
 | [TD-392](../tracker/todo/TD-392.md) | Device registry: scoped admin device list endpoint (System admin: all users; PER-09: its projects' members) to replace the client's per-user fan-out | T-0051 | implementer |
 | [TD-393](../tracker/todo/TD-393.md) | Expose is_system_admin on GET /auth/me so the client need not probe GET /admin/grants for Admin nav visibility | T-0051 | implementer |
-| [TD-403](../tracker/todo/TD-403.md) | Stats and export providers for modules that land later: NCR, punch, equipment, credentials, materials/MTR, MDR, welding | T-0219, T-0235 | planner |
+| [TD-403](../tracker/todo/TD-403.md) | Stats and export providers for modules that land later: NCR, punch, equipment, credentials, materials/MTR, MDR, welding | T-0219, T-0235, T-0312 | planner |
 | [TD-415](../tracker/todo/TD-415.md) | Inspection follow-ups (oe_inspections_follow_up) move to the generic tasks module when E-04-07 is broken down | T-0257, T-0288, E-04-07 | planner |
 | [TD-440](../tracker/todo/TD-440.md) | In-app IP allowlisting is not built: network restrictions live in the WAF / Entra Conditional Access; revisit only if a client contract requires per-project IP rules | — | planner |
 | [TD-441](../tracker/todo/TD-441.md) | Per-test PostgreSQL databases: widen the empty-source check to leftover types, sequences, views and functions (not only tables) | T-0082 | reviewer |
@@ -381,6 +382,7 @@
 | ✅ | [TD-054](../tracker/todo/TD-054.md) | Edge spec §6 policy targets 'TO kerp_app_role'; T-0007 applies it to PUBLIC | Confirm policy without a TO clause (PUBLIC); amend edge spec section 6. (user, 2026-11-10); follow-up edits in TD-112 |
 | ✅ | [TD-057](../tracker/todo/TD-057.md) | Audit ledger: diff §4 names the columns only; chain_key scope, hash algorithm, canonical serialisation and verification are implementer defaults | Accept the T-0006 implementer design (backend/app/core/audit/README.md) into the spec. (user, 2026-11-10); follow-up edits in TD-112 |
 | ✅ | [TD-061](../tracker/todo/TD-061.md) | Legacy inspection-system 'items' vs KERP anchors: where do personnel/material/equipment registers live? | Hybrid: dedicated modules for personnel (competency), materials and test equipment (QMS calibration); a generic register on item types for the rest (WPS etc.). (user, 2026-11-10); follow-up edits in TD-112 |
+| ✅ | [TD-066](../tracker/todo/TD-066.md) | Issue types (defect / observation) as versioned configuration with their own fields and close-out form | Specified in docs/spec/modules/issues.md §2 (user decisions 2026-11-21 + planner defaults): issue templates are one-engine templates of kind issue with frozen revisions (type punch\|ncr, category, flag defaults, step per section); close-out form = rectify/verify (punch) or NCR step sections; prefix = per-type numbering pattern; required photo count = template field rules; auto-raise on a field option = create_issue post-submit action with trigger_cel (T-0316). Tasks T-0311, T-0316. |
 | ✅ | [TD-070](../tracker/todo/TD-070.md) | Segregation of duties: may an inspector approve or delete their own inspection? | Configurable per project; default forbids self-approval; soft-delete only. (user, 2026-11-10); follow-up edits in TD-112 |
 | ✅ | [TD-071](../tracker/todo/TD-071.md) | Accept ADR 0003: configurable breakdown levels, work-anchor role and client terminology packs (CUI Scope/Job Package/Line vs RSW) | ADR 0003 accepted with 8 amendments (recorded in the ADR): one work anchor per branch (never nested), one tree + many-to-many collections, move/split/merge/retire with lineage, configurable code uniqueness, inspection without work, terminology per language with plurals, pack upgrades offered never forced, time lines without a work anchor (delay/overhead code). (user, 2026-11-10); follow-up edits in TD-112 |
 | ✅ | [TD-072](../tracker/todo/TD-072.md) | Accept ADR 0004: rule sets ship as defaults on every project; projects edit, disable, delete, add and reset rules; mandatory gates locked | ADR 0004 accepted, amended: per-record override of a blocked check (requester + QA/QC Lead; if requester is QA/QC then Project Manager; if requester is PM then QA/QC; never self-approve; mandatory typed reason; saved to activity + audit ledger; approval bound to the exact values). Changing a locked rule needs the Quality Director plus a second approver. Validity checks evaluate on the inspection date, rerun live on edit and at submit; reports use completion snapshots. Backdating beyond N days (per project, default 7) needs a reason and is flagged on the report. (user, 2026-11-10); follow-up edits in TD-112 |
@@ -423,6 +425,7 @@
 | ✅ | [TD-164](../tracker/todo/TD-164.md) | Device registry: enrolled devices, remote revoke/wipe, device_id in audit (T-0006) with before/after diff, biometric unlock, certificate pinning (Capacitor), per-device sync health | 17a: device registry, remote revoke (sessions killed, local wipe on next contact) and device_id in the audit ledger for Pilot-0. Spec diff §4.3; tasks T-0043, T-0048, T-0143, T-0126. Biometric unlock, certificate pinning and sync-health views after the pilot: TD-204 (user, 2026-11-13) |
 | ✅ | [TD-165](../tracker/todo/TD-165.md) | Inspection scheduling and review: planned start/duration, calendar, general recurrence, light work-order grouping, explicit returned state, comments addressable to a single answer | Review/return, answer comments and planning fields cut into T-0150, T-0151, T-0152, T-0153; calendar, recurrence and work orders deferred to TD-217 (user, 2026-11-13, Q5a) |
 | ✅ | [TD-166](../tracker/todo/TD-166.md) | Field-type palette additions: video, audio, barcode/QR fields, annotation on captured photos (stored JSON, burned in on export), reference images on questions | Photo annotation (with capture time and location) cut into T-0156, T-0157 and burn-in in T-0158; video, audio, barcode/QR fields and reference images deferred to TD-218 (user, 2026-11-13, Q5a) |
+| ✅ | [TD-167](../tracker/todo/TD-167.md) | Defect close-out loop: open -> action assigned (owner, due) -> rectified -> verified closed by a re-inspection (closed_by_inspection link); extends TD-066 | Folded into docs/spec/modules/issues.md §4.1 (planner, issues re-plan 2026-11-21): punch open (owner, due) -> rectified -> verified -> closed with optional closed_by_inspection_id; T-0312. |
 | ✅ | [TD-168](../tracker/todo/TD-168.md) | Push notification channel (FCM via the Capacitor build) for assignment and return; T-0019 is in-app only and email is TD-084 | 5a: T-0019 stays in-app only behind a pluggable channel interface; FCM push is T-0144 in the Android build work (user, 2026-11-13) |
 | ✅ | [TD-169](../tracker/todo/TD-169.md) | M2 Documents-Lite 'batch inspection PDF export' (consolidation diff §7) has no task | Cut into T-0158 (inspection PDF) and T-0159 (batch PDF export); spec in quality-and-inspection.md (user, 2026-11-13, Q5a) |
 | ✅ | [TD-170](../tracker/todo/TD-170.md) | Offline window: 14 days (clean-room FR-02) vs up to 7 days (master §6); tenant setting and default | 14a: offline window is a tenant setting, default 7 days, maximum 14; sync and sessions built for 14. Spec diff §4.2/§4.4, master §6; tasks T-0044, T-0126, T-0127, T-0143 (user, 2026-11-13) |
