@@ -195,7 +195,7 @@
 | [TD-508](../tracker/todo/TD-508.md) | Verify the e2e suite on the make up compose stack, and give it its own database | T-0027 | implementer |
 | [TD-510](../tracker/todo/TD-510.md) | Deployment-config view lacks the mail reply-to of diff §4.7: Settings has no reply-to field yet | T-0230 | implementer |
 
-## later (141)
+## later (142)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -340,6 +340,7 @@
 | [TD-511](../tracker/todo/TD-511.md) | Drop the read-only oe_settings_deployment table (destructive migration, needs an ADR) | T-0230 | implementer |
 | [TD-512](../tracker/todo/TD-512.md) | Split the backend-pg CI job into parallel shards | T-0086 | coordinator |
 | [TD-513](../tracker/todo/TD-513.md) | CI: the SQLite backend job (~6.5 min) becomes the critical path once backend-pg is sharded | T-0086 | implementer |
+| [TD-516](../tracker/todo/TD-516.md) | Registry entries declared by later tasks add their label to admin.settings.entries (and a new category to admin.settings.categories) in the Settings screen | T-0232 | implementer |
 
 ## bug (10)
 
