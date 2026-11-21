@@ -80,7 +80,7 @@
 | ✅ | [T-0025](../tracker/tasks/T-0025.md) | Reusable UI shells: RegisterPage, DetailPage (gate banner, tabs, audit), Dynamic Form Renderer | frontend | M | T-0024, T-0017 | #42 |
 | ✅ | [T-0045](../tracker/tasks/T-0045.md) | NFR budget harness: warn-only CI performance job + 300-question form-open budget (< 1.5 s) | frontend | S | T-0025 | #118 |
 | ✅ | [T-0047](../tracker/tasks/T-0047.md) | Dynamic Form Renderer: localised template strings (plain string or per-locale map, fallback to the template default language) | frontend | S | T-0025 | #74 |
-| 🟦 | [T-0026](../tracker/tasks/T-0026.md) | Admin UI: System admin grants (appoint Project Admins), user manager, project creation, persona + site scope assignment with SoD warning | frontend | M | T-0024, T-0014, T-0039 |  |
+| 🟪 | [T-0026](../tracker/tasks/T-0026.md) | Admin UI: System admin grants (appoint Project Admins), user manager, project creation, persona + site scope assignment with SoD warning | frontend | M | T-0024, T-0014, T-0039 | #147 |
 | ▶ | [T-0041](../tracker/tasks/T-0041.md) | Lobby screens: lobby list (internal users), project-code entry, Active requests panel with status chips, rejection reason and Request again after cooldown | frontend | M | T-0040, T-0050, T-0051, T-0042 |  |
 | ✅ | [T-0042](../tracker/tasks/T-0042.md) | Top-bar project picker wired to memberships + post-login landing (one project -> in, several -> last used, none -> lobby) | frontend | S | T-0014, T-0024 | #108 |
 | ⚫ | [T-0048](../tracker/tasks/T-0048.md) | Devices screen: list enrolled devices, revoke with wipe warning (admin and own devices) | frontend | S | T-0043, T-0024 |  |
