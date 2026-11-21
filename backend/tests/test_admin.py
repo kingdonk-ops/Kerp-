@@ -566,6 +566,7 @@ def test_a_system_admin_appoints_and_removes_project_admins(api: Api) -> None:
         "email": DAVE,
         "display_name": "",
         "grant": "create_projects",
+        "sod_warning": False,  # only system_admin for a hold-authority holder warns (ADR 0016)
     }
     assert api.client.post(GRANTS, json=body, headers=root).status_code == 200  # already held
     listed = api.client.get(GRANTS, headers=root).json()
@@ -700,12 +701,18 @@ def test_me_projects_lists_the_callers_live_projects(api: Api) -> None:
         projects.delete_project(s, third)
     response = api.client.get("/api/v1/me/projects", headers=api.headers(CAROL))
     assert response.status_code == 200
+    member = {"personas": ["PER-02"], "access": "member"}
     assert response.json() == [
-        {"id": str(api.away), "code": "AWAY", "name": "Synthetic AWAY", "personas": ["PER-02"]},
-        {"id": str(api.home), "code": "HOME", "name": "Synthetic HOME", "personas": ["PER-02"]},
+        {"id": str(api.away), "code": "AWAY", "name": "Synthetic AWAY", **member},
+        {"id": str(api.home), "code": "HOME", "name": "Synthetic HOME", **member},
     ]
-    # A System admin grant adds no project of its own; no tenant id anywhere.
-    assert api.client.get("/api/v1/me/projects", headers=api.headers(ALICE)).json() == []
+    # A System admin sees every live project of the tenant without a membership (ADR 0016,
+    # T-0275: tests/test_system_admin_capabilities.py); no tenant id anywhere.
+    admin_view = api.client.get("/api/v1/me/projects", headers=api.headers(ALICE)).json()
+    assert [(p["code"], p["personas"], p["access"]) for p in admin_view] == [
+        ("AWAY", [], "system_admin"),
+        ("HOME", [], "system_admin"),
+    ]
     assert api.client.get("/api/v1/me/projects", headers=api.headers(DAVE)).json() == []
 
 
@@ -822,6 +829,7 @@ def test_the_last_admin_check_sees_a_deactivation_committed_meanwhile(
         assert held.is_active  # in this session's identity map, strongly referenced
         with api.db.unit_of_work(ROOT) as other:  # meanwhile: B is deactivated
             service.update_user(other, bob, UserUpdate(is_active=False), actor_id=alice)
+
         def remove_alice() -> object:
             if action == "deactivate":
                 return service.update_user(s, alice, UserUpdate(is_active=False), actor_id=alice)

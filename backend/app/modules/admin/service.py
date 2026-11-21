@@ -30,10 +30,13 @@ from app.core.auth import memberships
 from app.core.auth import service as users
 from app.core.auth.access import (
     ADMIN_GRANTS,
+    HOLD_AUTHORITY,
     SYSTEM_ADMIN,
     Grant,
+    load_grants,
     register_admin_grant_lookup,
     sod_warning,
+    system_admin_holders,
 )
 from app.core.auth.models import SOURCE_DIRECT, User, normalize_email
 from app.core.tenancy.rls import session_tenancy
@@ -51,7 +54,8 @@ class DuplicateUserError(ValueError):
 
 
 class SodConfirmationError(ValueError):
-    """PER-09 + hold-authority persona without ``confirm_sod`` (409, TD-151)."""
+    """PER-09 or ``system_admin`` + hold-authority persona without ``confirm_sod`` (409,
+    TD-151, ADR 0016)."""
 
 
 class GrantRaceError(RuntimeError):
@@ -132,15 +136,57 @@ def own_admin_grants(session: Session, tenant_id: uuid.UUID, user_id: uuid.UUID)
 register_admin_grant_lookup(own_admin_grants)
 
 
-def grant(session: Session, user_id: uuid.UUID, kind: str, *, actor_id: uuid.UUID | None) -> bool:
+def hold_authority_projects(session: Session, user_id: uuid.UUID) -> list[uuid.UUID]:
+    """The live projects where the user holds a hold-authority persona (PER-02, PER-06,
+    PER-07, PER-11), from any source (individual or team-derived): granting ``system_admin``
+    to such a user warns (ADR 0016, diff §4.1). Memberships of deleted projects are revoked
+    with the project, so they never count. Needs a session that reads the user's memberships
+    (a ``system_admin`` one)."""
+    held = load_grants(session, _tenant_id(session), user_id)
+    return sorted({g.project_id for g in held if g.persona in HOLD_AUTHORITY}, key=str)
+
+
+def grant(
+    session: Session,
+    user_id: uuid.UUID,
+    kind: str,
+    *,
+    actor_id: uuid.UUID | None,
+    confirm_sod: bool = False,
+) -> bool:
     """Grant ``kind`` (``system_admin`` sessions only: the RLS policy and the ORM guard refuse
-    anyone else). ``False`` when the user already holds it. Called by ``/admin/grants``."""
+    anyone else). ``False`` when the user already holds it (``grant_checked``)."""
+    created, _sod_projects = grant_checked(
+        session, user_id, kind, actor_id=actor_id, confirm_sod=confirm_sod
+    )
+    return created
+
+
+def grant_checked(
+    session: Session,
+    user_id: uuid.UUID,
+    kind: str,
+    *,
+    actor_id: uuid.UUID | None,
+    confirm_sod: bool = False,
+) -> tuple[bool, list[uuid.UUID]]:
+    """``grant``, also returning the projects that made it a separation-of-duties case (empty
+    when none, or when nothing was granted). Called by ``/admin/grants``.
+
+    ``system_admin`` for a user holding a hold-authority persona on a live project needs
+    ``confirm_sod`` (else ``SodConfirmationError``, nothing written) and is audited with
+    ``sod_warning: true`` and those projects (ADR 0016, diff §4.1)."""
     if kind not in ADMIN_GRANTS:
         raise ValueError(f"unknown admin grant {kind!r}")
     tenant_id = _tenant_id(session)
     users.get_user(session, user_id)
     if kind in own_admin_grants(session, tenant_id, user_id):
-        return False
+        return False, []
+    sod_projects = hold_authority_projects(session, user_id) if kind == SYSTEM_ADMIN else []
+    if sod_projects and not confirm_sod:
+        raise SodConfirmationError(
+            "system_admin for a holder of a hold-authority persona: confirm with confirm_sod"
+        )
     row = AdminGrant(
         tenant_id=tenant_id,
         project_id=None,
@@ -157,8 +203,13 @@ def grant(session: Session, user_id: uuid.UUID, kind: str, *, actor_id: uuid.UUI
         # insert (live unique index). No SAVEPOINT: on SQLite one opened before any write
         # commits early. The caller's unit of work is now unusable and must roll back.
         raise GrantRaceError(f"{kind} was granted concurrently") from exc
-    _append(session, f"admin-grant:{user_id}", {"action": "grant", "grant": kind}, actor_id)
-    return True
+    payload: dict[str, Any] = {"action": "grant", "grant": kind}
+    if kind == SYSTEM_ADMIN:
+        payload["sod_warning"] = bool(sod_projects)
+    if sod_projects:
+        payload["sod_project_ids"] = [str(p) for p in sod_projects]
+    _append(session, f"admin-grant:{user_id}", payload, actor_id)
+    return True, sod_projects
 
 
 def revoke(session: Session, user_id: uuid.UUID, kind: str, *, actor_id: uuid.UUID | None) -> bool:
@@ -328,7 +379,8 @@ def assign_member(
 
     Team-derived rows are left alone; a persona the user also holds through a team gets its
     own individual row (it outlives the team link). PER-09 with a hold-authority persona,
-    counted over the user's effective grants (individual and team-derived, ADR 0008), needs
+    counted over the user's effective grants (individual and team-derived, ADR 0008), or a
+    hold-authority persona for a user holding ``system_admin`` (ADR 0016), needs
     ``confirm_sod`` (else ``SodConfirmationError``) and is audited with ``sod_warning: true``.
     Assigning PER-09 adds no hold or signing capability: capabilities come only from each
     persona (TD-151).
@@ -337,10 +389,13 @@ def assign_member(
     user = users.get_user(session, user_id)
     wanted = frozenset(personas)
     team = _team_rows(session, project_id, user_id)
-    warn = sod_warning([*(g.persona for g in wanted), *(t.grant.persona for t in team)])
+    is_admin = bool(system_admin_holders(session, _tenant_id(session), [user_id]))
+    held = [*(g.persona for g in wanted), *(t.grant.persona for t in team)]
+    warn = sod_warning(held, system_admin=is_admin)
     if warn and not confirm_sod:
         raise SodConfirmationError(
-            "PER-09 together with a hold-authority persona: confirm with confirm_sod"
+            "PER-09 or system_admin together with a hold-authority persona:"
+            " confirm with confirm_sod"
         )
     added, removed = memberships.set_user_grants(
         session, project_id, user_id, wanted, actor_id=actor_id
@@ -389,6 +444,8 @@ __all__ = [
     "assign_member",
     "create_user",
     "grant",
+    "grant_checked",
+    "hold_authority_projects",
     "list_grants",
     "lookup_user",
     "own_admin_grants",

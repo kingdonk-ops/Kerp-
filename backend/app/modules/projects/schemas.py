@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from enum import StrEnum
 from typing import Annotated, Any, Final, Literal, Self
 
 from pydantic import (
@@ -143,6 +144,14 @@ class LobbyVisibility(BaseModel):
     visible_in_lobby: bool
 
 
+class ProjectAccessKind(StrEnum):
+    """How the caller reaches a project (ADR 0016, T-0275): through a membership, or only
+    through the ``system_admin`` grant (no membership on the project)."""
+
+    MEMBER = "member"
+    SYSTEM_ADMIN = "system_admin"
+
+
 class ProjectRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -158,3 +167,7 @@ class ProjectRead(BaseModel):
     revision: int
     created_at: datetime
     updated_at: datetime
+    access: ProjectAccessKind = Field(
+        description="member: the caller holds a membership on the project; system_admin: "
+        "reached only through the caller's system_admin grant (ADR 0016)"
+    )

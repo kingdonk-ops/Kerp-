@@ -70,7 +70,7 @@ endpoint takes or returns a tenant id.
 
 **Separation of duties** (ADR 0008). A link create / re-role, or a member add, that would give
 a hold-authority persona (PER-02, PER-06, PER-07, PER-11) on a linked project to a user who
-holds **individual** PER-09 there answers 409
+holds **individual** PER-09 there, or holds `system_admin` (ADR 0016, T-0275), answers 409
 `{"code": "sod_confirmation_required", "sod_warning": {"user_ids": [...], "project_ids": [...]}}`
 and writes nothing, unless the body carries `confirm_sod: true`. A member add checks every
 project the team is linked to. A confirmed change is audited with `sod_warning: true`.

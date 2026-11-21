@@ -32,7 +32,9 @@ unique constraint: 409, and the unit of work rolls back. A grant racing a duplic
 held. No SAVEPOINT is used (on SQLite one opened before any write commits early).
 
 **What the grants allow** (diff §4.1, T-0039). `system_admin`: this module's System-admin
-endpoints. `create_projects` ("Project Admin"): `POST /api/v1/projects`, nothing else; the
+endpoints, and on every live project of the tenant `V`, `C`, `E` and `admin` (PER-09
+equivalent) without a membership, never `A` or `S` (ADR 0016, T-0275:
+`access.project_access(..., system_admin=True)`). `create_projects` ("Project Admin"): `POST /api/v1/projects`, nothing else; the
 projects module reads it through `access.CallerAdminGrants` (loaded with the scope at
 authentication) and grants the creator PER-09 on the new project in the creating
 transaction. Revoking `create_projects` keeps the user's PER-09 memberships. Deleting a project
@@ -64,7 +66,7 @@ never from a claim, parameter or header.
 | `PUT /projects/{p}/members/{user}` | PER-09 of `p`, `system_admin` | set the user's complete **individual** persona set on `p`; team-derived grants are untouched, and a persona also held through a team gets its own individual row (it outlives the team) |
 | `DELETE /projects/{p}/members/{user}` | PER-09 of `p`, `system_admin` | revoke all of the user's individual personas on `p`; 409 `managed_through_team` (with the link ids) when the user's access is only team-derived |
 | `GET /grants[?user_id=]` | `system_admin` | live tenant-level grants `{user_id, email, display_name, grant}`, by e-mail |
-| `POST /grants` | `system_admin` | `{user_id, grant}` with `grant` `system_admin` or `create_projects`: 201, 200 if already held, 404 unknown user |
+| `POST /grants` | `system_admin` | `{user_id, grant, confirm_sod?}` with `grant` `system_admin` or `create_projects`: 201, 200 if already held, 404 unknown user; the response carries `sod_warning`. `system_admin` for a user holding a hold-authority persona on a live project: 409 `sod_confirmation_required` without `confirm_sod` (ADR 0016) |
 | `DELETE /grants/{user}/{grant}` | `system_admin` | revoke: 204, 404 if not held, 409 for the last active `system_admin` |
 
 Everyone else gets 403; a project the caller is not a member of (or a deleted one) is 404 for
@@ -101,6 +103,18 @@ the response carries `sod_warning: true` and the audit entry `sod_warning: true`
 counts the user's team-derived grants on the project too (T-0073, ADR 0008): individual PER-09
 for a user with a team-derived PER-02/06/07/11 needs the same confirmation. Assigning PER-09 never adds hold or signing
 capability: capabilities stay those of each persona (`access.PERSONAS`).
+
+**`system_admin` and hold authority** (ADR 0016, diff §4.1, T-0275). `sod_warning(personas,
+system_admin=)` is also true for a hold-authority persona held by a user with `system_admin`:
+the member PUT (and so access-request approval and invite acceptance, which go through it), the
+invite creation (for an existing account) and the team link / team member endpoints answer the
+same 409 unless confirmed, and audit `sod_warning: true`. Whether the target holds
+`system_admin` is read by `access.system_admin_holders`: in the caller's session when it is a
+`system_admin` one, else in a short read-only side session bound to that user (the own-rows
+policy), so a PER-09 caller never reads anyone's grants. Granting `system_admin`
+(`POST /grants`) to a user holding PER-02/06/07/11 on a live project (any source) needs
+`confirm_sod` and is audited on `admin-grant:<user>` with `sod_warning: true` and
+`sod_project_ids`.
 
 ## Project invites (T-0052, diff §4.1 Invites)
 

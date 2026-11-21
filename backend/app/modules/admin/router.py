@@ -16,6 +16,10 @@ bound with, loaded from the grants table at authentication, never from the reque
 * ``GET/POST /grants``, ``DELETE /grants/{user}/{grant}``: ``system_admin`` only (else 403):
   appoint and remove System admins and Project Admins (``create_projects``); the last System
   admin cannot be removed (409). Every grant and revoke is audited (T-0039, diff §4.1).
+  ``system_admin`` for a user holding a hold-authority persona on a live project answers 409
+  ``sod_confirmation_required`` unless ``confirm_sod`` (then ``sod_warning: true``, audited;
+  ADR 0016). Assigning a hold-authority persona to a ``system_admin`` through the member
+  endpoints warns the same way.
 
 * Project invites (``invites_router.py``, T-0052): ``/projects/{p}/invites`` for a PER-09 of
   ``p`` or a ``system_admin``; ``/invites/preview`` and ``/invites/accept`` for the invitee.
@@ -55,6 +59,7 @@ from app.core.db import DbSession
 from app.modules.admin import service
 from app.modules.admin.invites_router import router as invites_router
 from app.modules.admin.schemas import (
+    AdminGranted,
     AdminGrantIn,
     AdminGrantKind,
     AdminGrantRead,
@@ -302,25 +307,39 @@ def list_grants(session: DbSession, user_id: uuid.UUID | None = None) -> list[Ad
 
 @router.post(
     "/grants",
-    response_model=AdminGrantRead,
+    response_model=AdminGranted,
     status_code=status.HTTP_201_CREATED,
     dependencies=[SystemAdminOnly],
-    responses={status.HTTP_200_OK: {"model": AdminGrantRead, "description": "Already held"}},
+    responses={
+        status.HTTP_200_OK: {"model": AdminGranted, "description": "Already held"},
+        status.HTTP_409_CONFLICT: {
+            "description": "system_admin for a hold-authority holder needs confirm_sod"
+        },
+    },
 )
 def grant(
     body: AdminGrantIn, principal: CurrentPrincipal, session: DbSession, response: Response
-) -> AdminGrantRead:
+) -> AdminGranted:
     user = auth_service.get_user(session, body.user_id)
+    kind = body.grant.value
     try:
-        created = service.grant(session, user.id, body.grant.value, actor_id=principal.user_id)
+        created, sod_projects = service.grant_checked(
+            session, user.id, kind, actor_id=principal.user_id, confirm_sod=body.confirm_sod
+        )
+    except service.SodConfirmationError as exc:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            {"code": "sod_confirmation_required", "sod_warning": True, "message": str(exc)},
+        ) from exc
     except service.GrantRaceError:
         # Another request granted it first. This request wrote nothing else, so its unit of
         # work is rolled back here and the answer is the sequential one: already held.
         session.rollback()
-        created = False
+        created, sod_projects = False, []
     if not created:
         response.status_code = status.HTTP_200_OK
-    return _admin_grant(user, body.grant.value)
+    warn = bool(sod_projects)
+    return AdminGranted(**_admin_grant(user, kind).model_dump(), sod_warning=warn)
 
 
 @router.delete(

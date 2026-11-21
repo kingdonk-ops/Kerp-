@@ -56,8 +56,9 @@ class MemberPut(BaseModel):
 
     confirm_sod: bool = Field(
         default=False,
-        description="Confirm that the user, an individual PER-09 of a linked project, gets a"
-        " hold-authority persona there through this team (else 409 sod_warning)",
+        description="Confirm that the user, an individual PER-09 of a linked project or a"
+        " system_admin, gets a hold-authority persona there through this team (else 409"
+        " sod_warning)",
     )
 
 
@@ -76,7 +77,7 @@ class LinkPut(BaseModel):
     confirm_sod: bool = Field(
         default=False,
         description="Confirm a hold-authority persona for members who hold individual PER-09"
-        " on the project (else 409 sod_warning)",
+        " on the project or system_admin (else 409 sod_warning)",
     )
 
     @model_validator(mode="after")

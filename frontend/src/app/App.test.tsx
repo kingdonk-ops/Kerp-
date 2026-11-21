@@ -11,7 +11,7 @@ import { createQueryClient } from "./queryClient";
 import type { AppServices } from "./services";
 
 const PROJECTS: ProjectSummary[] = [
-  { id: "p-alpha", code: "SYN-001", name: "Synthetic Refinery Unit", personas: ["PER-02"] },
+  { id: "p-alpha", code: "SYN-001", name: "Synthetic Refinery Unit", personas: ["PER-02"], access: "member" },
 ];
 
 function setup(

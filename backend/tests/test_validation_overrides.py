@@ -17,11 +17,12 @@ from sqlalchemy.exc import IntegrityError
 
 from app.core.audit.service import append as audit_append
 from app.core.audit.service import chain_entries, verify_chain
-from app.core.auth.access import Persona
+from app.core.auth.access import SYSTEM_ADMIN, Persona
 from app.core.auth.models import ProjectMembership
 from app.core.db import Base, Database, contract_violations, utcnow
 from app.core.tenancy.context import TenancyContext
 from app.core.tenancy.rls import rls_tables
+from app.modules.admin import service as admin_service
 from app.modules.notifications import service as notifications
 from app.modules.projects import service as projects
 from app.modules.projects.schemas import ProjectCreate
@@ -572,6 +573,34 @@ def test_members_list_and_read_overrides_of_their_project_only(api: Api) -> None
     assert api.client.get(base, headers=api.as_("outsider")).status_code == 404
     other = f"{API}/projects/{api.other}/overrides/{override['id']}"
     assert api.client.get(other, headers=api.as_("outsider")).status_code == 404
+
+
+def test_a_non_member_system_admin_reads_and_requests_but_never_decides(api: Api) -> None:
+    """ADR 0016 §4, T-0275: V/C/E/admin on every project, never A without its own PER-06."""
+    with api.db.unit_of_work(TenancyContext(tenant_id=T1, is_system_admin=True)) as s:
+        # The outsider is PER-06 of the other project: the SoD warning is confirmed.
+        assert admin_service.grant(
+            s, api.ids["outsider"], SYSTEM_ADMIN, actor_id=None, confirm_sod=True
+        )
+    override = api.request("fw", api.finding(blocked(api, uuid.uuid4()))).json()
+    base = f"{API}/projects/{api.project}/overrides"
+    listed = api.client.get(base, headers=api.as_("outsider"))
+    assert [o["id"] for o in listed.json()] == [override["id"]]
+    assert (
+        api.client.get(f"{base}/{override['id']}", headers=api.as_("outsider")).status_code == 200
+    )
+    # Visible is not "of this project": through another project's path it is 404.
+    other = f"{API}/projects/{api.other}/overrides/{override['id']}"
+    assert api.client.get(other, headers=api.as_("outsider")).status_code == 404
+    for action in ("approve", "reject"):
+        assert api.decide("outsider", override["id"], action).status_code == 403
+    assert api.override(override["id"]).decision == "pending"
+    mine = api.request("outsider", api.finding(blocked(api, uuid.uuid4())))
+    assert mine.status_code == 201, mine.text  # C, routed to PER-06 like any requester
+    # With its own PER-06 on the project the admin decides as that persona.
+    with api.db.unit_of_work(CTX) as s:
+        api._member(s, "outsider", api.project, P.QAQC_LEAD)
+    assert api.decide("outsider", override["id"], "approve").status_code == 200
 
 
 def test_other_projects_and_tenants_see_no_overrides(api: Api) -> None:

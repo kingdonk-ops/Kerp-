@@ -14,6 +14,9 @@ endpoints only declare what they need.
   the bound project. A Site Inspector (PER-07) sees only their site's rows.
 * **SoD**: hold release is an explicit per-persona grant. The Project Administrator
   (PER-09) holds no hold authority at all (``SOD_BLOCKED``), whatever its admin tier.
+* **System admin** (ADR 0016, T-0275): a ``system_admin`` has the Admin tier (``V``, ``C``,
+  ``E``, ``admin``: PER-09 equivalent) on every live project of its tenant without a
+  membership, never ``A`` or ``S``: those come only from its own personas on the project.
 """
 
 from __future__ import annotations
@@ -26,11 +29,11 @@ from typing import TYPE_CHECKING, Annotated, Final
 
 from fastapi import Depends, Request
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.auth.deps import CurrentPrincipal
 from app.core.auth.models import ProjectMembership
-from app.core.db import DbSession
+from app.core.db import SIDE_WRITE_DB_KEY, DbSession
 from app.core.tenancy.context import TenancyContext
 from app.core.tenancy.rls import bind_tenancy, session_tenancy
 from app.core.tenancy.scope import OutOfScopeError
@@ -171,26 +174,45 @@ class Grant:
 
 @dataclass(frozen=True, slots=True)
 class ProjectAccess:
-    """What a user may do in one project: the union of their personas there."""
+    """What a user may do in one project: the union of their personas there, plus, for a
+    ``system_admin`` (ADR 0016, T-0275), the Admin tier (``V``/``C``/``E``/``admin``, PER-09
+    equivalent) with or without a membership. ``A`` and ``S`` and hold release come only from
+    the user's own personas (``grants``), never from ``system_admin``."""
 
     project_id: uuid.UUID
     grants: frozenset[Grant]
+    system_admin: bool = False
 
     @property
     def personas(self) -> frozenset[Persona]:
+        """The user's own personas on the project (memberships only)."""
         return frozenset(g.persona for g in self.grants)
 
     @property
+    def acting_personas(self) -> frozenset[Persona]:
+        """``personas`` plus PER-09 for a ``system_admin``: for persona-gated *configuration*
+        rules ("PER-09 may edit ..."). PER-09 has no ``A``/``S`` and no hold authority, so
+        this never widens approval; approvers are still checked against ``personas``."""
+        admin = {Persona.PROJECT_ADMINISTRATOR} if self.system_admin else set()
+        return self.personas | admin
+
+    @property
     def capabilities(self) -> frozenset[Capability]:
-        return frozenset().union(*(PERSONAS[p].capabilities for p in self.personas))
+        admin = TIER_CAPABILITIES[Tier.ADMIN] if self.system_admin else frozenset()
+        return admin.union(*(PERSONAS[p].capabilities for p in self.personas))
 
     def has(self, capability: Capability) -> bool:
         return capability in self.capabilities
 
     @property
     def site_node_ids(self) -> frozenset[uuid.UUID] | None:
-        """The sites the user is limited to, or ``None`` when any persona is unrestricted."""
-        if not self.grants or any(PERSONAS[g.persona].scope is not Scope.SITE for g in self.grants):
+        """The sites the user is limited to, or ``None`` when any persona is unrestricted (a
+        ``system_admin`` is never site-filtered, ``scope.site_filter``)."""
+        if (
+            self.system_admin
+            or not self.grants
+            or any(PERSONAS[g.persona].scope is not Scope.SITE for g in self.grants)
+        ):
             return None
         return frozenset(g.site_node_id for g in self.grants if g.site_node_id is not None)
 
@@ -206,12 +228,21 @@ class ProjectAccess:
         return False
 
 
-def project_access(grants: Iterable[Grant], project_id: uuid.UUID) -> ProjectAccess:
-    """The user's access to ``project_id``; ``OutOfScopeError`` (404) for a non-member."""
+def project_access(
+    grants: Iterable[Grant], project_id: uuid.UUID, *, system_admin: bool = False
+) -> ProjectAccess:
+    """The user's access to ``project_id``; ``OutOfScopeError`` (404) for a non-member who is
+    not a ``system_admin``.
+
+    ``system_admin`` must be the flag the session was bound with (``resolve_request_scope``,
+    never the request). This is pure: it does not check that the project exists, is live or
+    belongs to the tenant; the caller loads it under the session's scope (``get_project``),
+    which answers 404 for an unknown, deleted or other-tenant project.
+    """
     here = frozenset(g for g in grants if g.project_id == project_id)
-    if not here:
+    if not here and not system_admin:
         raise OutOfScopeError("project not found")
-    return ProjectAccess(project_id, here)
+    return ProjectAccess(project_id, here, system_admin)
 
 
 def resolve_scope(
@@ -220,7 +251,8 @@ def resolve_scope(
     """The session scope for a user: ``base`` plus the bound project and the allowed list.
 
     The allowed (read-only) projects are those of the user's portfolio-scope personas; the
-    bound project, if any, must be one of the user's projects and sets the site filter. Every
+    bound project, if any, must be one of the user's projects (any project of the tenant for a
+    ``system_admin``, ADR 0016) and sets the site filter. Every
     project of the grants becomes a member project (it widens only the rows describing a
     project, T-0014); the projects where the user holds PER-09 become admin projects (they widen
     only the access requests of those projects, T-0050); ``base.is_system_admin`` is kept.
@@ -229,7 +261,11 @@ def resolve_scope(
     allowed = frozenset(
         g.project_id for g in grants if PERSONAS[g.persona].scope is Scope.PORTFOLIO
     )
-    sites = project_access(grants, project_id).site_node_ids if project_id is not None else None
+    sites = (
+        project_access(grants, project_id, system_admin=base.is_system_admin).site_node_ids
+        if project_id is not None
+        else None
+    )
     return TenancyContext(
         tenant_id=base.tenant_id,
         project_id=project_id,
@@ -303,8 +339,9 @@ def caller_admin_grants(
 ) -> frozenset[str]:
     """The user's own tenant-level admin grants (``system_admin``, ``create_projects``).
 
-    Neither grant is a persona or a membership, and neither adds a capability: no ``A`` or
-    ``S`` comes from them (TD-151); those come only from the personas in ``PERSONAS``.
+    Neither grant is a persona or a membership. ``system_admin`` gives the Admin tier on every
+    project of the tenant (``project_access(..., system_admin=True)``, ADR 0016); no ``A`` or
+    ``S`` comes from either (TD-151): those come only from the personas in ``PERSONAS``.
     """
     found: frozenset[str] = frozenset()
     for lookup in _admin_grant_lookups:
@@ -319,13 +356,53 @@ HOLD_AUTHORITY: Final = frozenset(
 )
 
 
-def sod_warning(personas: Iterable[Persona]) -> bool:
-    """Whether a user's *full* persona set on one project combines PER-09 with a
-    hold-authority persona (TD-151, edge spec §5 Admins): allowed, but the assignment must
-    be confirmed and is audited with ``sod_warning: true``. Callers pass every grant of the
-    user on the project, whatever its source (individual or team-derived, T-0073)."""
+def sod_warning(personas: Iterable[Persona], *, system_admin: bool = False) -> bool:
+    """Whether a user's *full* persona set on one project combines PER-09, or the user's
+    ``system_admin`` grant (ADR 0016, diff §4.1), with a hold-authority persona (TD-151, edge
+    spec §5 Admins): allowed, but the assignment must be confirmed and is audited with
+    ``sod_warning: true``. Callers pass every grant of the user on the project, whatever its
+    source (individual or team-derived, T-0073), and whether the user holds ``system_admin``
+    (``system_admin_holders``)."""
     held = frozenset(personas)
-    return Persona.PROJECT_ADMINISTRATOR in held and bool(held & HOLD_AUTHORITY)
+    admin = system_admin or Persona.PROJECT_ADMINISTRATOR in held
+    return admin and bool(held & HOLD_AUTHORITY)
+
+
+def system_admin_holders(
+    session: Session, tenant_id: uuid.UUID, user_ids: Iterable[uuid.UUID]
+) -> frozenset[uuid.UUID]:
+    """The users among ``user_ids`` who hold ``system_admin`` (for the SoD warning, ADR 0016).
+
+    A ``system_admin`` session reads every admin grant of its tenant, any session its own; for
+    anyone else (a PER-09 assigning a persona) each user's own grants are read in a short
+    read-only session bound to that user, as ``resolve_request_scope`` does (the admin-grant
+    policy shows a session its own rows), on the side pool so it never waits on the request
+    pool (T-0210). Only the yes/no leaves this function.
+    """
+    context = session_tenancy(session)
+    found: set[uuid.UUID] = set()
+    for user_id in set(user_ids):
+        if context is not None and (context.is_system_admin or context.user_id == user_id):
+            grants = caller_admin_grants(session, tenant_id, user_id)
+        else:
+            with _side_sessionmaker(session)() as side:
+                bind_tenancy(side, TenancyContext(tenant_id=tenant_id, user_id=user_id))
+                grants = caller_admin_grants(side, tenant_id, user_id)
+        if SYSTEM_ADMIN in grants:
+            found.add(user_id)
+    return frozenset(found)
+
+
+def _side_sessionmaker(session: Session) -> sessionmaker[Session]:
+    """The side pool of ``session``'s ``Database`` (``Database.session`` stashes it under
+    ``SIDE_WRITE_DB_KEY``; request sessions always carry it, so a request never waits on its
+    own pool here, T-0210), else a plain factory on its own engine (a bare session, scripts and
+    tests, is never the shared request pool)."""
+    database = session.info.get(SIDE_WRITE_DB_KEY)
+    if database is not None:
+        maker: sessionmaker[Session] = database.side_write_sessionmaker
+        return maker
+    return sessionmaker(bind=session.get_bind().engine, autoflush=False, expire_on_commit=False)
 
 
 # ``request.state`` attribute holding ``(tenant_id, user_id, grants)`` once the request's
@@ -419,7 +496,7 @@ def get_caller_admin_grants(
 ) -> frozenset[str]:
     """The caller's own tenant-level admin grants (``create_projects`` gates project creation,
     T-0039): the ones loaded when the request's scope was resolved, else looked up. Never
-    from the request. They confer no capability (``caller_admin_grants``)."""
+    from the request. They confer no ``A`` or ``S`` (``caller_admin_grants``)."""
     cached = getattr(request.state, ADMIN_GRANTS_STATE, None)
     if cached is not None and cached[:2] == (principal.tenant_id, principal.user_id):
         return frozenset(cached[2])

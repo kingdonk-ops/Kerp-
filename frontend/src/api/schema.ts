@@ -2198,6 +2198,12 @@ export interface components {
              */
             user_id: string;
             grant: components["schemas"]["AdminGrantKind"];
+            /**
+             * Confirm Sod
+             * @description Confirms system_admin for a user who holds a hold-authority persona (PER-02, PER-06, PER-07, PER-11) on a live project (else 409 sod_warning; ADR 0016)
+             * @default false
+             */
+            confirm_sod: boolean;
         };
         /**
          * AdminGrantKind
@@ -2217,6 +2223,28 @@ export interface components {
             /** Display Name */
             display_name: string;
             grant: components["schemas"]["AdminGrantKind"];
+        };
+        /**
+         * AdminGranted
+         * @description ``POST /admin/grants``: the grant, and whether it combined ``system_admin`` with a
+         *     hold-authority persona (confirmed with ``confirm_sod``, audited ``sod_warning: true``).
+         */
+        AdminGranted: {
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+            /** Email */
+            email: string;
+            /** Display Name */
+            display_name: string;
+            grant: components["schemas"]["AdminGrantKind"];
+            /**
+             * Sod Warning
+             * @description system_admin given to a holder of a hold-authority persona (ADR 0016)
+             */
+            sod_warning: boolean;
         };
         /** Aggregate */
         Aggregate: {
@@ -3251,7 +3279,7 @@ export interface components {
             site_node_id?: string | null;
             /**
              * Confirm Sod
-             * @description Confirm a hold-authority persona for members who hold individual PER-09 on the project (else 409 sod_warning)
+             * @description Confirm a hold-authority persona for members who hold individual PER-09 on the project or system_admin (else 409 sod_warning)
              * @default false
              */
             confirm_sod: boolean;
@@ -3492,7 +3520,7 @@ export interface components {
         MemberPut: {
             /**
              * Confirm Sod
-             * @description Confirm that the user, an individual PER-09 of a linked project, gets a hold-authority persona there through this team (else 409 sod_warning)
+             * @description Confirm that the user, an individual PER-09 of a linked project or a system_admin, gets a hold-authority persona there through this team (else 409 sod_warning)
              * @default false
              */
             confirm_sod: boolean;
@@ -3549,8 +3577,13 @@ export interface components {
             code: string;
             /** Name */
             name: string;
-            /** Personas */
+            /**
+             * Personas
+             * @description The caller's own personas on the project (empty for system_admin access)
+             */
             personas: components["schemas"]["Persona"][];
+            /** @description member: through a membership; system_admin: only through the caller's system_admin grant (ADR 0016) */
+            access: components["schemas"]["ProjectAccessKind"];
         };
         /**
          * NodeCreate
@@ -4011,6 +4044,13 @@ export interface components {
             expires_at: string;
         };
         /**
+         * ProjectAccessKind
+         * @description How the caller reaches a project (ADR 0016, T-0275): through a membership, or only
+         *     through the ``system_admin`` grant (no membership on the project).
+         * @enum {string}
+         */
+        ProjectAccessKind: "member" | "system_admin";
+        /**
          * ProjectCreate
          * @description ``POST /projects``. The tenant comes from the token, never from the body.
          *
@@ -4070,6 +4110,8 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+            /** @description member: the caller holds a membership on the project; system_admin: reached only through the caller's system_admin grant (ADR 0016) */
+            access: components["schemas"]["ProjectAccessKind"];
         };
         /**
          * ProjectTeamRead
@@ -7351,7 +7393,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AdminGrantRead"];
+                    "application/json": components["schemas"]["AdminGranted"];
                 };
             };
             /** @description Successful Response */
@@ -7360,8 +7402,15 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AdminGrantRead"];
+                    "application/json": components["schemas"]["AdminGranted"];
                 };
+            };
+            /** @description system_admin for a hold-authority holder needs confirm_sod */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

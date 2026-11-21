@@ -15,6 +15,7 @@ export const ADMIN_PROJECT: ProjectSummary = {
   code: "SYN-001",
   name: "Synthetic Refinery Unit",
   personas: ["PER-09"],
+  access: "member",
 };
 
 /** A synthetic project record (`GET /projects`), `ADMIN_PROJECT` unless overridden. */
@@ -32,6 +33,7 @@ export function project(extra: Partial<Project> = {}): Project {
     revision: 1,
     created_at: "2026-11-01T08:00:00Z",
     updated_at: "2026-11-01T08:00:00Z",
+    access: "member",
     ...extra,
   };
 }

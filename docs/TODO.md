@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 328 · **Closed:** 146
+**Open:** 329 · **Closed:** 146
 
 ## decision (39)
 
@@ -118,7 +118,7 @@
 | [TD-480](../tracker/todo/TD-480.md) | code_pattern is a 'validation/generation pattern': T-0101 validates node codes against it as an RE2 regex; generation (and its syntax, e.g. {seq:4}) is undefined | T-0101 | implementer |
 | [TD-481](../tracker/todo/TD-481.md) | oe_asset_node columns the spec does not name or type: name, planned_start/planned_finish, Numeric(18,4) quantities, list-of-ids lineage; display_code for a level missing on the path | T-0101 | implementer |
 
-## missed (8)
+## missed (9)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -130,6 +130,7 @@
 | [TD-337](../tracker/todo/TD-337.md) | Web/Android route /magic-link#<token> that redeems the e-mailed sign-in link (POST /auth/magic-link/redeem); the e-mail now links there | T-0058 | implementer |
 | [TD-388](../tracker/todo/TD-388.md) | saved_views: wire the my_teams filter op | T-0074 | reviewer |
 | [TD-463](../tracker/todo/TD-463.md) | Server: refuse self-deactivation on PATCH /admin/users/{id} (Admin → Users only hides the button) | T-0331 | implementer |
+| [TD-487](../tracker/todo/TD-487.md) | Frontend: Admin -> System grants page needs the SoD confirm step for system_admin on a hold-authority holder (POST /admin/grants 409 sod_confirmation_required, confirm_sod), plus the same warning for hold personas on system_admins in member/invite/team UIs | T-0275 | implementer |
 
 ## deferred (47)
 

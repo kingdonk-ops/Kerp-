@@ -19,6 +19,7 @@ const OTHER_PROJECT: ProjectSummary = {
   code: "SYN-002",
   name: "Synthetic Tank Farm",
   personas: ["PER-01"],
+  access: "member",
 };
 const ME = { id: FAKE_USER.id, email: FAKE_USER.email, display_name: FAKE_USER.display_name, is_active: true, is_internal: true };
 const PLANNER = { id: "00000000-0000-4000-8000-000000000302", email: "planner@example.test", display_name: "Synthetic Planner", is_active: true, is_internal: true };

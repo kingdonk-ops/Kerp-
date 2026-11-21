@@ -9,7 +9,7 @@ modules carries the project's `id` as its `project_id`.
 |---|---|
 | `models.py` | `oe_projects_project` (`BaseRecordMixin`, tenant-level row; migration `0008`, membership-based RLS since `0015`, `visible_in_lobby` since `0021`, DB-side `status`/`site_timezone` defaults since `0033`) |
 | `schemas.py` | `ProjectCreate` / `ProjectUpdate` / `ProjectRead`, `LobbyVisibility`, `PolygonGeoJSON`; timezone, ISO 4217, BCP 47 validation from `app.core.locale` (shared with the settings module) |
-| `service.py` | `create_project`, `get_project`, `list_projects`, `live_project_ids` (the jobs scheduler, T-0214), `update_project`, `delete_project`, `site_zone`, `bind_project` (project-scoped routers, T-0217), `set_lobby_visibility`, the narrow lobby read `lobby_projects` / `project_by_code` (T-0040) and `lobby_projects_by_id` (access requests, T-0050) |
+| `service.py` | `create_project`, `get_project`, `list_projects`, `live_project_ids` (the jobs scheduler, T-0214), `update_project`, `delete_project`, `site_zone`, `bind_project` (project-scoped routers, T-0217), `tenant_projects` (every live project a `system_admin` session sees, T-0275), `set_lobby_visibility`, the narrow lobby read `lobby_projects` / `project_by_code` (T-0040) and `lobby_projects_by_id` (access requests, T-0050) |
 | `router.py` | `GET/POST /api/v1/projects`, `GET/PATCH/DELETE /api/v1/projects/{id}`, `PUT /api/v1/projects/{id}/lobby` |
 
 ## Record
@@ -56,9 +56,13 @@ The request binds no project yet (TD-122), so the router authorises against the 
 the path using the caller's memberships (`app.core.auth.access.CallerGrants`: the grants the
 request's scope was resolved from, so they are read once per request, T-0071):
 
-- list and read: projects the caller is a member of; everything else is 404;
-- edit and delete: the `admin` capability (Project Administrator, PER-09) on that project, else
-  403; a non-member (also a PER-09 or Project Admin of another project) gets 404;
+- list and read: projects the caller is a member of; everything else is 404. A `system_admin`
+  lists and reads every live project of its tenant (ADR 0016, T-0275); every `ProjectRead`
+  carries `access`: `member`, or `system_admin` where the caller holds no membership. Deleted,
+  unknown and other tenants' projects stay 404 for everyone;
+- edit and delete: the `admin` capability (Project Administrator, PER-09, or a `system_admin`)
+  on that project, else 403; a non-member who is not a `system_admin` (also a PER-09 or
+  Project Admin of another project) gets 404;
 - lobby flag (`PUT /{id}/lobby`): PER-09 of that project or a System admin (diff §4.1); a
   non-member who is not a System admin 404, a member without PER-09 403; audited as an
   `update` with `fields: ["visible_in_lobby"]`;
@@ -112,7 +116,10 @@ local = some_utc_timestamp.astimezone(site_zone(project))
 
 A project-scoped endpoint (`/projects/{project_id}/...`) binds its request session with
 `bind_project` (T-0217): non-member 404, member without `require` 403, then the session is
-rebound to the project scope and a deleted project is 404. It returns the caller's access:
+rebound to the project scope and a deleted project is 404. A `system_admin` (the session's
+flag, ADR 0016, T-0275) is answered as a PER-09 member without a membership: `V`/`C`/`E`/
+`admin`, never `A`/`S` unless its own personas give them; for an unknown, deleted or other
+tenant's project it gets 404 before any 403. It returns the caller's access:
 
 ```python
 from app.core.auth.access import Capability

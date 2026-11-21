@@ -167,8 +167,9 @@ def _tenant_set_read(session: Session, grants: list[Grant], rule_set_id: uuid.UU
 def _bind_project(
     principal: Principal, grants: list[Grant], session: Session, project_id: uuid.UUID
 ) -> frozenset[Persona]:
-    """Bind the request session to ``project_id`` (non-member: 404); the caller's personas."""
-    return projects.bind_project(session, principal, grants, project_id).personas
+    """Bind the request session to ``project_id`` (non-member: 404); the caller's personas,
+    with PER-09 for a ``system_admin`` (PER-09 equivalent, ADR 0016; it gives no approval)."""
+    return projects.bind_project(session, principal, grants, project_id).acting_personas
 
 
 def _project_set(

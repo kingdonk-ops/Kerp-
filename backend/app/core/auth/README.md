@@ -29,7 +29,7 @@ rewritten (HS256 → RS256/EdDSA + JWKS + `jti` revocation in Redis).
 | `models.py` | `auth_user` table (tenant-level rows, RLS) — migration `0003`, internal staff flag + Entra link in `0013` (T-0049, ADR 0009); `auth_project_membership` (T-0010) — migration `0006`, persona CHECK widened for PER-16 in `0012` (T-0076), membership-based RLS in `0015` (T-0014), grant sources (`source_type`, `source_id`) in `0025` (T-0073, ADR 0008); `oe_identity_device` (T-0043) — migration `0016`, `wipe_secret_hash` in `0018` (T-0080), `pin_hash` + `pin_set_at` in `0019` (T-0038) |
 | `memberships.py` | The membership store's write side for **individual** (`direct`) rows (`project_grants`, `set_user_grants`, `revoke_project`; revoke = soft delete, re-grant revives) and the member list with sources (`project_member_grants`), used by the admin module (T-0014) and the projects module (creator PER-09, revoke on delete; T-0039) |
 | `team_grants.py` | Team-derived grants (T-0073, ADR 0008): `sync_team_link_grants`, `revoke_team_link_grants`, `team_link_grants` for the teams module, and the startup check (below) |
-| `access.py` | Persona matrix, capability tiers, SoD, scope resolution, `ProjectAccess` (`has`, `can_release_hold`) (T-0010); admin-grant lookup seam, `is_system_admin` binding, `CallerIsSystemAdmin`, `sod_warning` (T-0014); `CallerAdminGrants` (the caller's own `system_admin` / `create_projects`, cached with the scope; T-0039) |
+| `access.py` | Persona matrix, capability tiers, SoD, scope resolution, `ProjectAccess` (`has`, `can_release_hold`) (T-0010); admin-grant lookup seam, `is_system_admin` binding, `CallerIsSystemAdmin`, `sod_warning` (T-0014); `system_admin` capabilities on every project, `system_admin_holders` (T-0275); `CallerAdminGrants` (the caller's own `system_admin` / `create_projects`, cached with the scope; T-0039) |
 | `devices.py` | Device registry (`oe_identity_device`): enrol + session binding, `resolve_request_device` (last seen, revoked → `DEVICE_REVOKED`), revoke, wipe secret + uniform wipe confirmation (T-0080), `record_sync` for the sync endpoints (T-0043); the device PIN (`set_pin`, `pin_device`, T-0038) |
 | `device_api.py` | Device endpoints: enrol (with the PIN), PIN change, own / per-user lists, revoke (self, `system_admin`, PER-09 of a shared project; cross-project wipe warning), wipe-confirmed with the wipe secret (T-0043, T-0080, T-0038) |
 | `device_signal.py` | `X-KERP-Device-Id` header, `DeviceRevokedError` → `401` with `code: DEVICE_REVOKED` (no database) |
@@ -725,8 +725,21 @@ the token's `sub` is bound as `app.current_user_id`, and every project of the ca
 memberships (individual and team-derived, T-0073) as `app.member_project_ids`. None of these is ever read from a token claim, request
 parameter or header. Core imports no module: the admin module registers its lookup with
 `register_admin_grant_lookup` at import (no lookup → nobody is a System admin). Neither admin
-grant is a persona or adds a capability (no `A`/`S`, TD-151). `sod_warning(personas)` flags
-PER-09 together with a persona that has `A` on one project (TD-151, derived from `PERSONAS`).
+grant is a persona, and neither ever adds `A`/`S` (TD-151). `sod_warning(personas,
+system_admin=)` flags PER-09, or the user's `system_admin` grant, together with a persona that
+has `A` on one project (TD-151, ADR 0016; derived from `PERSONAS`); `system_admin_holders`
+answers which users hold `system_admin` (own rows through a side session bound to each user
+when the caller's session cannot read them).
+
+**System admin capabilities (ADR 0016 §4, T-0275).** `project_access(grants, project,
+system_admin=)` takes the flag the request session was bound with (never the request): for a
+`system_admin` the result has the Admin tier (`V`, `C`, `E`, `admin`, PER-09 equivalent) with
+or without a membership, plus whatever its own personas there give. `A`, `S` and
+`can_release_hold` come only from those personas. `acting_personas` adds PER-09 for persona-gated
+configuration rules (it has no `A`); a `system_admin` is never site-filtered (`site_node_ids`
+is `None`). `project_access` stays pure: callers load the project under the session scope
+(`projects.service.bind_project`, `get_project`), so an unknown, deleted or other-tenant
+project is 404 before any 403.
 
 ## Personas, tiers and scope (T-0010)
 

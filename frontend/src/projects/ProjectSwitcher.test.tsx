@@ -16,18 +16,21 @@ const TANK: ProjectSummary = {
   code: "SYN-002",
   name: "Synthetic Tank Farm",
   personas: ["PER-02"],
+  access: "member",
 };
 const REFINERY: ProjectSummary = {
   id: "p-refinery",
   code: "SYN-001",
   name: "Synthetic Refinery Unit",
   personas: ["PER-07"],
+  access: "member",
 };
 const PIPELINE: ProjectSummary = {
   id: "p-pipeline",
   code: "SYN-003",
   name: "Synthetic Pipeline Spread",
   personas: ["PER-05"],
+  access: "member",
 };
 
 const KEY = scopeStorageKey(FAKE_USER.id);
@@ -130,7 +133,7 @@ describe("project picker", () => {
   });
 
   it("offers All-Projects to a portfolio persona and remembers the choice", async () => {
-    const ctx = setup([TANK, { ...REFINERY, personas: ["PER-11"] }]);
+    const ctx = setup([TANK, { ...REFINERY, personas: ["PER-11"], access: "member" }]);
     renderApp("/", ctx);
 
     const select = await picker();

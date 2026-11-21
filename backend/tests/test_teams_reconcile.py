@@ -21,7 +21,7 @@ from sqlalchemy import select
 
 from app.core.audit.service import chain_entries
 from app.core.auth import memberships
-from app.core.auth.access import Grant, Persona
+from app.core.auth.access import SYSTEM_ADMIN, Grant, Persona
 from app.core.auth.models import SOURCE_TEAM_LINK, ProjectMembership
 from app.core.auth.team_grants import NotSystemAdminError, sync_team_link_grants, team_link_grants
 from app.core.db import Database
@@ -291,6 +291,35 @@ def test_an_unconfirmed_sod_combination_stays_pending_until_confirm_sod(world: W
     assert entry["sod_user_ids"] == [str(world.erin)]
     assert entry["reason"] == "reconcile"
     assert world.reconcile().links == ()
+
+
+def test_a_missing_hold_row_of_a_system_admin_stays_pending_until_confirm_sod(
+    world: World,
+) -> None:
+    """ADR 0016 (T-0275): a missing derived hold persona for a ``system_admin`` (no PER-09
+    anywhere) is ``sod_pending`` like one for an individual PER-09."""
+    with world.db.unit_of_work(ROOT) as s:  # the link becomes PER-06 (hold authority)
+        teams.set_link(
+            s, world.team, world.p, Persona.QAQC_LEAD, None, confirm_sod=False, actor_id=None
+        )
+    world.drop_row(world.erin)  # her derived row goes missing ...
+    with world.db.unit_of_work(ROOT) as s:  # ... while she becomes a System admin
+        assert admin.grant(s, world.erin, SYSTEM_ADMIN, actor_id=None)
+    erin_t, frank_t = world.tuple(world.erin, "PER-06"), world.tuple(world.frank, "PER-06")
+
+    (drift,) = world.reconcile().links
+    assert drift.missing == {erin_t}
+    assert drift.sod_pending == {erin_t}
+    fixed = world.reconcile(fix=True)
+    (drift,) = fixed.links
+    assert (drift.sod_pending, drift.remaining, drift.added) == ({erin_t}, {erin_t}, frozenset())
+    assert fixed.unresolved
+    assert world.stored()[world.link] == {frank_t}  # not written without confirm_sod
+
+    confirmed = world.reconcile(fix=True, confirm_sod=True)
+    assert confirmed.links[0].added == {erin_t}
+    entry = world.membership_chain(world.p)[-1]
+    assert (entry["sod_warning"], entry["sod_user_ids"]) == (True, [str(world.erin)])
 
 
 def test_a_deactivated_members_row_is_neither_excess_nor_removed(world: World) -> None:

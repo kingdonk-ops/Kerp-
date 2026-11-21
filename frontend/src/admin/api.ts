@@ -184,13 +184,17 @@ export async function setAdminGrant(
   grant: AdminGrantKind,
   on: boolean,
 ): Promise<"ok" | "last"> {
+  // A 409 on POST is the system_admin + hold-authority SoD warning (ADR 0016); it has no
+  // confirm step here yet, so it surfaces as an action error (TD-487).
   const { response } = on
-    ? await api.POST("/api/v1/admin/grants", { body: { user_id: userId, grant } })
+    ? await api.POST("/api/v1/admin/grants", {
+        body: { user_id: userId, grant, confirm_sod: false },
+      })
     : await api.DELETE("/api/v1/admin/grants/{user_id}/{grant}", {
         params: { path: { user_id: userId, grant } },
       });
   if (response.ok || response.status === 404) return "ok"; // 404: already removed
-  if (response.status === 409) return "last";
+  if (response.status === 409 && !on) return "last";
   throw new AdminApiError(response.status);
 }
 
