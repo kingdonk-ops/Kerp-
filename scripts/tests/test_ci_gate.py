@@ -22,7 +22,7 @@ def needs(flags: str = "true", **results: str) -> dict:
     """``toJSON(needs)``-shaped dict; every job green unless overridden."""
     out = {"backend": flags, "frontend": flags, "e2e": flags}
     jobs = {"detect": {"result": "success", "outputs": out}}
-    for job in ("tracker", "backend", "backend-image", "backend-publish", "frontend", "perf", "e2e"):
+    for job in ("tracker", "backend", "backend-pg", "backend-image", "backend-publish", "frontend", "perf", "e2e"):
         jobs[job] = {"result": "success", "outputs": {}}
     for job, result in results.items():
         jobs[job.replace("_", "-")]["result"] = result
@@ -39,16 +39,23 @@ def test_publish_must_skip_on_pull_request() -> None:
 
 
 def test_components_absent_may_skip() -> None:
-    skipped = {j: "skipped" for j in ("backend", "backend_image", "backend_publish", "frontend", "perf", "e2e")}
+    skipped = {
+        j: "skipped"
+        for j in ("backend", "backend_pg", "backend_image", "backend_publish", "frontend", "perf", "e2e")
+    }
     assert ci_gate.evaluate(needs("false", **skipped), "push") == []
 
 
-@pytest.mark.parametrize("job", ["backend", "backend_image", "backend_publish", "frontend", "perf", "e2e"])
+@pytest.mark.parametrize(
+    "job", ["backend", "backend_pg", "backend_image", "backend_publish", "frontend", "perf", "e2e"]
+)
 def test_component_present_but_skipped_fails(job: str) -> None:
     assert ci_gate.evaluate(needs(**{job: "skipped"}), "push") != []
 
 
-@pytest.mark.parametrize("job", ["detect", "tracker", "backend", "backend_image", "frontend", "perf", "e2e"])
+@pytest.mark.parametrize(
+    "job", ["detect", "tracker", "backend", "backend_pg", "backend_image", "frontend", "perf", "e2e"]
+)
 @pytest.mark.parametrize("result", ["failure", "cancelled", "skipped"])
 def test_any_non_success_fails(job: str, result: str) -> None:
     assert ci_gate.evaluate(needs(**{job: result}), "push") != []
@@ -57,7 +64,7 @@ def test_any_non_success_fails(job: str, result: str) -> None:
 def test_detect_failure_without_outputs_fails() -> None:
     jobs = needs("false")
     jobs["detect"] = {"result": "failure", "outputs": {}}
-    for job in ("backend", "backend-image", "backend-publish", "frontend", "perf", "e2e"):
+    for job in ("backend", "backend-pg", "backend-image", "backend-publish", "frontend", "perf", "e2e"):
         jobs[job]["result"] = "skipped"
     assert ci_gate.evaluate(jobs, "push") != []
 
@@ -138,3 +145,21 @@ def test_perf_job_runs_with_the_frontend_and_is_not_skippable() -> None:
 
 def test_install_does_not_reference_postgres_extra() -> None:
     assert "postgres]" not in CI.read_text(encoding="utf-8")
+
+
+def test_backend_suites_run_as_parallel_jobs() -> None:
+    """T-0081: SQLite (parallel workers) and PostgreSQL + RLS run as separate jobs that both
+    start right after detect; publishing and e2e wait for both."""
+    jobs = _jobs()
+    sqlite, pg = jobs["backend"], jobs["backend-pg"]
+    assert "needs: detect\n" in sqlite and "needs: detect\n" in pg
+    assert "run: pytest -n auto --durations=25" in sqlite
+    assert "services:" not in sqlite and "KERP_DATABASE_URL" not in sqlite
+    assert "--cov" not in sqlite  # the coverage floor comes from pyproject addopts
+    assert "postgresql+psycopg://kerp_app:" in pg  # NOSUPERUSER NOBYPASSRLS runtime role
+    assert "20-kerp-app.sql" in pg
+    assert "pytest --no-cov --durations=25" in pg
+    assert ci_gate.EXPECTED["backend-pg"] == ("backend", False)
+    for job in ("backend-publish", "e2e"):
+        listed = re.search(r"needs: \[([^\]]*)\]", jobs[job])
+        assert listed and {"backend", "backend-pg"} <= {n.strip() for n in listed.group(1).split(",")}

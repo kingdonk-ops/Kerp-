@@ -16,7 +16,8 @@ import sys
 EXPECTED: dict[str, tuple[str | None, bool]] = {
     "detect": (None, False),
     "tracker": (None, False),
-    "backend": ("backend", False),
+    "backend": ("backend", False),  # lint + types + SQLite suite
+    "backend-pg": ("backend", False),  # PostgreSQL + RLS suite, parallel to backend (T-0081)
     "backend-image": ("backend", False),
     "backend-publish": ("backend", True),
     "frontend": ("frontend", False),

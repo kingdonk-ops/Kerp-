@@ -2,7 +2,8 @@
 
 ``docker-compose.yml`` and the ``Makefile`` live at the repository root;
 the app-role SQL in ``infra/postgres/initdb/`` is shared by compose (as an init script) and
-CI's backend job (``psql -f``). These tests only read files, so they run everywhere.
+CI's backend-pg job (``psql -f``; T-0081 split it from the SQLite ``backend`` job).
+These tests only read files, so they run everywhere.
 """
 
 import re
@@ -34,7 +35,8 @@ def compose() -> dict[str, Any]:
 
 @pytest.fixture(scope="module")
 def ci_backend() -> dict[str, Any]:
-    return _yaml(CI)["jobs"]["backend"]
+    """The CI job that runs the PostgreSQL tests (``backend-pg`` since T-0081)."""
+    return _yaml(CI)["jobs"]["backend-pg"]
 
 
 def _ci_step(ci_backend: dict[str, Any], name_prefix: str) -> dict[str, Any]:
