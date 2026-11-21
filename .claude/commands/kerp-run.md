@@ -26,7 +26,10 @@ Read the task + spec refs. Goal concrete, acceptance testable, spec sections exi
 git switch -c task/<id>-<slug> origin/dev && git push -u origin task/<id>-<slug>
 ```
 Dispatch **kerp-implementer** (Agent tool, `isolation: "worktree"` when running in parallel) with: task id, branch, "follow CLAUDE.md, TDD, all gates green, raise TODOs for anything missed/deferred".
-When it reports back, **verify, don't trust**: check out the branch and run the quality gates yourself. Red → send the failures back to the implementer (counts as a fix round).
+When it reports back, **verify, don't trust**: check out the branch and run the fast gates (tracker, ruff + mypy or lint + typecheck) and the affected test files yourself; the full suites run in CI on the PR. Red → send the failures back to the implementer (counts as a fix round).
+
+### Bundling small tasks (user request)
+When the user asks for several small tasks in one PR: the survivor task absorbs the others' acceptance criteria (marked "— from T-xxxx"), the absorbed tasks are set `dropped` with a dated note, and any task that depended on an absorbed one depends on the survivor. Record the bundle **in the task files only** (survivor Notes, absorbed task Note) — not in `docs/DEVELOPMENT-PLAN.md`: that file counts toward the review patch-id, so every rebase over another plan edit would force a re-review. Keep bundles within the size guidance (S + S ≈ M, < ~800 lines).
 
 ## 3. Open the PR to `dev`
 ```bash
@@ -39,6 +42,8 @@ git commit -am "chore(tracker): <id> in review" && git push
 Dispatch **kerp-reviewer** with PR number, task id, branch, round number. It posts `KERP-REVIEW: … patch-id=…`.
 - **CHANGES_REQUESTED** → dispatch **kerp-implementer** with the must-fix list verbatim (fix round) → verify gates → reviewer again.
 - After **3** rejected rounds → `python scripts/tracker.py set <id> --status blocked --note "review stalled: <summary>"`, raise a `bug` or `decision` TODO with the open must-fix items, comment on the PR, leave it open, move on.
+
+A re-check after a rebase or bookkeeping (patch-id changed, no code change) does not need a full review: dispatch **kerp-reviewer** with `model: "sonnet"` and ask for the re-check described in its instructions (range-diff + tracker gates + new marker). First reviews and fix rounds keep the default model.
 
 ## 5. Merge to `dev` (serial — one PR at a time)
 ```bash

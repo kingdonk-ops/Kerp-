@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 305 · **Closed:** 144
+**Open:** 307 · **Closed:** 144
 
 ## decision (38)
 
@@ -168,7 +168,7 @@
 | [TD-448](../tracker/todo/TD-448.md) | Playwright e2e journey for T-0026 (System admin appoints a Project Admin -> they create a project -> assign a user) once T-0027 sets up e2e/; covered meanwhile by the component-level journey in frontend/src/admin/MembersPage.test.tsx | T-0026 | implementer |
 | [TD-451](../tracker/todo/TD-451.md) | Queue monitor: failed-job list and retry/abort see only job rows the caller's RLS shows until T-0274 (ADR 0016) lets a system_admin read every project's oe_jobs_job rows | T-0218 | implementer |
 
-## later (125)
+## later (127)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -297,6 +297,8 @@
 | [TD-441](../tracker/todo/TD-441.md) | Per-test PostgreSQL databases: widen the empty-source check to leftover types, sequences, views and functions (not only tables) | T-0082 | reviewer |
 | [TD-449](../tracker/todo/TD-449.md) | Expose the caller's create_projects grant (Project Admin) on GET /auth/me (with is_system_admin, TD-393) so Backbone -> Projects offers 'New project' only to Project Admins; today every user sees it and a 403 is explained | T-0026 | implementer |
 | [TD-450](../tracker/todo/TD-450.md) | Project settings dialog: edit project code and spatial bounds (PATCH /projects accepts both; T-0026 edits name, status, time zone, currency, locale) | T-0026 | implementer |
+| [TD-453](../tracker/todo/TD-453.md) | main ruleset: require the fast-forwarded commit to be on dev (today main only requires a CI-green ci-gate on the commit, so any contents:write token could fast-forward main to an unreviewed CI-green commit; no workflow does this today) — from the PR #138 review | T-0332 | coordinator |
+| [TD-454](../tracker/todo/TD-454.md) | Dev tooling: pin mypy (and friends) in the backend dev extra or lock so local runs match CI (local mypy 2.3.1 flags core/audit/guard.py:66 and admin/service.py:122, CI's 2.4.1 does not) — from the PR #136/#138 reviews | T-0332 | coordinator |
 
 ## bug (6)
 
