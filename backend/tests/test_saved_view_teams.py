@@ -475,8 +475,10 @@ def legacy(tmp_path: Path) -> Iterator[tuple[Config, World, uuid.UUID]]:
     """A database at 0031 with a legacy team view (``team_id`` = X), then upgraded to head.
 
     The world is built at head, because the services need today's schema (creating a project
-    reads ``oe_settings_value``, revision 0037; T-0230), and the database is then taken back
-    to 0031 for the legacy rows.
+    reads ``oe_settings_value``, revision 0037; T-0230), and through the ORM (whose models are
+    head's: a column added to a project or team table later than 0031 has no place at 0031).
+    The database then goes down to 0031 for the legacy rows written through the frozen
+    ``_LEGACY`` table.
     """
     cfg = Config(str(ALEMBIC_INI))
     cfg.attributes.update(url=database_url(tmp_path), configure_logger=False)
@@ -485,6 +487,7 @@ def legacy(tmp_path: Path) -> Iterator[tuple[Config, World, uuid.UUID]]:
     try:
         seed_tenants(db, *FIXTURE_TENANTS)
         world = _world(db)
+        db.dispose()  # no pooled connection holds the schema the downgrade replaces
         command.downgrade(cfg, "0031")
         view_id = _legacy_view(db, world.home, "Legacy", world.x)
         _legacy_view(db, world.home, "Legacy private", None)
