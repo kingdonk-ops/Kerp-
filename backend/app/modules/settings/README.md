@@ -94,7 +94,7 @@ left alone if any is stored).
 
 `oe_settings_deployment` (T-0044) is **read-only**: migration `0037` copied every live row
 into `oe_settings_value` and nothing reads or writes the old table. Dropping it is a
-destructive migration and needs an ADR (TD-503).
+destructive migration and needs an ADR (TD-511).
 
 **Region is not a setting here.** It is deployment configuration (environment, like the
 database URL): AWS `ap-southeast-2` for Australian deployments, `eu-central-1` only if an EU
@@ -145,7 +145,7 @@ TD-296).
 (`deployment_config.FIELDS`). `read` refuses to run if the list holds a secret: any
 `SecretStr`, any field hidden from `repr()`, any `*_url` or `*_file`, any secret-like name
 (tested against every field of `Settings`). The mail reply-to of diff §4.7 is not shown yet:
-the deployment has no such configuration (TD-502).
+the deployment has no such configuration (TD-510).
 
 ## Audit
 
