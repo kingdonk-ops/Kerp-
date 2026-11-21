@@ -422,3 +422,71 @@ class JobActionRead(BaseModel):
     id: uuid.UUID
     kind: str
     status: Literal["queued", "running", "succeeded", "failed"]
+
+
+# --- System console: deployment stats and health (T-0219, diff §4.7) ---------------------------
+
+
+class ProjectCounts(BaseModel):
+    active: int
+    soft_deleted: int
+
+
+class UserCounts(BaseModel):
+    active: int
+    deactivated: int
+
+
+class DeviceCounts(BaseModel):
+    active: int
+    revoked: int
+
+
+class StorageClassTotals(BaseModel):
+    storage_class: Literal["STANDARD", "GLACIER_IR", "DEEP_ARCHIVE", "other"]
+    objects: int
+    bytes: int
+
+
+class ObjectStoreTotals(BaseModel):
+    """From the last ``admin.object_store_totals`` batch run (``as_of``: when it finished;
+    ``null`` and no classes before the first run). ``refreshing``: a run is queued or running."""
+
+    as_of: datetime | None
+    refreshing: bool
+    storage_classes: list[StorageClassTotals]
+
+
+class SystemStatsRead(BaseModel):
+    """``GET /admin/system/stats``: counts and byte totals only, never ids, names or rows.
+
+    ``modules``: per module the counts its registered stats provider returns."""
+
+    projects: ProjectCounts
+    users: UserCounts
+    devices: DeviceCounts
+    modules: dict[str, dict[str, int]]
+    object_store: ObjectStoreTotals
+
+
+class ObjectStoreRefreshRead(BaseModel):
+    """``POST /admin/system/stats/object-store/refresh`` (202) or the run in progress (409)."""
+
+    job_id: uuid.UUID
+    status: Literal["queued", "running"]
+
+
+class HealthProbeRead(BaseModel):
+    """One probe: status and latency only, never a host name, connection string or credential."""
+
+    name: Literal["postgresql", "redis", "object_store", "malware_scanner"]
+    status: Literal["ok", "degraded", "down"]
+    latency_ms: float | None
+
+
+class SystemHealthRead(BaseModel):
+    """``GET /admin/system/health``: ``status`` is the worst probe's."""
+
+    status: Literal["ok", "degraded", "down"]
+    checked_at: datetime
+    probes: list[HealthProbeRead]

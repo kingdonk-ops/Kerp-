@@ -17,7 +17,7 @@ import hashlib
 import re
 import shutil
 import unicodedata
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from functools import lru_cache
@@ -136,11 +136,20 @@ class UnsafeKeyError(ValueError):
     """An object key that could escape its prefix (absolute, ``..``, empty segment, NUL)."""
 
 
+# The health probe's own deadline (T-0219): the probe client connects, reads and gives up
+# within it, with no retry, so a hanging S3 never holds a probe thread for minutes.
+HEALTH_PROBE_TIMEOUT_S: Final = 2.0
+# S3 storage classes the System console totals by (T-0219); any other class counts as "other".
+STORAGE_CLASSES: Final = ("STANDARD", "GLACIER_IR", "DEEP_ARCHIVE")
+OTHER_CLASS: Final = "other"
+
+
 @dataclass(frozen=True, slots=True)
 class ObjectInfo:
     key: str
     size: int
     last_modified: datetime
+    storage_class: str = "STANDARD"  # S3 lists it; ``head`` and local files: STANDARD
 
 
 @dataclass(frozen=True, slots=True)
@@ -258,6 +267,10 @@ class LocalStorage:
     def delete(self, key: str) -> None:
         self._path(key).unlink(missing_ok=True)
 
+    def ping(self) -> bool:
+        """The health probe (T-0219): the root directory exists."""
+        return self.root.is_dir()
+
     def list(self, prefix: str) -> Iterator[ObjectInfo]:
         root = self.root.resolve()
         if not root.is_dir():
@@ -278,8 +291,23 @@ class S3Storage:
     outside it).
     """
 
-    def __init__(self, bucket: str, client: S3Client, presign_client: S3Client) -> None:
+    def __init__(
+        self,
+        bucket: str,
+        client: S3Client,
+        presign_client: S3Client,
+        probe_client_factory: Callable[[], S3Client] | None = None,
+    ) -> None:
         self.bucket, self.client, self.presign_client = bucket, client, presign_client
+        self._probe_factory = probe_client_factory
+        self._probe: S3Client | None = None
+
+    def probe_client(self) -> S3Client:
+        """The client of the health probe: short timeouts, no retries (built on first use);
+        without a factory, the shared client."""
+        if self._probe is None:
+            self._probe = self._probe_factory() if self._probe_factory else self.client
+        return self._probe
 
     def presign_put(
         self, key: str, *, content_type: str, size: int, expires_in: int
@@ -335,13 +363,24 @@ class S3Storage:
     def delete(self, key: str) -> None:
         self.client.delete_object(Bucket=self.bucket, Key=key)
 
+    def ping(self) -> bool:
+        """The health probe (T-0219): ``HeadBucket`` on the probe client (raises when
+        unreachable, slow or denied)."""
+        self.probe_client().head_bucket(Bucket=self.bucket)
+        return True
+
     def list(self, prefix: str) -> Iterator[ObjectInfo]:
         pages = self.client.get_paginator("list_objects_v2").paginate(
             Bucket=self.bucket, Prefix=prefix
         )
         for page in pages:
             for item in page.get("Contents", []):
-                yield ObjectInfo(item["Key"], item["Size"], item["LastModified"])
+                yield ObjectInfo(
+                    item["Key"],
+                    item["Size"],
+                    item["LastModified"],
+                    str(item.get("StorageClass") or "STANDARD"),
+                )
 
 
 def build_s3_storage(settings: Settings) -> S3Storage:
@@ -352,20 +391,33 @@ def build_s3_storage(settings: Settings) -> S3Storage:
     secret = settings.s3_secret_access_key
     config = Config(signature_version="s3v4", s3={"addressing_style": "path"})
 
-    def client(endpoint: str | None) -> S3Client:
+    probe_config = config.merge(
+        Config(
+            connect_timeout=HEALTH_PROBE_TIMEOUT_S,
+            read_timeout=HEALTH_PROBE_TIMEOUT_S,
+            retries={"total_max_attempts": 1, "mode": "standard"},  # one attempt, no retry
+        )
+    )
+
+    def client(endpoint: str | None, client_config: Config = config) -> S3Client:
         return boto3.client(
             "s3",
             endpoint_url=endpoint,
             region_name=settings.s3_region,
             aws_access_key_id=settings.s3_access_key_id,
             aws_secret_access_key=secret.get_secret_value() if secret else None,
-            config=config,
+            config=client_config,
         )
 
     internal = client(settings.s3_endpoint_url)
     public = settings.s3_public_endpoint_url
     presign = client(public) if public and public != settings.s3_endpoint_url else internal
-    return S3Storage(settings.storage_bucket, internal, presign)
+    return S3Storage(
+        settings.storage_bucket,
+        internal,
+        presign,
+        probe_client_factory=lambda: client(settings.s3_endpoint_url, probe_config),
+    )
 
 
 _override: Storage | None = None

@@ -38,7 +38,7 @@ from collections.abc import Collection
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import bindparam, select, text
+from sqlalchemy import bindparam, func, select, text
 from sqlalchemy.orm import Session, object_session
 
 from app.core.audit import service as audit
@@ -80,7 +80,7 @@ from app.core.auth.tokens import InvalidTokenError, IssuedToken, TokenClaims
 from app.core.config import Settings, get_settings
 from app.core.db import Database, utcnow
 from app.core.tenancy.context import TenancyContext
-from app.core.tenancy.rls import bind_tenancy
+from app.core.tenancy.rls import bind_tenancy, session_tenancy
 from app.core.tenancy.scope import get_or_404
 
 _logger = logging.getLogger("kerp.auth")
@@ -200,6 +200,22 @@ def active_user_ids(session: Session, user_ids: Collection[uuid.UUID]) -> set[uu
         return set()
     query = select(User.id).where(User.id.in_(list(user_ids)), User.is_active.is_(True))
     return set(session.scalars(query))
+
+
+def user_counts(session: Session) -> dict[str, int]:
+    """The session tenant's live accounts by state: ``active``, ``deactivated`` (T-0219).
+
+    Counts only, under the caller's RLS, filtered on the bound tenant explicitly."""
+    context = session_tenancy(session)
+    if context is None:
+        raise RuntimeError("user_counts needs a session bound to a tenant")
+    rows = session.execute(
+        select(User.is_active, func.count())
+        .where(User.tenant_id == context.tenant_id)
+        .group_by(User.is_active)
+    ).all()
+    by_state = {bool(active): int(count) for active, count in rows}
+    return {"active": by_state.get(True, 0), "deactivated": by_state.get(False, 0)}
 
 
 def find_user_by_email(session: Session, email: str) -> User | None:

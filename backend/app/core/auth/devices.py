@@ -41,7 +41,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Final, Literal
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.auth.device_signal import DeviceRevokedError
@@ -119,6 +119,19 @@ def device_status(session: Session, device_id: uuid.UUID) -> str | None:
         Device.tenant_id == _tenant_id(session), Device.device_id == device_id
     )
     return session.scalars(query).one_or_none()
+
+
+def device_counts(session: Session) -> dict[str, int]:
+    """The tenant's live enrolled devices by status: ``active``, ``revoked`` (T-0219).
+
+    Counts only, under the caller's RLS, filtered on the bound tenant explicitly."""
+    rows = session.execute(
+        select(Device.status, func.count())
+        .where(Device.tenant_id == _tenant_id(session))
+        .group_by(Device.status)
+    ).all()
+    by_status = {str(status): int(count) for status, count in rows}
+    return {"active": by_status.get(DEVICE_ACTIVE, 0), "revoked": by_status.get(DEVICE_REVOKED, 0)}
 
 
 def devices_of_user(session: Session, user_id: uuid.UUID) -> list[Device]:

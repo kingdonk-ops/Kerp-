@@ -42,7 +42,7 @@ from collections.abc import Collection, Iterable
 from dataclasses import dataclass, replace
 from typing import Any, Final
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -51,6 +51,7 @@ from app.core.auth import memberships, team_grants
 from app.core.auth import service as users
 from app.core.auth.access import HOLD_AUTHORITY, Persona, system_admin_holders
 from app.core.auth.models import User
+from app.core.stats.registry import register_stats_provider
 from app.core.tenancy.rls import session_tenancy
 from app.core.tenancy.scope import get_or_404
 from app.modules.projects import service as projects
@@ -729,6 +730,13 @@ def reconcile(session: Session, *, fix: bool = False, confirm_sod: bool = False)
     return ReconcileReport(tuple(found), fix)
 
 
+@register_stats_provider("teams")
+def deployment_stats(session: Session) -> dict[str, int]:
+    """Live teams of the caller's tenant (T-0219); a count only, under the caller's RLS."""
+    count = session.scalar(select(func.count(Team.id)).where(Team.tenant_id == _tenant_id(session)))
+    return {"teams": int(count or 0)}
+
+
 __all__ = [
     "RECONCILE_REASON",
     "DuplicateTeamNameError",
@@ -742,6 +750,7 @@ __all__ = [
     "add_member",
     "create_team",
     "delete_team",
+    "deployment_stats",
     "get_team",
     "is_member",
     "link_team_names",

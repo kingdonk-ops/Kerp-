@@ -2058,6 +2058,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/system/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Deployment Stats */
+        get: operations["deployment_stats_api_v1_admin_system_stats_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/system/stats/object-store/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Refresh Object Store */
+        post: operations["refresh_object_store_api_v1_admin_system_stats_object_store_refresh_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/system/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** System Health */
+        get: operations["system_health_api_v1_admin_system_health_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/access-requests": {
         parameters: {
             query?: never;
@@ -2578,6 +2629,13 @@ export interface components {
             /** Default Locale */
             default_locale?: string | null;
         };
+        /** DeviceCounts */
+        DeviceCounts: {
+            /** Active */
+            active: number;
+            /** Revoked */
+            revoked: number;
+        };
         /**
          * DeviceEnrolRequest
          * @description A field client registers itself after sign-in (every sign-in; idempotent).
@@ -3024,6 +3082,24 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /**
+         * HealthProbeRead
+         * @description One probe: status and latency only, never a host name, connection string or credential.
+         */
+        HealthProbeRead: {
+            /**
+             * Name
+             * @enum {string}
+             */
+            name: "postgresql" | "redis" | "object_store" | "malware_scanner";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "degraded" | "down";
+            /** Latency Ms */
+            latency_ms: number | null;
         };
         /** HealthResponse */
         HealthResponse: {
@@ -3982,6 +4058,35 @@ export interface components {
             deliveries: components["schemas"]["DeliveryRead"][];
         };
         /**
+         * ObjectStoreRefreshRead
+         * @description ``POST /admin/system/stats/object-store/refresh`` (202) or the run in progress (409).
+         */
+        ObjectStoreRefreshRead: {
+            /**
+             * Job Id
+             * Format: uuid
+             */
+            job_id: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "queued" | "running";
+        };
+        /**
+         * ObjectStoreTotals
+         * @description From the last ``admin.object_store_totals`` batch run (``as_of``: when it finished;
+         *     ``null`` and no classes before the first run). ``refreshing``: a run is queued or running.
+         */
+        ObjectStoreTotals: {
+            /** As Of */
+            as_of: string | null;
+            /** Refreshing */
+            refreshing: boolean;
+            /** Storage Classes */
+            storage_classes: components["schemas"]["StorageClassTotals"][];
+        };
+        /**
          * OverrideCreate
          * @description Body of an override request: the blocking finding and the mandatory typed reason.
          */
@@ -4251,6 +4356,13 @@ export interface components {
          * @enum {string}
          */
         ProjectAccessKind: "member" | "system_admin";
+        /** ProjectCounts */
+        ProjectCounts: {
+            /** Active */
+            active: number;
+            /** Soft Deleted */
+            soft_deleted: number;
+        };
         /**
          * ProjectCreate
          * @description ``POST /projects``. The tenant comes from the token, never from the body.
@@ -4917,6 +5029,54 @@ export interface components {
              */
             start_url: string;
         };
+        /** StorageClassTotals */
+        StorageClassTotals: {
+            /**
+             * Storage Class
+             * @enum {string}
+             */
+            storage_class: "STANDARD" | "GLACIER_IR" | "DEEP_ARCHIVE" | "other";
+            /** Objects */
+            objects: number;
+            /** Bytes */
+            bytes: number;
+        };
+        /**
+         * SystemHealthRead
+         * @description ``GET /admin/system/health``: ``status`` is the worst probe's.
+         */
+        SystemHealthRead: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "degraded" | "down";
+            /**
+             * Checked At
+             * Format: date-time
+             */
+            checked_at: string;
+            /** Probes */
+            probes: components["schemas"]["HealthProbeRead"][];
+        };
+        /**
+         * SystemStatsRead
+         * @description ``GET /admin/system/stats``: counts and byte totals only, never ids, names or rows.
+         *
+         *     ``modules``: per module the counts its registered stats provider returns.
+         */
+        SystemStatsRead: {
+            projects: components["schemas"]["ProjectCounts"];
+            users: components["schemas"]["UserCounts"];
+            devices: components["schemas"]["DeviceCounts"];
+            /** Modules */
+            modules: {
+                [key: string]: {
+                    [key: string]: number;
+                };
+            };
+            object_store: components["schemas"]["ObjectStoreTotals"];
+        };
         /**
          * TeamCreate
          * @description ``POST /teams``.
@@ -5182,6 +5342,13 @@ export interface components {
         UploadTicket: {
             file: components["schemas"]["FileRead"];
             upload: components["schemas"]["PresignedRead"];
+        };
+        /** UserCounts */
+        UserCounts: {
+            /** Active */
+            active: number;
+            /** Deactivated */
+            deactivated: number;
         };
         /**
          * UserCreate
@@ -9843,6 +10010,75 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    deployment_stats_api_v1_admin_system_stats_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SystemStatsRead"];
+                };
+            };
+        };
+    };
+    refresh_object_store_api_v1_admin_system_stats_object_store_refresh_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ObjectStoreRefreshRead"];
+                };
+            };
+            /** @description a run is in progress */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ObjectStoreRefreshRead"];
+                };
+            };
+        };
+    };
+    system_health_api_v1_admin_system_health_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SystemHealthRead"];
                 };
             };
         };

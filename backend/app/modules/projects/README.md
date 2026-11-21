@@ -9,7 +9,7 @@ modules carries the project's `id` as its `project_id`.
 |---|---|
 | `models.py` | `oe_projects_project` (`BaseRecordMixin`, tenant-level row; migration `0008`, membership-based RLS since `0015`, `visible_in_lobby` since `0021`, DB-side `status`/`site_timezone` defaults since `0033`) |
 | `schemas.py` | `ProjectCreate` / `ProjectUpdate` / `ProjectRead`, `LobbyVisibility`, `PolygonGeoJSON`; timezone, ISO 4217, BCP 47 validation from `app.core.locale` (shared with the settings module) |
-| `service.py` | `create_project`, `get_project`, `list_projects`, `live_project_ids` (the jobs scheduler, T-0214), `update_project`, `delete_project`, `site_zone`, `bind_project` (project-scoped routers, T-0217), `tenant_projects` (every live project a `system_admin` session sees, T-0275), `set_lobby_visibility`, the narrow lobby read `lobby_projects` / `project_by_code` (T-0040) and `lobby_projects_by_id` (access requests, T-0050) |
+| `service.py` | `create_project`, `get_project`, `list_projects`, `live_project_ids` (the jobs scheduler, T-0214), `project_counts` (live and soft-deleted, System console stats, T-0219), `update_project`, `delete_project`, `site_zone`, `bind_project` (project-scoped routers, T-0217), `tenant_projects` (every live project a `system_admin` session sees, T-0275), `set_lobby_visibility`, the narrow lobby read `lobby_projects` / `project_by_code` (T-0040) and `lobby_projects_by_id` (access requests, T-0050) |
 | `router.py` | `GET/POST /api/v1/projects`, `GET/PATCH/DELETE /api/v1/projects/{id}`, `PUT /api/v1/projects/{id}/lobby`, the module toggle `GET /api/v1/projects/{id}/modules`, `PUT /api/v1/projects/{id}/modules/{name}` (T-0084) |
 
 ## Record
