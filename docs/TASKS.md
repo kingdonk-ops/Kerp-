@@ -3,16 +3,16 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 74/206 tasks done (36%) · **ready now:** 25 · **epics awaiting breakdown:** 47
+**Overall:** 74/256 tasks done (29%) · **ready now:** 24 · **epics awaiting breakdown:** 48
 
 | Phase | Tasks done | Progress |
 |---|---|---|
-| 0 · Platform foundations | 74/106 | `███████░░░` 70% |
-| 1 · Asset & Quality backbone | 0/91 (+1 epics) | `░░░░░░░░░░` 0% |
-| 2 · Welding quality | 0/9 | `░░░░░░░░░░` 0% |
-| 3 · Logistics | 0/0 (+7 epics) | `░░░░░░░░░░` 0% |
-| 4 · Execution | 0/0 (+14 epics) | `░░░░░░░░░░` 0% |
-| 5 · Documents, collaboration & AI | 0/0 (+10 epics) | `░░░░░░░░░░` 0% |
+| 0 · Platform foundations | 74/112 | `██████░░░░` 66% |
+| 1 · Asset & Quality backbone | 0/125 (+1 epics) | `░░░░░░░░░░` 0% |
+| 2 · Welding quality | 0/10 | `░░░░░░░░░░` 0% |
+| 3 · Logistics | 0/2 (+7 epics) | `░░░░░░░░░░` 0% |
+| 4 · Execution | 0/0 (+15 epics) | `░░░░░░░░░░` 0% |
+| 5 · Documents, collaboration & AI | 0/7 (+10 epics) | `░░░░░░░░░░` 0% |
 | 6 · Defense, claims & controls | 0/0 (+8 epics) | `░░░░░░░░░░` 0% |
 | 6b · Work packaging (AWP) | 0/0 (+3 epics) | `░░░░░░░░░░` 0% |
 | 7 · Client portal | 0/0 (+4 epics) | `░░░░░░░░░░` 0% |
@@ -112,11 +112,11 @@
 | ✅ | [T-0081](../tracker/tasks/T-0081.md) | CI speed 1: SQLite test DB from a migrated template + pytest-xdist, SQLite and PostgreSQL backend tests as parallel jobs, docs-only PRs skip app jobs, --durations | platform | M | — | #140 |
 | ▶ | [T-0218](../tracker/tasks/T-0218.md) | uploads: ClamAV scanner (clamd INSTREAM) in the worker replacing the stub, signature on the file row, scanner PING for health | uploads | S | T-0016, T-0213, T-0215 |  |
 | ✅ | [T-0082](../tracker/tasks/T-0082.md) | CI speed 2: PostgreSQL tests on a per-test copy of a migrated template database, pytest-xdist on PostgreSQL, fsync-off CI Postgres, coverage floor on the PostgreSQL run | platform | M | T-0081 | #141 |
-| ⬜ | [T-0219](../tracker/tasks/T-0219.md) | admin: deployment stats (counts + byte totals via module stats providers and count-only SECURITY DEFINER functions) and health probes at /api/v1/admin/system | admin | M | T-0014, T-0015, T-0016, T-0039, T-0218 |  |
+| ⬜ | [T-0219](../tracker/tasks/T-0219.md) | admin: deployment stats (counts + byte totals via module stats providers under normal RLS) and health probes at /api/v1/admin/system | admin | M | T-0014, T-0015, T-0016, T-0039, T-0218, T-0274 |  |
 | ▶ | [T-0220](../tracker/tasks/T-0220.md) | jobs: queue monitor API for System admins (queue depths, cron runs, failed jobs without payloads, retry/abort) | jobs | S | T-0015, T-0214, T-0039 |  |
 | ▶ | [T-0083](../tracker/tasks/T-0083.md) | CI speed 3: frontend-only PRs skip the backend jobs (per-component change detection in ci.yml detect) | platform | S | T-0082 |  |
-| ⬜ | [T-0221](../tracker/tasks/T-0221.md) | uploads: quarantine monitor API — rejected/verifying/expired upload rows of member projects, counts for the others, re-check stuck files, sweep now | uploads | S | T-0218, T-0215, T-0039, T-0219 |  |
-| ▶ | [T-0222](../tracker/tasks/T-0222.md) | admin: read-only audit explorer over the hash-chain ledger (filters, verify one chain, verify all as a batch job) | admin | M | T-0006, T-0043, T-0039, T-0015 |  |
+| ⬜ | [T-0221](../tracker/tasks/T-0221.md) | uploads: quarantine monitor API — rejected/verifying/expired upload rows and counts of every project, re-check stuck files, sweep now | uploads | S | T-0218, T-0215, T-0039, T-0274 |  |
+| ⬜ | [T-0222](../tracker/tasks/T-0222.md) | admin: read-only audit explorer over the hash-chain ledger (filters, verify one chain, verify all as a batch job) | admin | M | T-0006, T-0043, T-0039, T-0015, T-0274 |  |
 | ▶ | [T-0223](../tracker/tasks/T-0223.md) | projects: per-project legal hold (flag + reason, System admin only, audited) blocking soft delete with 409 LEGAL_HOLD_ACTIVE (ADR) | projects | S | T-0012, T-0039 |  |
 | ▶ | [T-0226](../tracker/tasks/T-0226.md) | core mail: delivery ledger — delivered status from SES delivery events, recipient_user_id/project_id/broadcast_id, stats and searchable history (ADR) | platform | M | T-0058 |  |
 | ▶ | [T-0227](../tracker/tasks/T-0227.md) | core mail: automated template overrides — per template + locale subject/text blocks with revisions, preview, test send to self, reset to shipped default | platform | M | T-0058, T-0039 |  |
@@ -127,6 +127,12 @@
 | ⬜ | [T-0225](../tracker/tasks/T-0225.md) | Frontend: Admin → System → Audit log (filters, verify chain, verify all) and legal-hold toggle on the project admin page | frontend | S | T-0026, T-0222, T-0223 |  |
 | ⬜ | [T-0229](../tracker/tasks/T-0229.md) | Frontend: Admin → Communications — broadcast composer, delivery stats and history, automated template editor | frontend | M | T-0026, T-0226, T-0227, T-0228 |  |
 | ⬜ | [T-0232](../tracker/tasks/T-0232.md) | Frontend: Admin → System → Settings — editable registry by category with bounds, read-only deployment configuration | frontend | S | T-0026, T-0230 |  |
+| ⬜ | [T-0274](../tracker/tasks/T-0274.md) | tenancy: system_admin global project visibility (ADR 0016) — additive migration replacing project_isolation_policy on every project-scoped table through the frozen-DDL helper, ORM scope mirror, RLS contract tests updated | tenancy | M | T-0007, T-0014, T-0033 |  |
+| ⬜ | [T-0275](../tracker/tasks/T-0275.md) | identity/projects: system_admin capabilities on every project (V, C, E, administer; never A or S), all projects in GET /projects and /me/projects, SoD warning for hold personas on system_admins | identity | S | T-0274, T-0010, T-0014, T-0042 |  |
+| ⬜ | [T-0276](../tracker/tasks/T-0276.md) | Frontend: project picker and All-Projects scope show every project for a system_admin (badge for admin access without membership; no A/S actions) | frontend | S | T-0275, T-0042, T-0024 |  |
+| 🟥 | [T-0277](../tracker/tasks/T-0277.md) | identity: system_admin impersonation token — POST /admin/users/{id}/impersonate and /auth/impersonation/exit, single-session impersonation JWT (no refresh), target RLS with is_system_admin = false (blocked by TD-426) *(blocked by TD-426)* | identity | M | T-0006, T-0008, T-0010, T-0014, T-0039, T-0043, T-0230, T-0274 |  |
+| 🟥 | [T-0278](../tracker/tasks/T-0278.md) | identity: central impersonation guardrail — 403 IMPERSONATION_ACTION_FORBIDDEN for A/S authority, signing, co-sign, inspection submit/approve, hold release, overrides and credential/device/grant mutations; route-classification contract test (blocked by TD-426) *(blocked by TD-426)* | identity | M | T-0277, T-0010 |  |
+| 🟥 | [T-0279](../tracker/tasks/T-0279.md) | audit: dual-identity ledger entries during impersonation — impersonated_by_user_id column, ledger hash v3, attribution in the audit explorer (ADR 0015; blocked by TD-426) *(blocked by TD-426)* | audit | S | T-0006, T-0043, T-0277 |  |
 
 ## Phase 1 — Asset & Quality backbone
 
@@ -160,8 +166,12 @@
 | ▶ | [T-0119](../tracker/tasks/T-0119.md) | signing: append-only hash-chained sign-off ledger (internal now; pyHanko PAdES seam later) | signing | M | T-0006 |  |
 | ⬜ | [T-0120](../tracker/tasks/T-0120.md) | requirements / source_data: requirements & prerequisite-documents register | requirements | S | T-0101 |  |
 | ⬜ | [T-0121](../tracker/tasks/T-0121.md) | review_authority / project_route: external review cycles + work-type routing gate | review_authority | S | T-0111 |  |
+| ⬜ | [T-0188](../tracker/tasks/T-0188.md) | qms: rule-based scope-to-ITP assignment (itp_assignment rule kind), manual instantiation, batch auto-generation into pending_qa_review proposals, QA Approve & Activate | qms | M | T-0015, T-0018, T-0034, T-0101, T-0111, T-0113, T-0119 |  |
 | ▶ | [T-0122](../tracker/tasks/T-0122.md) | compliance DSL wired into run_checks (CEL rule sets) | compliance | M | T-0018 |  |
+| ⬜ | [T-0281](../tracker/tasks/T-0281.md) | qms: ITP instance customization (PER-06, non-signed lines only) and master-revision propagation API (auto-update unstarted lines, never signed ones, per-instance keep/apply for customized instances) | qms | M | T-0188, T-0113, T-0119 |  |
+| ⬜ | [T-0282](../tracker/tasks/T-0282.md) | Frontend: ITP manual instantiation and Activation Review Matrix (scope-to-ITP mapping, swap template, Approve & Activate) | frontend | M | T-0188, T-0025 |  |
 | ⬜ | [T-0124](../tracker/tasks/T-0124.md) | Rule sets A — completion gates: inspection.close, work_anchor.complete, asset.status_change (open Cat A/NCR blocks) as locked defaults | validation | M | T-0111, T-0114, T-0116, T-0034, T-0139 |  |
+| ⬜ | [T-0283](../tracker/tasks/T-0283.md) | Frontend: ITP Propagation Wizard (dry-run diff, keep/apply per customized instance) and instance line editing | frontend | S | T-0281, T-0282 |  |
 | ⬜ | [T-0125](../tracker/tasks/T-0125.md) | Rule sets B — P6 sync: asset.p6_fields, schedule.p6_import/export | validation | S | T-0104, T-0106 |  |
 | ⬜ | [T-0126](../tracker/tasks/T-0126.md) | Offline sync core: outbox_mutations, client_op_id idempotency, vector clock, conflict resolution (immutable approvals, per-field apply per ADR 0005) | sync | M | T-0006, T-0110 |  |
 | ⬜ | [T-0127](../tracker/tasks/T-0127.md) | Frontend: client storage contract + Dexie (web PWA) adapter, useOfflineSync tier-1 outbox + offline indicator | frontend | M | T-0126, T-0024 |  |
@@ -208,11 +218,11 @@
 | ⬜ | [T-0166](../tracker/tasks/T-0166.md) | sync: P6 re-import during a field checkout — tests 10 and 12 and checked-out records on the change-impact report (split from T-0133) | sync | S | T-0133, T-0104 |  |
 | 🧩 | [E-01-01](../tracker/tasks/E-01-01.md) | register views: column catalogue (level/item-type fields, ancestors, rollups, cross-module providers), filter AST, shared saved views, grouped totals, bulk actions | saved_views | L | T-0020, T-0025, T-0102 |  |
 | ✅ | [E-01-02](../tracker/tasks/E-01-02.md) | project export and retention archive: self-contained zip (offline HTML viewer, categorised files, restorable row dump), S3 storage tiering, deep-archive restore, restore as deleted or new project | archive | L | T-0015, T-0016, T-0026, T-0101, T-0103, T-0111, T-0158 | #137 |
-| ⬜ | [T-0233](../tracker/tasks/T-0233.md) | archive: module + project archive registry (oe_archive_project_archive), export request API, status lifecycle, completion notifications | archive | S | T-0015, T-0016, T-0019, T-0058, T-0039, T-0223 |  |
+| ⬜ | [T-0233](../tracker/tasks/T-0233.md) | archive: module + project archive registry (oe_archive_project_archive), export request API, status lifecycle, completion notifications | archive | S | T-0015, T-0016, T-0019, T-0058, T-0039, T-0223, T-0274 |  |
 | ⬜ | [T-0234](../tracker/tasks/T-0234.md) | archive: package builder — export-provider contract, manifest + SHA-256 inventory, project_data.json/.js, db_restore_manifest.jsonl.gz, streamed zip; providers for projects, memberships, uploads, audit | archive | M | T-0233, T-0006, T-0016 |  |
 | ⬜ | [T-0235](../tracker/tasks/T-0235.md) | archive: export providers for asset hierarchy, Items and inspections + anchored file tree (reports, original and annotated photos, attachments) | asset_management | M | T-0234, T-0101, T-0103, T-0111, T-0150, T-0156, T-0158 |  |
 | ⬜ | [T-0236](../tracker/tasks/T-0236.md) | archive: offline HTML viewer (index.html + viewer-assets) — hierarchy, Items, inspections, audit hashes, relative file links, zero network | frontend | M | T-0235, T-0024 |  |
-| ⬜ | [T-0237](../tracker/tasks/T-0237.md) | archive: storage tier change (CopyObject STANDARD/GLACIER_IR ↔ DEEP_ARCHIVE) and presigned download | archive | S | T-0233, T-0014 |  |
+| ⬜ | [T-0237](../tracker/tasks/T-0237.md) | archive: storage tier change (CopyObject STANDARD/GLACIER_IR ↔ DEEP_ARCHIVE) and presigned download | archive | S | T-0233, T-0014, T-0274 |  |
 | ⬜ | [T-0238](../tracker/tasks/T-0238.md) | archive: deep-archive restore (RestoreObject Bulk/Standard), SAQ cron polling, ready notification and temporary-copy expiry | archive | S | T-0237, T-0214 |  |
 | ⬜ | [T-0239](../tracker/tasks/T-0239.md) | archive: restore — validate archive (manifest SHA-256s, schema versions, audit chains) and restore a soft-deleted project | archive | M | T-0234, T-0235, T-0016, T-0237 |  |
 | ⬜ | [T-0240](../tracker/tasks/T-0240.md) | archive: restore as a new project — deterministic id remap, rebuilt ltree paths, copied objects, archived audit chains as evidence (ADR) | archive | M | T-0239 |  |
@@ -222,9 +232,39 @@
 | ⬜ | [T-0244](../tracker/tasks/T-0244.md) | admin: force sign-out (revoke every live session, no device wipe) and resend invite for invited accounts | admin | S | T-0243, T-0052, T-0059, T-0077 |  |
 | ▶ | [T-0245](../tracker/tasks/T-0245.md) | admin: user-centric memberships API — GET/POST/PUT/DELETE /api/v1/admin/users/{id}/memberships across projects (System admin; PER-09 only on its own projects) with SoD warning | admin | S | T-0014, T-0073 |  |
 | ⬜ | [T-0246](../tracker/tasks/T-0246.md) | Frontend: Admin → Users directory (status, presence, logins, filters, resend invite, force sign-out, activate/deactivate) + user detail Memberships tab | frontend | M | T-0026, T-0243, T-0244, T-0245 |  |
+| ⬜ | [T-0179](../tracker/tasks/T-0179.md) | inspections: standalone inspection categories (qa_itp, safety_prestart, equipment_check, repair_fault, general) on templates and records, no parent ITP, node/Item anchors | inspections | M | T-0110, T-0111 |  |
+| ⬜ | [T-0180](../tracker/tasks/T-0180.md) | inspections: post-submit automation rules on the template revision (CEL trigger, update_target_fields through the owning service), action log, ledger source automation | inspections | M | T-0179, T-0150, T-0015, T-0018, T-0019, T-0006 |  |
+| ⬜ | [T-0181](../tracker/tasks/T-0181.md) | qms: unified QA verification queue oe_qms_verification_item (equipment calibration, staff credential, material MTR) with target-provider seam, approve/reject/reassign API, QA reviewer role per project | qms | M | T-0016, T-0018, T-0019, T-0006, T-0140 |  |
+| ⬜ | [T-0182](../tracker/tasks/T-0182.md) | qms: verification SLA rule set verification.sla (ADR 0004 notify kind), due/reminder/escalation columns, 15-minute SAQ reminder and escalation cron, pending-item summary and reminder nudge API | qms | M | T-0181, T-0015, T-0018, T-0019, T-0227 |  |
+| 🟥 | [T-0249](../tracker/tasks/T-0249.md) | equipment: fleet vehicles and plant in the equipment register — equipment_class, requires_calibration, asset_number, custodian (blocked by TD-412) *(blocked by TD-412)* | equipment | S | T-0112 |  |
+| 🟥 | [T-0250](../tracker/tasks/T-0250.md) | inspections: equipment as the anchor of standalone inspections (equipment_id, exactly one of node/Item/equipment; ADR 0014, blocked by TD-411) *(blocked by TD-411)* | inspections | S | T-0179, T-0249 |  |
+| ⬜ | [T-0251](../tracker/tasks/T-0251.md) | Frontend: standalone inspection registers (pre-starts, safety checks, fault reports) and the Pilot-0 tiles category toggle (default qa_itp) | frontend | S | T-0179, T-0160, T-0130 |  |
+| 🟥 | [T-0252](../tracker/tasks/T-0252.md) | inspections: public capture links oe_inspections_public_link — model, token issuance (project-bound opaque token, SHA-256 hash), create/list/revoke API for PER-06/PER-09 (blocked by TD-410) *(blocked by TD-410)* | inspections | M | T-0179, T-0006 |  |
+| 🟥 | [T-0253](../tracker/tasks/T-0253.md) | inspections: public capture endpoints /api/v1/public/inspections/{token} — GET form, presign (ClamAV), submit with CEL validation; rate limits, abuse controls, 404-only failures (blocked by TD-410) *(blocked by TD-410)* | inspections | M | T-0252, T-0016, T-0218, T-0230, T-0110, T-0180, T-0068 |  |
+| 🟥 | [T-0254](../tracker/tasks/T-0254.md) | Frontend: public mobile capture runner /public/inspect/:token — dynamic form, vehicle and name pick, photo capture + annotation, receipt (blocked by TD-410) *(blocked by TD-410)* | frontend | M | T-0253, T-0157, T-0046, T-0025, T-0047 |  |
+| 🟥 | [T-0255](../tracker/tasks/T-0255.md) | Frontend: public capture link management — create (template, anchor, lookups, expiry/permanent, cap), printable QR label, revoke/rotate, permanent-links review (blocked by TD-410) *(blocked by TD-410)* | frontend | S | T-0252, T-0025 |  |
+| ⬜ | [T-0256](../tracker/tasks/T-0256.md) | inspections: post-submit notify_users action — personas, custodian or users of the project, high priority, in-app + push + e-mail link | inspections | S | T-0180, T-0019, T-0058, T-0144 |  |
+| ⬜ | [T-0257](../tracker/tasks/T-0257.md) | inspections: create_action_task follow-ups (tagout_confirmation, repair_request, supervisor_review) and the tagout gate for node/Item targets (equipment part: T-0288) | inspections | M | T-0180, T-0256 |  |
+| ⬜ | [T-0258](../tracker/tasks/T-0258.md) | Frontend: post-submit rule editor on template revisions (trigger CEL with live compile, action forms) for PER-06/PER-09 | frontend | S | T-0180, T-0256, T-0257, T-0025 |  |
+| ⬜ | [T-0259](../tracker/tasks/T-0259.md) | Frontend: follow-up and tagout confirmation screens (pinned notification → confirm tagout with photo, resolve, cancel) | frontend | S | T-0257, T-0157, T-0025 |  |
+| ⬜ | [T-0260](../tracker/tasks/T-0260.md) | equipment: equipment.activate gate (locked CEL rule: verified, non-expired cert with document), new equipment starts out_of_service, missing-cert alert, non-QA upload routing into the verification queue | equipment | M | T-0181, T-0112, T-0034 |  |
+| ⬜ | [T-0288](../tracker/tasks/T-0288.md) | inspections/equipment: equipment-anchored follow-ups and the equipment.activate tagout check provider (split from T-0257; waits on TD-411 via T-0250) | inspections | M | T-0257, T-0250, T-0260 |  |
+| ⬜ | [T-0261](../tracker/tasks/T-0261.md) | credentials: credential.activate gate (pending_verification until QA verifies the document), eligibility fails for unverified credentials, missing-document alert, non-QA upload routing | credentials | M | T-0181, T-0118, T-0139 |  |
+| ⬜ | [T-0262](../tracker/tasks/T-0262.md) | Frontend: QA Verification Inbox and two-lane workbench (record vs OCR with discrepancies, history selector, PDF/image viewer, approve/reject/reassign) | frontend | M | T-0181, T-0260, T-0025, T-0016 |  |
+| ⬜ | [T-0263](../tracker/tasks/T-0263.md) | Frontend: pending-approval banner on DetailPage (status, reviewer, submitted, SLA countdown/overdue, Review & Verify, Send Reminder) | frontend | S | T-0182, T-0262, T-0025 |  |
+| ⬜ | [T-0264](../tracker/tasks/T-0264.md) | qms: SLA reminders and escalation for override requests and tagout follow-ups through oe_qms_sla_state (no change to the frozen override table) | qms | S | T-0182, T-0257, T-0035 |  |
+| ⬜ | [T-0183](../tracker/tasks/T-0183.md) | compliance: configurable multi-stage expiry lead-time alerts — rule set compliance.expiry_alerts, expiring-resource provider seam, daily alert cron, dedup log | compliance | M | T-0015, T-0018, T-0019, T-0034, T-0227, T-0112, T-0118 |  |
+| ⬜ | [T-0266](../tracker/tasks/T-0266.md) | compliance: schedule readiness conflicts oe_compliance_readiness_conflict — engine over scheduled inspections, daily + reactive evaluation, conflict alerts, auto-resolve on renewal/verification, conflicts API | compliance | M | T-0183, T-0152, T-0181 |  |
+| ⬜ | [T-0267](../tracker/tasks/T-0267.md) | compliance: P6 activity readiness targets — resources of anchor-linked P6 activities, re-evaluation on P6 import commit | compliance | S | T-0266, T-0104 |  |
 | ⬜ | [T-0161](../tracker/tasks/T-0161.md) | e2e: Pilot-0 journey — download, inspect offline with annotated photo, sign and sync, return, resubmit, approve, PDF; scan-to-locate | e2e | S | T-0149, T-0153, T-0155, T-0157, T-0159, T-0160, T-0143, T-0027, T-0164, T-0165, T-0170, T-0171, T-0172, T-0175, T-0176 |  |
+| ⬜ | [T-0185](../tracker/tasks/T-0185.md) | materials/qms: product substitution register oe_material_substitution — internal_qa route (QE approval signed through T-0119), non-QA drafts to the verification queue, scope by project/subtree/work anchor/Item | materials | M | T-0016, T-0018, T-0019, T-0119, T-0181, T-0108, T-0006, T-0140 |  |
 | ⬜ | [T-0146](../tracker/tasks/T-0146.md) | [Pilot-0] readiness gate: NFR budgets become hard CI gates; pilot scope checklist green | platform | S | T-0045, T-0145, T-0046, T-0142, T-0143, T-0144, T-0111, T-0119, T-0126, T-0127, T-0037, T-0038, T-0039, T-0040, T-0041, T-0042, T-0049, T-0050, T-0051, T-0052, T-0053, T-0054, T-0055, T-0057, T-0058, T-0059, T-0077, T-0078, T-0043, T-0044, T-0047, T-0147, T-0148, T-0149, T-0150, T-0151, T-0152, T-0153, T-0154, T-0155, T-0156, T-0157, T-0158, T-0159, T-0160, T-0161, T-0130, T-0162, T-0163, T-0164, T-0165, T-0167, T-0168, T-0169, T-0170, T-0171, T-0172, T-0107, T-0173, T-0174, T-0175, T-0176, T-0177 |  |
+| ⬜ | [T-0269](../tracker/tasks/T-0269.md) | materials: baseline approved product list per specified product code (oe_material_approved_product), seeded from client packs | materials | S | T-0185, T-0108 |  |
 | ⬜ | [T-0131](../tracker/tasks/T-0131.md) | [M1] Phase 1 backbone-freeze contract gate: freeze core tables, level-def shape + role names, rule-store shape, override record, field ownership, seam sigs; CEL parity | platform | M | T-0005, T-0016, T-0018, T-0101, T-0103, T-0110, T-0111, T-0112, T-0124, T-0132, T-0035, T-0139 |  |
+| ⬜ | [T-0270](../tracker/tasks/T-0270.md) | eligibility/forms: is_product_approved CEL helper (pure, dual-runtime parity fixtures) over context.product_approvals resolved by the eligibility service | materials | S | T-0185, T-0269, T-0139, T-0110, T-0017 |  |
+| ⬜ | [T-0271](../tracker/tasks/T-0271.md) | materials/inspections: substitutions in the offline reference bundle, substitution_id bound on the answer, read-only substitution note on the inspection and its PDF | materials | M | T-0270, T-0147, T-0158, T-0111 |  |
+| ⬜ | [T-0272](../tracker/tasks/T-0272.md) | Frontend: product selector shows approved substitutes badged "Approved Substitute (ref)" with the equivalency document viewable offline; selecting binds substitution_id | materials | S | T-0271, T-0165 |  |
+| 🟥 | [T-0280](../tracker/tasks/T-0280.md) | Frontend: Admin → Users 'Login as user (support)' with reason modal, persistent impersonation banner with countdown and Exit, session hand-back (blocked by TD-426) *(blocked by TD-426)* | frontend | M | T-0246, T-0026, T-0277, T-0278, T-0279 |  |
 
 ## Phase 2 — Welding quality
 
@@ -239,6 +279,7 @@
 | ⬜ | [T-0207](../tracker/tasks/T-0207.md) | Continuity watch report + expiry notifications (SAQ cron) | wps | S | T-0206, T-0019, T-0015 |  |
 | ⬜ | [T-0208](../tracker/tasks/T-0208.md) | Frontend: WPS register, welder quals, weld register | frontend | M | T-0206, T-0128 |  |
 | ⬜ | [T-0209](../tracker/tasks/T-0209.md) | Phase 2 exit journey: weld cannot be accepted outside qualification/NDE rules | e2e | S | T-0208 |  |
+| ⬜ | [T-0265](../tracker/tasks/T-0265.md) | materials: material_cert.verify gate (heat/MTR pending_verification until QA verifies the MTR), blocks weld/spool release, missing-certificate alert, MTR lane provider | materials | M | T-0181, T-0205, T-0034 |  |
 
 ## Phase 3 — Logistics
 
@@ -251,13 +292,15 @@
 | 🧩 | [E-03-05](../tracker/tasks/E-03-05.md) | cutting: 1D FFD + 2D rectpack nesting, yield/waste, offcut reuse, cutting.confirm → inventory | cutting | L | E-03-04 |  |
 | 🧩 | [E-03-06](../tracker/tasks/E-03-06.md) | site_logistics: Gate Delivery edge screen + OS&D vs ERP-mirrored PO lines | site_logistics | L | T-0127, E-03-02 |  |
 | 🧩 | [E-03-07](../tracker/tasks/E-03-07.md) | equipment & fleet register (extends calibration core) | equipment | L | T-0112 |  |
+| ⬜ | [T-0184](../tracker/tasks/T-0184.md) | materials/qms: material shelf-life extension workflow — oe_material_shelf_life_extension, QA approval through the verification queue (no self-approval), effective use-by date, eligibility and readiness re-evaluation, ledger | materials | M | E-03-03, T-0016, T-0018, T-0019, T-0139, T-0181, T-0183, T-0266, T-0262 |  |
+| ⬜ | [T-0268](../tracker/tasks/T-0268.md) | materials/sync: material batches and approved extension documents in the offline reference bundle, client/server use-by check | materials | S | T-0184, T-0147, T-0017 |  |
 
 ## Phase 4 — Execution
 
 | | ID | Title | Module | Size | Depends on | PR |
 |---|---|---|---|---|---|---|
 | 🧩 | [E-04-01](../tracker/tasks/E-04-01.md) | schedule: field programme (P6-synced, RSW-linked) | schedule | L | T-0106 |  |
-| 🧩 | [E-04-02](../tracker/tasks/E-04-02.md) | schedule_advanced: Look-Ahead Constraint Board edge screen → PPC + RNC Pareto | schedule_advanced | L | E-04-01, T-0127 |  |
+| 🧩 | [E-04-02](../tracker/tasks/E-04-02.md) | schedule_advanced: Look-Ahead Constraint Board edge screen → PPC + RNC Pareto | schedule_advanced | L | E-04-01, T-0127, T-0183, T-0266 |  |
 | 🧩 | [E-04-03](../tracker/tasks/E-04-03.md) | progress: physical earned quantity vs RSW/Item (gated) → P6 export | progress | L | E-04-01 |  |
 | 🧩 | [E-04-04](../tracker/tasks/E-04-04.md) | field_execution: Daily Workface Log edge screen + shift logs + CBS burn ingest | field_execution | L | T-0127 |  |
 | 🧩 | [E-04-05](../tracker/tasks/E-04-05.md) | field_time: labour + plant hours capture → CBS cost codes + payroll export | field_time | L | E-04-04 |  |
@@ -270,6 +313,7 @@
 | 🧩 | [E-04-12](../tracker/tasks/E-04-12.md) | planner: work plans (shutdown/break-in/campaign) in overlay or interrupt mode, resource pool (groups, people, crews, rosters), allocation grid by day/shift, capacity check, overlay Gantt, commit into programme | planner | L | E-04-01, E-04-07, T-0101, T-0018, T-0019, T-0118 |  |
 | 🧩 | [E-04-13](../tracker/tasks/E-04-13.md) | scaffolding: scaffold register (location, build/approve/tag data, files, photos), lifecycle, tagging on one-engine inspections, automatic re-inspection tasks + overdue gate, build/modify/dismantle requests, QR card | scaffolding | L | T-0101, T-0103, T-0111, T-0118, T-0016, T-0019, E-04-07 |  |
 | 🧩 | [E-04-14](../tracker/tasks/E-04-14.md) | scope_changes: change-of-scope register anchored to RSW/node (current-scope snapshot, proposed lines, photos, walk-down, party responses), agree then scope revision via asset service, portal exposure, variation link | scope_changes | L | T-0101, T-0102, T-0016, T-0018 |  |
+| 🧩 | [E-04-15](../tracker/tasks/E-04-15.md) | calendar: unified personal and project calendar — core/calendar provider registry (personal and project layers), P6/work-plan linkage with readiness conflict badges, month/week/day/agenda views, revocable iCal feed | calendar | L | T-0104, T-0112, T-0115, T-0118, T-0152, T-0181, T-0183, T-0266, T-0267, E-03-03, E-03-06, E-04-01, E-04-07, E-04-11, E-04-12 |  |
 
 ## Phase 5 — Documents, collaboration & AI
 
@@ -279,12 +323,19 @@
 | 🧩 | [E-05-02](../tracker/tasks/E-05-02.md) | markups + plan_room: PDF/drawing viewer + vector markup overlays | markups | L | E-05-01 |  |
 | 🧩 | [E-05-03](../tracker/tasks/E-05-03.md) | transmittals + correspondence | transmittals | L | E-05-01 |  |
 | 🧩 | [E-05-04](../tracker/tasks/E-05-04.md) | rfi / submittals / meetings / interface_management | rfi | L | E-05-01 |  |
-| 🧩 | [E-05-05](../tracker/tasks/E-05-05.md) | MDR collation engine: SAQ streaming PDF merge, bookmarks, TOC, pagination, SHA-256, transmittal | mdr | L | E-05-01, T-0111 |  |
+| 🧩 | [E-05-05](../tracker/tasks/E-05-05.md) | MDR collation engine: SAQ streaming PDF merge, bookmarks, TOC, pagination, SHA-256, transmittal | mdr | L | E-05-01, T-0111, T-0184, T-0265, T-0185, T-0271 |  |
 | 🧩 | [E-05-06](../tracker/tasks/E-05-06.md) | search / retrieval: docket OCR → full-text + vector index (SAQ) | search | L | E-05-01 |  |
 | 🧩 | [E-05-07](../tracker/tasks/E-05-07.md) | integrations: outbound event bus + webhooks (HMAC) + ERP sync bridge (SAP/Xero/P6) | integrations | L | T-0015 |  |
 | 🧩 | [E-05-08](../tracker/tasks/E-05-08.md) | erp_chat / ai_agents: operational assistant (proposals only, human-confirmed) | erp_chat | L | E-05-06 |  |
 | 🧩 | [E-05-09](../tracker/tasks/E-05-09.md) | RSW document ingestion: bulk/ZIP upload, combined-PDF splitting, template recognition, OCR extraction with source traceability | documents | L | T-0104, T-0105 |  |
 | 🧩 | [E-05-10](../tracker/tasks/E-05-10.md) | RSW-P6 matching & reconciliation engine: candidates, versioned weighted scoring, CEL hard/soft rules, verification queue, findings | asset_management | L | T-0104, T-0105, E-05-09 |  |
+| ⬜ | [T-0273](../tracker/tasks/T-0273.md) | materials/tq: client_tq substitution route — link to a TQ, approve automatically when the TQ is approved or with recorded client approval evidence | materials | S | E-05-04, T-0185 |  |
+| ⬜ | [T-0187](../tracker/tasks/T-0187.md) | qms/ai_agents: AI-assisted ITP template drafting from a master template and the project scope, AI section rewrite with diff preview, human publish by PER-06/PER-13 | qms | M | T-0015, T-0018, T-0101, T-0110, T-0113, T-0120, T-0281, E-05-08 |  |
+| ⬜ | [T-0284](../tracker/tasks/T-0284.md) | Frontend: two-pane AI ITP authoring (source scope/requirements beside the editable ITP table), AI rewrite with diff preview, publish | frontend | M | T-0187, T-0025 |  |
+| ⬜ | [T-0285](../tracker/tasks/T-0285.md) | Domain events for ITP alignment triggers through the transactional outbox: scope_change.agreed/implemented, p6.import.committed, asset.node.updated, task.created | integrations | S | E-05-07, E-04-14, E-04-07, T-0104, T-0101 |  |
+| ⬜ | [T-0189](../tracker/tasks/T-0189.md) | qms/ai_agents: ITP alignment watchdog — drift reviews on scope-change, P6 and task events, AI gap analysis and proposed ITP patch (proposal only), reviewer notification | qms | M | T-0015, T-0019, T-0058, T-0104, T-0187, T-0188, T-0281, T-0285, E-04-07, E-04-14, E-05-08 |  |
+| ⬜ | [T-0286](../tracker/tasks/T-0286.md) | qms: ITP alignment review actions — dismiss, mark manually updated, Apply AI proposal & approve (human-confirmed, signed lines preserved, ledgered) | qms | S | T-0189, T-0281 |  |
+| ⬜ | [T-0287](../tracker/tasks/T-0287.md) | Frontend: ITP Alignment Review drawer (what changed, AI gap analysis, proposed patch diff; dismiss / edit manually / apply & approve) and review register | frontend | M | T-0286, T-0283 |  |
 
 ## Phase 6 — Defense, claims & controls
 
