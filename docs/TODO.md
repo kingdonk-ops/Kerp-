@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 253 · **Closed:** 133
+**Open:** 256 · **Closed:** 133
 
 ## decision (10)
 
@@ -84,7 +84,7 @@
 | [TD-337](../tracker/todo/TD-337.md) | Web/Android route /magic-link#<token> that redeems the e-mailed sign-in link (POST /auth/magic-link/redeem); the e-mail now links there | T-0058 | implementer |
 | [TD-388](../tracker/todo/TD-388.md) | saved_views: wire the my_teams filter op | T-0074 | reviewer |
 
-## deferred (36)
+## deferred (37)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -124,8 +124,9 @@
 | [TD-336](../tracker/todo/TD-336.md) | Mail: settle send-log rows stuck in queued (enqueue failed or Redis payload lost); no re-enqueue is possible because the payload (with the link token) is never persisted | T-0058 | implementer |
 | [TD-360](../tracker/todo/TD-360.md) | First-run: one-time password link for the first System admin once T-0077 ships | T-0023 | implementer |
 | [TD-365](../tracker/todo/TD-365.md) | Frontend translations of the password policy codes and the password policy in /auth/config | T-0077 | implementer |
+| [TD-394](../tracker/todo/TD-394.md) | Approve access request: site picker for PER-07 site scope once the asset hierarchy API exists | T-0051 | implementer |
 
-## later (116)
+## later (118)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -245,6 +246,8 @@
 | [TD-389](../tracker/todo/TD-389.md) | teams reconcile _repair: pass confirm_sod only when the drift has pending SoD items | T-0075 | reviewer |
 | [TD-390](../tracker/todo/TD-390.md) | teams reconcile CLI: distinct exit code for unexpected exceptions | T-0075 | reviewer |
 | [TD-391](../tracker/todo/TD-391.md) | audit ledger: rename _SQLITE_WRITE_LOCK and document the race-test barrier timeout | T-0077 | reviewer |
+| [TD-392](../tracker/todo/TD-392.md) | Device registry: scoped admin device list endpoint (System admin: all users; PER-09: its projects' members) to replace the client's per-user fan-out | T-0051 | implementer |
+| [TD-393](../tracker/todo/TD-393.md) | Expose is_system_admin on GET /auth/me so the client need not probe GET /admin/grants for Admin nav visibility | T-0051 | implementer |
 
 ## bug (6)
 
