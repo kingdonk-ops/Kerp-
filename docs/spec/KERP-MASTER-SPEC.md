@@ -327,6 +327,8 @@ The quality assurance and quality control (QA/QC) verification engine. It transl
 
 ### [MOD-09] Non-Conformance Reports (NCR), Deviations & Punchlists
 
+* **Amended (user, 2026-11-21):** NCR and punch are the two types of one template-driven **issues** engine (module `issues`): workflow fixed by type, fields from layered, revisioned issue templates with categories; `visibility` (`internal | client`) and `mdr_effect` (`blocks | register_only | excluded`) flags; punch → NCR upgrade and "raise external NCR" as new linked records; `create_issue` post-submit action. The state machine below becomes punch `open → rectified → verified → closed` and NCR `containment → disposition → root_cause → corrective_action → effectiveness → closed`. See `docs/spec/modules/issues.md`.
+
 #### 1. What It Is & Purpose
 The discrepancy, non-conformance, and completion-punchlist resolution engine. It ensures all physical defects, specification deviations, and architectural snags are identified, categorized, tracked, rectified, and formally closed out before subsystem completion.
 
@@ -598,6 +600,9 @@ CREATE INDEX idx_itp_exec_tag ON itp_step_executions(tag_id);
 CREATE INDEX idx_itp_exec_iwp ON itp_step_executions(iwp_id);
 
 -- 6. Discrepancy & Punchlist Management
+-- Amendment (user, 2026-11-21): replaced by the issues engine (oe_issues_issue, type punch | ncr,
+-- template-driven, BaseRecordMixin + project RLS, anchors per ADR 0003 §2); see
+-- docs/spec/modules/issues.md §3. The table below is illustrative only.
 CREATE TABLE punch_items (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL,
@@ -669,6 +674,7 @@ ITP Hold Point Lifecycle:
 * **Amended (TD-045, decided 2026-11-10; terminology amended 2026-11-13):** `RFI_ISSUED` is renamed — `INSPECTION_REQUESTED` (name confirmed by the user on TD-045) — and the call-out itself is a separate `inspection_request` record. See `docs/spec/modules/quality-and-inspection.md` §Unified inspection record. In KERP, RFI = Request for Inspection; a Request for Information is a TQ (Technical Query).
 * `INSPECTED_PASSED`: Verifier signs off the physical check point. Requires authenticated digital signature, current UTC timestamp, and geographic coordinates.
 * `INSPECTED_FAILED`: Inspection fails to meet technical criteria. The engine automatically forces creation of an associated `punch_items` record (Category A) or formal `non_conformance_reports` record.
+* **Amended (user, 2026-11-21):** the punch or NCR is an issue (`oe_issues_issue`, type `punch | ncr`) raised through the post-submit action `create_issue` or by the reviewer; see `docs/spec/modules/issues.md` §8.
 * `LOCKED_FOR_TURNOVER`: Record verified and immutable. No modifications permitted; queued for MDR document collation.
 * **Amended (Pilot-0, planner spec 2026-11-13; TD-165, Q5a):** an inspection record is reviewed before its result stands: the inspector submits (`SUBMITTED`), and a reviewer approves (→ `INSPECTED_PASSED` / `INSPECTED_FAILED` as submitted) or returns it with a reason (`RETURNED` → edited → `SUBMITTED` again). See `docs/spec/modules/quality-and-inspection.md` §Review and return.
 
@@ -717,7 +723,7 @@ The Turnover & MDR Collation Engine ([MOD-11]) automates the generation of clien
                                       v
                                 [2. Dependency Graph Verification]
                                       |-- Confirm 100% ITPs Passed
-                                      |-- Confirm 0 Open Cat A Punches
+                                      |-- Confirm 0 Open Issues with mdr_effect = blocks (issues.md §6)
                                       |-- Confirm 100% Heat MTRs Attached
                                       |
                                       v
@@ -743,6 +749,8 @@ The Turnover & MDR Collation Engine ([MOD-11]) automates the generation of clien
 #### Compilation Rules & Verification Criteria
 * **Gating Invariant**: An MDR compilation job cannot execute if:
   $$\sum \text{Open Cat A Punch Items} > 0 \quad \lor \quad \sum \text{Unsigned ITP Hold Points} > 0$$
+  *(superseded — see amendment below)*
+  **Amended (user, 2026-11-21; TD-445 approved):** the invariant becomes `Σ open issues with mdr_effect = blocks > 0 ∨ Σ unsigned ITP hold points > 0`, and the dossier gains an NCR / concession register section (`docs/spec/modules/documents-and-mdr.md`, `docs/spec/modules/issues.md` §5–§6). **MDR gate rule (planner default, TD-445):** `mdr_effect` alone governs the MDR gate: `mdr.compile` blocks while any issue in the dossier scope with `mdr_effect = blocks` is open, and nothing else about an issue (type, `punch_category`, visibility) enters it; this replaces the earlier "open Cat A punch" clause. Punch templates that use Cat A (all system-default punch templates) default to `mdr_effect = blocks`. An open Cat A punch always blocks work completion (`work_anchor.complete`) regardless of `mdr_effect`.
 * **Bookmark Hierarchy Standard**:
   * Level 1: Subsystem Identifier (`System 310 - High Pressure Hydrocarbon Gas`)
   * Level 2: Discipline Dossier (`Piping Quality Dossier`)

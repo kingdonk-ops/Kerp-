@@ -98,7 +98,8 @@ RefKind(kind="node", label_key="ref.node", search(q, ctx) -> [RefHit], preview(i
 ```
 
 Kinds at first: work-anchor / any level node and Item (`asset_management`), inspection,
-NCR / punch, inspection request, document, meeting, diary entry, user. Later modules add
+NCR / punch (one `issue` resolver of the `issues` module, [issues.md](issues.md); internal issues
+resolve to `None` for external viewers), inspection request, document, meeting, diary entry, user. Later modules add
 theirs by registering — no change in `handover`. Resolvers enforce the **viewer's** RLS:
 if the viewer cannot see the record, `preview` returns `None` and the link renders as a
 "restricted" chip. No cross-module table access.
@@ -128,7 +129,7 @@ Default rules are generated from the project's breakdown template and numbering 
 | Rule | Pattern (illustrative) | Resolves to |
 |---|---|---|
 | work anchor code | `(?i)\bRSW[\s:\-]*(?P<code>\d+(?:[.\-]\d+)?)\b` (RE2 syntax) — matches `rsw103`, `RSW: 401.1`, `RSW 16-900` | node of the `work_anchor` level with that code |
-| NCR number | the project's NCR numbering pattern | NCR |
+| NCR number | the project's NCR numbering pattern (per issue type, issues.md §3) | NCR (issue) |
 | inspection request number | project numbering pattern | inspection request |
 | asset code | `asset` level `code_pattern` | node |
 

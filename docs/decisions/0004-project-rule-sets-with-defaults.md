@@ -77,7 +77,7 @@ calibration hard gate, "open Cat A punch / NCR blocks completion", eligibility c
 Only **PER-13 Quality Director**, at the tenant layer, can unlock a locked rule, and the
 change needs an ADR reference recorded on the rule. Separation of duties: PER-09 Project
 Administrator (SoD-blocked from quality holds) can never unlock, disable or loosen a `check`
-rule. Whether unlocking also needs a second approver (e.g. via `approval_routes`) is open in
+rule. *Amendment (user, 2026-11-21; `docs/spec/modules/issues.md` §5):* PER-09 (and QA authority) may override an individual issue's `visibility` / `mdr_effect` / `completion_effect` flag with a mandatory, audited reason; this changes one issue, never a rule, and is the only exception to the PER-09 restriction above. Guardrails: issues of origin `client` / `external_audit` can never become `internal` or `excluded`, an issue once seen by the client never becomes `internal` again, and every loosening override notifies QA and is counted in QMS KPIs (issues.md §5). Whether unlocking also needs a second approver (e.g. via `approval_routes`) is open in
 TD-072.
 
 ### 6. Safe editing

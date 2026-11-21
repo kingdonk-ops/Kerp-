@@ -35,7 +35,7 @@ pluggable parser adapter). Money is a **read-only external mirror** only.
 | Phase | Scope | Depth | Exit criterion |
 |---|---|---|---|
 | **0** Platform substrate & security core | scaffold, DB + BaseRecordMixin, **project-scoped RLS** (+4 bypass tests), **RS256/EdDSA JWT + JWKS**, field-worker magic-link+PIN, 15-persona RBAC, module loader, **SAQ** jobs, presigned uploads, **CEL runtime substrate**, `run_checks` shell, hash-chain audit, frontend shell (8-group IA) + reusable shells; access model (System admin → Project Admins, lobby, project picker), 12 h sessions, hybrid PIN, device registry, deployment settings (2026-11-13); login & lobby, invites, Entra SSO, outbound e-mail, password reset (2026-11-14) | **78 tasks** | tenant/project created, user authed & scoped, module toggled, rule set run — CI green |
-| **1** Asset backbone, one-engine & quality core | **ltree** hierarchy, **JSONB** field registry (EAV deleted), Items + CML stubs, P6 import/export (idempotent + unmatched-row linking), **one-engine** forms+CEL, **unified inspection record** + **eligibility**, **equipment calibration** register + hard gate, qms/construction_control/inspection_requests, NCR/punch, signing, completion-gate + P6 rule sets, offline sync core (Dexie), UI, **M1 freeze gate (T-0131)**; Capacitor Android build + SQLCipher store, FCM push, Pilot-0 gate (2026-11-13); Pilot-0 slice: sync scope + download, review/return, client co-sign, capture screen, scan-to-locate, photo annotation, video/audio/barcode fields + reference images, inspection PDF, dashboard tiles | **75 tasks** | P6→hierarchy; inspections gated by CEL; expired tool blocked; completion blocked by open NCR; backbone contract frozen |
+| **1** Asset backbone, one-engine & quality core | **ltree** hierarchy, **JSONB** field registry (EAV deleted), Items + CML stubs, P6 import/export (idempotent + unmatched-row linking), **one-engine** forms+CEL, **unified inspection record** + **eligibility**, **equipment calibration** register + hard gate, qms/construction_control/inspection_requests, NCR/punch (one template-driven issues engine, 2026-11-21), signing, completion-gate + P6 rule sets, offline sync core (Dexie), UI, **M1 freeze gate (T-0131)**; Capacitor Android build + SQLCipher store, FCM push, Pilot-0 gate (2026-11-13); Pilot-0 slice: sync scope + download, review/return, client co-sign, capture screen, scan-to-locate, photo annotation, video/audio/barcode fields + reference images, inspection PDF, dashboard tiles | **75 tasks** | P6→hierarchy; inspections gated by CEL; expired tool blocked; completion blocked by open NCR; backbone contract frozen |
 | **2** Welding quality & traceability | WPS, welder quals/continuity, welds as Items, NDE, heat/MTR trace, R-WPS rules | **9 tasks** | a weld can't be accepted outside qualification/NDE rules |
 | **3** Logistics & supply chain | **contacts**, **procurement (front)**, materials/MRIR+heat, inventory, **cutting (FFD + rectpack)**, Gate Delivery edge screen, equipment/fleet | 7 epics | delivery → gate receipt + OS&D; cutting plan → inventory |
 | **4** Execution & LPS | schedule, Look-Ahead board, earned-qty progress, Daily Workface Log + CBS burn, field time, estimating/EVM, tasks, **resource rollup (moved here)**, safety/PTW, supervision/closeout, **shift/swing handover register** | 11 epics | progress as earned qty (gated), actuals → P6, PPC computed |
@@ -81,7 +81,10 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
   - **Not in the gate (2026-11-14):** the access-request decision e-mails (T-0056; the lobby
     panel is the authoritative channel).
   - **Phase 1 subset:** T-0101, T-0103 (hierarchy + Items), T-0107 (equipment import; in T-0146's gate since PR #51 round 3), T-0110
-    (field registry + CEL), T-0111 (inspection record), T-0116/T-0117 (defects, TD-167), T-0119
+    (field registry + CEL), T-0111 (inspection record), T-0311–T-0314 (issues engine: templates, punch, NCR,
+    flags; replace the dropped T-0116/T-0117, user 2026-11-21, issues.md), T-0322 (seeded
+    starting issue templates), T-0318/T-0319 (issues register, raise, punch and NCR detail
+    screens; product owner 2026-11-21, TD-444 resolved), T-0119
     (signing), T-0126/T-0127 (offline sync), T-0133 (field checkout; its P6 tests split to
     T-0166, outside the pilot — user, 2026-11-13, R2a), T-0130 (inspections register +
     calibration-gated tool pick; user, 2026-11-13, R2a), T-0141–T-0145 (Android build, SQLCipher
@@ -285,7 +288,7 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
   (verification SLA), T-0183 (expiry alerts), T-0184 (shelf-life extension, **Phase 3**: no
   material batch exists before E-03-03; TD-421), E-04-15 (calendar epic, Phase 4,
   needs-breakdown). Splits to stay S/M got T-0249–T-0268: T-0249 fleet classes (blocked TD-412),
-  T-0250 equipment anchor (blocked TD-411, ADR 0014 proposed), T-0251 registers + tile toggle,
+  T-0250 equipment anchor (blocked TD-411, ADR 0014 proposed; re-scoped 2026-11-21 to equipment links, see below), T-0251 registers + tile toggle,
   T-0252–T-0255 public capture (blocked TD-410, ADR 0013 proposed), T-0256 notify action,
   T-0257 follow-ups + tagout gate (node/Item; equipment part T-0288, waits on TD-411), T-0258/T-0259 screens, T-0260 equipment.activate, T-0261
   credential.activate, T-0262 two-lane window, T-0263 banner, T-0264 SLA for overrides and
@@ -391,6 +394,43 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
   TD-437 (SCIM), TD-438 (machine credentials), TD-439 (feature flags), TD-440 (later: in-app IP
   rules).
 
+- **2026-11-21 — template menus, template settings, project-level inspections and links
+  (product-owner decisions, binding; planner pass on PR #145):** two menu items, one shared
+  designer: **Templates** (every inspection template, filterable by area, issue category, formal,
+  audit, status, kind) and **Issues** (register + issue templates), diff §6.1. Presets for "New
+  template"; settings on the revision: area (= `category`, plain labels, `health_safety` added),
+  issue category (`issue_category`; the planner's `discipline` replacement was reverted by the
+  product owner, see TD-456), formal tick (informal = record-only, submit final,
+  outside MDR/progress/KPIs; ITP-chain always formal), audit tick with internal/external scope,
+  linked issue types (one used, several picked, none → category × type default); changing area,
+  formal or audit needs QA authority or PER-09 and makes a new revision. **ADR 0003 amendment
+  2026-11-21:** `qa_itp` inspections keep the asset anchor; every other area is project-level with
+  optional informational location and links (asset, material, equipment); equipment is a link
+  (ADR 0014 superseded, TD-411 resolved; TD-412 stays open). Audit/H&S issues may be
+  project-level: never block work completion; with `mdr_effect = blocks` they block every MDR of
+  the project, or only MDRs covering their location (TD-443 resolved). Spec:
+  `quality-and-inspection.md` §Standalone inspections, §Template settings, §Project-level
+  inspections; `issues.md` §2, §3.1, §5 (`saved_view` channel), §6, §8; `documents-and-mdr.md`
+  §Gating invariant. New, phase 1: T-0324 (template settings, M), T-0325 (project-level
+  inspections, location, links, M), T-0326 (project-level issues, M), T-0327 (linked issue types,
+  S), T-0328 (Templates menu, M), T-0329 (project-level screens, M), T-0330 (raise from an
+  inspection, S). Re-shaped: T-0250 (equipment links, unblocked, S), T-0288, T-0316 (names a
+  linked issue type; depends on T-0324/T-0326/T-0327), T-0320 (Issues menu → issue templates,
+  S → M), E-01-03; T-0251 depends on T-0324/T-0325. Forward-compatible criteria only on the gate
+  tasks T-0312 and T-0314 (plus round-4 review fixes on T-0314); notes on T-0111, T-0112,
+  T-0179, T-0180, T-0249, T-0252, T-0257, T-0259, T-0311, T-0318, T-0322, E-03-03. **Pilot-0 gate
+  unchanged** (none of the new or re-shaped tasks is in T-0146's closure). Raised: TD-456
+  (planner defaults of this pass, not blocking).
+
+- **2026-11-21 — product-owner approvals (binding):** TD-445 approved as-is (`mdr_effect` alone
+  governs `mdr.compile`; Cat A punch templates default to `blocks`; Cat A always blocks work
+  completion). TD-456 approved except "`discipline` replaces `issue_category`": inspection
+  templates keep the optional `issue_category`, pointing at an issue category list that also
+  holds non-discipline categories (vehicle, equipment, pre-start, general; a vehicle pre-start
+  has no discipline); the Templates list filters by area and issue category; no `discipline`
+  field. Updated: `quality-and-inspection.md`, `issues.md` §2/§8, T-0316, T-0324, T-0326,
+  T-0327, T-0328, E-01-03, T-0311 (note). Pilot-0 gate unchanged.
+
 - **2026-11-21 — Phase 0 bundling (user request), bundle 4:** T-0218 absorbs T-0220 (ClamAV
   scanner + System-console queue monitor API; both small worker-side backends on disjoint modules;
   size M). T-0220 is `dropped` (body kept); its acceptance criteria live on in T-0218. T-0224 now
@@ -419,5 +459,5 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
 | Enterprise governance (2026-11-21) | Formal sign-offs attested (re-auth + intent + device/IP in the ledger); narrow delegation that never confers authority; SCIM deprovisioning; machine credentials bind the tenant from the deployment (ADR 0017), never `A`/`S`; metering counts only, soft limits never block; feature flags gate availability only; IP allowlisting in WAF / Conditional Access |
 
 ## Open decisions (see `TODO.md`)
-TD-433 (signing attestation details), TD-434 (delegation open points), TD-435 (external inspection party persona, blocks T-0296/T-0297), TD-436 (metering attribution), TD-437 (SCIM), TD-438 (machine credentials, ADR 0017), TD-439 (feature flags), TD-410 (public capture links, ADR 0013 proposed), TD-411 (equipment as an inspection anchor, ADR 0014 proposed), TD-412 (fleet in the Phase-1 equipment register), TD-418 (escalation and approval authority), TD-419 (calendar iCal feed), TD-422 (PER-13 shelf-life approval), TD-423 (self-approval of internal-QA substitutions), TD-426 (system admin impersonation, ADR 0015 proposed, blocks T-0277–T-0280), TD-427 (access logging of system_admin reads without membership, ADR 0016), TD-430 (ADR 0004 Amendment H rule kind `itp_assignment`, planner default in force until revised), TD-431 (QA reviewer self-verification of own uploads), TD-096 (coating/Grating ITR, with the client; interim confirmed 2026-11-15), TD-293 (shared tablets in the pilot, ask the pilot team before go-live), TD-004 (hosting target), TD-072 (ADR 0004 rule-set defaults per project), TD-073 (handover first-shift trigger),
+TD-433 (signing attestation details), TD-434 (delegation open points), TD-435 (external inspection party persona, blocks T-0296/T-0297), TD-436 (metering attribution), TD-437 (SCIM), TD-438 (machine credentials, ADR 0017), TD-439 (feature flags), TD-410 (public capture links, ADR 0013 proposed), TD-412 (fleet in the Phase-1 equipment register), TD-418 (escalation and approval authority), TD-419 (calendar iCal feed), TD-422 (PER-13 shelf-life approval), TD-423 (self-approval of internal-QA substitutions), TD-426 (system admin impersonation, ADR 0015 proposed, blocks T-0277–T-0280), TD-427 (access logging of system_admin reads without membership, ADR 0016), TD-430 (ADR 0004 Amendment H rule kind `itp_assignment`, planner default in force until revised), TD-431 (QA reviewer self-verification of own uploads), TD-096 (coating/Grating ITR, with the client; interim confirmed 2026-11-15), TD-293 (shared tablets in the pilot, ask the pilot team before go-live), TD-004 (hosting target), TD-072 (ADR 0004 rule-set defaults per project), TD-073 (handover first-shift trigger),
 TD-039 (dropped AIP-proposal extras). TD-013 (review-gate ignores tracker) is resolved by T-0029. TD-002/005/007/008/009/012 are resolved by this merge; TD-001 by ADR 0001 (`docs/decisions/`). TD-002 is carried into code by ADR 0002 (`docs/decisions/0002-port-one-engine.md`). TD-034 (remaining Inspection-ERP core packages) is resolved by ADR 0007. TD-003 (SSO vs local JWT) is resolved; the SSO spec is diff §4.5 (TD-043 resolved 2026-11-14). Resolved 2026-11-14 by the product owner: TD-257 (offline grace binds; window is an upper bound), TD-136 (magic links PER-14 only, T-0057) and TD-262 (externals create their own password, reset by e-mail); TD-084 (outbound e-mail) resolved by diff §4.6. Resolved 2026-11-15 by the product owner: TD-224 (per-mailbox magic-link cap), TD-213 (object key layout), TD-271 (T-0079), TD-261 (PER-15 password/SSO) and TD-223 (PR principals; residual risk TD-276). Resolved 2026-11-15 (second batch): TD-283 (one account per device id, per-account client store; follow-up TD-293), TD-281 (rule-set upgrade permissions, ADR 0004 Amendment G) and TD-285 (native-origin allow-list); TD-286 and TD-291 (device risks) accepted for development and covered by T-0080 before pilot go-live.
