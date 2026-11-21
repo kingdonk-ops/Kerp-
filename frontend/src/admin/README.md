@@ -47,7 +47,7 @@ client (`api.ts`, `invites.ts`, `users.ts`, `settings.ts`); every string through
   maximum is the lower of the two), the default (or "Default value" while none is stored) and
   whether field devices receive it.
 - Labels come from `admin.settings.entries.<key>`. An entry declared by a later task without a
-  label shows its key and the server's description until the task adds its label (TD-516).
+  label shows its key and the server's description until the task adds its label (TD-532).
 - **Bounds are checked client-side** (`checkSettingValue`, `settings.ts`: type, minimum, maximum
   lowered by the cap, length, items) and an invalid value cannot be saved. Each entry saves on
   its own (`PATCH /settings/registry/{key}` with the value in its JSON type); the server's

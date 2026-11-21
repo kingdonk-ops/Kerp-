@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 354 · **Closed:** 150
+**Open:** 355 · **Closed:** 150
 
 ## decision (40)
 
@@ -340,7 +340,7 @@
 | [TD-511](../tracker/todo/TD-511.md) | Drop the read-only oe_settings_deployment table (destructive migration, needs an ADR) | T-0230 | implementer |
 | [TD-512](../tracker/todo/TD-512.md) | Split the backend-pg CI job into parallel shards | T-0086 | coordinator |
 | [TD-513](../tracker/todo/TD-513.md) | CI: the SQLite backend job (~6.5 min) becomes the critical path once backend-pg is sharded | T-0086 | implementer |
-| [TD-516](../tracker/todo/TD-516.md) | Registry entries declared by later tasks add their label to admin.settings.entries (and a new category to admin.settings.categories) in the Settings screen | T-0232 | implementer |
+| [TD-532](../tracker/todo/TD-532.md) | Registry entries declared by later tasks add their label to admin.settings.entries (and a new category to admin.settings.categories) in the Settings screen | T-0232 | implementer |
 
 ## bug (10)
 
