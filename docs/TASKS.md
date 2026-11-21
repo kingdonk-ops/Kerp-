@@ -3,11 +3,11 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 72/205 tasks done (35%) · **ready now:** 24 · **epics awaiting breakdown:** 47
+**Overall:** 73/205 tasks done (36%) · **ready now:** 25 · **epics awaiting breakdown:** 47
 
 | Phase | Tasks done | Progress |
 |---|---|---|
-| 0 · Platform foundations | 72/105 | `██████░░░░` 69% |
+| 0 · Platform foundations | 73/105 | `███████░░░` 70% |
 | 1 · Asset & Quality backbone | 0/91 (+1 epics) | `░░░░░░░░░░` 0% |
 | 2 · Welding quality | 0/9 | `░░░░░░░░░░` 0% |
 | 3 · Logistics | 0/0 (+7 epics) | `░░░░░░░░░░` 0% |
@@ -109,9 +109,9 @@
 | ✅ | [T-0070](../tracker/tasks/T-0070.md) | Default KERP_ENVIRONMENT to production; development opts in | platform | S | — | #58 |
 | ✅ | [T-0071](../tracker/tasks/T-0071.md) | Load the caller's memberships once per request | projects | S | — | #57 |
 | ✅ | [T-0072](../tracker/tasks/T-0072.md) | Duplicated tab keeps its session: cross-tab refresh lock and token hand-off | frontend | M | T-0037 | #105 |
-| 🟪 | [T-0081](../tracker/tasks/T-0081.md) | CI speed 1: SQLite test DB from a migrated template + pytest-xdist, SQLite and PostgreSQL backend tests as parallel jobs, docs-only PRs skip app jobs, --durations | platform | M | — | #140 |
+| ✅ | [T-0081](../tracker/tasks/T-0081.md) | CI speed 1: SQLite test DB from a migrated template + pytest-xdist, SQLite and PostgreSQL backend tests as parallel jobs, docs-only PRs skip app jobs, --durations | platform | M | — | #140 |
 | ▶ | [T-0218](../tracker/tasks/T-0218.md) | uploads: ClamAV scanner (clamd INSTREAM) in the worker replacing the stub, signature on the file row, scanner PING for health | uploads | S | T-0016, T-0213, T-0215 |  |
-| ⬜ | [T-0082](../tracker/tasks/T-0082.md) | CI speed 2: PostgreSQL tests on a per-test copy of a migrated template database, pytest-xdist on PostgreSQL, fsync-off CI Postgres, coverage floor on the PostgreSQL run | platform | M | T-0081 |  |
+| ▶ | [T-0082](../tracker/tasks/T-0082.md) | CI speed 2: PostgreSQL tests on a per-test copy of a migrated template database, pytest-xdist on PostgreSQL, fsync-off CI Postgres, coverage floor on the PostgreSQL run | platform | M | T-0081 |  |
 | ⬜ | [T-0219](../tracker/tasks/T-0219.md) | admin: deployment stats (counts + byte totals via module stats providers and count-only SECURITY DEFINER functions) and health probes at /api/v1/admin/system | admin | M | T-0014, T-0015, T-0016, T-0039, T-0218 |  |
 | ▶ | [T-0220](../tracker/tasks/T-0220.md) | jobs: queue monitor API for System admins (queue depths, cron runs, failed jobs without payloads, retry/abort) | jobs | S | T-0015, T-0214, T-0039 |  |
 | ⬜ | [T-0221](../tracker/tasks/T-0221.md) | uploads: quarantine monitor API — rejected/verifying/expired upload rows of member projects, counts for the others, re-check stuck files, sweep now | uploads | S | T-0218, T-0215, T-0039, T-0219 |  |
