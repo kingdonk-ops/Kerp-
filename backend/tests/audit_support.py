@@ -5,6 +5,8 @@ REVOKE, the append-only triggers and the RLS policy are the ones production gets
 """
 
 import os
+import shutil
+import tempfile
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
@@ -20,9 +22,54 @@ ALEMBIC_INI = Path(__file__).resolve().parents[1] / "alembic.ini"
 OWNER_URL = os.environ.get("KERP_TEST_OWNER_URL", "")
 
 
+_sqlite_templates: dict[bool, Path] = {}
+
+
+def _sqlite_template_file(*, seeded: bool) -> Path:
+    """One migrated SQLite file per test process and variant (each xdist worker builds its
+    own); ``seeded`` adds the fixture tenants' directory rows.
+
+    Migrating per test cost ~1.3 s (all revisions up, then down again); a byte copy of this
+    file gives each test the identical schema and rows in milliseconds (T-0081).
+    """
+    if seeded not in _sqlite_templates:
+        path = Path(tempfile.mkdtemp(prefix="kerp-sqlite-template-")) / "template.db"
+        url = "sqlite:///" + path.as_posix()
+        cfg = Config(str(ALEMBIC_INI))
+        cfg.attributes.update(url=url, configure_logger=False)
+        command.upgrade(cfg, "head")
+        if seeded:
+            db = Database(url)
+            try:
+                seed_tenants(db, *FIXTURE_TENANTS)
+            finally:
+                db.dispose()
+        _sqlite_templates[seeded] = path
+    return _sqlite_templates[seeded]
+
+
+def migrated_sqlite_file(tmp_path: Path, *, seeded: bool = True) -> str:
+    """Copy a migrated template to ``tmp_path`` and return its URL (SQLite only)."""
+    assert not ON_POSTGRES, "migrated_sqlite_file is the SQLite path of migrated_database"
+    url = database_url(tmp_path)
+    shutil.copyfile(_sqlite_template_file(seeded=seeded), tmp_path / "kerp.db")
+    return url
+
+
 def migrated_database(tmp_path: Path) -> Iterator[Database]:
-    """Upgrade to head, seed the fixture tenants' directory rows, hand out a ``Database``,
-    downgrade to base afterwards."""
+    """Hand out a ``Database`` at head with the fixture tenants' directory rows seeded.
+
+    PostgreSQL: upgrade to head, seed, yield, downgrade to base. SQLite: a copy of the
+    per-process migrated template; the file goes away with ``tmp_path``, so nothing is
+    downgraded (``test_migrations.py`` covers the downgrade path on both dialects).
+    """
+    if not ON_POSTGRES:
+        db = Database(migrated_sqlite_file(tmp_path))
+        try:
+            yield db
+        finally:
+            db.dispose()
+        return
     url = database_url(tmp_path)
     cfg = Config(str(ALEMBIC_INI))
     cfg.attributes.update(url=url, configure_logger=False)

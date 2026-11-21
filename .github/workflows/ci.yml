@@ -28,23 +28,23 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0 # PRs: diff against the merge base with the target branch
-      # Components that exist run. On a pull_request whose changes are tracker-only
-      # (scripts/ci_changes.py) the app jobs are skipped; ci-gate accepts "false" flags as
+      # Components that exist run. On a pull_request whose changes are all under tracker/,
+      # docs/ or .claude/ (scripts/ci_changes.py) the app jobs are skipped; ci-gate accepts "false" flags as
       # expected skips. Push and workflow_dispatch always run everything that exists.
       - id: d
         env:
           BASE_REF: ${{ github.base_ref }}
         run: |
           set -euo pipefail
-          tracker_only=false
+          skip_app=false
           if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
             git diff --name-only --no-renames "origin/$BASE_REF...HEAD" > "$RUNNER_TEMP/changed.txt"
             echo "changed files:"; cat "$RUNNER_TEMP/changed.txt"
             result="$(python3 scripts/ci_changes.py < "$RUNNER_TEMP/changed.txt")"
             echo "$result"
-            [ "$result" = "tracker_only=true" ] && tracker_only=true
+            [ "$result" = "docs_or_tracker_only=true" ] && skip_app=true
           fi
-          flag() { [ "$tracker_only" = false ] && [ -f "$1" ] && echo true || echo false; }
+          flag() { [ "$skip_app" = false ] && [ -f "$1" ] && echo true || echo false; }
           echo "backend=$(flag backend/pyproject.toml)" >> "$GITHUB_OUTPUT"
           echo "frontend=$(flag frontend/package.json)" >> "$GITHUB_OUTPUT"
           echo "e2e=$(flag e2e/package.json)" >> "$GITHUB_OUTPUT"
@@ -80,24 +80,12 @@ jobs:
           python scripts/tracker.py stats >> "$GITHUB_STEP_SUMMARY" || true
           echo '```' >> "$GITHUB_STEP_SUMMARY"
 
+  # Backend lint + types + the full suite on SQLite, in parallel workers (T-0081). Agents in
+  # cloud sessions have no PostgreSQL, so this is their local gate too; CI keeps it green.
   backend:
     needs: detect
     if: needs.detect.outputs.backend == 'true'
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgis/postgis:16-3.4
-        env:
-          POSTGRES_USER: kerp
-          POSTGRES_PASSWORD: kerp
-          POSTGRES_DB: kerp_test
-        ports: ["5432:5432"]
-        options: >-
-          --health-cmd "pg_isready -U kerp" --health-interval 5s
-          --health-timeout 5s --health-retries 10
-      redis:
-        image: redis:7-alpine
-        ports: ["6379:6379"]
     # The backend defaults to production (T-0070); the test job opts in explicitly.
     env:
       KERP_ENVIRONMENT: test
@@ -122,7 +110,46 @@ jobs:
       - name: Types
         run: mypy app
       - name: Tests (SQLite)
-        run: pytest
+        run: pytest -n auto --durations=25
+
+  # The full suite again on PostgreSQL 16 + PostGIS + ltree as the NOSUPERUSER NOBYPASSRLS
+  # runtime role, so RLS applies. Runs in parallel with `backend` (T-0081).
+  backend-pg:
+    needs: detect
+    if: needs.detect.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: kerp
+          POSTGRES_PASSWORD: kerp
+          POSTGRES_DB: kerp_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U kerp" --health-interval 5s
+          --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+    env:
+      KERP_ENVIRONMENT: test
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/pyproject.toml
+      - name: Install
+        run: |
+          python -m pip install -U pip
+          pip install -e ".[dev]"
       # Same script docker-compose.yml runs locally (make test-pg): ltree + postgis and the
       # NOSUPERUSER NOBYPASSRLS role kerp_app. tests/test_dev_infra.py keeps them in sync.
       - name: Create non-superuser app role (RLS must not be bypassed)
@@ -131,13 +158,15 @@ jobs:
         run: >-
           psql -h localhost -U kerp -d kerp_test -v ON_ERROR_STOP=1
           -f ../infra/postgres/initdb/20-kerp-app.sql
+      # Serial on purpose: every test shares the one kerp_test database until T-0082 gives
+      # each test its own copy of a migrated template.
       - name: Tests (PostgreSQL + RLS)
         env:
           KERP_DATABASE_URL: postgresql+psycopg://kerp_app:kerp_app@localhost:5432/kerp_test
           KERP_TEST_OWNER_URL: postgresql+psycopg://kerp:kerp@localhost:5432/kerp_test
           KERP_REDIS_URL: redis://localhost:6379/0
         # exit 5 = no tests collected (before the DB layer exists) — allowed
-        run: pytest --no-cov || [ $? -eq 5 ]
+        run: pytest --no-cov --durations=25 || [ $? -eq 5 ]
 
   # Backend container image (T-0004): build + smoke test on every run, read-only token.
   backend-image:
@@ -206,7 +235,7 @@ jobs:
   # Pushes to dev/main only, after tests and the smoke test passed: publish to GHCR.
   # The only job allowed to write packages (T-0028).
   backend-publish:
-    needs: [detect, backend, backend-image]
+    needs: [detect, backend, backend-pg, backend-image]
     if: github.event_name == 'push' && needs.detect.outputs.backend == 'true'
     runs-on: ubuntu-latest
     permissions:
@@ -291,7 +320,7 @@ jobs:
           if-no-files-found: ignore
 
   e2e:
-    needs: [detect, backend, frontend]
+    needs: [detect, backend, backend-pg, frontend]
     if: always() && needs.detect.outputs.e2e == 'true' && !contains(needs.*.result, 'failure')
     runs-on: ubuntu-latest
     defaults:
@@ -315,7 +344,7 @@ jobs:
   # Single required check for branch rules. Passes only if every job succeeded or skipped
   # because it is expected to (component absent, or publish on a non-push) — scripts/ci_gate.py.
   ci-gate:
-    needs: [detect, tracker, backend, backend-image, backend-publish, frontend, perf, e2e]
+    needs: [detect, tracker, backend, backend-pg, backend-image, backend-publish, frontend, perf, e2e]
     if: always()
     runs-on: ubuntu-latest
     steps:
