@@ -125,7 +125,7 @@
 | [TD-503](../tracker/todo/TD-503.md) | T-0027 rule-set step: AC names a CEL variable and an API path that do not exist (context.qty, /api/v1/projects/{id}/rule-sets) | T-0027 | implementer |
 | [TD-505](../tracker/todo/TD-505.md) | Runtime settings registry: categories, the unit and ceiling of max_upload_size_mb, and client-visible flags are implementer readings | T-0230 | implementer |
 | [TD-515](../tracker/todo/TD-515.md) | Field registry has no multi-point measurement field: add measurement_set (list of values + unit) with CEL list statistics (mean/min/max/count) | — | planner |
-| [TD-536](../tracker/todo/TD-536.md) | T-0342: production KERP_REDIS_URL is a startup refusal of the API and worker, not a Settings validation error (Settings also serves alembic and the first-run CLI) | T-0342 | implementer |
+| [TD-538](../tracker/todo/TD-538.md) | T-0342: production KERP_REDIS_URL is a startup refusal of the API and worker, not a Settings validation error (Settings also serves alembic and the first-run CLI) | T-0342 | implementer |
 
 ## missed (8)
 
