@@ -1,8 +1,9 @@
-# `src/admin` — Admin screens: access requests, devices (T-0051), admin grants, projects, members (T-0026)
+# `src/admin` — Admin screens: access requests, devices (T-0051), admin grants, projects, members (T-0026), users (T-0331)
 
 Admin-group screens of diff §6.1 on the finished backends of T-0050 (access requests),
-T-0043 (device registry), T-0039 (admin grants), T-0012 / T-0044 (projects) and T-0014 (members). Everything goes through the generated client (`api.ts`); every
-string through `t()` (`admin.*`, `devices.*`, `personas.*`).
+T-0043 (device registry), T-0039 (admin grants), T-0012 / T-0044 (projects), T-0014 (members,
+accounts) and T-0052 (invites). Everything goes through the generated client (`api.ts`,
+`invites.ts`, `users.ts`); every string through `t()` (`admin.*`, `devices.*`, `personas.*`).
 
 ## Who sees what
 
@@ -10,8 +11,8 @@ string through `t()` (`admin.*`, `devices.*`, `personas.*`).
   `GET /me/projects`) and whether they are a **System admin**. `/auth/me` has no such flag yet,
   so the client probes `GET /admin/grants?user_id=<self>`, which answers only System admins
   (TD-393). The server still checks every call; the flags only decide what is offered.
-- Nav items `admin.system` (`/admin/system/devices`) and `admin.accessRequests`
-  (`/admin/access-requests`) carry `requires: "projectAdmin"` (`src/app/nav.ts`): shown to PER-09
+- Nav items `admin.users` (`/admin/users`), `admin.system` (`/admin/system/devices`) and
+  `admin.accessRequests` (`/admin/access-requests`) carry `requires: "projectAdmin"` (`src/app/nav.ts`): shown to PER-09
   holders and System admins only.
 - Profile → **My devices** (`/profile/devices`) is a top-bar link for every signed-in user.
 
@@ -72,7 +73,31 @@ string through `t()` (`admin.*`, `devices.*`, `personas.*`).
   asks first. `409`/`404` (accepted or revoked meanwhile) is explained and the list re-read;
   accepted and revoked invites are not listed, so they offer no Resend. Hidden for a member
   without PER-09 (403).
-- Creating invites (Admin → Users) is T-0331; it should reuse `PendingInvites`.
+- Creating invites is Admin → Users (below), which shows the same panel.
+
+## Users (`UsersPage`, `/admin/users`, diff §4.1, §6.1, T-0331)
+
+- **Accounts** (System admins only; `GET /admin/users` is not even called for anyone else):
+  every account with e-mail, *Active* / *Deactivated* and *Internal staff*. **New account**
+  (`POST /admin/users`, e-mail + name; `409` → "exists already") creates an account without
+  credentials; the dialog says the person sets a password from an invite. **Deactivate** asks
+  first (signed out at once), **Reactivate** does not; both `PATCH /admin/users/{id}` with
+  `is_active` only. The caller's own row shows *(you)* and no button ("You cannot deactivate
+  your own account"; the server does not refuse it yet unless it is the last System admin,
+  TD-463). A `409` (the last active System admin) says so and the list is re-read.
+- **Invite to a project** (PER-09 holders and System admins): the project (a PER-09 sees only
+  the projects it administers, from `/me/projects`; a System admin every project of
+  `GET /projects`), the e-mail and persona(s) + site (`PersonaFields`, PER-07 needs its site).
+  `POST /admin/projects/{p}/invites` (`createInvite`, `invites.ts`). A `409 sod_warning`
+  (TD-151) shows the warning naming the project; only **Send anyway** re-sends with
+  `confirm_sod: true`, and any change in the form withdraws it. `429` → when inviting is
+  possible again (`Retry-After`); `409 INVITE_CONFLICT` → try again. On success the screen says
+  the e-mail was sent and shows the copyable link (`invite_link`, `invite_token` only) **once**
+  in a read-only field with **Copy** until **Close**. The link is held only in component state:
+  the mutation hands it to state and returns a result without it (`gcTime: 0`), so it is in no
+  query or mutation cache. The form is cleared.
+- Below the form, the chosen project's **Open invitations** (`PendingInvites`) with Resend and
+  Revoke; it is re-read after each invite.
 
 ## Access requests (`AccessRequestsPage`, diff §4.1)
 

@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 311 · **Closed:** 146
+**Open:** 312 · **Closed:** 146
 
 ## decision (37)
 
@@ -110,7 +110,7 @@
 | [TD-452](../tracker/todo/TD-452.md) | Uploads: a file larger than the malware scan limit (KERP_UPLOAD_SCAN_MAX_BYTES or clamd StreamMaxLength) is rejected as verify_failed; diff 4.7 lists no dedicated reason code (e.g. scan_too_large) | T-0218 | implementer |
 | [TD-460](../tracker/todo/TD-460.md) | Invite setup-preview returns no invited e-mail (and no password policy): 'Create your password' cannot show the e-mail read-only or a minimum-length hint before the first submit | T-0053 | implementer |
 
-## missed (7)
+## missed (8)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -121,6 +121,7 @@
 | [TD-327](../tracker/todo/TD-327.md) | Frontend i18n key notifications.kind.access_requests.requested for the inbox (needed when the access-request UI lands) | T-0050 | reviewer |
 | [TD-337](../tracker/todo/TD-337.md) | Web/Android route /magic-link#<token> that redeems the e-mailed sign-in link (POST /auth/magic-link/redeem); the e-mail now links there | T-0058 | implementer |
 | [TD-388](../tracker/todo/TD-388.md) | saved_views: wire the my_teams filter op | T-0074 | reviewer |
+| [TD-463](../tracker/todo/TD-463.md) | Server: refuse self-deactivation on PATCH /admin/users/{id} (Admin → Users only hides the button) | T-0331 | implementer |
 
 ## deferred (43)
 

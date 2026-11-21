@@ -114,6 +114,39 @@ describe.each(THEMES)("admin screens in the %s theme", (theme) => {
       expect(findings, formatFindings(findings)).toEqual([]);
     }, SLOW);
 
+    it("users with the new-account dialog and the invite SoD warning", async () => {
+      await setViewport(viewport);
+      renderAdmin(
+        "/admin/users",
+        {
+          "GET /api/v1/admin/users": () =>
+            json([
+              { ...FAKE_USER, is_active: true, is_internal: true },
+              { ...REQUEST.requester, is_active: false, is_internal: false },
+            ]),
+          "GET /api/v1/projects": () => json([project()]),
+          [`GET /api/v1/admin/projects/${ADMIN_PROJECT.id}/invites`]: () => json([]),
+          [`POST /api/v1/admin/projects/${ADMIN_PROJECT.id}/invites`]: () =>
+            json({ detail: { code: "sod_confirmation_required", sod_warning: true } }, 409),
+        },
+        { theme, systemAdmin: true },
+      );
+      await screen.findByText(REQUEST.requester.email, { exact: false }, WAIT);
+      fireEvent.click(screen.getByRole("button", { name: i18n.t("admin.users.newAccount") }));
+      const target = await screen.findByRole("combobox", { name: i18n.t("admin.users.project") }, WAIT);
+      await within(target).findByRole("option", { name: /SYN-001/ }, WAIT);
+      fireEvent.change(screen.getByLabelText(i18n.t("admin.users.inviteEmail")), {
+        target: { value: "fitter@example.test" },
+      });
+      fireEvent.click(screen.getByRole("checkbox", { name: /PER-09/ }));
+      fireEvent.click(screen.getByRole("checkbox", { name: /PER-02/ }));
+      fireEvent.click(screen.getByRole("button", { name: i18n.t("admin.users.send") }));
+      await screen.findByRole("button", { name: i18n.t("admin.users.confirmSod") }, WAIT);
+
+      const findings = await auditA11y(document.body, theme);
+      expect(findings, formatFindings(findings)).toEqual([]);
+    }, SLOW);
+
     it("my devices with the revoke dialog", async () => {
       await setViewport(viewport);
       renderAdmin("/profile/devices", { "GET /api/v1/devices": () => json([DEVICE]) }, { theme });
