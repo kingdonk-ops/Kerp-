@@ -5,7 +5,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { AppRoot } from "../app/AppRoot";
 import { createQueryClient } from "../app/queryClient";
@@ -15,6 +15,11 @@ import { i18n } from "../i18n";
 import type { ProjectSummary } from "../projects/directory";
 import { scopeStorageKey } from "../projects/ProjectScopeProvider";
 import { FAKE_USER, json, makeServices, tokens } from "../test/fakeApi";
+
+// First appearances wait for several fake-server round-trips on a cold `AppRoot`; a loaded CI
+// runner needs more than Testing Library's 1 s default (PR #146 review). This file only.
+const LOADED = { timeout: 5000 };
+vi.setConfig({ testTimeout: 20_000 });
 
 const ALPHA: ProjectSummary = {
   id: "00000000-0000-4000-8000-00000000a001",
@@ -60,7 +65,7 @@ const scopeIs = async (project: ProjectSummary) => {
     expect(screen.getByTestId("scope-indicator")).toHaveTextContent(
       i18n.t("scope.projectOption", { code: project.code, name: project.name }),
     );
-  });
+  }, LOADED);
 };
 
 describe("SSO landing", () => {
@@ -127,7 +132,7 @@ describe("SSO landing", () => {
     land("?status=signed_in", { projects: [] });
 
     expect(
-      await screen.findByRole("heading", { level: 1, name: i18n.t("lobby.title") }),
+      await screen.findByRole("heading", { level: 1, name: i18n.t("lobby.title") }, LOADED),
     ).toBeInTheDocument();
   });
 
@@ -148,7 +153,7 @@ describe("SSO landing", () => {
       refresh: () => json({ detail: "Not authenticated" }, 401),
     });
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(
+    expect(await screen.findByRole("alert", {}, LOADED)).toHaveTextContent(
       i18n.t("auth.sso.errors.SSO_FAILED"),
     );
     expect(session.getItem(SESSION_STORAGE_KEY)).toBeNull();
@@ -158,7 +163,7 @@ describe("SSO landing", () => {
     land("");
 
     expect(
-      await screen.findByRole("heading", { level: 1, name: i18n.t("auth.login.title") }),
+      await screen.findByRole("heading", { level: 1, name: i18n.t("auth.login.title") }, LOADED),
     ).toBeInTheDocument();
     expect(screen.queryByRole("alert")).toBeNull();
   });
@@ -166,7 +171,7 @@ describe("SSO landing", () => {
   it("lets a refusal win over a success marker", async () => {
     const { calls } = land("?status=signed_in&error=SSO_NO_ACCOUNT");
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(
+    expect(await screen.findByRole("alert", {}, LOADED)).toHaveTextContent(
       i18n.t("auth.sso.errors.SSO_NO_ACCOUNT"),
     );
     expect(calls.some((c) => c.path === "/api/v1/auth/refresh")).toBe(false);

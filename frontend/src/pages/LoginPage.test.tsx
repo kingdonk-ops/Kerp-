@@ -14,6 +14,11 @@ import { json, makeServices } from "../test/fakeApi";
 const START_URL = "/api/v1/auth/sso/entra/start";
 const SSO_ON = { password: { available: true }, sso: { provider: "entra", preferred: true, start_url: START_URL } };
 const SSO_OFF = { password: { available: true }, sso: null };
+// First appearances wait for several fake-server round-trips on a cold `AppRoot`; a loaded CI
+// runner needs more than Testing Library's 1 s default (PR #146 review). This file only.
+const LOADED = { timeout: 5000 };
+vi.setConfig({ testTimeout: 20_000 });
+
 const PROJECTS = [
   { id: "p-alpha", code: "SYN-001", name: "Synthetic Refinery Unit", personas: ["PER-02"] },
 ];
@@ -30,7 +35,8 @@ function renderLogin(config: unknown, path = "/login", status = 200) {
   return { calls: base.calls };
 }
 
-const ssoButton = () => screen.findByRole("button", { name: i18n.t("auth.sso.start") });
+const ssoButton = () =>
+  screen.findByRole("button", { name: i18n.t("auth.sso.start") }, LOADED);
 const passwordSubmit = () => screen.getByRole("button", { name: i18n.t("auth.login.submit") });
 
 afterEach(() => {
@@ -44,7 +50,7 @@ describe("sign-in screen with SSO enabled", () => {
 
     await waitFor(() => {
       expect(button).toHaveFocus();
-    });
+    }, LOADED);
     expect(screen.getByText(i18n.t("auth.sso.hint"))).toBeInTheDocument();
     // First in the document, ahead of the password form, and the visually primary one.
     const buttons = screen.getAllByRole("button");
@@ -85,7 +91,7 @@ describe("sign-in screen with SSO enabled", () => {
     expect(passwordSubmit()).toBeEnabled();
     fireEvent.click(passwordSubmit());
 
-    await screen.findByTestId("scope-indicator");
+    await screen.findByTestId("scope-indicator", {}, LOADED);
     expect(calls).toContainEqual(
       expect.objectContaining({
         method: "POST",
@@ -112,11 +118,11 @@ describe("sign-in screen with SSO enabled", () => {
         queryClient={queryClient}
       />,
     );
-    const email = await screen.findByLabelText(i18n.t("auth.login.email"));
+    const email = await screen.findByLabelText(i18n.t("auth.login.email"), {}, LOADED);
     email.focus();
     await waitFor(() => {
       expect(base.calls.some((c) => c.path === "/api/v1/auth/config")).toBe(true);
-    });
+    }, LOADED);
     answer(json(SSO_ON));
 
     await ssoButton();
@@ -127,7 +133,7 @@ describe("sign-in screen with SSO enabled", () => {
     renderLogin({ sso: { provider: "entra", preferred: true, start_url: "https://evil.example/start" } });
     await waitFor(() => {
       expect(passwordSubmit()).toHaveAttribute("data-variant", "primary");
-    });
+    }, LOADED);
     expect(screen.queryByRole("button", { name: i18n.t("auth.sso.start") })).toBeNull();
   });
 });
@@ -140,10 +146,10 @@ describe("sign-in screen with SSO disabled", () => {
     const { calls } = renderLogin(config, "/login", status);
     await waitFor(() => {
       expect(calls.some((c) => c.path === "/api/v1/auth/config")).toBe(true);
-    });
+    }, LOADED);
     await waitFor(() => {
       expect(passwordSubmit()).toHaveAttribute("data-variant", "primary");
-    });
+    }, LOADED);
     expect(screen.queryByRole("button", { name: i18n.t("auth.sso.start") })).toBeNull();
     expect(screen.queryByText(i18n.t("auth.sso.hint"))).toBeNull();
     expect(screen.queryByText(i18n.t("auth.sso.passwordDivider"))).toBeNull();
@@ -154,8 +160,8 @@ describe("SSO refusals", () => {
   it.each(SSO_ERROR_CODES)("shows the translated message for %s on the sign-in screen", async (code) => {
     renderLogin(SSO_ON, `/login/sso-return?error=${code}`);
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(i18n.t(`auth.sso.errors.${code}`));
-    expect(await screen.findByRole("heading", { level: 1, name: i18n.t("auth.login.title") })).toBeInTheDocument();
+    expect(await screen.findByRole("alert", {}, LOADED)).toHaveTextContent(i18n.t(`auth.sso.errors.${code}`));
+    expect(await screen.findByRole("heading", { level: 1, name: i18n.t("auth.login.title") }, LOADED)).toBeInTheDocument();
     // Password stays available after a refusal.
     expect(passwordSubmit()).toBeInTheDocument();
   });
@@ -174,7 +180,7 @@ describe("SSO refusals", () => {
     );
     renderLogin(SSO_ON, `/login/sso-return?error=${leak}&id_token=${leak}`);
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(i18n.t("auth.sso.errors.SSO_FAILED"));
+    expect(await screen.findByRole("alert", {}, LOADED)).toHaveTextContent(i18n.t("auth.sso.errors.SSO_FAILED"));
     expect(document.body.textContent).not.toContain(leak);
     for (const spy of spies) {
       for (const args of spy.mock.calls) expect(JSON.stringify(args)).not.toContain(leak);

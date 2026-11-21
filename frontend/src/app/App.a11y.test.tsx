@@ -86,11 +86,12 @@ describe.each(THEMES)("app shell in the %s theme", (theme) => {
     it("the sign-in page with SSO and a refusal meets WCAG 2.1 AA and 48 px targets", async () => {
       await setViewport(viewport);
       renderApp("/login/sso-return?error=SSO_NO_ACCOUNT", theme, false, PROJECTS, SSO_CONFIG);
-      await screen.findByRole("button", { name: i18n.t("auth.sso.start") });
-      await screen.findByRole("alert");
+      // The button needs the /auth/config round-trip: more than the 1 s default under load.
+      await screen.findByRole("button", { name: i18n.t("auth.sso.start") }, { timeout: 5000 });
+      await screen.findByRole("alert", {}, { timeout: 5000 });
 
       const findings = await auditA11y(document.body, theme);
       expect(findings, formatFindings(findings)).toEqual([]);
-    });
+    }, 20_000);
   });
 });

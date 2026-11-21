@@ -53,6 +53,7 @@ export function SsoReturnPage() {
 
   useEffect(() => {
     if (!adopted || status !== "authenticated" || !user) return;
+    // A `joined_project_id` that is not a UUID is ignored: the normal landing applies.
     if (joined !== null && UUID.test(joined)) rememberProjectScope(preferences, user.id, joined);
     void navigate("/", { replace: true });
   }, [adopted, status, user, joined, preferences, navigate]);
