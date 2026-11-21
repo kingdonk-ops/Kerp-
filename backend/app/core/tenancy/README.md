@@ -156,21 +156,48 @@ rows with `tests/db_support.seed_tenants` (synthetic ids only).
 ## Migrations
 
 Every table that carries `tenant_id` must be under RLS unless listed in `RLS_EXEMPT` with a
-reason. In the migration that creates the table:
+reason. **Migrations never call the live helpers** (TD-060, T-0033): a revision replays exactly
+the DDL that shipped, so it inlines the statements `rls_policy_sql(table, policy)` (and, for
+`tenants`, `tenant_census_policy_sql`) returned when it was written, in a module-level constant,
+and executes that:
 
 ```python
-from app.core.tenancy.rls import rls_policy_sql
+# Frozen DDL (TD-060): what rls_policy_sql("oe_asset_node") returned. Never edit it.
+FROZEN_RLS_DDL: dict[str, tuple[str, ...]] = {
+    TABLE: (
+        "ALTER TABLE oe_asset_node ENABLE ROW LEVEL SECURITY",
+        ...  # paste the helper output verbatim, one string per statement
+    ),
+}
 
-for statement in rls_policy_sql("oe_asset_node"):
-    op.execute(statement)
+def upgrade() -> None:
+    ...
+    if op.get_context().dialect.name == "postgresql":
+        for statement in FROZEN_RLS_DDL[TABLE]:
+            op.execute(statement)
 ```
+
+Generate the strings by calling the helper with the revision's exact arguments and pasting the
+output (or build them from constants local to the revision, as `0015`/`0028` do); never import
+`app.core.tenancy.rls` (or `app.core.audit.guard`) from `migrations/versions/`.
+
+**Changing a policy helper** (or a model's `RlsPolicy`) therefore needs a **new** revision that
+drops and re-creates the affected policies with the new output frozen in its own
+`FROZEN_RLS_DDL`; a shipped revision is never edited. `tests/test_migration_frozen_ddl.py`
+enforces it: it replays every revision's `FROZEN_RLS_DDL` in order, per table (`ENABLE`/`FORCE`,
+`DROP POLICY IF EXISTS`, `CREATE POLICY`, and the `CREATE OR REPLACE FUNCTION` a policy calls,
+compared whitespace-insensitively), and fails naming each table whose result differs from what
+the live helpers emit (`apply_rls_policies`), with the newest revision touching it. It also
+fails when a revision imports a live helper or a frozen statement is not in the revision's
+offline (`--sql`) output.
 
 `tests/test_rls_bypass.py` fails if a migrated model table is not covered
 (`rls_coverage_problems`) or the runtime role is SUPERUSER/BYPASSRLS
 (`rls_enforcement_problems`). Data migrations see no rows unless they bind a context (TD-055).
-Migration `0006` (T-0010) inlines its RLS DDL so it stays frozen at that revision; it adds
-`allowed_projects_read_policy` to every table that already has `project_isolation_policy`
-(0002–0005 still import the live helper: TD-154).
+Migration `0006` (T-0010) adds `allowed_projects_read_policy` to every table that already has
+`project_isolation_policy` (a `DO` loop over the catalog). The frozen DDL of `0002`–`0005` is
+the helper output as replayed before T-0033 (it already includes that policy), so a fresh
+`alembic upgrade head` is unchanged (TD-154).
 
 ## Contract tests
 

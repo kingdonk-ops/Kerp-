@@ -66,6 +66,11 @@ def _membership_rls_sql() -> list[str]:
     ]
 
 
+# The RLS DDL this revision applies, per table (TD-060, T-0033): frozen here, replayed by
+# tests/test_migration_frozen_ddl.py against the live helpers.
+FROZEN_RLS_DDL: dict[str, tuple[str, ...]] = {TABLE: tuple(_membership_rls_sql())}
+
+
 def upgrade() -> None:
     op.create_table(
         TABLE,
@@ -116,7 +121,7 @@ def upgrade() -> None:
     )
     if op.get_context().dialect.name != "postgresql":
         return
-    for statement in _membership_rls_sql():
+    for statement in FROZEN_RLS_DDL[TABLE]:
         op.execute(statement)
     op.execute(_for_every_rls_table(_DROP_ALLOWED, _CREATE_ALLOWED))
 

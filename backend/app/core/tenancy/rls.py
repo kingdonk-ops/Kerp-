@@ -461,10 +461,9 @@ def rls_tables(metadata: MetaData, *, exempt: frozenset[str] = RLS_EXEMPT) -> li
 def rls_policy_sql(table: str, policy: RlsPolicy | None = None) -> list[str]:
     """DDL that puts ``table`` under project-scoped RLS, or ``policy`` (idempotent).
 
-    Migrations run it with ``op.execute`` right after creating a table::
-
-        for statement in rls_policy_sql("oe_asset_node"):
-            op.execute(statement)
+    Migrations do not call it (TD-060): the revision that creates a table pastes this output
+    into its ``FROZEN_RLS_DDL`` and executes that, so a later change here needs a new revision
+    (``tests/test_migration_frozen_ddl.py``; see ``README.md``, "Migrations").
     """
     if policy is not None:
         return _special_policy_sql(table, policy)

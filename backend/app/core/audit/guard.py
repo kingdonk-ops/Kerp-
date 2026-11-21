@@ -28,7 +28,7 @@ REVOKED: Final = ("UPDATE", "DELETE", "TRUNCATE")
 
 
 def ledger_guard_sql(table: str = TABLE) -> list[str]:
-    """DDL that makes ``table`` append-only. Run by the migration after creating it."""
+    """DDL that makes ``table`` append-only, frozen into migration ``0002`` (TD-060)."""
     return [
         f"REVOKE {', '.join(REVOKED)} ON {table} FROM PUBLIC",
         f"REVOKE {', '.join(REVOKED)} ON {table} FROM CURRENT_USER",
@@ -43,7 +43,7 @@ def ledger_guard_sql(table: str = TABLE) -> list[str]:
 
 
 def ledger_guard_drop_sql(table: str = TABLE) -> list[str]:
-    """Undo ``ledger_guard_sql`` (the migration's downgrade; the table is dropped after)."""
+    """Undo ``ledger_guard_sql`` (frozen into ``0002``'s downgrade; the table is dropped after)."""
     return [
         f"DROP TRIGGER IF EXISTS {TRUNCATE_TRIGGER} ON {table}",
         f"DROP TRIGGER IF EXISTS {ROW_TRIGGER} ON {table}",
