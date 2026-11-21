@@ -18,26 +18,29 @@ Only the worker imports this module; both cron jobs run on the batch worker (SAQ
 from __future__ import annotations
 
 import asyncio
+import functools
 import logging
 import uuid
-from collections.abc import Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from typing import TYPE_CHECKING, Any, Final
 
+from app.core.db import utcnow
 from app.core.tenancy.context import TenancyContext
 from app.modules.jobs import service
-from app.modules.jobs.registry import UnknownJobKindError
+from app.modules.jobs.broker import CronRun
+from app.modules.jobs.registry import CRON_SCHEDULES, UnknownJobKindError
 from app.modules.projects import service as projects
 
 if TYPE_CHECKING:
     from app.core.db import Database
     from app.modules.jobs.registry import JobRegistry
 
-SWEEP_CRON: Final = "*/5 * * * *"
+SWEEP_CRON: Final = CRON_SCHEDULES["sweep_cron"]
 # Explicit SAQ job timeout for the cron run (SAQ's default is 10 s): one DB round-trip per
 # scope plus a Redis lookup per stale row. An interrupted run is resumed by the next tick.
 CRON_TIMEOUT_S: Final = 120
 # Hourly per-project jobs (T-0215), off the full hour so they do not pile up with other crons.
-HOURLY_CRON: Final = "17 * * * *"
+HOURLY_CRON: Final = CRON_SCHEDULES["hourly_project_jobs"]
 
 logger = logging.getLogger("kerp.jobs")
 
@@ -108,3 +111,32 @@ def _known_kinds(registry: JobRegistry) -> tuple[str, ...]:
             continue
         known.append(kind)
     return tuple(known)
+
+
+CronFunction = Callable[[Mapping[str, Any]], Awaitable[None]]
+
+
+def tracked(function: CronFunction) -> CronFunction:
+    """Record each run's start, end and outcome for the queue monitor (T-0218).
+
+    Keeps the function's name (SAQ keys the cron job by it). Recording is best effort: a
+    Redis error is logged and never changes the run's outcome.
+    """
+
+    @functools.wraps(function)
+    async def run(ctx: Mapping[str, Any]) -> None:
+        started, outcome = utcnow(), "failed"
+        try:
+            await function(ctx)
+            outcome = "succeeded"
+        finally:
+            monitor = ctx.get("broker")
+            if monitor is not None:
+                try:
+                    await monitor.record_cron_run(
+                        function.__name__, CronRun(started, utcnow(), outcome)
+                    )
+                except Exception:
+                    logger.exception("recording the cron run failed")
+
+    return run

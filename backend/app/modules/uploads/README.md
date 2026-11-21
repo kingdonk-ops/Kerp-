@@ -8,10 +8,10 @@ the bytes; it signs, checks and records. Helpers adapted from Inspection-ERP
 | File | What |
 |---|---|
 | `storage.py` | `clean_filename`, `content_disposition`, served-type (H-10) and magic-byte allowlists, `Storage` Protocol, `LocalStorage` (traversal guard; tests), `S3Storage` (boto3, lazy), `get_storage`/`set_storage` |
-| `scan.py` | `Scanner` seam; `StubScanner` says every object is clean (real AV scanner: TD-211); `require_real_scanner`, the worker startup check that refuses the stub in production (T-0213) |
-| `models.py` | `oe_uploads_file` (`BaseRecordMixin`, project RLS, migration `0009`) |
+| `scan.py` | `Scanner` seam; `StubScanner` (always clean; dev and tests); `ClamdScanner` (ClamAV over the clamd socket, `INSTREAM`, `PING`; T-0218); `scanner_from_settings` / `get_scanner` (`KERP_UPLOAD_SCANNER`); `ping_scanner` (health probe, T-0219); `require_real_scanner`, the worker startup check that refuses the stub in production (T-0213) |
+| `models.py` | `oe_uploads_file` (`BaseRecordMixin`, project RLS, migration `0009`; `scan_signature`, migration `0034`) |
 | `service.py` | `presign_upload`, `complete_upload`, `get_file`, `download_request`, `verify_upload`, `sweep_orphans`, `schedule_sweep` |
-| `jobs.py` | `uploads.verify` (interactive), `uploads.verify_large` and `uploads.sweep_orphans` (batch; queued hourly per project) |
+| `jobs.py` | `uploads.verify` (interactive), `uploads.verify_large` (batch; both retried with back-off while the scanner is unavailable) and `uploads.sweep_orphans` (batch; queued hourly per project) |
 | `router.py`, `schemas.py` | `/api/v1/uploads/projects/{project_id}/files...` |
 
 ## Flow
@@ -42,7 +42,39 @@ the bytes; it signs, checks and records. Helpers adapted from Inspection-ERP
    presigned `GET` that forces the served type and `Content-Disposition` (H-10: HTML,
    SVG and anything unknown are `application/octet-stream` attachments).
 
-`rejection_reason` holds codes, not text, so the client translates them.
+`rejection_reason` holds codes, not text, so the client translates them. An `infected` file
+also stores the scanner's signature name in `scan_signature` (as clamd returns it, control
+characters removed, at most 200 characters; T-0218). The bytes are deleted at rejection either
+way (TD-397): nothing infected is kept at rest.
+
+## Malware scan (T-0218, TD-211)
+
+The scan runs in the worker on the quarantine copy, after the SHA-256 check. Which scanner is
+deployment configuration: `KERP_UPLOAD_SCANNER=stub` (default; always clean, development and
+tests) or `clamd`, with `KERP_CLAMD_ADDRESS` (`tcp://<host>:<port>` or `unix:///<path>`;
+required, the settings refuse anything else). `ClamdScanner` uses only the standard library
+`socket`:
+
+* `zINSTREAM`, then the object streamed from storage in length-prefixed chunks of at most
+  64 KiB and a zero-length terminator. Reply `stream: OK` is clean; `stream: <signature> FOUND`
+  is `infected` with that signature; anything else (`... ERROR`, garbage) counts as unavailable.
+* Size limit: an object larger than `KERP_UPLOAD_SCAN_MAX_BYTES` (100 MiB) is never sent, and
+  clamd's own `INSTREAM size limit exceeded` is honoured too: the file is rejected with
+  `verify_failed` at once (it is never published unscanned, and retrying cannot help; TD-452). Keep
+  clamd's `StreamMaxLength` at least `KERP_UPLOAD_SCAN_MAX_BYTES`.
+* Unavailable (connection refused, `KERP_CLAMD_TIMEOUT_SECONDS` (30) per socket operation,
+  error reply): `ScannerUnavailableError`. The file stays `verifying`, its quarantine copy is
+  kept, and the job raises the jobs module's `RetryLaterError`: SAQ runs it again after 30 s,
+  doubling up to 30 min (with jitter), up to 48 attempts. The row is `queued` meanwhile. After
+  `VERIFY_STUCK_AFTER` (6 h) the orphan sweep rejects the file with `verify_failed` and deletes
+  the quarantine copy; a later retry finds the file decided and stops.
+* `ping()` sends `zPING` and expects `PONG` (the System console health probe, T-0219;
+  `ping_scanner()` answers `True`/`False`, or `None` for the stub).
+* No error, log line or `repr` names the scanner's host, port or socket path.
+
+`set_scanner` installs a scanner for the process (tests). In production the worker refuses to
+start with the stub (T-0213) unless `KERP_UPLOAD_SCANNER_ALLOW_STUB=true`. The compose service
+`clamd` (profile `worker`) runs ClamAV for development; the worker container is configured for it.
 
 ## Orphan sweep
 
@@ -64,13 +96,17 @@ never hard-coded: default `ap-southeast-2` for Australian deployments, TD-171 / 
 MinIO ignores it),
 `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` (unset: the AWS credential chain),
 `UPLOAD_MAX_BYTES` (100 MiB), `UPLOAD_URL_SECONDS` (900), `DOWNLOAD_URL_SECONDS` (300).
+`UPLOAD_SCANNER` (`stub` | `clamd`), `CLAMD_ADDRESS`, `CLAMD_TIMEOUT_SECONDS` (30),
+`UPLOAD_SCAN_MAX_BYTES` (100 MiB): the malware scanner (above, T-0218).
 `UPLOAD_SCANNER_ALLOW_STUB` (false): with `KERP_ENVIRONMENT=production` the SAQ worker refuses
 to start while the scanner is the always-clean `StubScanner` (worker startup check
-`scan.require_real_scanner`, T-0213); install a real scanner with `set_scanner` (TD-211) or set
-this to `true` to accept unscanned uploads explicitly.
+`scan.require_real_scanner`, T-0213); configure `KERP_UPLOAD_SCANNER=clamd` or set this to
+`true` to accept unscanned uploads explicitly.
 
 ## Tests
 
 `tests/test_uploads_storage.py` (helpers, `LocalStorage`, `S3Storage` via botocore's
 `Stubber`; a real MinIO round trip when `KERP_TEST_S3_ENDPOINT` is set) and
-`tests/test_uploads.py` (service, jobs, API on `LocalStorage`; SQLite and PostgreSQL).
+`tests/test_uploads.py` (service, jobs, API on `LocalStorage`; SQLite and PostgreSQL) and
+`tests/test_uploads_clamd.py` (`ClamdScanner` against a fake clamd socket server that reports a
+synthetic marker string as a detection; no real malware or EICAR file in the repository).

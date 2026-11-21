@@ -108,12 +108,25 @@ def test_compose_worker_runs_the_saq_worker_from_the_backend_image(
     assert {name: dep["condition"] for name, dep in worker["depends_on"].items()} == {
         "postgres": "service_healthy",
         "redis": "service_healthy",
+        "clamd": "service_started",  # T-0218: the verify job retries until clamd answers
     }
     assert worker["environment"]["KERP_REDIS_URL"] == "redis://redis:6379/0"
     assert "kerp_app:" in worker["environment"]["KERP_DATABASE_URL"]  # RLS applies
     assert worker["healthcheck"] == {"disable": True}  # the image's check probes the API
     # T-0070: the backend defaults to production; the dev worker opts in.
     assert worker["environment"]["KERP_ENVIRONMENT"] == "development"
+
+
+def test_compose_worker_scans_uploads_with_the_clamd_service(compose: dict[str, Any]) -> None:
+    # T-0218: a pinned ClamAV image with a health check, opt-in with the worker, and the
+    # worker configured for it by environment (nothing hard-coded in the code).
+    clamd = compose["clamd"]
+    assert re.fullmatch(r"clamav/clamav:\d+\.\d+\.\d+", clamd["image"]), clamd["image"]
+    assert "worker" in clamd["profiles"]
+    assert "healthcheck" in clamd
+    assert all(p.startswith("127.0.0.1:") for p in clamd["ports"])
+    env = compose["worker"]["environment"]
+    assert (env["KERP_UPLOAD_SCANNER"], env["KERP_CLAMD_ADDRESS"]) == ("clamd", "tcp://clamd:3310")
 
 
 def test_postgres_healthcheck_uses_tcp_not_the_init_socket(compose: dict[str, Any]) -> None:

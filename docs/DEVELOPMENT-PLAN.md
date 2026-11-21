@@ -391,6 +391,11 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
   TD-437 (SCIM), TD-438 (machine credentials), TD-439 (feature flags), TD-440 (later: in-app IP
   rules).
 
+- **2026-11-21 — Phase 0 bundling (user request), bundle 4:** T-0218 absorbs T-0220 (ClamAV
+  scanner + System-console queue monitor API; both small worker-side backends on disjoint modules;
+  size M). T-0220 is `dropped` (body kept); its acceptance criteria live on in T-0218. T-0224 now
+  depends on T-0218 instead of T-0220.
+
 ## Key engineering decisions (baked into the spec — see consolidation diff)
 
 | Area | Decision |

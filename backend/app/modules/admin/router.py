@@ -20,6 +20,9 @@ bound with, loaded from the grants table at authentication, never from the reque
 * Project invites (``invites_router.py``, T-0052): ``/projects/{p}/invites`` for a PER-09 of
   ``p`` or a ``system_admin``; ``/invites/preview`` and ``/invites/accept`` for the invitee.
 
+* System console (``system_router.py``, T-0218): ``/system/queues...``, ``system_admin`` only
+  (403 for everyone else, PER-09 included).
+
 No endpoint takes or returns a tenant id. Tenant-level grants are not personas: they are
 never assignable through the membership endpoints.
 """
@@ -66,6 +69,7 @@ from app.modules.admin.schemas import (
     UserSummary,
     UserUpdate,
 )
+from app.modules.admin.system_router import router as system_router
 from app.modules.teams import service as teams
 
 router = APIRouter(tags=["admin"])
@@ -339,3 +343,7 @@ def revoke(
 # --- project invites (T-0052): ``invites_router.py`` ------------------------------------------
 
 router.include_router(invites_router)
+
+# --- System console: queue monitor (T-0218): ``system_router.py`` ------------------------------
+
+router.include_router(system_router)

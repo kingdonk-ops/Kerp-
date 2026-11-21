@@ -1,4 +1,4 @@
-# admin — users, project memberships, admin grants (T-0014, T-0039), project invites (T-0052)
+# admin — users, project memberships, admin grants (T-0014, T-0039), project invites (T-0052), System console (T-0218)
 
 The administration surface of the access model (diff §4.1; TD-120, TD-184, TD-151). The tenant
 stays in code and RLS but is never taken or returned by this API.
@@ -9,6 +9,7 @@ stays in code and RLS but is never taken or returned by this API.
 | `schemas.py` | `UserCreate` / `UserUpdate` / `UserRead`, `UserLookupRequest` / `UserSummary`, `GrantIn` / `MemberAssign` / `MemberRead` / `MemberAssigned`, `AdminGrantKind` / `AdminGrantIn` / `AdminGrantRead` |
 | `service.py` | `own_admin_grants` (registered as core's admin-grant lookup), `list_grants` / `grant` / `revoke`, `create_user` / `update_user` / `lookup_user`, `project_members` / `assign_member` / `remove_member` |
 | `router.py` | `/api/v1/admin/...` (below) |
+| `system_router.py` | System console (diff §4.7): the queue monitor (T-0218, *System console* below); it calls the jobs service only |
 | `invites.py`, `invites_router.py` | Project invites (T-0052, *Project invites* below): `oe_admin_project_invite` (`ProjectInvite` in `models.py`, own `project_invite` RLS policy; migration `0030`), the invite service, the post-authentication hook and the magic-link eligibility provider registered with core auth, and the invite endpoints |
 
 ## Admin grants
@@ -241,6 +242,21 @@ set the invitee's password. Screens: T-0078.
 project, or adding a user to a linked team, grants access directly; nobody is invited and
 nobody accepts anything.
 
+## System console (`/api/v1/admin/system`, diff §4.7)
+
+`system_admin` only: everyone else, a PER-09 of every project included, gets **403** (an admin
+surface, not a project record). Queue monitor (T-0218, absorbed T-0220; detail in
+`app/modules/jobs/README.md` *Queue monitor*):
+
+| Endpoint | Answer |
+|---|---|
+| `GET /system/queues` | `queues`: per queue (`interactive`, `batch`) `queued`, `active`, `scheduled` (SAQ, deployment-wide), `failed` (job rows), `oldest_queued_age_s`; `cron_jobs`: `name`, `schedule`, `last_run_at`, `last_finished_at`, `last_outcome`, `next_run_at`. 503 without Redis |
+| `GET /system/queues/failed?limit=&offset=` | failed job rows: `id`, `kind`, `queue`, `project_id`, `project_code`, `attempts`, `error_class`, `message` (<= 500 characters). Never a payload, result or SAQ kwargs |
+| `POST /system/queues/failed/{job_id}/retry` | 202 `{id, kind, status: queued}`; 409 unless `failed`; 404 unknown |
+| `POST /system/queues/{job_id}/abort` | `{id, kind, status: failed}` for a `queued` or `running` job (SAQ abort, best effort); 409 otherwise; 404 unknown |
+
+SAQ's own web UI is not mounted (it has no KERP auth; a test checks every route).
+
 ## Audit
 
 Tenant-level chains: `admin-user:<user>` (create, update), `admin-user-lookup:<caller>` (every
@@ -248,7 +264,8 @@ lookup), `project-members:<project>` (`assign` with added / removed / grants / `
 `remove`), `admin-grant:<user>` (grant, revoke), `project-invites:<project>` (`create` and
 `resend` with `email_queued`, `revoke`, `first_password_set`, `accept` and `refuse` with stage
 and reason; the invitee by account id) and `project-invites` (`refuse` of a token that matches
-no invite). Invite entries never carry a token, a hash, a password or an e-mail address. An accepted invite also writes the usual
+no invite), `admin-system:<tenant>` (System console: `job_retried`, `job_aborted` with job id,
+kind, queue and project id; T-0218). Invite entries never carry a token, a hash, a password or an e-mail address. An accepted invite also writes the usual
 `assign` entry on `project-members:<project>`.
 
 ## Tests
@@ -258,4 +275,5 @@ no invite). Invite entries never carry a token, a hash, a password or an e-mail 
 `tests/test_invites.py` (SQLite and PostgreSQL: the whole invite life cycle, carry-through,
 send cap, races, log scrubbing), `tests/test_invite_setup.py` (the invite e-mail, the
 `setup_token`, first password at acceptance, its races, scrubbing; capturing mail queue),
-`tests/test_rls_invites.py` (PostgreSQL as `kerp_app`).
+`tests/test_rls_invites.py` (PostgreSQL as `kerp_app`), `tests/test_queue_monitor.py` (System
+console queue monitor; SQLite and PostgreSQL).

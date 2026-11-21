@@ -90,6 +90,17 @@ class Settings(BaseSettings):
     # Malware scan (T-0213, TD-211): in production the worker refuses to start while uploads
     # would be verified by the always-clean stub scanner, unless this is set explicitly.
     upload_scanner_allow_stub: bool = False
+    # The malware scanner (T-0218, TD-211): ``stub`` (always clean; dev and tests) or ``clamd``
+    # (ClamAV over its socket, ``INSTREAM``). ``clamd_address`` is ``tcp://<host>:<port>`` or
+    # ``unix:///<path>``, required with ``clamd``; kept out of repr and never in an API answer.
+    upload_scanner: Literal["stub", "clamd"] = "stub"
+    clamd_address: str | None = Field(default=None, repr=False)
+    # Per socket operation (connect, each chunk, the reply); a timeout leaves the file
+    # ``verifying`` and the job retries with back-off.
+    clamd_timeout_seconds: float = Field(default=30.0, gt=0, le=600)
+    # Largest object streamed to clamd. Keep clamd's ``StreamMaxLength`` at least this large;
+    # a bigger object is never scanned and so never published (``verify_failed``).
+    upload_scan_max_bytes: int = Field(default=100 * 1024 * 1024, ge=1, le=5 * 1024**3)
 
     # Auth tokens (T-0008, diff §4). Asymmetric JWTs, public keys served as JWKS.
     # ``jwt_private_key`` is a PEM (RSA for RS256, Ed25519 for EdDSA); ``jwt_private_key_file``
@@ -327,6 +338,29 @@ class Settings(BaseSettings):
             raise ValueError(
                 "KERP_PIN_IDLE_MINUTES (pin_idle_minutes) must be at least "
                 "KERP_ACCESS_TOKEN_MINUTES"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _clamd_needs_an_address(self) -> "Settings":
+        # T-0218: nothing hard-coded; a clamd scanner without a valid address refuses to start.
+        if self.upload_scanner != "clamd":
+            return self
+        address = (self.clamd_address or "").strip()
+        parts = urlsplit(address)
+        if parts.scheme == "unix":
+            valid = bool(parts.path) and not parts.netloc
+        elif parts.scheme == "tcp":
+            try:
+                valid = bool(parts.hostname) and parts.port is not None and not parts.path
+            except ValueError:
+                valid = False
+        else:
+            valid = False
+        if not valid:
+            raise ValueError(
+                "KERP_UPLOAD_SCANNER=clamd needs KERP_CLAMD_ADDRESS as tcp://<host>:<port> "
+                "or unix:///<path>"
             )
         return self
 
