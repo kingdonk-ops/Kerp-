@@ -45,6 +45,11 @@ def quarantine_prefix(tenant_id: uuid.UUID, project_id: uuid.UUID) -> str:
     return f"{QUARANTINE_PREFIX}/{tenant_id}/{project_id}/"
 
 
+def tenant_prefixes(tenant_id: uuid.UUID) -> tuple[str, str, str]:
+    """Every key prefix of the tenant's objects: content, staging, quarantine (T-0219)."""
+    return f"{tenant_id}/", f"{STAGING_PREFIX}/{tenant_id}/", f"{QUARANTINE_PREFIX}/{tenant_id}/"
+
+
 class UploadedFile(Base, BaseRecordMixin):
     """An uploaded file of one project; ``module`` is the owning module's namespace."""
 

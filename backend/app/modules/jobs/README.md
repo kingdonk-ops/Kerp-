@@ -10,7 +10,7 @@ contract, `update(progress, message)` and the sanitised error (ADR 0007).
 | `models.py` | `oe_jobs_job` (`BaseRecordMixin`, project RLS, no exemption; migration `0007`) |
 | `registry.py` | `register_job(kind, queue=...)`, `JobKind`, `JobContext`, `JobRegistry`, `JOB_REGISTRY`; `register_startup_check(fn)`: a module's precondition the worker runs before it connects (raise to refuse start-up; T-0213) |
 | `broker.py` | `JobBroker` seam, `QueueMonitor` seam, `SaqBroker` (two SAQ `RedisQueue`s; both seams), `LoopDispatcher` (post-commit enqueue) |
-| `service.py` | `create_job`, `get_job`, `start_job`/`report_progress`/`finish_job`, `requeue_for_retry`, `sanitise_error`, `sweep`; the queue monitor (`queue_statuses`, `cron_statuses`, `failed_counts`, `list_failed_jobs`, `retry_failed_job`, `abort_job`, `set_queue_monitor`; T-0218) |
+| `service.py` | `create_job`, `get_job`, `start_job`/`report_progress`/`finish_job`, `requeue_for_retry`, `sanitise_error`, `sweep`; the queue monitor (`queue_statuses`, `cron_statuses`, `failed_counts`, `list_failed_jobs`, `retry_failed_job`, `abort_job`, `set_queue_monitor`; T-0218); tenant-level single runs (`create_single_run_job`, `pending_job`, `last_succeeded_job`) and the stats provider `deployment_stats` (job rows per status; T-0219) |
 | `scheduler.py` | `deployment_scopes`, `sweep_cron` (SAQ cron, every 5 min, batch worker; T-0214), `hourly_project_jobs` (queues every `schedule_hourly_per_project` kind in every live project at :17; T-0215), `tracked` (records each cron run for the queue monitor; T-0218). The cron expressions live in `registry.CRON_SCHEDULES` |
 | `worker.py` | `run_job` (the one SAQ function), `build_workers`, `serve`; `python -m app.modules.jobs.worker` |
 | `router.py`, `schemas.py` | `POST /api/v1/jobs`, `GET /api/v1/jobs/{id}` |
@@ -90,6 +90,16 @@ never mounted (it has no KERP auth).
 * Visibility: under ADR 0016 (T-0274) a `system_admin` session reads (and the console retries
   and aborts) the job rows of every project of its tenant without a membership, under normal
   RLS; never another tenant's (TD-451).
+
+## Single-run tenant-level jobs (T-0219)
+
+`create_single_run_job(session, kind, payload)` queues a tenant-level job (no project) unless
+one of the same kind is `queued` or `running` for the session's tenant, and then returns that one
+(`created` false). Concurrent callers are serialised by a transaction-scoped lock (PostgreSQL
+advisory lock per tenant and kind; SQLite: the write lock). `pending_job` and
+`last_succeeded_job` read only tenant-level rows of the session's own tenant, filtered
+explicitly (a `system_admin` session sees every project's rows too, ADR 0016). The System
+console's object-store totals use them (`admin.object_store_totals`, its `result` is the cache).
 
 ## Worker (rule 1)
 

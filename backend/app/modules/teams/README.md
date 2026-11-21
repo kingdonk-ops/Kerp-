@@ -12,7 +12,7 @@ access to the project.
 |---|---|
 | `models.py` | `oe_teams_team`, `oe_teams_member`, `oe_teams_project_link` (`BaseRecordMixin`, tenant-level, `team` RLS policy; migration `0028`) |
 | `schemas.py` | `TeamCreate`, `TeamUpdate`, `MemberPut`, `LinkPut`, `TeamRead`, `TeamDetail`, `TeamLinkRead`, `ProjectTeamRead`, `SodWarning` |
-| `service.py` | writes (`create_team`, `update_team`, `delete_team`, `add_member`, `remove_member`, `set_link`, `unlink`), reads, and the **public read contract** (below) |
+| `service.py` | writes (`create_team`, `update_team`, `delete_team`, `add_member`, `remove_member`, `set_link`, `unlink`), reads, the stats provider `deployment_stats` (live teams, T-0219), and the **public read contract** (below) |
 | `router.py` | `/api/v1/teams/...` |
 | `reconcile.py` | the command line: `python -m app.modules.teams.reconcile [--fix [--confirm-sod]]` (T-0075) |
 

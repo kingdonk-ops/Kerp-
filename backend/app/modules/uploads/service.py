@@ -20,21 +20,31 @@ from sqlalchemy.orm import Session
 
 from app.core.audit import service as audit
 from app.core.db import Database, utcnow
+from app.core.stats.registry import register_stats_provider
 from app.core.tenancy.context import TenancyContext
 from app.core.tenancy.rls import session_tenancy
 from app.core.tenancy.scope import OutOfScopeError, get_or_404
 from app.modules.jobs.service import CONSOLE_CHAIN, JOB_REGISTRY, create_job, job_status
 from app.modules.projects import service as projects
-from app.modules.uploads.models import UploadedFile, quarantine_prefix, staging_prefix
+from app.modules.uploads.models import (
+    STATUSES,
+    UploadedFile,
+    quarantine_prefix,
+    staging_prefix,
+    tenant_prefixes,
+)
 from app.modules.uploads.scan import (
     Scanner,
     ScannerUnavailableError,
     ScanRefusedError,
     outcome,
+    ping_scanner,
 )
 from app.modules.uploads.schemas import UploadCreate
 from app.modules.uploads.storage import (
     MAGIC_SNIFF_BYTES,
+    OTHER_CLASS,
+    STORAGE_CLASSES,
     PresignedRequest,
     Storage,
     get_storage,
@@ -61,8 +71,12 @@ __all__ = [
     "QueuedJob",
     "UploadStateError",
     "complete_upload",
+    "deployment_stats",
     "download_request",
     "get_file",
+    "object_store_totals",
+    "ping_scanner",
+    "ping_storage",
     "presign_upload",
     "quarantine_counts",
     "quarantine_files",
@@ -659,3 +673,59 @@ def queue_project_sweep(
         actor_id,
     )
     return queued
+
+
+# --- System console: deployment stats and health (T-0219, diff §4.7) ---------------------------
+
+
+@register_stats_provider("uploads")
+def deployment_stats(session: Session) -> dict[str, int]:
+    """Uploaded files per status and the bytes of the ``available`` ones, of every project the
+    caller's RLS shows (a ``system_admin``: every project of the tenant, ADR 0016); counts
+    only, filtered on the bound tenant explicitly."""
+    context = session_tenancy(session)
+    if context is None:
+        raise RuntimeError("the uploads stats need a session bound to a tenant")
+    rows = session.execute(
+        select(
+            UploadedFile.status, func.count(), func.coalesce(func.sum(UploadedFile.size_bytes), 0)
+        )
+        .where(UploadedFile.tenant_id == context.tenant_id)
+        .group_by(UploadedFile.status)
+    ).all()
+    counts = {str(status): (int(n), int(size)) for status, n, size in rows}
+    stats = {f"files_{status}": counts.get(status, (0, 0))[0] for status in STATUSES}
+    stats["available_bytes"] = counts.get("available", (0, 0))[1]
+    return stats
+
+
+def object_store_totals(
+    tenant_id: uuid.UUID, storage: Storage | None = None
+) -> dict[str, dict[str, int]]:
+    """Object count and bytes per storage class of the tenant's objects (``STANDARD``,
+    ``GLACIER_IR``, ``DEEP_ARCHIVE``, ``other``): content, staging and quarantine keys.
+
+    Slow (a paginated listing of the bucket): the admin module runs it as a ``batch`` job."""
+    totals = {name: {"objects": 0, "bytes": 0} for name in (*STORAGE_CLASSES, OTHER_CLASS)}
+    store = storage or get_storage()
+    for prefix in tenant_prefixes(tenant_id):
+        for obj in store.list(prefix):
+            known = obj.storage_class in STORAGE_CLASSES
+            bucket = totals[obj.storage_class if known else OTHER_CLASS]
+            bucket["objects"] += 1
+            bucket["bytes"] += obj.size
+    return totals
+
+
+def ping_storage(storage: Storage | None = None) -> bool | None:
+    """The health probe (T-0219): head bucket; ``None`` for a storage without a probe.
+
+    Answers ``True``/``False`` only, never the endpoint, bucket or credentials."""
+    store = storage or get_storage()
+    ping = getattr(store, "ping", None)
+    if not callable(ping):
+        return None
+    try:
+        return bool(ping())
+    except Exception:  # unreachable, denied, misconfigured: down, never the detail
+        return False

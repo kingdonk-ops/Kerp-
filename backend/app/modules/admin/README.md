@@ -1,4 +1,4 @@
-# admin — users, project memberships, admin grants (T-0014, T-0039), project invites (T-0052), System console (T-0218)
+# admin — users, project memberships, admin grants (T-0014, T-0039), project invites (T-0052), System console (T-0218, T-0219)
 
 The administration surface of the access model (diff §4.1; TD-120, TD-184, TD-151). The tenant
 stays in code and RLS but is never taken or returned by this API.
@@ -11,6 +11,7 @@ stays in code and RLS but is never taken or returned by this API.
 | `router.py` | `/api/v1/admin/...` (below) |
 | `system_router.py` | System console (diff §4.7): the queue monitor (T-0218, *System console* below); it calls the jobs service only |
 | `system_uploads_router.py` | System console: the upload quarantine monitor (T-0221, *System console* below); it calls the uploads service only |
+| `stats_router.py`, `system_stats.py`, `health.py`, `jobs.py` | System console deployment stats and health probes (T-0219, *Deployment stats and health* below): counts from core auth, the projects service and the module stats providers; object-store totals from the `admin.object_store_totals` batch job; probes through the uploads service |
 | `invites.py`, `invites_router.py` | Project invites (T-0052, *Project invites* below): `oe_admin_project_invite` (`ProjectInvite` in `models.py`, own `project_invite` RLS policy; migration `0030`), the invite service, the post-authentication hook and the magic-link eligibility provider registered with core auth, and the invite endpoints |
 | `audit_explorer.py`, `audit_router.py`, `audit_jobs.py`, `jobs.py` | Audit explorer (T-0222, *Audit explorer* below): the service, its endpoints and the `admin.audit_verify_all` batch job (`jobs.py` is what the module loader imports) |
 
@@ -284,6 +285,40 @@ bypass role, no `SECURITY DEFINER` function, no purge (TD-397):
 | `POST /system/uploads/{file_id}/recheck` | 202 `{job_id, project_id, kind, status: queued}` for a stuck `verifying` file (its verify job is not `queued`/`running`) whose bytes still exist; 409 `NOT_VERIFYING` / `CHECK_RUNNING` / `OBJECT_GONE`; 404 unknown |
 | `POST /system/uploads/sweep?project=` | 202 `{job_id, project_id, kind: uploads.sweep_orphans, status: queued}`; 404 unknown or deleted project |
 
+### Deployment stats and health (T-0219)
+
+| Endpoint | Answer |
+|---|---|
+| `GET /system/stats` | `projects` (`active`, `soft_deleted`), `users` (`active`, `deactivated`), `devices` (`active`, `revoked`), `modules` (per loaded module the counts its stats provider returns, e.g. `asset_management.asset_nodes`, `uploads.files_<status>` and `available_bytes`, `jobs.jobs_<status>`, `teams.teams`), `object_store` (`as_of`, `refreshing`, `storage_classes`: `STANDARD`, `GLACIER_IR`, `DEEP_ARCHIVE`, `other` with `objects` and `bytes`). Numbers only: never an id, name or row |
+| `POST /system/stats/object-store/refresh` | 202 `{job_id, status: queued}`: the `admin.object_store_totals` job on the `batch` queue; **409** with the run in progress (`queued` or `running`): one run at a time per tenant (transaction lock, `jobs.create_single_run_job`) |
+| `GET /system/health` | `status` (the worst probe), `checked_at`, `probes`: `postgresql` (`SELECT 1` on a pool connection), `redis` (`PING`), `object_store` (`HeadBucket`), `malware_scanner` (clamd `PING`, T-0218), each `{name, status, latency_ms}`. Never a host name, connection string, bucket or credential |
+
+**Counts under normal RLS** (ADR 0016, T-0274): every count is read in the caller's
+tenant-level request session, which shows a `system_admin` every project of the tenant without a
+membership; no `SECURITY DEFINER` function, no bypass role. Each count also filters on the
+session's tenant explicitly ("visibility is not scope"). The admin module never reads another
+module's table: users and devices come from core auth (`user_counts`, `device_counts`), projects
+from `projects.service.project_counts`, everything else from the **stats-provider registry**
+(`app/core/stats/`): each module registers `@register_stats_provider("<module>")` in its own
+`service.py`; only the modules this app loaded are collected. A table that still hid rows from a
+`system_admin` session would get a TODO, never a bypass.
+
+**Object-store totals**: listing the bucket is slow, so `admin.object_store_totals` (batch,
+tenant-level, `jobs.py`) lists the tenant's key prefixes (content, `staging/`, `quarantine/`)
+through `uploads.service.object_store_totals` (paginated S3 listing). The newest succeeded run's
+`result` is the cache; its `finished_at` is `as_of`. Only tenant-level runs of the kind count
+(a project row of the same kind neither blocks a refresh nor feeds the cache).
+
+**Health** (`health.py`): the probes run concurrently in a bounded thread pool with a deadline
+of `PROBE_TIMEOUT_S` = 2 s (planner default). `ok`: healthy within `DEGRADED_AFTER_S` = 1 s;
+`degraded`: healthy but slower, or nothing real to probe (the always-clean stub scanner);
+`down`: failed, raised, timed out or not configured (no Redis URL). A probe's exception text is
+never returned, audited or logged (only its class): it can name a host or DSN.
+
+Every call (stats, refresh, refused refresh, health) is audited in `admin-system:<tenant>`
+(`stats_viewed`, `object_store_refresh_queued` / `object_store_refresh_running` with the job
+id, `health_checked` with each probe's status).
+
 ## Audit
 
 Tenant-level chains: `admin-user:<user>` (create, update), `admin-user-lookup:<caller>` (every
@@ -293,7 +328,9 @@ lookup), `project-members:<project>` (`assign` with added / removed / grants / `
 and reason; the invitee by account id) and `project-invites` (`refuse` of a token that matches
 no invite), `admin-system:<tenant>` (System console: `job_retried`, `job_aborted` with job id,
 kind, queue and project id; T-0218; `upload_rechecked` with file, project and job id,
-`upload_sweep_queued` with project and job id; T-0221). Invite entries never carry a token, a hash, a password or an e-mail address. An accepted invite also writes the usual
+`upload_sweep_queued` with project and job id; T-0221; `stats_viewed`,
+`object_store_refresh_queued`, `object_store_refresh_running`, `health_checked`;
+T-0219). Invite entries never carry a token, a hash, a password or an e-mail address. An accepted invite also writes the usual
 `assign` entry on `project-members:<project>`.
 
 ## Audit explorer (`/api/v1/admin/system/audit`, T-0222, diff §4.7)
@@ -336,4 +373,6 @@ send cap, races, log scrubbing), `tests/test_invite_setup.py` (the invite e-mail
 `setup_token`, first password at acceptance, its races, scrubbing; capturing mail queue),
 `tests/test_rls_invites.py` (PostgreSQL as `kerp_app`), `tests/test_queue_monitor.py` (System
 console queue monitor; SQLite and PostgreSQL), `tests/test_uploads_quarantine.py` (upload
-quarantine monitor; SQLite and PostgreSQL as `kerp_app`).
+quarantine monitor; SQLite and PostgreSQL as `kerp_app`), `tests/test_admin_system_stats.py`
+(deployment stats, the stats-provider registry and import boundary, object-store totals,
+health probes; SQLite and PostgreSQL).

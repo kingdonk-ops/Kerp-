@@ -10,7 +10,7 @@ later tasks (T-0102, T-0103, T-0134, T-0135, T-0136, T-0108).
 | `models.py` | `oe_asset_level_def`, `oe_asset_node` (`BaseRecordMixin`, project RLS, migration `0036`) |
 | `tree.py` | `LtreePath` column type and the path expressions `within` / `contains` / `rebased` (ltree operators on PostgreSQL, text prefixes on SQLite) |
 | `schemas.py` | `LevelDefCreate` / `LevelDefUpdate` / `LevelDefRead`, `NodeCreate` / `NodeMove` / `NodeRead`, `PointZGeoJSON` |
-| `service.py` | `create_level_def`, `update_level_def`, `list_level_defs`, `create_node`, `get_node`, `list_nodes`, `move_node`, **`work_anchor_for`**; errors `TreeRuleError`, `DuplicateCodeError`, `LevelInUseError`, `NoWorkAnchor` |
+| `service.py` | `create_level_def`, `update_level_def`, `list_level_defs`, `create_node`, `get_node`, `list_nodes`, `move_node`, **`work_anchor_for`**; the stats provider `deployment_stats` (asset nodes, level definitions; T-0219); errors `TreeRuleError`, `DuplicateCodeError`, `LevelInUseError`, `NoWorkAnchor` |
 | `router.py` | `/api/v1/asset-management/projects/{project_id}/level-defs...` and `/nodes...` |
 
 ## `oe_asset_level_def` — the breakdown template

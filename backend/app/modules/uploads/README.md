@@ -7,10 +7,10 @@ the bytes; it signs, checks and records. Helpers adapted from Inspection-ERP
 
 | File | What |
 |---|---|
-| `storage.py` | `clean_filename`, `content_disposition`, served-type (H-10) and magic-byte allowlists, `Storage` Protocol, `LocalStorage` (traversal guard; tests), `S3Storage` (boto3, lazy), `get_storage`/`set_storage` |
+| `storage.py` | `clean_filename`, `content_disposition`, served-type (H-10) and magic-byte allowlists, `Storage` Protocol, `LocalStorage` (traversal guard; tests), `S3Storage` (boto3, lazy), `get_storage`/`set_storage`; `ObjectInfo.storage_class` (S3 listing; `STANDARD` otherwise) and `ping()` on both backends (health probe, T-0219) |
 | `scan.py` | `Scanner` seam; `StubScanner` (always clean; dev and tests); `ClamdScanner` (ClamAV over the clamd socket, `INSTREAM`, `PING`; T-0218); `scanner_from_settings` / `get_scanner` (`KERP_UPLOAD_SCANNER`); `ping_scanner` (health probe, T-0219); `require_real_scanner`, the worker startup check that refuses the stub in production (T-0213) |
 | `models.py` | `oe_uploads_file` (`BaseRecordMixin`, project RLS, migration `0009`; `scan_signature`, migration `0034`) |
-| `service.py` | `presign_upload`, `complete_upload`, `get_file`, `download_request`, `verify_upload`, `sweep_orphans`, `schedule_sweep`; quarantine monitor: `quarantine_files`, `quarantine_counts`, `recheck_upload`, `queue_project_sweep` (T-0221) |
+| `service.py` | `presign_upload`, `complete_upload`, `get_file`, `download_request`, `verify_upload`, `sweep_orphans`, `schedule_sweep`; quarantine monitor: `quarantine_files`, `quarantine_counts`, `recheck_upload`, `queue_project_sweep` (T-0221); for the System console (T-0219): the stats provider `deployment_stats` (files per status, `available_bytes`), `object_store_totals` (objects and bytes per storage class of a tenant's key prefixes, run by the admin batch job), `ping_storage` (head bucket) and `ping_scanner` (clamd `PING`) |
 | `jobs.py` | `uploads.verify` (interactive), `uploads.verify_large` (batch; both retried with back-off while the scanner is unavailable) and `uploads.sweep_orphans` (batch; queued hourly per project) |
 | `router.py`, `schemas.py` | `/api/v1/uploads/projects/{project_id}/files...`; the monitor's shapes (`Quarantine*`), served by `admin/system_uploads_router.py` |
 

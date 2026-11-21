@@ -33,7 +33,7 @@ from typing import TYPE_CHECKING, Any, Final, NamedTuple
 from zoneinfo import ZoneInfo
 
 from fastapi import HTTPException, status
-from sqlalchemy import ColumnElement, select, text
+from sqlalchemy import ColumnElement, func, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -267,6 +267,22 @@ def live_project_ids(session: Session) -> list[uuid.UUID]:
     """
     query = select(Project.id).where(Project.tenant_id == _tenant_id(session)).order_by(Project.id)
     return list(session.scalars(query))
+
+
+def project_counts(session: Session) -> dict[str, int]:
+    """The tenant's projects the session can see: ``active`` (live) and ``soft_deleted``.
+
+    The System console's deployment stats (T-0219): counts only, under the caller's normal
+    RLS (a ``system_admin`` session reads every project row of its tenant, ADR 0016),
+    filtered on the bound tenant explicitly (visibility is not scope).
+    """
+    query = (
+        select(func.count(), func.count(Project.deleted_at))
+        .where(Project.tenant_id == _tenant_id(session))
+        .execution_options(include_deleted=True)
+    )
+    total, deleted = session.execute(query).one()
+    return {"active": int(total) - int(deleted), "soft_deleted": int(deleted)}
 
 
 def update_project(

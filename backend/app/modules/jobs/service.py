@@ -9,6 +9,7 @@ happens (process died, Redis down), ``sweep`` re-enqueues rows still ``queued``.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
 import re
 import uuid
@@ -17,17 +18,18 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any, Final
 
-from sqlalchemy import event, func, select
+from sqlalchemy import event, func, select, text
 from sqlalchemy.orm import Session, SessionTransaction
 
 from app.core.audit import service as audit
 from app.core.db import Database, utcnow
 from app.core.request_context import get_request_id
+from app.core.stats.registry import register_stats_provider
 from app.core.tenancy.context import TenancyContext
 from app.core.tenancy.rls import session_tenancy
 from app.core.tenancy.scope import OutOfScopeError, get_or_404, is_visible
 from app.modules.jobs.broker import QUEUE_NAMES, JobBroker, JobRef, QueueMonitor
-from app.modules.jobs.models import MAX_TEXT, Job
+from app.modules.jobs.models import MAX_TEXT, STATUSES, TABLE, Job
 from app.modules.jobs.registry import (
     CRON_SCHEDULES,
     DEFAULT_TIMEOUT_S,
@@ -53,13 +55,17 @@ __all__ = [
     "UnknownJobKindError",
     "abort_job",
     "create_job",
+    "create_single_run_job",
     "cron_statuses",
+    "deployment_stats",
     "failed_counts",
     "finish_job",
     "get_job",
     "get_queue_monitor",
     "job_status",
+    "last_succeeded_job",
     "list_failed_jobs",
+    "pending_job",
     "queue_statuses",
     "register_job",
     "report_progress",
@@ -591,3 +597,101 @@ def abort_job(
         row.updated_by = actor_id
     _console_audit(session, "job_aborted", job, actor_id)
     return job
+
+
+# --- tenant-level single-run jobs and deployment stats (T-0219) --------------------------------
+
+_SQLITE_WRITE_LOCK: Final = text(f"UPDATE {TABLE} SET status = status WHERE 0")
+
+
+def _tenant_scope(session: Session) -> uuid.UUID:
+    context = session_tenancy(session)
+    if context is None or context.project_id is not None:
+        raise RuntimeError("a tenant-level job needs a tenant-level bound session")
+    return context.tenant_id
+
+
+def _tenant_jobs(session: Session, kind: str, statuses: Iterable[str]) -> Job | None:
+    """The newest tenant-level job of ``kind`` in ``statuses`` of the session's own tenant.
+
+    Explicit filters (visibility is not scope): a ``system_admin`` session also sees every
+    project's job rows (ADR 0016), and they are not this tenant-level job."""
+    query = (
+        select(Job)
+        .where(
+            Job.tenant_id == _tenant_scope(session),
+            Job.project_id.is_(None),
+            Job.kind == kind,
+            Job.status.in_(list(statuses)),
+        )
+        .order_by(Job.created_at.desc(), Job.id)
+        .limit(1)
+    )
+    return session.scalars(query).first()
+
+
+def pending_job(session: Session, kind: str) -> Job | None:
+    """The tenant-level job of ``kind`` that is ``queued`` or ``running``, if any."""
+    return _tenant_jobs(session, kind, ("queued", "running"))
+
+
+def last_succeeded_job(session: Session, kind: str) -> Job | None:
+    """The newest ``succeeded`` tenant-level job of ``kind`` (its ``result`` is a cache)."""
+    query = (
+        select(Job)
+        .where(
+            Job.tenant_id == _tenant_scope(session),
+            Job.project_id.is_(None),
+            Job.kind == kind,
+            Job.status == "succeeded",
+        )
+        .order_by(Job.finished_at.desc(), Job.id)
+        .limit(1)
+    )
+    return session.scalars(query).first()
+
+
+def _lock_kind(session: Session, tenant_id: uuid.UUID, kind: str) -> None:
+    """Serialise ``create_single_run_job`` per tenant and kind until the transaction ends."""
+    dialect = session.get_bind().dialect.name
+    if dialect == "postgresql":
+        digest = hashlib.sha256(f"oe_jobs_single_run|{tenant_id}|{kind}".encode()).digest()
+        key = int.from_bytes(digest[:8], "big", signed=True)
+        session.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": key})
+    elif dialect == "sqlite":
+        session.execute(_SQLITE_WRITE_LOCK)
+
+
+def create_single_run_job(
+    session: Session,
+    job_kind: JobKind,
+    payload: dict[str, Any] | None = None,
+    *,
+    actor_id: uuid.UUID | None = None,
+) -> tuple[Job, bool]:
+    """Queue a tenant-level job of ``job_kind`` unless one is already queued or running.
+
+    Returns ``(job, created)``: the new job, or the pending one with ``created`` false. One
+    run at a time per tenant and kind, also for concurrent callers (a transaction-scoped
+    lock: PostgreSQL advisory lock, SQLite write lock)."""
+    _lock_kind(session, _tenant_scope(session), job_kind.kind)
+    pending = pending_job(session, job_kind.kind)
+    if pending is not None:
+        return pending, False
+    return create_job(session, job_kind, payload, actor_id=actor_id), True
+
+
+@register_stats_provider("jobs")
+def deployment_stats(session: Session) -> dict[str, int]:
+    """Job rows per status of the caller's tenant (every project's for a ``system_admin``,
+    ADR 0016, plus the tenant-level ones); counts only, under the caller's RLS."""
+    context = session_tenancy(session)
+    if context is None:
+        raise RuntimeError("the jobs stats need a session bound to a tenant")
+    rows = session.execute(
+        select(Job.status, func.count())
+        .where(Job.tenant_id == context.tenant_id)
+        .group_by(Job.status)
+    ).all()
+    by_status = {str(status): int(count) for status, count in rows}
+    return {f"jobs_{status}": by_status.get(status, 0) for status in STATUSES}

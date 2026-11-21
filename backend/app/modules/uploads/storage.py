@@ -136,11 +136,17 @@ class UnsafeKeyError(ValueError):
     """An object key that could escape its prefix (absolute, ``..``, empty segment, NUL)."""
 
 
+# S3 storage classes the System console totals by (T-0219); any other class counts as "other".
+STORAGE_CLASSES: Final = ("STANDARD", "GLACIER_IR", "DEEP_ARCHIVE")
+OTHER_CLASS: Final = "other"
+
+
 @dataclass(frozen=True, slots=True)
 class ObjectInfo:
     key: str
     size: int
     last_modified: datetime
+    storage_class: str = "STANDARD"  # S3 lists it; ``head`` and local files: STANDARD
 
 
 @dataclass(frozen=True, slots=True)
@@ -258,6 +264,10 @@ class LocalStorage:
     def delete(self, key: str) -> None:
         self._path(key).unlink(missing_ok=True)
 
+    def ping(self) -> bool:
+        """The health probe (T-0219): the root directory exists."""
+        return self.root.is_dir()
+
     def list(self, prefix: str) -> Iterator[ObjectInfo]:
         root = self.root.resolve()
         if not root.is_dir():
@@ -335,13 +345,23 @@ class S3Storage:
     def delete(self, key: str) -> None:
         self.client.delete_object(Bucket=self.bucket, Key=key)
 
+    def ping(self) -> bool:
+        """The health probe (T-0219): ``HeadBucket`` (raises when unreachable or denied)."""
+        self.client.head_bucket(Bucket=self.bucket)
+        return True
+
     def list(self, prefix: str) -> Iterator[ObjectInfo]:
         pages = self.client.get_paginator("list_objects_v2").paginate(
             Bucket=self.bucket, Prefix=prefix
         )
         for page in pages:
             for item in page.get("Contents", []):
-                yield ObjectInfo(item["Key"], item["Size"], item["LastModified"])
+                yield ObjectInfo(
+                    item["Key"],
+                    item["Size"],
+                    item["LastModified"],
+                    str(item.get("StorageClass") or "STANDARD"),
+                )
 
 
 def build_s3_storage(settings: Settings) -> S3Storage:

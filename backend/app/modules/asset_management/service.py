@@ -33,6 +33,7 @@ from sqlalchemy.orm import Session
 
 from app.core.audit import service as audit
 from app.core.db import GUID, utcnow
+from app.core.stats.registry import register_stats_provider
 from app.core.tenancy.rls import session_tenancy
 from app.core.tenancy.scope import OutOfScopeError
 from app.modules.asset_management.models import (
@@ -54,6 +55,7 @@ __all__ = [
     "TreeRuleError",
     "create_level_def",
     "create_node",
+    "deployment_stats",
     "get_node",
     "list_level_defs",
     "list_nodes",
@@ -614,3 +616,21 @@ def move_node(
         new_display_path=node.display_path,
     )
     return node
+
+
+# --- deployment stats (T-0219) ----------------------------------------------------------------
+
+
+@register_stats_provider("asset_management")
+def deployment_stats(session: Session) -> dict[str, int]:
+    """Live asset nodes and level definitions of every project the caller's RLS shows (a
+    ``system_admin``: every project of the tenant, ADR 0016); counts only, own tenant."""
+    context = session_tenancy(session)
+    if context is None:
+        raise RuntimeError("the asset_management stats need a session bound to a tenant")
+    tenant = context.tenant_id
+    nodes = session.scalar(select(func.count(AssetNode.id)).where(AssetNode.tenant_id == tenant))
+    levels = session.scalar(
+        select(func.count(AssetLevelDef.id)).where(AssetLevelDef.tenant_id == tenant)
+    )
+    return {"asset_nodes": int(nodes or 0), "level_defs": int(levels or 0)}
