@@ -635,12 +635,15 @@ Pilot-0 gate (2026-11-14), the transport is a Pilot-0 dependency. Planner defaul
 The user supplied a spec for four features on 2026-11-21 (it asked for "§4.5"; numbered §4.7
 because §4.5 is Entra ID SSO). Where it disagreed with earlier sections, the earlier sections win
 and the difference is an open TODO; the planner defaults below apply until the user decides.
-Tasks: T-0218–T-0232; the user directory is §4.8; the project archive is in `modules/documents-and-mdr.md` (epic E-01-02).
+Tasks: T-0218–T-0232 and T-0248; the user directory is §4.8; the project archive is in `modules/documents-and-mdr.md` (epic E-01-02).
 
 **System console** (`/api/v1/admin/system/*`, T-0219–T-0225). Only `system_admin`; every other
 caller, PER-09 included, gets **403** (an admin surface, not a project record). Every action is
 written to the audit ledger. Record reads keep project RLS: System admins read no
-project-scoped record without a membership (§4.1; TD-396).
+project-scoped record without a membership (§4.1; TD-396), and no console endpoint widens a
+project RLS policy or uses a bypass role; where a non-member needs an overview it gets counts
+from a count-only function. The project archive follows the same rule (export, download and
+restore of a deleted project need a membership; `modules/documents-and-mdr.md` §Access).
 
 - **Deployment stats** (T-0219): counts and byte totals only, never rows: projects (active,
   soft-deleted), users (active, deactivated), enrolled devices, and per module the counts it
@@ -666,9 +669,14 @@ project-scoped record without a membership (§4.1; TD-396).
   replacing the stub (TD-211). Rejected bytes stay deleted at rejection (T-0016): nothing
   infected is kept at rest, so there is nothing to purge (TD-397). Actions: re-queue the check of
   a file stuck in `verifying` whose staging object still exists; run a project's orphan sweep
-  now. Rows are read through a narrow metadata path (project code, file id, size, SHA-256,
-  status, reason, signature, uploader id, times); the original filename only where the admin
-  holds a membership (TD-396).
+  now. **Rows only where the admin holds a membership:** the list reads `oe_uploads_file`
+  under normal project RLS, so it shows full rows (project code, file id, original filename,
+  size, SHA-256, status, reason, signature, uploader id, times) only for projects where the
+  admin is a member. For every other project it shows **counts only**, per project and status
+  (and reason code), from a count-only `SECURITY DEFINER` function of the T-0219 pattern
+  (pinned `search_path`, `EXECUTE` revoked from `PUBLIC`, returns numbers only; ADR). The
+  uploads RLS policy is **not widened** and **no bypass role** is used; to act on rows of such a
+  project the admin first grants themselves a membership (audited, T-0014; TD-396).
 - **Audit explorer** (T-0222): read-only over the hash-chain ledger (§4); no endpoint ever
   changes a ledger row. Reads under normal RLS: tenant-level chains (grants, users, devices,
   deployment settings, mail suppression, teams, the system console) in full; project chains
@@ -679,8 +687,9 @@ project-scoped record without a membership (§4.1; TD-396).
   with a report. Anchoring chain heads outside the database stays TD-058.
 - **Legal hold** (T-0223): a per-project `legal_hold` flag with reason, set by and set at, on the
   project table (core-table change: ADR). Set and cleared only by a System admin, reason
-  required, audited. While it is on: soft-deleting the project answers **409
-  `LEGAL_HOLD_ACTIVE`**, and the project's archives (documents-and-mdr) cannot be deleted. KERP
+  required, audited in the tenant-level chain `admin-system:<tenant>` (like
+  `deployment-settings:<tenant>`; a System admin need not be a member of the project). While
+  it is on: soft-deleting the project answers **409 `LEGAL_HOLD_ACTIVE`**, and the project's archives (documents-and-mdr) cannot be deleted. KERP
   has no hard purge of project data (retention rules: TD-175; TD-401).
 
 **Communications** (Admin → Communications, T-0226–T-0229), on the outbound e-mail service
@@ -740,7 +749,8 @@ Read-only **deployment configuration** (shown, never edited at runtime; TD-046, 
 refresh-token lifetime (`KERP_REFRESH_TOKEN_HOURS`, 12), PIN idle (`KERP_PIN_IDLE_MINUTES`, 30),
 the PIN lockout schedule (T-0009), the deployment region (§4.4, default `ap-southeast-2`), the
 mail sender and reply-to (§4.6), the malware scanner, and the AI provider (`none` until the
-assistant, Phase 5). **Client bootstrap** (T-0231): `GET /api/v1/settings/client` (the paste's
+assistant, Phase 5). **Client bootstrap** (API T-0231, phase 0; client consumption T-0248,
+phase 1): `GET /api/v1/settings/client` (the paste's
 `/api/v1/config/client`, under the settings module's mount) for any signed-in user returns the
 client-visible entries only; web and Android read it at sign-in and at every sync.
 
@@ -1016,10 +1026,14 @@ the navigation **and** refused by the API (403 for admin surfaces).
 | **Users** | user directory (status, presence, sessions, logins, grants, filters, search; resend invite, force sign-out, activate/deactivate); user detail with memberships across projects (§4.8) | `system_admin`; PER-09 memberships tab for its own projects | T-0026, T-0246 |
 | **System** | deployment stats + health; queue monitor (retry / abort); upload quarantine (re-check, sweep now); runtime settings (editable registry + read-only deployment configuration); admin grants (T-0026); devices (T-0048); audit log (filters, verify chain); legal hold on the project admin page | `system_admin` | T-0224, T-0225, T-0232 |
 | **Communications** | broadcast composer (audience, count, send); delivery stats (cards) and history; automated e-mail templates (edit, preview, test send, reset) | `system_admin`; PER-09 composer and stats for its own projects | T-0229 |
-| **Project archives** | archive list; export; storage tier toggle; download; start a deep-archive restore; restore wizard (deleted project or new project) | `system_admin` | T-0241 (epic E-01-02) |
+| **Project archives** | archive list; export; storage tier toggle; download; start a deep-archive restore; restore wizard (deleted project or new project) | `system_admin`; export, download and restore of a deleted project also need a membership on that project | T-0241 (epic E-01-02) |
 
 Numbers on these screens are counts and states only (§4.7); a screen never shows a project
-record the caller could not open in the project itself.
+record the caller could not open in the project itself. This holds for the upload quarantine
+(rows only of member projects, counts for the rest), the audit explorer (project chains only of
+member projects) and the project archives (export, download and restore of a deleted project
+need a membership on that project; restore as new makes the restoring admin PER-09 of the new
+project, audited; `modules/documents-and-mdr.md` §Access; TD-396).
 
 ---
 
