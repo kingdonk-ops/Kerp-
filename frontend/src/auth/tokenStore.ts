@@ -39,6 +39,18 @@ export class TokenStore {
     this.emit();
   }
 
+  /**
+   * Adopts a session the server started with a redirect (Entra ID SSO callback, T-0055): the
+   * `httpOnly` refresh cookie is set, but script has no access token yet. Marks the tab as
+   * signed in and drops any access token of an earlier session, so the next request resumes
+   * through `/auth/refresh` (single-flight, shared with the other tabs).
+   */
+  adoptCookieSession(): void {
+    this.accessToken = null;
+    this.storage.setItem(SESSION_STORAGE_KEY, "1");
+    this.emit();
+  }
+
   clear(): void {
     const had = this.accessToken !== null || this.hasSession;
     this.accessToken = null;

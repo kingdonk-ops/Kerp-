@@ -69,7 +69,9 @@ describe("app shell", () => {
     expect(
       screen.getByText(i18n.t("auth.signedInAs", { name: FAKE_USER.display_name })),
     ).toBeInTheDocument();
-    expect(ctx.calls[0]).toMatchObject({
+    // The sign-in screen first asks which methods are offered (T-0055), then signs in.
+    expect(ctx.calls[0]).toMatchObject({ method: "GET", path: "/api/v1/auth/config" });
+    expect(ctx.calls[1]).toMatchObject({
       method: "POST",
       path: "/api/v1/auth/login",
       body: { email: FAKE_USER.email, password: "secret" },

@@ -17,8 +17,23 @@ const PROJECTS = [
   { id: "p-alpha", code: "SYN-001", name: "Synthetic Refinery Unit", personas: ["PER-01"] },
 ];
 
-function renderApp(path: string, theme: ThemeId, signedIn: boolean, projects: unknown[] = PROJECTS) {
-  const base = makeServices({ "GET /api/v1/me/projects": () => json(projects) });
+// Entra ID SSO offered (T-0055): the sign-in page shows "Sign in with Microsoft" first.
+const SSO_CONFIG = {
+  password: { available: true },
+  sso: { provider: "entra", preferred: true, start_url: "/api/v1/auth/sso/entra/start" },
+};
+
+function renderApp(
+  path: string,
+  theme: ThemeId,
+  signedIn: boolean,
+  projects: unknown[] = PROJECTS,
+  config: unknown = { password: { available: true } },
+) {
+  const base = makeServices({
+    "GET /api/v1/me/projects": () => json(projects),
+    "GET /api/v1/auth/config": () => json(config),
+  });
   if (signedIn) base.tokens.set(tokens(0));
   const preferences = memoryStorage();
   // The theme comes from the stored preference, exercising the real switch-on path.
@@ -63,6 +78,16 @@ describe.each(THEMES)("app shell in the %s theme", (theme) => {
       await setViewport(viewport);
       renderApp("/login", theme, false);
       await screen.findByRole("heading", { level: 1, name: i18n.t("auth.login.title") });
+
+      const findings = await auditA11y(document.body, theme);
+      expect(findings, formatFindings(findings)).toEqual([]);
+    });
+
+    it("the sign-in page with SSO and a refusal meets WCAG 2.1 AA and 48 px targets", async () => {
+      await setViewport(viewport);
+      renderApp("/login/sso-return?error=SSO_NO_ACCOUNT", theme, false, PROJECTS, SSO_CONFIG);
+      await screen.findByRole("button", { name: i18n.t("auth.sso.start") });
+      await screen.findByRole("alert");
 
       const findings = await auditA11y(document.body, theme);
       expect(findings, formatFindings(findings)).toEqual([]);
