@@ -196,11 +196,11 @@ and the drift report in Consequences. Where it is more specific than the section
   projects get it. A changed system set is only offered to the tenant layer, never forced (§4).
 - **Routes** are keyed by the rule set's id (as the T-0034 rule routes), not by its key.
 
-## Amendment H. Rule kind `itp_assignment` (planner default, 2026-11-21; pending TD-430)
+## Amendment H. Rule kind `itp_assignment` (planner default, 2026-11-21; TD-430 may revise)
 
-Proposed for the user's T-0188 (`quality-and-inspection.md` §ITP authoring, assignment and
-propagation). Not in force until TD-430 is confirmed; it must land before the M1 freeze (T-0131)
-or as a post-freeze amendment.
+For the user's T-0188 (`quality-and-inspection.md` §ITP authoring, assignment and propagation).
+In force as a planner default: T-0188 builds it as written. TD-430 may revise it before the M1
+freeze (T-0131); after the freeze, a revision needs a post-freeze amendment of this ADR.
 
 | Kind | Engine | Variables | Action |
 |---|---|---|---|

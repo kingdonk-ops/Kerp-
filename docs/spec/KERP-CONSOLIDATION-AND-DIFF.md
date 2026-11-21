@@ -871,7 +871,7 @@ additive and need an ADR (CLAUDE.md §6).
   authority is `pending_qa_verification` and goes to the QA verification queue
   (`quality-and-inspection.md` §QA verification queue); the OCR-discrepancy review of this section
   is routed into the same queue (TD-416).
-- **Out of service and tagout** (T-0257): a failed pre-start can set `out_of_service` through a
+- **Out of service and tagout** (T-0257; equipment part T-0288): a failed pre-start can set `out_of_service` through a
   post-submit rule; a blocking tagout follow-up keeps it there until confirmed and closed
   (`equipment.activate` fails with 422 while it is open). Out-of-service, quarantined and
   decommissioned equipment is never selectable in inspections or allocation.

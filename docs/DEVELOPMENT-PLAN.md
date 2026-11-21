@@ -274,7 +274,7 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
   needs-breakdown). Splits to stay S/M got T-0249–T-0268: T-0249 fleet classes (blocked TD-412),
   T-0250 equipment anchor (blocked TD-411, ADR 0014 proposed), T-0251 registers + tile toggle,
   T-0252–T-0255 public capture (blocked TD-410, ADR 0013 proposed), T-0256 notify action,
-  T-0257 follow-ups + tagout gate, T-0258/T-0259 screens, T-0260 equipment.activate, T-0261
+  T-0257 follow-ups + tagout gate (node/Item; equipment part T-0288, waits on TD-411), T-0258/T-0259 screens, T-0260 equipment.activate, T-0261
   credential.activate, T-0262 two-lane window, T-0263 banner, T-0264 SLA for overrides and
   follow-ups, T-0265 material_cert.verify (Phase 2), T-0266/T-0267 readiness conflicts,
   T-0268 offline batch bundle (Phase 3). Where the paste disagreed with the spec, the spec won:
@@ -326,7 +326,7 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
 - **2026-11-21 — AI ITP authoring, rule-based ITP instantiation and propagation, scope-drift
   watchdog (user-supplied T-0187, T-0188, T-0189; planner pass):** spec in
   `quality-and-inspection.md` §ITP authoring, assignment and propagation, `change-of-scope.md`
-  §5 (outbox consumer), ADR 0004 Amendment H (rule kind `itp_assignment`, pending TD-430). The
+  §5 (outbox consumer), ADR 0004 Amendment H (rule kind `itp_assignment`, in force as a planner default; TD-430 may revise it before the M1 freeze). The
   user's ids were free on every branch and are kept. Phase 1: T-0188 (rules, manual
   instantiation, auto-generate proposals, Approve & Activate; M), T-0281 (instance edits +
   propagation API; M), T-0282 (activation matrix UI; M), T-0283 (propagation wizard UI; S).
@@ -364,5 +364,5 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
 | Region (2026-11-13) | Per-deployment setting: AWS `ap-southeast-2` for Australian deployments (diff §4.4) |
 
 ## Open decisions (see `TODO.md`)
-TD-410 (public capture links, ADR 0013 proposed), TD-411 (equipment as an inspection anchor, ADR 0014 proposed), TD-412 (fleet in the Phase-1 equipment register), TD-418 (escalation and approval authority), TD-419 (calendar iCal feed), TD-422 (PER-13 shelf-life approval), TD-423 (self-approval of internal-QA substitutions), TD-096 (coating/Grating ITR, with the client; interim confirmed 2026-11-15), TD-293 (shared tablets in the pilot, ask the pilot team before go-live), TD-004 (hosting target), TD-072 (ADR 0004 rule-set defaults per project), TD-073 (handover first-shift trigger),
+TD-410 (public capture links, ADR 0013 proposed), TD-411 (equipment as an inspection anchor, ADR 0014 proposed), TD-412 (fleet in the Phase-1 equipment register), TD-418 (escalation and approval authority), TD-419 (calendar iCal feed), TD-422 (PER-13 shelf-life approval), TD-423 (self-approval of internal-QA substitutions), TD-426 (system admin impersonation, ADR 0015 proposed, blocks T-0277–T-0280), TD-427 (access logging of system_admin reads without membership, ADR 0016), TD-430 (ADR 0004 Amendment H rule kind `itp_assignment`, planner default in force until revised), TD-431 (QA reviewer self-verification of own uploads), TD-096 (coating/Grating ITR, with the client; interim confirmed 2026-11-15), TD-293 (shared tablets in the pilot, ask the pilot team before go-live), TD-004 (hosting target), TD-072 (ADR 0004 rule-set defaults per project), TD-073 (handover first-shift trigger),
 TD-039 (dropped AIP-proposal extras). TD-013 (review-gate ignores tracker) is resolved by T-0029. TD-002/005/007/008/009/012 are resolved by this merge; TD-001 by ADR 0001 (`docs/decisions/`). TD-002 is carried into code by ADR 0002 (`docs/decisions/0002-port-one-engine.md`). TD-034 (remaining Inspection-ERP core packages) is resolved by ADR 0007. TD-003 (SSO vs local JWT) is resolved; the SSO spec is diff §4.5 (TD-043 resolved 2026-11-14). Resolved 2026-11-14 by the product owner: TD-257 (offline grace binds; window is an upper bound), TD-136 (magic links PER-14 only, T-0057) and TD-262 (externals create their own password, reset by e-mail); TD-084 (outbound e-mail) resolved by diff §4.6. Resolved 2026-11-15 by the product owner: TD-224 (per-mailbox magic-link cap), TD-213 (object key layout), TD-271 (T-0079), TD-261 (PER-15 password/SSO) and TD-223 (PR principals; residual risk TD-276). Resolved 2026-11-15 (second batch): TD-283 (one account per device id, per-account client store; follow-up TD-293), TD-281 (rule-set upgrade permissions, ADR 0004 Amendment G) and TD-285 (native-origin allow-list); TD-286 and TD-291 (device risks) accepted for development and covered by T-0080 before pilot go-live.

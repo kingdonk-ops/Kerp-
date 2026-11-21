@@ -441,7 +441,8 @@ links for Field Workers only (diff §4.2), so it needs an explicit, documented e
 
 Template-level rules that run after an inspection reaches `SUBMITTED` (authenticated and, once
 accepted, public). Tasks: T-0180 (store, engine, `update_target_fields`), T-0256
-(`notify_users`), T-0257 (`create_action_task`, tagout gate), T-0258/T-0259 (screens).
+(`notify_users`), T-0257 (`create_action_task`, tagout gate for node/Item), T-0288 (equipment follow-ups and
+the `equipment.activate` tagout provider; waits on TD-411), T-0258/T-0259 (screens).
 
 - **Rule** `oe_inspections_post_action` (paste: `oe_inspection_post_action`): `sort_order`,
   `name`, `enabled`, `trigger_cel` (CEL bool over `answers`, `result`, `category`, `inspection`,
@@ -497,8 +498,10 @@ substitution drafts; §Product substitutions there), T-0262 (window).
   to the QA reviewer persona.
 - **Non-QA upload routing:** an upload by a user without QA authority is `pending_qa_verification`
   (equipment) / `pending_verification` (credential, MTR) even when SAQ OCR matches, and creates an
-  item with a deep-link notification; a QA reviewer's own upload may be verified at once (still an
-  item, audited). The T-0112 OCR-discrepancy review is routed into this queue (TD-416).
+  item with a deep-link notification. A QA reviewer's own upload creates a pending item like any
+  other, decided by a different QA-authority holder; it is auto-verified only when the project's
+  effective `allow_self_approval` (T-0140) is true, and is then flagged `self_approved` in the
+  ledger (TD-431). The T-0112 OCR-discrepancy review is routed into this queue (TD-416).
 - **Decisions:** Accept/Verify (target verified and active, prior certificate superseded and
   locked, ledger, uploader notified); Reject (mandatory non-blank reason, target stays inactive,
   optional rectification follow-up); Reassign/Forward (user or persona + note). Nobody decides an
@@ -552,7 +555,7 @@ check of the owning modules (§eligibility service).
 Tasks T-0266 (engine, inspections), T-0267 (P6). Rendering belongs to the calendar (E-04-15) and
 the Look-Ahead board (E-04-02).
 
-- `oe_schedule_readiness_conflict` (`BaseRecordMixin` + project RLS): resource (`resource_kind`,
+- `oe_compliance_readiness_conflict` (`BaseRecordMixin` + project RLS): resource (`resource_kind`,
   id, label, `expiry_date`), target (`target_kind` `p6_activity | work_plan_line |
   scheduled_inspection`, id, label, planned start/finish), `anchor_node_id`, `status` (`open |
   acknowledged | resolved`), `last_notified_at`, `resolved_at`; unique `(project_id,
@@ -613,7 +616,7 @@ status `pending_qa_review | active | superseded`) and, when active, one `kind = 
 line in `PENDING` (linked by `itp_instance_id`).
 
 **Assignment and activation (T-0188, phase 1).** Rule kind `itp_assignment` (ADR 0004
-Amendment H, pending TD-430) maps anchor, Item and activity attributes to a template key, for
+Amendment H, a planner default TD-430 may revise) maps anchor, Item and activity attributes to a template key, for
 example "coatings ITP for Blast & Paint, piping welding ITP for Weld". Manual instantiation
 applies a published revision to selected anchors. **Auto-generate** evaluates the rules over a
 subtree in a `batch` job and writes **proposals only**: instances in `pending_qa_review` without

@@ -3,9 +3,9 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 288 · **Closed:** 135
+**Open:** 289 · **Closed:** 135
 
-## decision (29)
+## decision (30)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -27,7 +27,7 @@
 | [TD-404](../tracker/todo/TD-404.md) | Pilot-0: is the ClamAV scanner (T-0218) required live in the pilot deployment, or is the stub with KERP_UPLOAD_SCANNER_ALLOW_STUB accepted for the pilot? | T-0218, T-0146 | planner |
 | [TD-407](../tracker/todo/TD-407.md) | Admin 'Resend invite' for an invited user: re-send the user's pending project invites (T-0052) or a password-setup e-mail, never a magic link for non-Field-Workers; via core mail, not notifications | T-0244 | planner |
 | [TD-410](../tracker/todo/TD-410.md) | Public unauthenticated inspection capture links (pasted T-0179 part 2/3): accept ADR 0013 (no-JWT endpoint, tenant from deployment config, project bound from the link token) or keep capture authenticated (PER-14 magic link)? | T-0252, T-0253, T-0254, T-0255 | planner |
-| [TD-411](../tracker/todo/TD-411.md) | Equipment (oe_equipment_asset) as an inspection anchor: accept ADR 0014 amending ADR 0003 (a third exclusive anchor for standalone equipment inspections only)? | T-0250, T-0111 | planner |
+| [TD-411](../tracker/todo/TD-411.md) | Equipment (oe_equipment_asset) as an inspection anchor: accept ADR 0014 amending ADR 0003 (a third exclusive anchor for standalone equipment inspections only)? | T-0250, T-0111, T-0288 | planner |
 | [TD-412](../tracker/todo/TD-412.md) | Fleet vehicles and plant in the Phase-1 equipment register: pull this part of E-03-07 into Phase 1 (equipment_class, requires_calibration, custodian) or wait for Phase 3? | T-0249, T-0112, E-03-07 | planner |
 | [TD-413](../tracker/todo/TD-413.md) | Post-submit notify_users: SMS has no channel and e-mail may not carry project data beyond code and name (diff §4.6) — confirm in-app + push + e-mail link only | T-0256 | planner |
 | [TD-414](../tracker/todo/TD-414.md) | QA verification gates on existing records: which equipment, credentials and heat/MTR records count as verified when T-0260/T-0261/T-0265 land, and do imports start unverified? | T-0260, T-0261, T-0265 | planner |
@@ -38,6 +38,7 @@
 | [TD-426](../tracker/todo/TD-426.md) | System admin impersonation (user's pasted 'T-0076'): may a system_admin act as another user, or only view as them? Accept ADR 0015 with (a) full impersonation, (b) admin-member projects only, (c) read-only view-as, or (d) target consent by one-time code | T-0277, T-0278, T-0279, T-0280 | planner |
 | [TD-427](../tracker/todo/TD-427.md) | system_admin global visibility (ADR 0016): should reads of project records by a system_admin who holds no membership on that project be access-logged? | T-0274, T-0275 | planner |
 | [TD-429](../tracker/todo/TD-429.md) | Pasted 'pending_qa_review' is not an inspection lifecycle state: keep auto-generated ITPs out of oe_inspections_inspection until QA activates them (planner default), or add a new state? And re-pinning PENDING lines on master propagation | T-0188, T-0281 | planner |
+| [TD-431](../tracker/todo/TD-431.md) | QA reviewer's own certificate/credential/MTR upload: verify immediately (user's T-0181 paste) or four eyes (TD-070 default)? | T-0181, T-0260, T-0261, T-0265 | planner |
 
 ## spec-gap (58)
 
@@ -279,7 +280,7 @@
 | [TD-392](../tracker/todo/TD-392.md) | Device registry: scoped admin device list endpoint (System admin: all users; PER-09: its projects' members) to replace the client's per-user fan-out | T-0051 | implementer |
 | [TD-393](../tracker/todo/TD-393.md) | Expose is_system_admin on GET /auth/me so the client need not probe GET /admin/grants for Admin nav visibility | T-0051 | implementer |
 | [TD-403](../tracker/todo/TD-403.md) | Stats and export providers for modules that land later: NCR, punch, equipment, credentials, materials/MTR, MDR, welding | T-0219, T-0235 | planner |
-| [TD-415](../tracker/todo/TD-415.md) | Inspection follow-ups (oe_inspections_follow_up) move to the generic tasks module when E-04-07 is broken down | T-0257, E-04-07 | planner |
+| [TD-415](../tracker/todo/TD-415.md) | Inspection follow-ups (oe_inspections_follow_up) move to the generic tasks module when E-04-07 is broken down | T-0257, T-0288, E-04-07 | planner |
 
 ## bug (6)
 
