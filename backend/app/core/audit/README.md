@@ -12,8 +12,8 @@ table is on `Base.metadata` for Alembic and the contract tests.
 | File | What |
 |---|---|
 | `models.py` | `AuditEntry` (`audit_ledger`, `BaseRecordMixin`), ORM append-only guard, `AppendOnlyError` |
-| `hashing.py` | canonical JSON, `compute_content_hash`, `verify_entries`, `ChainReport` (pure, no DB) |
-| `service.py` | `append`, `chain_entries`, `verify_chain` |
+| `hashing.py` | canonical JSON, `compute_content_hash`, `find_problems` / `ChainProblem`, `verify_entries`, `ChainReport` (pure, no DB) |
+| `service.py` | `append`, `chain_entries`, `verify_chain`; read helpers across scopes (T-0222, *Reading across scopes* below): `list_entries` / `EntryFilter`, `verify_scoped_chain`, `verify_readable_chains` / `LedgerReport` |
 | `guard.py` | PostgreSQL REVOKE + trigger DDL (`ledger_guard_sql`, frozen into migration `0002`) and `ledger_guard_problems` |
 
 ## Using it
@@ -67,6 +67,37 @@ from that binding, never from arguments.
   impossible in the table, but an export can carry). In-database verification cannot detect
   the newest entries being removed, or a chain rewritten with recomputed hashes by the table
   owner or a superuser. Anchoring head hashes outside the database is **TD-058**.
+
+## Reading across scopes (T-0222, diff §4.7 Audit explorer)
+
+`append`, `chain_entries` and `verify_chain` stay on the session's own scope. Three read-only
+helpers serve the admin audit explorer (`app/modules/admin`, the only caller): they see every
+entry the session can read under its normal RLS and ORM scope, which for an `is_system_admin`
+session is the tenant-level chains plus the chains of every project of its tenant (ADR 0016),
+never another tenant's. Each filters on the session's tenant explicitly, and a single chain is
+named with its scope, never guessed from what is visible (visibility is not scope). Core
+imports no module for them, and none of them writes.
+
+- `list_entries(session, EntryFilter(...), limit=, after=)`: newest first by
+  `(created_at, id)`; `after` is the pair of the previous page's last entry (keyset paging, so
+  entries appended meanwhile never shift a page). Filters: `actor_id` (`created_by`),
+  `device_id`, `chain_key_prefix` (literal: `%` and `_` are escaped), `event` (the payload's
+  top-level `event` string), `flag` (a top-level payload key that is the boolean `true`, e.g.
+  `sod_warning`; a `"true"` string or `1` does not match; key must match `FLAG_PATTERN`),
+  `created_from` (inclusive) and `created_to` (exclusive). The payload filters are JSONB
+  containment on PostgreSQL and `json_type` / `json_extract` on SQLite (TD-402: there is no
+  event column). No index serves these yet (TD-489).
+- `verify_scoped_chain(session, chain_key, project_id)`: `verify_chain` for the named scope
+  (`None` = tenant level). A chain the session cannot see has `length` 0.
+- `verify_readable_chains(session)`: verifies every visible chain of the tenant in one
+  streamed statement ordered by `(scope_id, chain_key, seq)` (one snapshot, memory bounded by
+  the longest chain) and returns `LedgerReport(chains, entries, broken, first_broken)`;
+  `first_broken` is the first broken chain in that order (tenant level first) with the `seq`
+  of its first finding. Heavy: call it from a batch job.
+
+`find_problems` returns the findings as `ChainProblem(seq, message)`; `verify_entries` keeps
+its texts (`"seq <n>: <message>"`), and `ChainReport.first_broken_seq` is the `seq` of the first
+finding (after a removed entry: the entry behind the gap).
 
 ## Device id and hash versions (T-0043, ADR 0010)
 

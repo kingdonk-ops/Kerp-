@@ -12,7 +12,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 from enum import StrEnum
-from typing import Annotated, Final, Literal, Self
+from typing import Annotated, Any, Final, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
@@ -314,6 +314,59 @@ class InviteRefusal(BaseModel):
         "INVITE_NOT_RESENDABLE",
         "INVITE_SIGN_IN_REQUIRED",
     ]
+
+
+# --- System console: audit explorer (T-0222, diff §4.7) --------------------------------------
+
+
+class AuditEntryRead(BaseModel):
+    """One ledger entry, as written (``actor_id`` is the entry's ``created_by``)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    project_id: uuid.UUID | None
+    chain_key: str
+    seq: int
+    created_at: datetime
+    actor_id: uuid.UUID | None = Field(validation_alias="created_by")
+    device_id: uuid.UUID | None
+    source: str
+    payload: dict[str, Any]
+    prev_hash: str
+    content_hash: str
+    hash_version: int
+
+
+class AuditPageRead(BaseModel):
+    """``GET /admin/system/audit``: a page, newest first; pass ``next_cursor`` as ``cursor``."""
+
+    items: list[AuditEntryRead]
+    next_cursor: str | None
+
+
+class ChainVerifyIn(BaseModel):
+    """``POST /admin/system/audit/verify``: the chain key and its scope (a project, or
+    ``null`` for the tenant level); the same key in two scopes is two chains."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    chain_key: Annotated[str, StringConstraints(min_length=1, max_length=200)]
+    project_id: uuid.UUID | None = None
+
+
+class ChainVerifyRead(BaseModel):
+    """The verification report: ``first_broken_seq`` is the first entry that fails a ledger
+    rule (after a removed entry: the one behind the gap); ``problems`` holds at most 100."""
+
+    chain_key: str
+    project_id: uuid.UUID | None
+    ok: bool
+    length: int
+    head_hash: str
+    first_broken_seq: int | None
+    problem_count: int
+    problems: list[str]
 
 
 # --- System console: queue monitor (T-0218, diff §4.7) ---------------------------------------

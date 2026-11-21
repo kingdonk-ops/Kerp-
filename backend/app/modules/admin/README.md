@@ -11,6 +11,7 @@ stays in code and RLS but is never taken or returned by this API.
 | `router.py` | `/api/v1/admin/...` (below) |
 | `system_router.py` | System console (diff §4.7): the queue monitor (T-0218, *System console* below); it calls the jobs service only |
 | `invites.py`, `invites_router.py` | Project invites (T-0052, *Project invites* below): `oe_admin_project_invite` (`ProjectInvite` in `models.py`, own `project_invite` RLS policy; migration `0030`), the invite service, the post-authentication hook and the magic-link eligibility provider registered with core auth, and the invite endpoints |
+| `audit_explorer.py`, `audit_router.py`, `audit_jobs.py`, `jobs.py` | Audit explorer (T-0222, *Audit explorer* below): the service, its endpoints and the `admin.audit_verify_all` batch job (`jobs.py` is what the module loader imports) |
 
 ## Admin grants
 
@@ -281,6 +282,37 @@ and reason; the invitee by account id) and `project-invites` (`refuse` of a toke
 no invite), `admin-system:<tenant>` (System console: `job_retried`, `job_aborted` with job id,
 kind, queue and project id; T-0218). Invite entries never carry a token, a hash, a password or an e-mail address. An accepted invite also writes the usual
 `assign` entry on `project-members:<project>`.
+
+## Audit explorer (`/api/v1/admin/system/audit`, T-0222, diff §4.7)
+
+Part of the System console: `system_admin` only, 403 for everyone else (a PER-09 of every
+project included). Read-only over the hash-chain ledger: there is no endpoint that updates or
+deletes a ledger row (a test checks the route table), and every read goes through
+`app/core/audit/service.py` (*Reading across scopes* in its README). Entries are read under the
+caller's normal RLS: the tenant-level chains and the chains of every project of the tenant,
+without a membership (ADR 0016), never another tenant's.
+
+| Endpoint | Answer |
+|---|---|
+| `GET /system/audit` | `{items, next_cursor}`, newest first. Filters: `actor_id`, `device_id`, `chain_key_prefix` (entity type, e.g. `admin-grant:`), `event` (payload `event` key), `flag` (payload key that is `true`, e.g. `sod_warning`; TD-402), `created_from` (inclusive) / `created_to` (exclusive), both with a UTC offset. Keyset paging: `limit` (1–200, default 50) and `cursor` (the previous `next_cursor`; opaque). An item: `id`, `project_id` (`null` = tenant level), `chain_key`, `seq`, `created_at`, `actor_id`, `device_id`, `source`, `payload`, `prev_hash`, `content_hash`, `hash_version`. Invalid filter or cursor: 422 |
+| `POST /system/audit/verify` | body `{chain_key, project_id}` (`project_id` `null` = the tenant-level chain; the same key in two scopes is two chains). Synchronous report: `ok`, `length`, `head_hash`, `first_broken_seq`, `problem_count`, `problems` (at most 100 texts). Checks contiguous `seq`, the `prev_hash` links and the recomputed `content_hash`. No visible entry: 404 |
+| `POST /system/audit/verify-all` | 202 `{id, kind: admin.audit_verify_all, status: queued}`: a `batch` job; poll `GET /api/v1/jobs/{id}`. Its `result`: `ok`, `chains`, `entries`, `broken_chains`, `first_broken` (`{project_id, chain_key, seq}` or `null`; first in scope and chain-key order, tenant level first) |
+
+The job is tenant-level, and the worker binds it without any admin flag. The handler re-checks
+at job start that the user who asked (`requested_by`, set by the endpoint, never by a client:
+the kind is not an `api` kind) still holds `system_admin`, and only then binds
+`is_system_admin` for the read (ADR 0016); otherwise the job fails. It runs for up to an hour
+in one pass (TD-489). The job row is tenant-level, so until the jobs API has a per-kind check
+(TD-156) a tenant user who knows the job id can poll its report (counts and one chain key).
+
+Listing is not ledgered. Both verifications are (diff §4.7: every console action; TD-488), on
+`admin-system:<tenant>` with the caller as actor: `audit_chain_verified` (chain key, project
+id, `ok`, `length`, `first_broken_seq`), `audit_verify_all_requested` (job id; same
+transaction as the job row) and `audit_verify_all_finished` (job id and the report). The
+impersonator filter arrives with T-0279; anchoring chain heads outside the database is TD-058.
+
+Tests: `tests/test_audit_explorer.py` (SQLite and PostgreSQL; the tampered chains are edited
+behind the triggers as in `tests/test_audit_ledger.py`).
 
 ## Tests
 

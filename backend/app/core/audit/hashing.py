@@ -136,32 +136,48 @@ def compute_content_hash(entry: LedgerRecord) -> str:
     return hashlib.sha256(HASH_DOMAIN + canonical_json(body)).hexdigest()
 
 
-def verify_entries(entries: Sequence[LedgerRecord]) -> list[str]:
+@dataclass(frozen=True, slots=True)
+class ChainProblem:
+    """One verification finding: the ``seq`` of the entry it was found at, and what."""
+
+    seq: int
+    message: str
+
+
+def find_problems(entries: Sequence[LedgerRecord]) -> list[ChainProblem]:
     """Problems in one chain, given its entries in ``seq`` order (empty = intact).
 
-    Detects an edited entry (hash mismatch), a removed entry (``seq`` gap), entries out of
-    order or renumbered, a broken ``prev_hash`` link and a soft-deleted entry. It cannot
-    detect removal of the newest entries; that needs an anchored head hash (TD-058).
+    Detects an edited entry (hash mismatch), a removed entry (``seq`` gap, reported at the
+    entry after the gap), entries out of order or renumbered, a broken ``prev_hash`` link and
+    a soft-deleted entry. It cannot detect removal of the newest entries; that needs an
+    anchored head hash (TD-058).
     """
-    problems: list[str] = []
+    problems: list[ChainProblem] = []
     previous_hash, expected = GENESIS_HASH, 1
     for entry in entries:
-        label = f"seq {entry.seq}"
-        if entry.seq != expected:
-            problems.append(f"{label}: expected seq {expected} (entry missing or out of order)")
+        seq = entry.seq
+        if seq != expected:
+            problems.append(
+                ChainProblem(seq, f"expected seq {expected} (entry missing or out of order)")
+            )
         elif entry.prev_hash != previous_hash:
-            problems.append(f"{label}: prev_hash does not match the previous entry")
+            problems.append(ChainProblem(seq, "prev_hash does not match the previous entry"))
         try:
             intact = compute_content_hash(entry) == entry.content_hash
         except ValueError as exc:
-            problems.append(f"{label}: {exc}")
+            problems.append(ChainProblem(seq, str(exc)))
         else:
             if not intact:
-                problems.append(f"{label}: content_hash does not match the entry")
+                problems.append(ChainProblem(seq, "content_hash does not match the entry"))
         if entry.deleted_at is not None:
-            problems.append(f"{label}: entry is marked deleted")
-        previous_hash, expected = entry.content_hash, entry.seq + 1
+            problems.append(ChainProblem(seq, "entry is marked deleted"))
+        previous_hash, expected = entry.content_hash, seq + 1
     return problems
+
+
+def verify_entries(entries: Sequence[LedgerRecord]) -> list[str]:
+    """``find_problems`` as texts: ``"seq <n>: <what>"`` per finding (empty = intact)."""
+    return [f"seq {p.seq}: {p.message}" for p in find_problems(entries)]
 
 
 @dataclass(frozen=True, slots=True)
@@ -172,6 +188,8 @@ class ChainReport:
     length: int
     head_hash: str
     problems: list[str] = field(default_factory=list)
+    # ``seq`` of the first entry that fails a ledger rule (after a gap: the entry behind it).
+    first_broken_seq: int | None = None
 
     @property
     def ok(self) -> bool:
