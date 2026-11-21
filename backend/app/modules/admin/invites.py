@@ -69,7 +69,7 @@ from sqlalchemy.orm import Session
 from app.core.audit import service as audit
 from app.core.auth import memberships
 from app.core.auth import service as users
-from app.core.auth.access import Grant, Persona, sod_warning
+from app.core.auth.access import Grant, Persona, sod_warning, system_admin_holders
 from app.core.auth.magic_link import MagicLinkCandidate, register_magic_link_eligibility
 from app.core.auth.models import User, normalize_email
 from app.core.auth.password_policy import PasswordPolicyError
@@ -424,13 +424,16 @@ def create_invite(
     _check_send_cap(rows, now)
     user = users.find_user_by_email(session, address)
     held: set[Persona] = set()
+    is_admin = False
     if user is not None:
         member = memberships.project_member_grants(session, project_id).get(user.id, set())
         held = {m.grant.persona for m in member}
-    warn = sod_warning([*(g.persona for g in wanted), *held])
+        is_admin = bool(system_admin_holders(session, context.tenant_id, [user.id]))
+    warn = sod_warning([*(g.persona for g in wanted), *held], system_admin=is_admin)
     if warn and not confirm_sod:
         raise admin.SodConfirmationError(
-            "PER-09 together with a hold-authority persona: confirm with confirm_sod"
+            "PER-09 or system_admin together with a hold-authority persona:"
+            " confirm with confirm_sod"
         )
     if user is None:
         try:

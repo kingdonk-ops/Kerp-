@@ -26,12 +26,14 @@ const ALPHA: ProjectSummary = {
   code: "SYN-001",
   name: "Alpha Synthetic Unit",
   personas: ["PER-02"],
+  access: "member",
 };
 const BETA: ProjectSummary = {
   id: "00000000-0000-4000-8000-00000000b002",
   code: "SYN-002",
   name: "Beta Synthetic Unit",
   personas: ["PER-02"],
+  access: "member",
 };
 
 function land(

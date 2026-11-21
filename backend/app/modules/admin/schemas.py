@@ -173,6 +173,11 @@ class AdminGrantIn(BaseModel):
 
     user_id: uuid.UUID
     grant: AdminGrantKind
+    confirm_sod: bool = Field(
+        default=False,
+        description="Confirms system_admin for a user who holds a hold-authority persona"
+        " (PER-02, PER-06, PER-07, PER-11) on a live project (else 409 sod_warning; ADR 0016)",
+    )
 
 
 class AdminGrantRead(BaseModel):
@@ -180,6 +185,15 @@ class AdminGrantRead(BaseModel):
     email: str
     display_name: str
     grant: AdminGrantKind
+
+
+class AdminGranted(AdminGrantRead):
+    """``POST /admin/grants``: the grant, and whether it combined ``system_admin`` with a
+    hold-authority persona (confirmed with ``confirm_sod``, audited ``sod_warning: true``)."""
+
+    sod_warning: bool = Field(
+        description="system_admin given to a holder of a hold-authority persona (ADR 0016)"
+    )
 
 
 # --- project invites (T-0052) ---------------------------------------------------------------

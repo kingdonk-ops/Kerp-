@@ -15,8 +15,9 @@ are audited by core on ``membership:<project>``.
 
 **Separation of duties** (ADR 0008): a change that would give a hold-authority persona
 (PER-02, PER-06, PER-07, PER-11) on a linked project to a user who holds individual PER-09
-there raises ``SodConfirmationError`` (409 ``sod_warning``) before anything is written,
-unless ``confirm_sod``; a confirmed change is audited with ``sod_warning: true``.
+there, or holds ``system_admin`` (ADR 0016), raises ``SodConfirmationError`` (409
+``sod_warning``) before anything is written, unless ``confirm_sod``; a confirmed change is
+audited with ``sod_warning: true``.
 
 **Read contract** (the module's public API for other modules; see ``README.md``): soft-deleted
 teams, members and links are ignored, and a member counts only while their account is active.
@@ -48,7 +49,7 @@ from sqlalchemy.orm import Session
 from app.core.audit import service as audit
 from app.core.auth import memberships, team_grants
 from app.core.auth import service as users
-from app.core.auth.access import HOLD_AUTHORITY, Persona
+from app.core.auth.access import HOLD_AUTHORITY, Persona, system_admin_holders
 from app.core.auth.models import User
 from app.core.tenancy.rls import session_tenancy
 from app.core.tenancy.scope import get_or_404
@@ -66,8 +67,8 @@ class InvalidMemberError(ValueError):
 
 
 class SodConfirmationError(ValueError):
-    """Individual PER-09 would meet a hold-authority persona from this team (409). Nothing
-    has been written; retry with ``confirm_sod``."""
+    """Individual PER-09 or ``system_admin`` would meet a hold-authority persona from this
+    team (409). Nothing has been written; retry with ``confirm_sod``."""
 
     def __init__(self, user_ids: Iterable[uuid.UUID], project_ids: Iterable[uuid.UUID]) -> None:
         self.user_ids = sorted(set(user_ids), key=str)
@@ -367,6 +368,18 @@ def _individual_admins(session: Session, project_id: uuid.UUID) -> set[uuid.UUID
     }
 
 
+def _sod_users(
+    session: Session, project_id: uuid.UUID, candidates: Collection[uuid.UUID]
+) -> set[uuid.UUID]:
+    """The ``candidates`` a hold-authority persona on the project must warn about: individual
+    PER-09 holders there (TD-151) and ``system_admin`` holders (ADR 0016, diff §4.1)."""
+    if not candidates:
+        return set()
+    admins = _individual_admins(session, project_id)
+    admins |= system_admin_holders(session, _tenant_id(session), candidates)
+    return set(candidates) & admins
+
+
 def _is_hold(persona: str) -> bool:
     return Persona(persona) in HOLD_AUTHORITY
 
@@ -417,7 +430,7 @@ def add_member(
     sod_projects = [  # a deleted project's link confers nothing, so it never triggers SoD
         link.linked_project_id
         for link in _live_project_links(session, links)
-        if _is_hold(link.persona) and user_id in _individual_admins(session, link.linked_project_id)
+        if _is_hold(link.persona) and _sod_users(session, link.linked_project_id, {user_id})
     ]
     if sod_projects and not confirm_sod:
         raise SodConfirmationError([user_id], sod_projects)
@@ -494,7 +507,7 @@ def set_link(
     if link is not None and (link.persona, link.site_node_id) == (persona.value, site_node_id):
         return link, False
     members = _live_members(session, [team.id])[team.id]
-    sod_users = members & _individual_admins(session, project_id) if _is_hold(persona) else set()
+    sod_users = _sod_users(session, project_id, members) if _is_hold(persona) else set()
     if sod_users and not confirm_sod:
         raise SodConfirmationError(sod_users, [project_id])
     payload: dict[str, Any] = {"project_id": str(project_id)}
@@ -648,7 +661,7 @@ def _sod_pending(
     while the derived row was missing)."""
     if not missing or not _is_hold(link.persona):
         return frozenset()
-    admins = _individual_admins(session, link.linked_project_id)
+    admins = _sod_users(session, link.linked_project_id, {t[0] for t in missing})
     return frozenset(t for t in missing if t[0] in admins)
 
 

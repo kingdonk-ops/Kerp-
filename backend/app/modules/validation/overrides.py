@@ -302,7 +302,10 @@ def request_override(
         raise OverrideError("the record was checked again since; request on the latest finding")
     record_type, record_id = target
     requester = _personas(session, context, actor)
-    if not requester:
+    # A system_admin requests like a PER-09 member without a membership (ADR 0016, T-0275);
+    # deciding still needs the approver persona (``_decide``).
+    admin = context.is_system_admin and actor == context.user_id
+    if not requester and not admin:
         raise OverridePermissionError("only a member of the project can request an override")
     persona = route_approver(requester)
     candidates = [

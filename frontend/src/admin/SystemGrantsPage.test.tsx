@@ -45,7 +45,17 @@ describe("admin grants (System admins)", () => {
     expect(calls.find((c: Recorded) => c.method === "POST" && c.path === "/api/v1/admin/grants")?.body).toEqual({
       user_id: PLANNER.id,
       grant: "create_projects",
+      confirm_sod: false,
     });
+  });
+
+  it("does not call a refused appointment (SoD, 409 on POST) the last System admin", async () => {
+    const sod = { detail: { code: "sod_confirmation_required", sod_warning: true } };
+    renderAdmin(PATH, handlers({ "POST /api/v1/admin/grants": () => json(sod, 409) }), { projects: [], systemAdmin: true });
+    await loaded();
+    fireEvent.click(box("admin.system.systemAdmin", "Synthetic Planner"));
+    expect(await screen.findByText(i18n.t("admin.actionError"), {}, WAIT)).toBeInTheDocument();
+    expect(screen.queryByText(i18n.t("admin.system.lastSystemAdmin"))).not.toBeInTheDocument();
   });
 
   it("says so when the last System admin would be removed (409)", async () => {

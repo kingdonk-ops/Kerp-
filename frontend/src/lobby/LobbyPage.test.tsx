@@ -31,7 +31,7 @@ const MATCH: CodeMatch = {
   lookup_ticket: "synthetic-ticket-1",
   lookup_ticket_expires_at: "2026-11-20T08:15:00Z",
 };
-const TANK_MEMBERSHIP: ProjectSummary = { id: TANK.id, code: TANK.code, name: TANK.name, personas: ["PER-14"] };
+const TANK_MEMBERSHIP: ProjectSummary = { id: TANK.id, code: TANK.code, name: TANK.name, personas: ["PER-14"], access: "member" };
 
 function req(extra: Partial<MyRequest> = {}): MyRequest {
   return {
@@ -279,7 +279,7 @@ describe("Active requests panel", () => {
     expect(button(i18n.t("lobby.requests.requestAgain"), pending)).toBeEnabled();
     expect(count(calls, "POST", `/api/v1/access-requests/${req().id}/withdraw`)).toBe(1);
 
-    projects = [{ id: JETTY.id, code: JETTY.code, name: JETTY.name, personas: ["PER-14"] }];
+    projects = [{ id: JETTY.id, code: JETTY.code, name: JETTY.name, personas: ["PER-14"], access: "member" }];
     fireEvent.click(button(i18n.t("lobby.requests.openProject"), approved));
     expect(await screen.findByTestId("scope-indicator")).toHaveTextContent(
       i18n.t("scope.projectOption", { code: JETTY.code, name: JETTY.name }),

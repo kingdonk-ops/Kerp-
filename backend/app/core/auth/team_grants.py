@@ -25,7 +25,8 @@ RLS refuses other sessions' writes to derived rows too). Each write that changes
 one audit entry per affected project on chain ``membership:<project_id>`` (link id, added and
 removed user ids, actor). Separation of duties is evaluated across sources:
 ``SodConfirmationRequired`` when a hold-authority persona would reach a user with individual
-PER-09 on the project, unless ``confirm_sod=True`` (then audited ``sod_warning: true``).
+PER-09 on the project or with ``system_admin`` (ADR 0016), unless ``confirm_sod=True`` (then
+audited ``sod_warning: true``).
 
 ``check_team_grants_at_startup`` fails closed when the teams module is not loaded but live
 derived rows exist.
@@ -43,7 +44,7 @@ from sqlalchemy.orm import Session
 
 from app.core.audit import service as audit
 from app.core.auth import service as users
-from app.core.auth.access import HOLD_AUTHORITY, PERSONAS, Persona, Scope
+from app.core.auth.access import HOLD_AUTHORITY, PERSONAS, Persona, Scope, system_admin_holders
 from app.core.auth.models import (
     MEMBERSHIP_TABLE,
     SOURCE_DIRECT,
@@ -199,7 +200,15 @@ def sync_team_link_grants(
     gone = [r for r in live if _key(r) != key or r.user_id not in wanted]
     new_users = wanted - kept
     hold = chosen in HOLD_AUTHORITY
-    sod_users = new_users & _individual_admins(session, tenant_id, project_id) if hold else set()
+    sod_users = (
+        new_users
+        & (
+            _individual_admins(session, tenant_id, project_id)
+            | system_admin_holders(session, tenant_id, new_users)
+        )
+        if hold
+        else set()
+    )
     if sod_users and not confirm_sod:
         raise SodConfirmationRequired(project_id, sod_users)
     removed: dict[uuid.UUID, set[uuid.UUID]] = defaultdict(set)

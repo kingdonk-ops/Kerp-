@@ -12,10 +12,11 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
-from app.core.auth.access import Persona
+from app.core.auth.access import SYSTEM_ADMIN, Persona
 from app.core.auth.models import ProjectMembership
 from app.core.db import Database
 from app.core.tenancy.context import TenancyContext
+from app.modules.admin import service as admin_service
 from app.modules.projects import service as projects
 from app.modules.projects.schemas import ProjectCreate
 from app.modules.validation.defaults import SeedRuleSet
@@ -216,6 +217,28 @@ def test_per09_never_disables_deletes_or_changes_a_check_rule(api: Api) -> None:
         api.client.post(f"{project_set}/reset", headers=headers),
     ]
     assert [r.status_code for r in responses] == [403] * 5
+
+
+def test_a_non_member_system_admin_edits_like_per09_only(api: Api) -> None:
+    """ADR 0016, T-0275: PER-09 equivalent on every project: the digest set (PER-09's), never
+    a check rule (PER-06's, SoD), and never the tenant layer (PER-13/PER-01's)."""
+    with api.db.unit_of_work(TenancyContext(tenant_id=T1, is_system_admin=True)) as s:
+        # The outsider is PER-06 of the other project: the SoD warning is confirmed.
+        assert admin_service.grant(
+            s, api.ids["outsider"], SYSTEM_ADMIN, actor_id=None, confirm_sod=True
+        )
+    headers = api.as_("outsider")
+    listed = api.client.get(f"{API}/projects/{api.project}/rule-sets", headers=headers)
+    assert listed.status_code == 200
+    # Only this project's copy, though the admin can see every project's (ADR 0016).
+    assert {s["id"] for s in listed.json()} == set(api.project_sets.values())
+    digest =api.client.put(api.project_rule(DIGEST, "added"), json=DIGEST_RULE, headers=headers)
+    assert digest.status_code == 200, digest.text
+    check = api.client.put(api.project_rule(CHECK, "added"), json=RULE, headers=headers)
+    assert check.status_code == 403
+    photo = api.project_rule(CHECK, "photo")
+    assert api.client.post(f"{photo}/disable", headers=headers).status_code == 403
+    assert api.client.get(f"{API}/rule-sets", headers=headers).status_code == 403
 
 
 def test_a_non_member_and_a_foreign_set_are_404(api: Api) -> None:

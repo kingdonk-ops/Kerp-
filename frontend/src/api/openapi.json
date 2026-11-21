@@ -3715,7 +3715,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminGrantRead"
+                  "$ref": "#/components/schemas/AdminGranted"
                 }
               }
             }
@@ -3725,10 +3725,13 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminGrantRead"
+                  "$ref": "#/components/schemas/AdminGranted"
                 }
               }
             }
+          },
+          "409": {
+            "description": "system_admin for a hold-authority holder needs confirm_sod"
           },
           "422": {
             "description": "Validation Error",
@@ -7633,6 +7636,12 @@
           },
           "grant": {
             "$ref": "#/components/schemas/AdminGrantKind"
+          },
+          "confirm_sod": {
+            "type": "boolean",
+            "title": "Confirm Sod",
+            "description": "Confirms system_admin for a user who holds a hold-authority persona (PER-02, PER-06, PER-07, PER-11) on a live project (else 409 sod_warning; ADR 0016)",
+            "default": false
           }
         },
         "additionalProperties": false,
@@ -7680,6 +7689,41 @@
           "grant"
         ],
         "title": "AdminGrantRead"
+      },
+      "AdminGranted": {
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "User Id"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "grant": {
+            "$ref": "#/components/schemas/AdminGrantKind"
+          },
+          "sod_warning": {
+            "type": "boolean",
+            "title": "Sod Warning",
+            "description": "system_admin given to a holder of a hold-authority persona (ADR 0016)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "email",
+          "display_name",
+          "grant",
+          "sod_warning"
+        ],
+        "title": "AdminGranted",
+        "description": "``POST /admin/grants``: the grant, and whether it combined ``system_admin`` with a\nhold-authority persona (confirmed with ``confirm_sod``, audited ``sod_warning: true``)."
       },
       "Aggregate": {
         "properties": {
@@ -10184,7 +10228,7 @@
           "confirm_sod": {
             "type": "boolean",
             "title": "Confirm Sod",
-            "description": "Confirm a hold-authority persona for members who hold individual PER-09 on the project (else 409 sod_warning)",
+            "description": "Confirm a hold-authority persona for members who hold individual PER-09 on the project or system_admin (else 409 sod_warning)",
             "default": false
           }
         },
@@ -10702,7 +10746,7 @@
           "confirm_sod": {
             "type": "boolean",
             "title": "Confirm Sod",
-            "description": "Confirm that the user, an individual PER-09 of a linked project, gets a hold-authority persona there through this team (else 409 sod_warning)",
+            "description": "Confirm that the user, an individual PER-09 of a linked project or a system_admin, gets a hold-authority persona there through this team (else 409 sod_warning)",
             "default": false
           }
         },
@@ -10815,7 +10859,12 @@
               "$ref": "#/components/schemas/Persona"
             },
             "type": "array",
-            "title": "Personas"
+            "title": "Personas",
+            "description": "The caller's own personas on the project (empty for system_admin access)"
+          },
+          "access": {
+            "$ref": "#/components/schemas/ProjectAccessKind",
+            "description": "member: through a membership; system_admin: only through the caller's system_admin grant (ADR 0016)"
           }
         },
         "type": "object",
@@ -10823,7 +10872,8 @@
           "id",
           "code",
           "name",
-          "personas"
+          "personas",
+          "access"
         ],
         "title": "MyProject",
         "description": "One project of the caller, for the project picker (T-0042)."
@@ -12004,6 +12054,15 @@
         "title": "PresignedRead",
         "description": "A request the client sends straight to object storage before ``expires_at``."
       },
+      "ProjectAccessKind": {
+        "type": "string",
+        "enum": [
+          "member",
+          "system_admin"
+        ],
+        "title": "ProjectAccessKind",
+        "description": "How the caller reaches a project (ADR 0016, T-0275): through a membership, or only\nthrough the ``system_admin`` grant (no membership on the project)."
+      },
       "ProjectCreate": {
         "properties": {
           "code": {
@@ -12149,6 +12208,10 @@
             "type": "string",
             "format": "date-time",
             "title": "Updated At"
+          },
+          "access": {
+            "$ref": "#/components/schemas/ProjectAccessKind",
+            "description": "member: the caller holds a membership on the project; system_admin: reached only through the caller's system_admin grant (ADR 0016)"
           }
         },
         "type": "object",
@@ -12164,7 +12227,8 @@
           "visible_in_lobby",
           "revision",
           "created_at",
-          "updated_at"
+          "updated_at",
+          "access"
         ],
         "title": "ProjectRead"
       },

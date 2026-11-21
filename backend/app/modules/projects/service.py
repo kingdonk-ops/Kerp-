@@ -74,6 +74,7 @@ __all__ = [
     "project_by_code",
     "set_lobby_visibility",
     "site_zone",
+    "tenant_projects",
     "update_project",
 ]
 
@@ -214,15 +215,23 @@ def bind_project(
     is rebound to the project scope resolved from the caller's memberships (never the
     request), and a deleted project is 404. Returns the caller's access to the project.
 
+    A ``system_admin`` (the flag the session was bound with, ADR 0016, T-0275) is answered as
+    a PER-09 member without a membership: ``V``/``C``/``E``/``admin``, never ``A``/``S``
+    unless its own personas give them. Without a membership it first gets 404 for an unknown,
+    deleted or other-tenant project, then 403 for a missing capability.
+
     The tenant-level objects loaded so far (the principal's user) are detached first: a
     session holding objects cannot be rebound (``bind_tenancy``).
     """
-    access = project_access(grants, project_id)
-    if require is not None and not access.has(require):
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Forbidden")
     base = session_tenancy(session) or TenancyContext(
         tenant_id=principal.tenant_id, user_id=principal.user_id
     )
+    is_admin = base.is_system_admin and base.user_id == principal.user_id
+    access = project_access(grants, project_id, system_admin=is_admin)
+    if require is not None and not access.has(require):
+        if not access.grants:
+            get_project(session, project_id)  # a non-member admin: 404 before 403
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Forbidden")
     session.expunge_all()
     bind_tenancy(session, resolve_scope(grants, base, project_id))
     get_project(session, project_id)
@@ -239,6 +248,13 @@ def list_projects(session: Session, project_ids: Collection[uuid.UUID]) -> list[
     if not project_ids:
         return []
     query = select(Project).where(Project.id.in_(list(project_ids))).order_by(Project.code)
+    return list(session.scalars(query))
+
+
+def tenant_projects(session: Session) -> list[Project]:
+    """Every live project of the session's tenant that the session can see, by code: all of
+    them for a ``system_admin`` session (ADR 0016), the described ones for anyone else."""
+    query = select(Project).where(Project.tenant_id == _tenant_id(session)).order_by(Project.code)
     return list(session.scalars(query))
 
 

@@ -244,7 +244,7 @@ describe("journey: System admin appoints a Project Admin → they create a proje
       i18n.t("admin.system.grantLabel", { grant: i18n.t("admin.system.projectAdmin"), name: planner.display_name }),
     ));
     expect(await screen.findByText(i18n.t("admin.system.saved"), {}, WAIT)).toBeInTheDocument();
-    expect(sys.find((c) => c.method === "POST")?.body).toEqual({ user_id: planner.id, grant: "create_projects" });
+    expect(sys.find((c) => c.method === "POST")?.body).toEqual({ user_id: planner.id, grant: "create_projects", confirm_sod: false });
     cleanup();
 
     // The new Project Admin (no project yet) creates one and becomes its PER-09.
