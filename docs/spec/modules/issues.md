@@ -3,7 +3,7 @@
 Covers MOD-09 (master spec). Decisions are the **product owner's (user, 2026-11-21)** unless
 marked **(planner default)**; planner defaults can be changed through a `decision` TODO.
 This replaces the separate `ncr` and `punchlist` modules of the earlier plan: tasks T-0116 and
-T-0117 are dropped and re-planned as T-0311–T-0322 and epic E-01-03 (§12). Pilot-0 gate
+T-0117 are dropped and re-planned as T-0311–T-0323 and epic E-01-03 (§12). Pilot-0 gate
 (user, 2026-11-21): T-0311–T-0314, T-0318, T-0319, T-0322.
 
 Anchors follow [ADR 0003](../../decisions/0003-configurable-breakdown-and-terminology.md) §2,
@@ -38,8 +38,10 @@ Designed the same way inspection templates are, only simpler.
 - **Authoring.** Templates are authored in the **shared template designer** used by inspection
   and issue templates alike (epic E-01-03, after Pilot-0; one engine, no per-module designer).
   For Pilot-0 the starting templates — `painting`, `blasting`, `civil`, `mechanical`, `welding`
-  × punch / NCR, plus an internal audit finding template (punch and NCR, `internal` +
-  `excluded`) — are **authored by us and seeded as tenant defaults** (user, 2026-11-21; T-0322).
+  × punch / NCR, plus internal audit finding templates (punch and NCR, in their own category
+  `audit`, `internal` + `excluded`, the defaults for `audit` × type so they never collide with
+  the `general` defaults) — are **authored by us and seeded as tenant defaults** through the
+  normal tenant provisioning path (user, 2026-11-21; T-0322).
 - **One engine (planner default).** An issue template is a one-engine form template of kind
   **`issue`** in the forms template store (T-0110), like ITP templates are kind `itp`
   (quality-and-inspection.md §ITP authoring): same field-type registry, sections, CEL
@@ -73,7 +75,7 @@ Designed the same way inspection templates are, only simpler.
 - **Categories.** A pack- and project-editable value list `oe_issues_category`
   (`key`, localised `label`, `is_active`, `sort_order`; same three layers). Seed (planner
   default): `painting`, `blasting`, `insulation`, `cladding`, `civil`, `mechanical`, `piping`,
-  `welding`, `scaffolding`, `electrical`, `general`. Keys are never re-keyed or deleted once
+  `welding`, `scaffolding`, `electrical`, `audit`, `general`. Keys are never re-keyed or deleted once
   used, only deactivated.
 - **Default template per category × type.** `oe_issues_default_template` (project,
   `category`, `issue_type`, template key). Raising an issue of category `painting` and type
@@ -103,6 +105,7 @@ the template; template answers live in `answers` JSONB, validated against the pi
 | `upgraded_from_issue_id`, `escalated_from_issue_id` | links of §7 (and the reverse `successor_issue_id` on the source) |
 | `visibility`, `mdr_effect`, `completion_effect` | effective flags (§5), copied from the revision at raise |
 | `closed_by_inspection_id` | the re-inspection that verified the fix, when one was used (TD-167) |
+| `client_seen_at`, `client_seen_channel` | nullable; set once by `issues.service.mark_client_seen(issue_ids, channel)` (idempotent, first value wins), never cleared (§5) |
 | `void_reason`, `voided_by`, `voided_at` | §4.3 |
 
 Photos and other media are template answers (photo field with capture time and annotation,
@@ -183,10 +186,14 @@ gates, tiles and registers means any non-terminal state.
   (user, 2026-11-21):
   - **Locked origins.** An issue with `origin = client` or `external_audit` can never be set
     `visibility = internal` or `mdr_effect = excluded` (422).
-  - **Once client-seen, never internal again.** `client_seen_at` is set the first time an
-    `is_internal = false` account reads the issue (API or offline pull) or it is included in a
-    client-facing output (portal, client-exported PDF, MDR) (planner default for "has been
-    client-visible"); after that `client → internal` is refused (422).
+  - **Once client-seen, never internal again.** `client_seen_at` is set by
+    `issues.service.mark_client_seen(issue_ids, channel)` (idempotent, first value wins) the
+    first time an `is_internal = false` account reads the issue through the issues API or
+    receives it in the offline pull (T-0314), or a client-facing output includes it: portal
+    (E-07-xx), an inspection PDF exported by an external account (T-0158/T-0159), shared saved
+    views (E-01-01), and the MDR, where `mdr_register` marks its rows itself (planner default for
+    "has been client-visible"). Every such consumer reads issues through the service and calls
+    it. After that `client → internal` is refused (422).
   - **No widening by override.** `internal → client` is not an override; it goes through "Raise
     external NCR from this" (§7) (422).
   - **Loosening** — `mdr_effect` towards `excluded` (`blocks → register_only | excluded`,
@@ -274,8 +281,8 @@ Both create a **new record**; nothing is converted, re-dated or rewritten.
   standalone `category` (quality-and-inspection.md §Standalone inspections). Manual raise from an
   inspection pre-filters templates by type + this category.
 - **Audits.** A site audit is a **standalone inspection template**; its findings raise issues
-  through audit issue templates (e.g. "Internal audit finding" = punch or NCR template with
-  `default_origin = internal_audit`, `internal` + `excluded`).
+  through audit issue templates (e.g. "Internal audit finding" = punch or NCR template in
+  category `audit` with `default_origin = internal_audit`, `internal` + `excluded`).
 - **Manual raise** filters templates by type + category; the project's default template per
   category × type is pre-selected.
 - **No work anchor on the path.** Manual raise answers 422 until a work-anchor node is picked or
@@ -314,7 +321,8 @@ superseded drawing revision stays on that revision (planner default).
 | T-0311 | issue templates (kind `issue`), revision metadata, categories, default template per category × type, layers and project copy |
 | T-0312 | issue record, fixed fields, numbering, anchors, punch workflow, void, offline create, RLS |
 | T-0313 | NCR steps, corrective/preventive actions, effectiveness sign-off (`ncr_close_verify`) |
-| T-0314 | visibility / MDR / completion flags, overrides, external-caller filtering, gate context providers |
+| T-0314 | visibility / MDR / completion flags, `client_seen_at` + `mark_client_seen`, external-caller filtering, gate context providers, `mdr_register` |
+| T-0323 | per-issue flag override API with guardrails (after Pilot-0) |
 | T-0315 | upgrade punch → NCR, raise external NCR from an internal issue |
 | T-0316 | `create_issue` post-submit action, auto-raise from `INSPECTED_FAILED`, inspection `issue_category` |
 | T-0317 | spatial pins on drawings |

@@ -3,12 +3,12 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 75/290 tasks done (26%) · **ready now:** 26 · **epics awaiting breakdown:** 49
+**Overall:** 75/291 tasks done (26%) · **ready now:** 26 · **epics awaiting breakdown:** 49
 
 | Phase | Tasks done | Progress |
 |---|---|---|
 | 0 · Platform foundations | 75/112 | `██████░░░░` 67% |
-| 1 · Asset & Quality backbone | 0/152 (+2 epics) | `░░░░░░░░░░` 0% |
+| 1 · Asset & Quality backbone | 0/153 (+2 epics) | `░░░░░░░░░░` 0% |
 | 2 · Welding quality | 0/11 | `░░░░░░░░░░` 0% |
 | 3 · Logistics | 0/2 (+7 epics) | `░░░░░░░░░░` 0% |
 | 4 · Execution | 0/0 (+15 epics) | `░░░░░░░░░░` 0% |
@@ -165,9 +165,10 @@
 | ⬜ | [T-0313](../tracker/tasks/T-0313.md) | issues: NCR workflow — containment, disposition (scrap/rework/repair/use-as-is + concession ref), root cause, corrective/preventive actions (oe_issues_action), effectiveness verification sign-off ncr_close_verify; verifier ≠ resolver | issues | M | T-0312, T-0119 |  |
 | ⬜ | [T-0322](../tracker/tasks/T-0322.md) | issues: seed the Pilot-0 starting issue templates as tenant defaults (painting, blasting, civil, mechanical, welding × punch/NCR, internal audit) | issues | S | T-0311 |  |
 | ⚫ | [T-0117](../tracker/tasks/T-0117.md) | punchlist: Cat A/B/C punch items + spatial pins on drawings | punchlist | S | T-0111 |  |
-| ⬜ | [T-0314](../tracker/tasks/T-0314.md) | issues: visibility / mdr_effect / completion_effect flags — template defaults, audited per-issue override (QA authority or PER-09), client-raised always client, internal issues hidden (404) from external accounts, gate context for work_anchor.complete and mdr.compile | issues | M | T-0312, T-0313, T-0049 |  |
+| ⬜ | [T-0314](../tracker/tasks/T-0314.md) | issues: visibility / mdr_effect / completion_effect flags — template defaults, client-raised always client, client_seen_at + mark_client_seen, internal issues hidden (404) from external accounts, gate context for work_anchor.complete and mdr.compile | issues | M | T-0312, T-0313, T-0049 |  |
 | ⬜ | [T-0315](../tracker/tasks/T-0315.md) | issues: upgrade punch → NCR and "raise external NCR from this" — new linked record dated now, chosen carry-over of answers/photos (original capture times), source closes upgraded/escalated, internal-only escalation link | issues | M | T-0313, T-0314 |  |
 | ⬜ | [T-0317](../tracker/tasks/T-0317.md) | issues: spatial pins on drawings (oe_issues_pin — drawing file, revision label, page, normalised x/y) + pin API | issues | S | T-0312, T-0016 |  |
+| ⬜ | [T-0323](../tracker/tasks/T-0323.md) | issues: per-issue flag override API with guardrails — locked client/external_audit origins, never internal once client-seen, no widening by override, loosening notifies QA and counts in QMS KPIs | issues | S | T-0314 |  |
 | ▶ | [T-0118](../tracker/tasks/T-0118.md) | credentials: qualification-type catalogue + credential records with certificate/VOC uploads + expiry (feeds eligibility) | credentials | M | T-0012, T-0016 |  |
 | ⬜ | [T-0139](../tracker/tasks/T-0139.md) | eligibility: stateless as-of-date validity service over credentials, calibration, WPS and materials registers (fail closed) | eligibility | M | T-0118 |  |
 | ▶ | [T-0119](../tracker/tasks/T-0119.md) | signing: append-only hash-chained sign-off ledger (internal now; pyHanko PAdES seam later) | signing | M | T-0006 |  |
@@ -200,7 +201,7 @@
 | ⬜ | [T-0155](../tracker/tasks/T-0155.md) | Frontend: scan-to-locate — camera barcode/QR and Android NFC, offline lookup over downloaded Items, online fallback, manual tag search | frontend | M | T-0154, T-0141, T-0149 |  |
 | ⬜ | [T-0156](../tracker/tasks/T-0156.md) | forms: photo answer value — capture time, location and versioned annotation JSON, validated server-side, read-only after submit | forms | S | T-0110, T-0016 |  |
 | ⬜ | [T-0157](../tracker/tasks/T-0157.md) | Frontend: photo capture with location and time + annotation editor (arrow, ellipse, rectangle, freehand, text), offline | frontend | M | T-0156, T-0127, T-0046, T-0247 |  |
-| ⬜ | [T-0158](../tracker/tasks/T-0158.md) | inspections: inspection PDF report (SAQ batch job, PyMuPDF lazy) with annotations burned in, signatures and review history | inspections | M | T-0150, T-0156, T-0312, T-0016, T-0136, T-0167, T-0247 |  |
+| ⬜ | [T-0158](../tracker/tasks/T-0158.md) | inspections: inspection PDF report (SAQ batch job, PyMuPDF lazy) with annotations burned in, signatures and review history | inspections | M | T-0150, T-0156, T-0312, T-0314, T-0016, T-0136, T-0167, T-0247 |  |
 | ⬜ | [T-0159](../tracker/tasks/T-0159.md) | inspections: batch inspection PDF export (ZIP + index.csv, max 500) + export action on the review queue | inspections | S | T-0158, T-0153 |  |
 | ⬜ | [T-0160](../tracker/tasks/T-0160.md) | reporting: Pilot-0 dashboard tiles — progress, overdue, open defects (API + Overview screen) | reporting | M | T-0150, T-0152, T-0312, T-0313, T-0024, T-0025 |  |
 | ▶ | [T-0162](../tracker/tasks/T-0162.md) | identity: client online signing PIN — own table, server-side per-signer rate limit and lockout, single-use co-sign token | identity | S | T-0010, T-0038 |  |
@@ -275,7 +276,7 @@
 | ⬜ | [T-0270](../tracker/tasks/T-0270.md) | eligibility/forms: is_product_approved CEL helper (pure, dual-runtime parity fixtures) over context.product_approvals resolved by the eligibility service | materials | S | T-0185, T-0269, T-0139, T-0110, T-0017 |  |
 | 🧩 | [E-01-03](../tracker/tasks/E-01-03.md) | Shared template designer for inspection and issue templates (one-engine): sections, core/fields, required/optional, help text, CEL validation, preview, draft → publish as a new revision; issue type, category, flag defaults, step per section | forms | L | T-0146, T-0110, T-0311, T-0179 |  |
 | ⬜ | [T-0271](../tracker/tasks/T-0271.md) | materials/inspections: substitutions in the offline reference bundle, substitution_id bound on the answer, read-only substitution note on the inspection and its PDF | materials | M | T-0270, T-0147, T-0158, T-0111 |  |
-| ⬜ | [T-0321](../tracker/tasks/T-0321.md) | Frontend: issue flag override dialog (guardrails, loosening warning), upgrade punch → NCR and "Raise external NCR from this" dialogs; NCR effectiveness verify through the signing ceremony | frontend | M | T-0314, T-0315, T-0319, T-0290, T-0291 |  |
+| ⬜ | [T-0321](../tracker/tasks/T-0321.md) | Frontend: issue flag override dialog (guardrails, loosening warning), upgrade punch → NCR and "Raise external NCR from this" dialogs; NCR effectiveness verify through the signing ceremony | frontend | M | T-0314, T-0315, T-0319, T-0290, T-0291, T-0323 |  |
 | ⬜ | [T-0272](../tracker/tasks/T-0272.md) | Frontend: product selector shows approved substitutes badged "Approved Substitute (ref)" with the equivalency document viewable offline; selecting binds substitution_id | materials | S | T-0271, T-0165 |  |
 | 🟥 | [T-0280](../tracker/tasks/T-0280.md) | Frontend: Admin → Users 'Login as user (support)' with reason modal, persistent impersonation banner with countdown and Exit, session hand-back (blocked by TD-426) *(blocked by TD-426)* | frontend | M | T-0246, T-0026, T-0277, T-0278, T-0279 |  |
 | ⬜ | [T-0289](../tracker/tasks/T-0289.md) | signing: e-signature attestation for formal sign-offs — re-authentication grant (signing PIN or password; device PIN offline), versioned intent statement, timestamp/device/IP evidence in the sign-off ledger, refused under impersonation (offline sync branch: T-0310) | signing | M | T-0119, T-0162, T-0143, T-0177, T-0230 |  |

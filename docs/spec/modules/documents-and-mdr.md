@@ -53,7 +53,8 @@ severity / punch category, anchor in project terminology, disposition and `conce
 attestation block. Issues with `mdr_effect = excluded` and `void` issues are never listed.
 Because the dossier goes to the client, **`internal` issues are never printed** (clients never
 see internal issues, issues.md §5); an internal issue with `mdr_effect = blocks` still blocks the
-compile while open (planner default). Rows and photos come from the issues service; the MDR
+compile while open (planner default). Rows and photos come from the issues service (`issues.service.mdr_register`, which marks every
+row client-seen itself, issues.md §5); the MDR
 engine reads no issues table.
 
 ### Material traceability in the MDR (user, 2026-11-21; E-05-05, from T-0184)
