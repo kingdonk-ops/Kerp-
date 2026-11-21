@@ -83,7 +83,7 @@ Designed the same way inspection templates are, only simpler.
   (`key`, localised `label`, `is_active`, `sort_order`; same three layers). Seed (planner
   default): `painting`, `blasting`, `insulation`, `cladding`, `civil`, `mechanical`, `piping`,
   `welding`, `scaffolding`, `electrical`, `audit`, `general`; T-0326 adds `health_safety`
-  (user, 2026-11-21, TD-451) and `vehicle`, `equipment`, `pre_start` (planner default).
+  (user, 2026-11-21, TD-451) and `vehicle`, `equipment`, `pre_start` (user, 2026-11-21).
   Keys are never re-keyed or deleted once used, only deactivated. **Categories are not only
   disciplines** (user, 2026-11-21): the list holds discipline categories (painting, blasting, …)
   alongside non-discipline ones (vehicle, equipment, pre-start, audit, general, …), because e.g.
