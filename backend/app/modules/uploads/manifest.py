@@ -3,7 +3,11 @@
 from app.core.module_loader.manifest import ModuleManifest
 
 # Platform kernel: every module stores its files through it, so a project cannot switch it
-# off. Verification and the orphan sweep run as jobs; files belong to a project.
+# off. Verification and the orphan sweep run as jobs; files belong to a project; the size limit
+# and the upload URL lifetime are runtime settings (T-0230).
 MANIFEST = ModuleManifest(
-    name="uploads", version="0.1.0", depends_on=("jobs", "projects"), toggleable=False
+    name="uploads",
+    version="0.1.0",
+    depends_on=("jobs", "projects", "settings"),
+    toggleable=False,
 )

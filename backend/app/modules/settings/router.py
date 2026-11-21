@@ -5,18 +5,31 @@
 * ``PATCH /deployment``: ``system_admin`` only (else 403); the flag is the one the request
   session was bound with at authentication, never from the request. Invalid values 422.
 
+* ``GET /registry`` and ``PATCH /registry/{key}`` (T-0230, diff §4.7): ``system_admin`` only.
+  Every declared entry with its value, default, bounds and category; a change out of bounds
+  or over the deployment cap is 422 (never clamped), an undeclared key 404.
+* ``GET /deployment-config``: ``system_admin`` only; the read-only deployment configuration
+  (environment), never a secret.
+
 No endpoint takes or returns a tenant id.
 """
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Request, status
 
 from app.core.auth.access import CallerIsSystemAdmin
 from app.core.auth.deps import CurrentPrincipal
+from app.core.config import Settings
 from app.core.db import DbSession
-from app.modules.settings import service
-from app.modules.settings.schemas import DeploymentSettingsRead, DeploymentSettingsUpdate
+from app.modules.settings import deployment_config, service
+from app.modules.settings.schemas import (
+    DeploymentConfigRead,
+    DeploymentSettingsRead,
+    DeploymentSettingsUpdate,
+    SettingEntryRead,
+    SettingValueUpdate,
+)
 
 router = APIRouter(tags=["settings"])
 
@@ -44,3 +57,51 @@ def update_deployment_settings(
     except service.ConcurrentUpdateError as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
     return DeploymentSettingsRead.model_validate(values)
+
+
+def _admin_config(request: Request, is_admin: bool) -> Settings:
+    """The deployment configuration, for a System admin only (else 403)."""
+    if not is_admin:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Forbidden")
+    config: Settings = request.app.state.settings
+    return config
+
+
+@router.get("/registry", response_model=list[SettingEntryRead])
+def read_registry(
+    request: Request,
+    _principal: CurrentPrincipal,
+    is_admin: CallerIsSystemAdmin,
+    session: DbSession,
+) -> list[SettingEntryRead]:
+    config = _admin_config(request, is_admin)
+    entries = service.registry_entries(session, config=config)
+    return [SettingEntryRead.model_validate(entry) for entry in entries]
+
+
+@router.patch("/registry/{key}", response_model=SettingEntryRead)
+def update_registry_entry(
+    key: str,
+    body: SettingValueUpdate,
+    request: Request,
+    principal: CurrentPrincipal,
+    is_admin: CallerIsSystemAdmin,
+    session: DbSession,
+) -> SettingEntryRead:
+    config = _admin_config(request, is_admin)
+    try:
+        service.set_values(session, {key: body.value}, actor_id=principal.user_id, config=config)
+    except service.UnknownSettingError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Not Found") from exc
+    except service.InvalidSettingError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
+    except service.ConcurrentUpdateError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+    return SettingEntryRead.model_validate(service.registry_entry(session, key, config=config))
+
+
+@router.get("/deployment-config", response_model=DeploymentConfigRead)
+def read_deployment_config(
+    request: Request, _principal: CurrentPrincipal, is_admin: CallerIsSystemAdmin
+) -> DeploymentConfigRead:
+    return deployment_config.read(_admin_config(request, is_admin))
