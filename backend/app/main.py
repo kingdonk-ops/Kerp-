@@ -39,7 +39,7 @@ from app.core.tenancy.provision import ensure_default_tenant
 from app.core.tenancy.scope import OutOfScopeError
 from app.modules.jobs import mail as jobs_mail
 from app.modules.jobs.broker import LoopDispatcher, SaqBroker
-from app.modules.jobs.service import set_dispatcher
+from app.modules.jobs.service import set_dispatcher, set_queue_monitor
 
 
 async def _out_of_scope_handler(_request: Request, _exc: Exception) -> JSONResponse:
@@ -77,7 +77,10 @@ def create_app(
         mail_dispatcher = jobs_mail.install(broker.queues["interactive"], loop) if broker else None
         if dispatcher is not None:
             set_dispatcher(dispatcher)
+        # The System console's queue monitor reads SAQ through the same broker (T-0218).
+        set_queue_monitor(broker)
         yield
+        set_queue_monitor(None)
         if broker is not None and dispatcher is not None and mail_dispatcher is not None:
             set_dispatcher(None)
             jobs_mail.uninstall()

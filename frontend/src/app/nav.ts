@@ -46,7 +46,8 @@ export const LOBBY_PATH = "/lobby";
 export const NAV_ITEMS = [
   { group: "overview", id: "dashboards" },
   { group: "overview", id: "myWork" },
-  { group: "backbone", id: "projects" },
+  // Projects: create (Project Admins), settings, lobby flag and members (PER-09; T-0026).
+  { group: "backbone", id: "projects", path: "/backbone/projects" },
   { group: "backbone", id: "assetHierarchy" },
   { group: "backbone", id: "items" },
   { group: "backbone", id: "teams" },
@@ -71,7 +72,8 @@ export const NAV_ITEMS = [
   { group: "controlsInsights", id: "moneyMirror" },
   { group: "admin", id: "users" },
   { group: "admin", id: "personas" },
-  // System = deployment settings, admin grants, devices; its first screen is Devices (T-0051).
+  // System = deployment settings, admin grants (T-0026), devices (T-0051); Devices is open to
+  // PER-09 too, so the item lands there.
   { group: "admin", id: "system", path: "/admin/system/devices", requires: "projectAdmin" },
   { group: "admin", id: "accessRequests", path: "/admin/access-requests", requires: "projectAdmin" },
 ] as const satisfies readonly {

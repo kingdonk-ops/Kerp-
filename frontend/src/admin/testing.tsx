@@ -8,6 +8,7 @@ import { memoryStorage } from "../auth/tokenStore";
 import type { ProjectSummary } from "../projects/directory";
 import { FAKE_USER, json, makeServices, tokens } from "../test/fakeApi";
 import { themeStorageKey, type ThemeId } from "../theme/theme";
+import type { Project } from "./api";
 
 export const ADMIN_PROJECT: ProjectSummary = {
   id: "00000000-0000-4000-8000-000000000101",
@@ -15,6 +16,25 @@ export const ADMIN_PROJECT: ProjectSummary = {
   name: "Synthetic Refinery Unit",
   personas: ["PER-09"],
 };
+
+/** A synthetic project record (`GET /projects`), `ADMIN_PROJECT` unless overridden. */
+export function project(extra: Partial<Project> = {}): Project {
+  return {
+    id: ADMIN_PROJECT.id,
+    code: ADMIN_PROJECT.code,
+    name: ADMIN_PROJECT.name,
+    status: "ACTIVE",
+    site_timezone: "Australia/Perth",
+    spatial_bounds: null,
+    currency_code: "AUD",
+    locale: "en-AU",
+    visible_in_lobby: false,
+    revision: 1,
+    created_at: "2026-11-01T08:00:00Z",
+    updated_at: "2026-11-01T08:00:00Z",
+    ...extra,
+  };
+}
 
 /** Signed-in app at `path`; a PER-09 on one project unless told otherwise. */
 export function renderAdmin(

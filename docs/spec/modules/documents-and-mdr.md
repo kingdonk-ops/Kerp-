@@ -37,9 +37,9 @@ or `Σ unsigned ITP hold points > 0` (amended 2026-11-21; [issues.md](issues.md)
 or H&S issue may be project-level (no anchor). With `mdr_effect = blocks`, an open project-level
 issue without a location is in the scope of **every** MDR of the project; one with a location is
 in the scope only of the MDRs whose dossier scope covers that location (the location is the scope
-node, inside it or an ancestor of it; user, 2026-11-21, TD-451). The same rule decides whether it is listed
+node, inside it or an ancestor of it; user, 2026-11-21, TD-456). The same rule decides whether it is listed
 in the NCR / concession register below.
-**Which inspection records a dossier collects (user, 2026-11-21; PR #145 review round 5, TD-451):**
+**Which inspection records a dossier collects (user, 2026-11-21; PR #145 review round 5, TD-456):**
 the dossier collects formal `qa_itp` records of its scope; formal project-level records are
 collected only when their location is inside the dossier scope (the location is the scope node
 or a descendant, through the `asset_management` service; unlike the blocking rule for

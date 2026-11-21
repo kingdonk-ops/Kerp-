@@ -400,7 +400,7 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
   audit, status, kind) and **Issues** (register + issue templates), diff §6.1. Presets for "New
   template"; settings on the revision: area (= `category`, plain labels, `health_safety` added),
   issue category (`issue_category`; the planner's `discipline` replacement was reverted by the
-  product owner, see TD-451), formal tick (informal = record-only, submit final,
+  product owner, see TD-456), formal tick (informal = record-only, submit final,
   outside MDR/progress/KPIs; ITP-chain always formal), audit tick with internal/external scope,
   linked issue types (one used, several picked, none → category × type default); changing area,
   formal or audit needs QA authority or PER-09 and makes a new revision. **ADR 0003 amendment
@@ -419,17 +419,22 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
   S → M), E-01-03; T-0251 depends on T-0324/T-0325. Forward-compatible criteria only on the gate
   tasks T-0312 and T-0314 (plus round-4 review fixes on T-0314); notes on T-0111, T-0112,
   T-0179, T-0180, T-0249, T-0252, T-0257, T-0259, T-0311, T-0318, T-0322, E-03-03. **Pilot-0 gate
-  unchanged** (none of the new or re-shaped tasks is in T-0146's closure). Raised: TD-451
+  unchanged** (none of the new or re-shaped tasks is in T-0146's closure). Raised: TD-456
   (planner defaults of this pass, not blocking).
 
 - **2026-11-21 — product-owner approvals (binding):** TD-445 approved as-is (`mdr_effect` alone
   governs `mdr.compile`; Cat A punch templates default to `blocks`; Cat A always blocks work
-  completion). TD-451 approved except "`discipline` replaces `issue_category`": inspection
+  completion). TD-456 approved except "`discipline` replaces `issue_category`": inspection
   templates keep the optional `issue_category`, pointing at an issue category list that also
   holds non-discipline categories (vehicle, equipment, pre-start, general; a vehicle pre-start
   has no discipline); the Templates list filters by area and issue category; no `discipline`
   field. Updated: `quality-and-inspection.md`, `issues.md` §2/§8, T-0316, T-0324, T-0326,
   T-0327, T-0328, E-01-03, T-0311 (note). Pilot-0 gate unchanged.
+
+- **2026-11-21 — Phase 0 bundling (user request), bundle 4:** T-0218 absorbs T-0220 (ClamAV
+  scanner + System-console queue monitor API; both small worker-side backends on disjoint modules;
+  size M). T-0220 is `dropped` (body kept); its acceptance criteria live on in T-0218. T-0224 now
+  depends on T-0218 instead of T-0220.
 
 ## Key engineering decisions (baked into the spec — see consolidation diff)
 

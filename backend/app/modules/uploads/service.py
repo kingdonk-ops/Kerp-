@@ -22,7 +22,12 @@ from app.core.tenancy.rls import session_tenancy
 from app.core.tenancy.scope import OutOfScopeError, get_or_404
 from app.modules.jobs.service import JOB_REGISTRY, create_job, job_status
 from app.modules.uploads.models import UploadedFile, quarantine_prefix, staging_prefix
-from app.modules.uploads.scan import Scanner
+from app.modules.uploads.scan import (
+    Scanner,
+    ScannerUnavailableError,
+    ScanRefusedError,
+    outcome,
+)
 from app.modules.uploads.schemas import UploadCreate
 from app.modules.uploads.storage import (
     MAGIC_SNIFF_BYTES,
@@ -205,20 +210,30 @@ def download_request(
 
 def _check(
     storage: Storage, key: str, expected: tuple[int, str, str], scanner: Scanner
-) -> tuple[Reason | None, str | None]:
-    """Check the object at ``key``: size, magic bytes, SHA-256, scan -> (reason, verdict)."""
+) -> tuple[Reason | None, str | None, str | None]:
+    """Check the object at ``key``: size, magic bytes, SHA-256, scan.
+
+    Returns ``(reason, verdict, signature)``. ``ScannerUnavailableError`` propagates (the
+    caller keeps the quarantine copy for the retry); an object the scanner refuses to scan
+    (over its stream limit) is ``verify_failed``: it is never published unscanned.
+    """
     size, content_type, sha256 = expected
     info = storage.head(key)
     if info is None:
-        return "missing_object", None
+        return "missing_object", None, None
     if info.size != size:
-        return "size_mismatch", None
+        return "size_mismatch", None, None
     if not matches_magic(content_type, storage.read(key, length=MAGIC_SNIFF_BYTES)):
-        return "type_mismatch", None
+        return "type_mismatch", None, None
     if sha256_of(storage, key) != sha256:
-        return "sha256_mismatch", None
-    verdict = "clean" if scanner.scan(storage, key) == "clean" else "infected"
-    return (None if verdict == "clean" else "infected"), verdict
+        return "sha256_mismatch", None, None
+    try:
+        clean, signature = outcome(scanner.scan(storage, key))
+    except ScanRefusedError:
+        return "verify_failed", None, None
+    if clean:
+        return None, "clean", None
+    return "infected", "infected", signature
 
 
 def verify_upload(
@@ -231,7 +246,10 @@ def verify_upload(
     ever issued for it) and deleted; every check then runs on that copy, and that same copy
     is published. An existing content key is never overwritten: it already holds those
     bytes. Idempotent: a file no longer ``verifying`` is left as it is. Staging and
-    quarantine objects are deleted in every outcome, an error included.
+    quarantine objects are deleted in every outcome, an error included, with one exception:
+    when the scanner is unavailable (``ScannerUnavailableError``, re-raised) the file stays
+    ``verifying`` and its quarantine copy is kept for the job's retry (T-0218); the orphan
+    sweep deletes it once the file is no longer ``verifying``.
     """
     with db.unit_of_work(tenancy) as session:
         file = get_file(session, file_id)
@@ -239,15 +257,21 @@ def verify_upload(
             return {"file_id": str(file_id), "status": file.status}
         staging, quarantine, content = file.staging_key, file.quarantine_key, file.content_key
         expected = (file.size_bytes, file.content_type, file.sha256)
+    keep_quarantine = False
     try:
         if storage.head(staging) is not None:
             storage.copy(staging, quarantine)
         storage.delete(staging)
-        reason, verdict = _check(storage, quarantine, expected, scanner)
+        try:
+            reason, verdict, signature = _check(storage, quarantine, expected, scanner)
+        except ScannerUnavailableError:
+            keep_quarantine = True
+            raise
         if reason is None and storage.head(content) is None:
             storage.copy(quarantine, content)
     finally:
-        storage.delete(quarantine)
+        if not keep_quarantine:
+            storage.delete(quarantine)
         storage.delete(staging)
     with db.unit_of_work(tenancy) as session:
         file = get_file(session, file_id)
@@ -256,6 +280,7 @@ def verify_upload(
         session.refresh(file, with_for_update=True)
         if file.status == "verifying":
             file.scan_result = verdict
+            file.scan_signature = signature
             if reason is not None:
                 _reject(file, reason)
             else:

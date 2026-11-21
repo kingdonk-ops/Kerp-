@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 299 · **Closed:** 142
+**Open:** 305 · **Closed:** 144
 
 ## decision (38)
 
@@ -48,7 +48,7 @@
 | [TD-439](../tracker/todo/TD-439.md) | Feature flags: who toggles them, project overrides, and what a flag may gate | T-0306 | planner |
 | [TD-442](../tracker/todo/TD-442.md) | Issues: may an internal punch/NCR be assigned to an external account (subcontractor) who must then see it? Planner default: no (422), internal issues are invisible to every is_internal=false caller | T-0314 | planner |
 
-## spec-gap (56)
+## spec-gap (57)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -108,6 +108,7 @@
 | [TD-425](../tracker/todo/TD-425.md) | CEL helper eligibility.is_product_approved cannot do I/O and must run offline: pure function over a resolved approvals map | T-0270 | planner |
 | [TD-428](../tracker/todo/TD-428.md) | ITP templates: line-item structure, approval authority and the ITP instance on an anchor are not specified in T-0113 / quality-and-inspection.md (pasted T-0187/T-0188 assume oe_qms_itp_template, draft → approved, is_customized) | T-0113, T-0187, T-0188, T-0281 | planner |
 | [TD-430](../tracker/todo/TD-430.md) | New rule kind itp_assignment in the ADR 0004 rule store (scope → approved ITP template): context variables, action vocabulary, editors | T-0188 | planner |
+| [TD-452](../tracker/todo/TD-452.md) | Uploads: a file larger than the malware scan limit (KERP_UPLOAD_SCAN_MAX_BYTES or clamd StreamMaxLength) is rejected as verify_failed; diff 4.7 lists no dedicated reason code (e.g. scan_too_large) | T-0218 | implementer |
 
 ## missed (7)
 
@@ -121,7 +122,7 @@
 | [TD-337](../tracker/todo/TD-337.md) | Web/Android route /magic-link#<token> that redeems the e-mailed sign-in link (POST /auth/magic-link/redeem); the e-mail now links there | T-0058 | implementer |
 | [TD-388](../tracker/todo/TD-388.md) | saved_views: wire the my_teams filter op | T-0074 | reviewer |
 
-## deferred (38)
+## deferred (41)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -163,8 +164,11 @@
 | [TD-365](../tracker/todo/TD-365.md) | Frontend translations of the password policy codes and the password policy in /auth/config | T-0077 | implementer |
 | [TD-394](../tracker/todo/TD-394.md) | Approve access request: site picker for PER-07 site scope once the asset hierarchy API exists | T-0051 | implementer |
 | [TD-432](../tracker/todo/TD-432.md) | Digest-pin the postgis/postgis:16-3.4 CI service image (ci.yml): the implementer sandbox could not reach the Docker Hub registry API to resolve its digest (redis is pinned); resolve with docker buildx imagetools inspect and drop the strict xfail in scripts/tests/test_workflows.py | T-0033 | implementer |
+| [TD-446](../tracker/todo/TD-446.md) | E2E journey: Sign in with Microsoft against the fake OIDC provider (T-0054) lands in the project, once the Playwright harness (T-0027) exists | T-0055 | implementer |
+| [TD-448](../tracker/todo/TD-448.md) | Playwright e2e journey for T-0026 (System admin appoints a Project Admin -> they create a project -> assign a user) once T-0027 sets up e2e/; covered meanwhile by the component-level journey in frontend/src/admin/MembersPage.test.tsx | T-0026 | implementer |
+| [TD-451](../tracker/todo/TD-451.md) | Queue monitor: failed-job list and retry/abort see only job rows the caller's RLS shows until T-0274 (ADR 0016) lets a system_admin read every project's oe_jobs_job rows | T-0218 | implementer |
 
-## later (123)
+## later (125)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -229,7 +233,7 @@
 | [TD-246](../tracker/todo/TD-246.md) | saved_views: validate register_key against register descriptors once modules declare them (E-01-01) | T-0020 | implementer |
 | [TD-247](../tracker/todo/TD-247.md) | saved_views: degrade gracefully when a stored view config no longer validates | T-0020 | implementer |
 | [TD-259](../tracker/todo/TD-259.md) | Outdoor theme default: switch the outdoor high-contrast theme on automatically when the OS asks for more contrast (prefers-contrast: more / forced-colors) and the user has no stored choice | T-0046 | implementer |
-| [TD-263](../tracker/todo/TD-263.md) | Harden .claude/settings.json and scripts/gemini_review.sh against agent edits via Bash (CODEOWNERS, CI check or PreToolUse hook) | — | planner |
+| [TD-263](../tracker/todo/TD-263.md) | Harden .claude/settings.json against agent edits via Bash (CODEOWNERS, CI check or PreToolUse hook) | — | planner |
 | [TD-267](../tracker/todo/TD-267.md) | Frontend Project Settings -> Rules screen (ADR 0004 §7) on the T-0034 Rules API: tabs by kind/module, same component for the tenant default layer, unlock request/approve | T-0034 | implementer |
 | [TD-272](../tracker/todo/TD-272.md) | Projects API: GET /api/v1/projects should list every project for a system_admin (diff §4.1 'System admins can list every project row'); it lists the caller's memberships only | T-0014 | implementer |
 | [TD-275](../tracker/todo/TD-275.md) | Deploy: when the migration owner and runtime role are split (TD-056), grant EXECUTE on kerp_caller_admin_grants() to the runtime role | T-0014 | implementer |
@@ -291,6 +295,8 @@
 | [TD-415](../tracker/todo/TD-415.md) | Inspection follow-ups (oe_inspections_follow_up) move to the generic tasks module when E-04-07 is broken down | T-0257, T-0288, E-04-07 | planner |
 | [TD-440](../tracker/todo/TD-440.md) | In-app IP allowlisting is not built: network restrictions live in the WAF / Entra Conditional Access; revisit only if a client contract requires per-project IP rules | — | planner |
 | [TD-441](../tracker/todo/TD-441.md) | Per-test PostgreSQL databases: widen the empty-source check to leftover types, sequences, views and functions (not only tables) | T-0082 | reviewer |
+| [TD-449](../tracker/todo/TD-449.md) | Expose the caller's create_projects grant (Project Admin) on GET /auth/me (with is_system_admin, TD-393) so Backbone -> Projects offers 'New project' only to Project Admins; today every user sees it and a 403 is explained | T-0026 | implementer |
+| [TD-450](../tracker/todo/TD-450.md) | Project settings dialog: edit project code and spatial bounds (PATCH /projects accepts both; T-0026 edits name, status, time zone, currency, locale) | T-0026 | implementer |
 
 ## bug (6)
 
@@ -321,7 +327,6 @@
 | [TD-235](../tracker/todo/TD-235.md) | review-gate patch-id ignores dated note lines entirely - a scope decision recorded as a dated Note can be added or reworded after approval without re-review | T-0029 | implementer |
 | [TD-253](../tracker/todo/TD-253.md) | Refresh Origin fallback fails closed behind a TLS proxy: production without KERP_WEB_ORIGIN signs users out ~15 min after login; SPA treats the 403 as transient | T-0037 | coordinator |
 | [TD-254](../tracker/todo/TD-254.md) | spatial_bounds 10,000-position cap also runs on reads (ProjectRead): a stored row above the cap makes GET /projects 500 for the whole tenant | T-0060 | coordinator |
-| [TD-292](../tracker/todo/TD-292.md) | Remove stale scripts/gemini_review.sh allow/deny rules from .claude/settings.json (human-only edit) | — | implementer |
 | [TD-299](../tracker/todo/TD-299.md) | Sign-in with valid credentials answers DEVICE_REVOKED for a revoked device of another account | T-0080 | implementer |
 | [TD-303](../tracker/todo/TD-303.md) | Field PIN gate can fail open if Redis evicts device:sid before the first rotation of a session bound by enrolment (its first refresh token has no did claim) | T-0038 | implementer |
 | [TD-305](../tracker/todo/TD-305.md) | Cross-tab broadcasts are not tied to a session: a sign-in in one tab hands that session's access token to other signed-in tabs (possibly another account); tag messages with the session id and ignore foreign ones | T-0072 | reviewer |
@@ -338,6 +343,7 @@
 | [TD-372](../tracker/todo/TD-372.md) | Invite preview/accept refusals are audited per attempt without a per-user throttle (ledger growth by a signed-in user) | T-0052 | implementer |
 | [TD-376](../tracker/todo/TD-376.md) | Password-reset and magic-link requests defer the account-dependent work to after the response: on a kept-alive connection the time until the next request is served may still differ by path (measure; move the deferred half to the SAQ worker if it does) | T-0077 | implementer |
 | [TD-377](../tracker/todo/TD-377.md) | Invite setup-preview and accept-with-password (not signed in) have no per-client or per-link throttle; every refusal writes an audit entry | T-0059 | implementer |
+| [TD-455](../tracker/todo/TD-455.md) | Queue monitor: retry/abort commit the job write before the audit entry (two transactions); an audit-commit failure leaves the action unaudited | T-0218 | implementer |
 
 ## Closed
 
@@ -472,6 +478,7 @@
 | ✅ | [TD-285](../tracker/todo/TD-285.md) | Native-origin allow-list: KERP_WEB_ORIGIN made mandatory when KERP_NATIVE_APP_ORIGINS is set; body transport also on magic-link redeem and PIN unlock | Product owner, 2026-11-15: both readings confirmed. (a) KERP_NATIVE_APP_ORIGINS requires KERP_WEB_ORIGIN (settings refuse otherwise) and the API's own origin never gets body transport; (b) body transport (out and in) also applies to magic-link redeem and PIN unlock by the same Origin rule; on the web origin /pin/unlock refuses a body token (422) and /refresh ignores it. Recorded in diff §4.2 |
 | ✅ | [TD-286](../tracker/todo/TD-286.md) | wipe-confirmed is unauthenticated: anyone who knows a revoked device_id can set its wipe time | Fixed by T-0080 (PR #94): per-device wipe secret issued once at enrolment, stored as SHA-256; wipe-confirmed requires it, uniform 404 for every refusal |
 | ✅ | [TD-291](../tracker/todo/TD-291.md) | Revoked-device oracle: refuse_revoked_device on login and wipe-confirmed answer for any device id | Fixed by T-0080 (PR #94): sign-in checks credentials before the device; wipe-confirmed answers uniformly |
+| ✅ | [TD-292](../tracker/todo/TD-292.md) | Remove stale scripts/gemini_review.sh allow/deny rules from .claude/settings.json (human-only edit) | Product owner removed the stale scripts/gemini_review.sh allow rule and both deny pairs from .claude/settings.json by hand (commit 07486d9 on dev, 2026-11-21); only the deny rules protecting .claude/settings.json remain. |
 | ✅ | [TD-295](../tracker/todo/TD-295.md) | T-0044 says module admin but the route /api/v1/settings/deployment and the projects->settings dependency need a separate settings module | Product owner, 2026-11-16: separate settings module (projects depends_on settings) confirmed |
 | ✅ | [TD-297](../tracker/todo/TD-297.md) | Admin UI screen for deployment settings (Admin > System) is not planned in any task | Planner, 2026-11-21: task T-0232 created (per the 2026-11-16 product-owner decision) |
 | ✅ | [TD-298](../tracker/todo/TD-298.md) | Rate-limit the unauthenticated wipe-confirmed endpoint (every refusal appends an audit entry) |  |
@@ -484,4 +491,5 @@
 | ✅ | [TD-443](../tracker/todo/TD-443.md) | Issues on a path with no work-anchor node (audit findings above the work-anchor level, condition surveys): create_issue skips + notifies (planner default) vs allowing issues without a work anchor | Product owner (user, 2026-11-21): issues from project-level inspections (audit, H&S and every non-qa_itp area) are project-level (no work anchor) with optional location/links; they never block work completion; with mdr_effect=blocks a project-level issue blocks every MDR of the project and a location-tagged one only the MDRs whose scope covers the location. Remaining case (a qa_itp inspection on a path without a work anchor): the planner default stays (manual raise 422 until a work anchor is picked; create_issue logged skipped NO_WORK_ANCHOR and notifies). |
 | ✅ | [TD-444](../tracker/todo/TD-444.md) | Pilot-0 scope after the issues re-plan: T-0311-T-0314 replace T-0116/T-0117 in the Phase 1 pilot subset; screens T-0318-T-0320, upgrade/escalate, create_issue and pins outside the gate (planner default) | Product owner (user, 2026-11-21): T-0318 (register, raise, punch detail) and a slimmed T-0319 (NCR detail workflow up to the ncr_close_verify sign-off) join the Pilot-0 gate, with T-0311-T-0314 and the seeded starting templates T-0322 (T-0108 transitively). Flag-override, upgrade and raise-external dialogs split to T-0321 after the pilot; T-0315, T-0317 stay outside the pilot; shared template designer epic E-01-03 after Pilot-0. |
 | ✅ | [TD-445](../tracker/todo/TD-445.md) | MDR gate: mdr_effect alone governs mdr.compile (the open-Cat-A-punch clause is replaced); Cat A punch templates default to mdr_effect=blocks; Cat A always blocks work completion | Product owner (user, 2026-11-21) approved the planner default as-is: mdr_effect alone governs mdr.compile; punch templates that use Cat A (all system-default punch templates) default to mdr_effect=blocks; an open Cat A punch always blocks work_anchor.complete regardless of mdr_effect. |
-| ✅ | [TD-451](../tracker/todo/TD-451.md) | Template settings and project-level records: confirm the planner defaults (preset table, health_safety area, informal submit is final, allows_project_level issue categories, at most one equipment link, MDR location overlap rule) | Product owner (user, 2026-11-21): all items approved except item 7 (discipline replacing issue_category). Decided instead: inspection templates keep the optional issue_category, pointing at the issue category value list, which holds non-discipline categories (vehicle, equipment, pre-start, general, ...) alongside disciplines (painting, blasting, ...), because e.g. issues from a vehicle pre-start have no discipline; raise-time fallback is issue_category x type (none -> general). There is no separate discipline field; the Templates list filters by area and issue category. |
+| ✅ | [TD-447](../tracker/todo/TD-447.md) | Admin → Users screen (T-0026 remainder): System admin creates / deactivates / reactivates accounts (GET/POST/PATCH /admin/users); PER-09 invites by e-mail to one of its projects with persona(s) + site + SoD confirm, shows the link once, lists / re-sends / revokes open invites |  |
+| ✅ | [TD-456](../tracker/todo/TD-456.md) | Template settings and project-level records: confirm the planner defaults (preset table, health_safety area, informal submit is final, allows_project_level issue categories, at most one equipment link, MDR location overlap rule) | Product owner (user, 2026-11-21): all items approved except item 7 (discipline replacing issue_category). Decided instead: inspection templates keep the optional issue_category, pointing at the issue category value list, which holds non-discipline categories (vehicle, equipment, pre-start, general, ...) alongside disciplines (painting, blasting, ...), because e.g. issues from a vehicle pre-start have no discipline; raise-time fallback is issue_category x type (none -> general). There is no separate discipline field; the Templates list filters by area and issue category. |

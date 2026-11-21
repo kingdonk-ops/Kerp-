@@ -146,7 +146,9 @@ def test_the_batch_worker_runs_the_sweep_every_five_minutes(db: Database) -> Non
     broker = SaqBroker("redis://localhost:6379/0", prefix="t")
     workers = build_workers(settings, db=db, registry=REGISTRY, broker=broker)
     crons = {
-        w.queue.name: [(c.function, c.cron, c.timeout) for c in w.cron_jobs] for w in workers
+        # Each cron function is wrapped by ``scheduler.tracked`` (T-0218) under its own name.
+        w.queue.name: [(c.function.__wrapped__, c.cron, c.timeout) for c in w.cron_jobs]  # type: ignore[attr-defined]
+        for w in workers
     }
     assert crons == {
         "t:interactive": [],

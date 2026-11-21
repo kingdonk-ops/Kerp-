@@ -42,7 +42,7 @@ src/
   admin/      Admin screens: access-request inbox, devices (admin + My devices), revoke (README.md)
   api/        generated API types (openapi.json, schema.ts) — never hand-edit (see src/api/README.md)
   app/        providers (AppRoot/AppProviders), services, router, shell layout, nav groups, query client
-  auth/       token store, AuthProvider (login/logout/me), RequireAuth route guard
+  auth/       token store, AuthProvider (login/logout/me), RequireAuth route guard, Entra ID SSO button + codes
   db/         Dexie database (KerpDb) + offline outbox helpers
   i18n/       i18next instance + message catalogues (locales/en.ts)
   lib/api/    API client (bearer token, single-flight refresh rotation + one retry on 401)
@@ -62,6 +62,26 @@ src/
   `sessionStorage` keeps only a "signed in" marker, so a reload resumes the session via
   `/api/v1/auth/refresh` (same origin). A session ends 12 hours after sign-in. Every other route sits behind `RequireAuth`. Sign-out calls
   `/api/v1/auth/logout` and clears the session even when the server is unreachable.
+- **Sign in with Microsoft (T-0055, diff §4.5).** `/login` asks `GET /api/v1/auth/config`
+  (T-0054). When it reports `sso`, **"Sign in with Microsoft"** is the primary, default action:
+  first on the screen, visually primary, focused when it appears (unless the user is already in
+  a field), with a short hint for company staff. Password sign-in stays below it for everyone,
+  internal users included (never hidden by e-mail domain). Without `sso`, or when the
+  configuration cannot be read, the screen is password only, as before. (The magic-link
+  request for Field Workers is not on this screen yet: TD-147.) The button is a plain HTML
+  form to the server's `start_url` (accepted only as a same-origin `/api/...` path, since the
+  pre-auth and session cookies are same-origin): a `GET` top-level navigation, or a `POST`
+  with the `invite_token` in the body when a pending invite is passed (wired by T-0053).
+  The callback redirects to **`/login/sso-return`** (`src/pages/SsoReturnPage.tsx`):
+  `?status=signed_in` → the tab adopts the session the server set as the `httpOnly` refresh
+  cookie (`TokenStore.adoptCookieSession`: only the "signed in" marker is stored; the access
+  token comes from `/auth/refresh`, memory only) and lands on `/` like any sign-in (diff
+  §4.1); `&joined_project_id=<id>` is remembered as the scope first, so that project opens.
+  `?error=<code>` → the sign-in screen with the translated refusal (`auth.sso.errors.*`, codes
+  in `src/auth/sso.ts`; unknown values show the generic `SSO_FAILED`). Nothing else from the
+  URL is shown or logged. `index.html` sets `<meta name="referrer" content="no-referrer">`
+  (TD-334). The e2e journey against the fake OIDC provider waits for the Playwright harness
+  (T-0027): TD-446.
 - **Navigation (diff §6, §6.1).** 8 groups in `src/app/nav.ts`: Overview, the 4 pillars
   (Logistics, Execution, Defense & Claims, Controls & Insights), Backbone, Documents,
   Admin. `NAV_ITEMS` holds the item mapping of diff §6.1 (e.g. Execution: inspections / QMS,

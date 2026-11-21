@@ -92,6 +92,20 @@ async def run_job(
                 result = await handler(
                     JobContext(row_id, kind, tenancy, payload, request_id, update, db)
                 )
+        except service.RetryLaterError as exc:
+            # The handler asked to run again later (T-0218): SAQ retries with back-off while
+            # the kind allows more attempts; the last one fails the row with the message.
+            message = service.sanitise_error(exc)
+            saq_job = ctx.get("job")
+            if saq_job is not None and saq_job.retryable:
+                logger.warning(
+                    "job will be retried",
+                    extra={"job_id": job_id, "kind": kind, "request_id": request_id},
+                )
+                await asyncio.to_thread(_requeue, db, tenancy, row_id, message)
+                raise
+            await asyncio.to_thread(_finish, db, tenancy, row_id, None, message)
+            return
         except (Exception, asyncio.CancelledError) as exc:
             logger.exception(
                 "job failed", extra={"job_id": job_id, "kind": kind, "request_id": request_id}
@@ -148,6 +162,11 @@ def _progress(
         service.report_progress(session, job_id, progress, message)
 
 
+def _requeue(db: Database, tenancy: TenancyContext, job_id: uuid.UUID, message: str) -> None:
+    with db.unit_of_work(tenancy) as session:
+        service.requeue_for_retry(session, job_id, message)
+
+
 def _finish(
     db: Database,
     tenancy: TenancyContext,
@@ -155,8 +174,9 @@ def _finish(
     result: dict[str, Any] | None,
     error: str | None,
 ) -> None:
+    # A row aborted by a System admin meanwhile keeps its outcome (T-0218).
     with db.unit_of_work(tenancy) as session:
-        service.finish_job(session, job_id, result=result, error=error)
+        service.finish_job(session, job_id, result=result, error=error, only_running=True)
 
 
 def load_registry() -> JobRegistry:
@@ -196,13 +216,14 @@ def build_workers(
     cron_jobs: dict[str, list[CronJob[WorkerContext]]] = {
         "interactive": [],
         "batch": [
+            # ``tracked``: each run's time and outcome for the queue monitor (T-0218).
             CronJob(
-                scheduler.sweep_cron,
+                scheduler.tracked(scheduler.sweep_cron),
                 cron=scheduler.SWEEP_CRON,
                 timeout=scheduler.CRON_TIMEOUT_S,
             ),
             CronJob(
-                scheduler.hourly_project_jobs,
+                scheduler.tracked(scheduler.hourly_project_jobs),
                 cron=scheduler.HOURLY_CRON,
                 timeout=scheduler.CRON_TIMEOUT_S,
             ),

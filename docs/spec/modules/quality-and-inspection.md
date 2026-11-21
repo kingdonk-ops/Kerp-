@@ -519,7 +519,7 @@ and tile filter), T-0250 (equipment links), T-0249 (fleet classes, blocked by TD
   `qa_itp`) and `is_standalone` (default false). The screens call it **Area** and show plain
   labels through `t()`: Quality (QA/ITP), Pre-start, Equipment check, Repair / fault,
   Health & Safety, General (user, 2026-11-21; `health_safety` added as the area for H&S checks
-  and H&S audits; user, 2026-11-21, TD-451). A record takes both from its pinned revision; the category
+  and H&S audits; user, 2026-11-21, TD-456). A record takes both from its pinned revision; the category
   is part of the revision hash. Rule sets may branch on `record.category`.
 - **No parent ITP.** A standalone template is `kind = inspection` only and is never attached to an
   ITP line. Its lifecycle and signing are the same as any inspection; review depends on the
@@ -550,7 +550,7 @@ menu), T-0320 (Issues menu → issue templates), epic E-01-03 (the shared design
 - **Presets.** "New template" asks one question. Inspection side: QA inspection, H&S check,
   Pre-start, Equipment check, Repair/fault, Internal audit, External audit; Issues side: Punch,
   NCR. The preset only pre-sets the settings below; the user can change every one of them before
-  the first publish. Inspection presets (user, 2026-11-21; TD-451):
+  the first publish. Inspection presets (user, 2026-11-21; TD-456):
 
   | Preset | Area | Formal | Audit |
   |---|---|---|---|
@@ -563,7 +563,7 @@ menu), T-0320 (Issues menu → issue templates), epic E-01-03 (the shared design
   | External audit | `general` | on | `external` |
 
   The issue presets copy the type and flag defaults of the project's `general` punch or NCR
-  template (issues.md §2; user, 2026-11-21, TD-451).
+  template (issues.md §2; user, 2026-11-21, TD-456).
 - **Settings** (on the template revision, part of the revision hash):
   - **Area** = `category` above.
   - **Issue category** (`issue_category`, optional; user, 2026-11-21): a key from the issue
@@ -577,10 +577,10 @@ menu), T-0320 (Issues menu → issue templates), epic E-01-03 (the shared design
     progress, ITP close-out and KPIs, is eligible for the MDR under the collection rule of
     documents-and-mdr.md §Gating invariant (formal `qa_itp` records of the scope; formal
     project-level records only when their location is inside the scope; internal-audit records
-    never; user, 2026-11-21, TD-451) and goes through review and approval
+    never; user, 2026-11-21, TD-456) and goes through review and approval
     (§Review and return). Unticked = **informal**, record-only: no review step — submit is final
     and moves the record straight to `INSPECTED_PASSED` / `INSPECTED_FAILED` from the proposed
-    result (user, 2026-11-21, TD-451), it never enters the QA verification queue, and it is excluded from
+    result (user, 2026-11-21, TD-456), it never enters the QA verification queue, and it is excluded from
     the MDR, the progress tiles and KPIs; it is still kept, signed, ledgered and auditable.
     `kind = itp` templates and every template attached to an ITP line are always formal (the
     tick is locked on; attaching an informal template to an ITP line → 422).
@@ -590,7 +590,7 @@ menu), T-0320 (Issues menu → issue templates), epic E-01-03 (the shared design
     `external` → origin `external_audit`, `client` + `blocks` defaults (issues.md §1, §5, §8).
     An external-scope audit always raises `client` issues (`excluded` lifted to
     `register_only` at raise, issues.md §5); the settings panel warns when it links an internal
-    issue template (user, 2026-11-21, TD-451).
+    issue template (user, 2026-11-21, TD-456).
   - **Linked issue types** (`linked_issue_templates`, 0..many issue template keys: one → used, several → the user picks,
     none → category × type default; issues.md §8).
   - **Locked settings.** Changing area, formal, audit (or its scope) — and with the area the
@@ -613,9 +613,9 @@ T-0329 (screens).
   Item), a material (materials module) or an equipment register entry. Each target is checked
   through its owning module's `service.py` (no FKs across modules, no cross-module table
   access); unknown or other project → 404. At most one `equipment` link per record (user,
-  2026-11-21, TD-451), so post-submit automations have one unambiguous `equipment` context (T-0250, T-0288).
+  2026-11-21, TD-456), so post-submit automations have one unambiguous `equipment` context (T-0250, T-0288).
   `material` links are accepted once the materials module exposes a link target (E-03-03; until
-  then 422 `LINK_KIND_UNAVAILABLE`; user, 2026-11-21, TD-451).
+  then 422 `LINK_KIND_UNAVAILABLE`; user, 2026-11-21, TD-456).
 - **Informational only.** Location and links never roll up (node inspection roll-up of T-0111),
   never feed progress, never block or satisfy completion and never make a record count for an
   asset. They are searchable (`GET /api/v1/inspections?location=…&linked=<kind>:<id>`) and shown

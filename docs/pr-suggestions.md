@@ -3,7 +3,141 @@
 > **Generated — do not hand-edit.** Rebuild with `python scripts/pr_suggestions.py rebuild`.
 > A running digest of everything agents surfaced on merged PRs — review notes, must-fix items, suggestions, nits, follow-ups and ideas — so nothing is lost after a squash-merge. Formal follow-ups also live as `TD-xxx` in `tracker/todo/` and on [TODO.md](TODO.md); this file is the readable skim. Each item links back to its PR or review for full context.
 
-_Repo `kingdonk-ops/Kerp-`, base `dev` · 142 merged PRs · 141 with surfaced notes._
+_Repo `kingdonk-ops/Kerp-`, base `dev` · 145 merged PRs · 144 with surfaced notes._
+
+---
+
+## PR #147 — T-0026: Admin UI: System admin grants (appoint Project Admins), user manager, project creation, persona + site scope assignment with SoD warning
+task `T-0026` · merged 2026-11-21 · by `kingdonk-ops` · [PR](https://github.com/kingdonk-ops/Kerp-/pull/147)
+
+**TODOs raised**
+
+- TD-447 (deferred) — Users screen
+- TD-448 (deferred) — Playwright journey after T-0027
+- TD-449 (later) — expose `create_projects` on `/auth/me` (New project is shown to everyone today; a 403 is explained)
+- TD-450 (later) — edit project code and spatial bounds in Settings
+
+**Review by `kingdonk-ops` — KERP-REVIEW: CHANGES_REQUESTED patch-id=1b3a9022e24eb9c9ce0ea8a8f2580e0a5af2c3f7** · [full review](https://github.com/kingdonk-ops/Kerp-/pull/147#pullrequestreview-6003748492)
+
+- _Must fix_
+  1. **`frontend/src/admin/api.ts:301-304` and `frontend/src/admin/MembersPage.tsx:211` — a user's PER-07 grants for other sites are silently revoked.** The backend allows one PER-07 grant per site: `MemberAssign` only rejects repeats of the pair (persona, site_node_id) (`backend/app/modules/admin/schemas.py:116`), and `PUT` replaces the user's whole individual set (`service.assign_member`). The client loses these grants in two places:
+     - `addToProjects` stores the merged grants in a map keyed by persona only, so the new PER-07 grant replaces any existing PER-07 grant for another site.
+     - The Edit dialog has a single site field. A member with PER-07 on sites X and Y who gets any unrelated persona edited is saved with only one PER-07 grant, and the other site is revoked.
+     Fixed means: merge by `(persona, site_node_id)`; Edit keeps PER-07 grants it does not show (or lists each site so it can be removed separately); and a test with two PER-07 sites proves both are still in the `PUT` body after an unrelated edit and after "add to projects".
+  2. **`frontend/src/admin/MembersPage.tsx:224-225`, `:268` and `api.ts:292` — the PER-07 site id is copied into other projects.** `site_node_id` is an asset node in the current project's hierarchy. "Add to several projects" sends the same id to every ticked project, and `assign_member` does not check that the node belongs to the project, so those projects end up with a wrong site scope. Fixed means: while PER-07 is chosen, the other-projects choice is disabled or hidden (with a short explanation), or each project needs its own site. Add 
+
+- _Suggestions (non-blocking)_
+  - `AssignDialog` can show its own warning: `onSite` does not clear `pending`, so changing the site after a SoD warning and then pressing "Save anyway" sends the new site with `confirm_sod: true`. SoD depends only on the personas, so this is harmless, but clearing `pending` on a site change would keep the dialog consistent.
+  - If a multi-project add fails part-way with an error other than SoD (for example a 403 on one project), the generic error does not say which projects were already saved. Retrying is safe because the merge gives the same result, but naming the failed project would help.
+  - Already flaky on `dev` (not this PR's tests): `AccessRequestsPage.test.tsx` and `ProjectSwitcher.test.tsx` also fail under 3-way parallel load. This is worth a `later` TODO.
+
+**Review by `kingdonk-ops` — KERP-REVIEW: APPROVED patch-id=6ffd02636dcae075dae4290a2e5418bebe240ca8** · [full review](https://github.com/kingdonk-ops/Kerp-/pull/147#pullrequestreview-6003874225)
+
+- _Must fix_
+  None.
+
+- _Suggestions (non-blocking)_
+  - `MembersPage.tsx:156`: the grant list key is `${g.persona}-${g.source_id ?? "direct"}`. A member with two direct PER-07 sites (now a supported case) therefore renders duplicate keys. React logs "Encountered two children with the same key, `PER-07-direct`" in the "keeps every PER-07 site" test. Add `site_node_id` to the key. I could not produce a visible rendering error, so this does not block.
+  - No test covers "any dialog change clears a pending SoD warning" (`MembersPage.tsx:256-261`): removing `setPending([])` keeps all tests green. A short test would be: warn, toggle a persona, assert the warning is gone and the button reads Save.
+  - `MembersPage.test.tsx`: the first test no longer asserts the title is an `h1` (now `findByText`). Consider keeping a cheap `getByRole("heading", { level: 1 })` check after the text wait.
+  - T-0331 is sized S, but it covers two audiences, invite listing / re-send / revoke, and SoD. The planner may want M, or a split if it grows past ~300 lines.
+  - AccessRequestsPage tests still use the 5 s default timeout and flake under parallel load. The same `testTimeout`/`WAIT` treatment would help (separate PR / `later` TODO).
+  KERP-REVIEW: APPROVED patch-id=6ffd02636dcae075dae4290a2e5418bebe240ca8
+  ---
+  _Generated by [Claude Code](https://claude.ai/code)_
+
+**Review by `kingdonk-ops` — KERP-REVIEW: APPROVED patch-id=32191a80556ed6b7c6fb40b2d12d8077cb868912** · [full review](https://github.com/kingdonk-ops/Kerp-/pull/147#pullrequestreview-6004018083)
+
+## KERP review - post-rebase re-check (not a full round)
+
+This is a re-check of the round-2 approval of 06396a3 (marker `APPROVED patch-id=6ffd0263...`, present on the PR). The branch was rebased onto dev a9d2ba0 (adds #146) and the coordinator added merge bookkeeping, so the patch-id changed.
+
+Compared:
+- `git range-diff 8d765ff..06396a3 origin/dev..HEAD`: commits 1 and 4 differ only by moved context/hunk offsets. Commits 2 and 3 are equal. Commits 5 and 6 are new bookkeeping (T-0026 done + pr-suggestions).
+- Non-tracker diff (excluding docs/TASKS.md, docs/TODO.md, docs/pr-suggestions.md), `+`/`-` lines at -U0: byte-identical between `8d765ff..06396a3` and `origin/dev...HEAD` (19 files, 171 …
+
+---
+
+## PR #146 — T-0055: Web sign-in with Microsoft (Entra ID SSO): button when enabled, callback landing, translated refusals
+task `T-0055` · merged 2026-11-21 · by `kingdonk-ops` · [PR](https://github.com/kingdonk-ops/Kerp-/pull/146)
+
+**TODOs raised**
+
+- TD-446 (deferred) — e2e journey against T-0054's fake OIDC provider once T-0027's Playwright harness exists
+
+**Review by `kingdonk-ops` — KERP-REVIEW: CHANGES_REQUESTED patch-id=cdc350a0084ff949f7e5f323b199698178eb0a91** · [full review](https://github.com/kingdonk-ops/Kerp-/pull/146#pullrequestreview-6003703648)
+
+- _Must fix_
+  1. `frontend/src/pages/LoginPage.test.tsx:33` (`ssoButton`, failing at `:43`): the first test fails every time under parallel load. The SSO button only appears after the `/auth/config` round-trip on a cold `AppRoot` render, which does not fit in the default 1000 ms `findByRole` timeout. This is very likely the coordinator's unexplained failing run. Fixed means the first wait for the button cannot time out on a loaded CI runner. For example, pass an explicit `{ timeout: 5000 }` to `ssoButton`'s `findByRole`, which I verified under stress. Alternatively, wait for the `/auth/config` call first, as the SSO-off tests do, and then for the button with a longer timeout. Apply the same pattern to the other first-appearance `findBy*` waits in the new files (`SsoReturnPage.test.tsx` `scopeIs`/`findByRole`, and the new `App.a11y.test.tsx` case) if they rely on the 1 s default after several round-trips. Do not lower any assertion.
+
+- _Suggestions (non-blocking)_
+  - Raise a `later` TODO to set a project-wide `configure({ asyncUtilTimeout })` in `src/test/setup.ts`. Pre-existing suites (AccessRequestsPage, RegisterPage, ProjectSwitcher, App.test) show the same load sensitivity.
+  - TD-334: add a note that the web half is done by T-0055's `index.html` meta, so only `/app/sso-return` (T-0143) remains.
+  - `LoginPage.tsx`: the refusal comes from `location.state`, which survives a reload of `/login`, so the message reappears. Consider clearing it with `navigate(".", { replace: true, state: {} })` after the first render.
+  - `SsoReturnPage.tsx`: `joined_project_id` failing the UUID check is silently ignored. That is fine, but a one-line comment would help.
+  KERP-REVIEW: CHANGES_REQUESTED patch-id=cdc350a0084ff949f7e5f323b199698178eb0a91
+  ---
+  _Generated by [Claude Code](https://claude.ai/code)_
+
+**Review by `kingdonk-ops` — KERP-REVIEW: APPROVED patch-id=3d4ecd9df019aa4f34678a5bfcae4753d3fd8182** · [full review](https://github.com/kingdonk-ops/Kerp-/pull/146#pullrequestreview-6003780368)
+
+- _Must fix_
+  None.
+
+- _Suggestions (non-blocking)_
+  - The branch is behind `origin/dev` (#138). `git merge-tree` shows conflicts only in the generated `docs/TASKS.md` / `docs/TODO.md`. Rebase, then run `python scripts/tracker.py render` before merge. Re-check the patch-id after the rebase.
+  - AccessRequestsPage first-appearance waits have the same default-1 s pattern. Consider a `later` TODO, out of scope here.
+  KERP-REVIEW: APPROVED patch-id=3d4ecd9df019aa4f34678a5bfcae4753d3fd8182
+  ---
+  _Generated by [Claude Code](https://claude.ai/code)_
+
+---
+
+## PR #138 — T-0033: Frozen migration DDL + CI hardening 2 (bundle: absorbs T-0032)
+task `T-0033` · merged 2026-11-21 · by `kingdonk-ops` · [PR](https://github.com/kingdonk-ops/Kerp-/pull/138)
+
+**TODOs raised**
+
+- TD-408 (deferred) — digest-pin postgis/postgis:16-3.4 in ci.yml + compose; drop the strict xfail
+- TD-409 (decision, open; user 2026-11-21: setting stays off for now) — lock-refresh PR needs "Allow GitHub Actions to create and approve pull requests"; until then the weekly run pushes the branch and fails at `gh pr create`
+
+**Review by `kingdonk-ops` — KERP-REVIEW: APPROVED patch-id=dbfc040a6f6718e0aee101ae66cd2c5634139304** · [full review](https://github.com/kingdonk-ops/Kerp-/pull/138#pullrequestreview-6002460481)
+
+- _Must fix_
+  None.
+
+- _Suggestions (non-blocking)_
+  - `lock-refresh.yml` "Install uv": install uv by hash (`pip install --require-hashes -r` a small pinned file) or use the official installer with a checksum. uv runs before the token is exposed, but it can still write `$GITHUB_ENV`/`$GITHUB_PATH` for the step that holds the token.
+  - Possible `later` TODO (risk, existed before this PR, but more visible now that a write-token workflow makes CI-green non-dev commits):
+    - The `main` ruleset in `scripts/setup_github.sh` requires only fast-forward plus a green `ci-gate` on the commit.
+    - So any `contents: write` GITHUB_TOKEN could fast-forward `main` to the CI-green lock-refresh commit and skip `review-gate`.
+    - The workflow code never does this. Requiring the commit to be reachable from `dev` in `promote.yml`, or a ruleset restriction, would close it.
+  - The PR is about 1,700 lines, over the M guideline. That is accepted as a user-requested bundle and most of it is mechanical frozen SQL.
+  KERP-REVIEW: APPROVED patch-id=dbfc040a6f6718e0aee101ae66cd2c5634139304
+  ---
+  _Generated by [Claude Code](https://claude.ai/code)_
+
+**Review by `kingdonk-ops` — KERP-REVIEW: APPROVED patch-id=17f5a4baad1bb6adfbd02d798a8f576331a173e0** · [full review](https://github.com/kingdonk-ops/Kerp-/pull/138#pullrequestreview-6003630220)
+
+- _Must fix_
+  None.
+
+- _Suggestions (non-blocking)_
+  - TD-432 (postgis digest) is still open as a user-deferred item. Resolving it removes the strict xfail.
+  KERP-REVIEW: APPROVED patch-id=17f5a4baad1bb6adfbd02d798a8f576331a173e0
+  ---
+  _Generated by [Claude Code](https://claude.ai/code)_
+
+**Review by `kingdonk-ops` — KERP-REVIEW: APPROVED patch-id=dc9d8ca9c804decfc81bf955e82619595a425011** · [full review](https://github.com/kingdonk-ops/Kerp-/pull/138#pullrequestreview-6003720056)
+
+- _Must fix_
+  None.
+
+- _Suggestions (non-blocking)_
+  - Dev tooling (mypy) is not lock-pinned, so newer local versions report errors that CI doesn't. Consider pinning the dev extra or adding the two annotations pre-emptively (`later` TODO).
+  KERP-REVIEW: APPROVED patch-id=dc9d8ca9c804decfc81bf955e82619595a425011
+  ---
+  _Generated by [Claude Code](https://claude.ai/code)_
 
 ---
 

@@ -69,7 +69,9 @@ describe("app shell", () => {
     expect(
       screen.getByText(i18n.t("auth.signedInAs", { name: FAKE_USER.display_name })),
     ).toBeInTheDocument();
-    expect(ctx.calls[0]).toMatchObject({
+    // The sign-in screen first asks which methods are offered (T-0055), then signs in.
+    expect(ctx.calls[0]).toMatchObject({ method: "GET", path: "/api/v1/auth/config" });
+    expect(ctx.calls[1]).toMatchObject({
       method: "POST",
       path: "/api/v1/auth/login",
       body: { email: FAKE_USER.email, password: "secret" },
@@ -110,8 +112,13 @@ describe("app shell", () => {
     renderApp("/", setup());
 
     const nav = await screen.findByRole("navigation", { name: i18n.t("nav.label") });
-    const links = within(nav).getAllByRole("link");
+    // The group links, then the built items under them (Backbone → Projects, T-0026).
+    const all = within(nav).getAllByRole("link");
+    const links = all.filter((l) => NAV_GROUPS.some((g) => l.getAttribute("href") === g.path));
     expect(links).toHaveLength(8);
+    expect(all.filter((l) => !links.includes(l)).map((l) => l.getAttribute("href"))).toEqual([
+      "/backbone/projects",
+    ]);
     expect(NAV_GROUPS).toHaveLength(8);
     expect(NAV_GROUPS.filter((g) => g.pillar).map((g) => g.id)).toEqual([
       "logistics",

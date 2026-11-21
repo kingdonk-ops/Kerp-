@@ -9,9 +9,9 @@ contract, `update(progress, message)` and the sanitised error (ADR 0007).
 |---|---|
 | `models.py` | `oe_jobs_job` (`BaseRecordMixin`, project RLS, no exemption; migration `0007`) |
 | `registry.py` | `register_job(kind, queue=...)`, `JobKind`, `JobContext`, `JobRegistry`, `JOB_REGISTRY`; `register_startup_check(fn)`: a module's precondition the worker runs before it connects (raise to refuse start-up; T-0213) |
-| `broker.py` | `JobBroker` seam, `SaqBroker` (two SAQ `RedisQueue`s), `LoopDispatcher` (post-commit enqueue) |
-| `service.py` | `create_job`, `get_job`, `start_job`/`report_progress`/`finish_job`, `sanitise_error`, `sweep` |
-| `scheduler.py` | `deployment_scopes`, `sweep_cron` (SAQ cron, every 5 min, batch worker; T-0214), `hourly_project_jobs` (queues every `schedule_hourly_per_project` kind in every live project at :17; T-0215) |
+| `broker.py` | `JobBroker` seam, `QueueMonitor` seam, `SaqBroker` (two SAQ `RedisQueue`s; both seams), `LoopDispatcher` (post-commit enqueue) |
+| `service.py` | `create_job`, `get_job`, `start_job`/`report_progress`/`finish_job`, `requeue_for_retry`, `sanitise_error`, `sweep`; the queue monitor (`queue_statuses`, `cron_statuses`, `failed_counts`, `list_failed_jobs`, `retry_failed_job`, `abort_job`, `set_queue_monitor`; T-0218) |
+| `scheduler.py` | `deployment_scopes`, `sweep_cron` (SAQ cron, every 5 min, batch worker; T-0214), `hourly_project_jobs` (queues every `schedule_hourly_per_project` kind in every live project at :17; T-0215), `tracked` (records each cron run for the queue monitor; T-0218). The cron expressions live in `registry.CRON_SCHEDULES` |
 | `worker.py` | `run_job` (the one SAQ function), `build_workers`, `serve`; `python -m app.modules.jobs.worker` |
 | `router.py`, `schemas.py` | `POST /api/v1/jobs`, `GET /api/v1/jobs/{id}` |
 | `mail.py` | Outbound e-mail's queue (T-0058): `install` sets core mail's post-commit enqueuer at start-up (API lifespan, worker), `MailDispatcher` stores the payload in Redis (`kerp:mail:<send id>`, TTL) and enqueues `kerp_send_mail` on the interactive queue with ids only; `send_mail_job` runs `app.core.mail.service.deliver` (SAQ retries with back-off). See `app/core/mail/README.md` |
@@ -52,6 +52,44 @@ async def ocr_page(job: JobContext) -> dict[str, object]:
   payload above 64 KiB as compact JSON with 422 (`MAX_PAYLOAD_BYTES`). Scope never comes from
   the body or the payload: a `tenant_id` in either is ignored or refused (T-0060).
 
+## Retry later (T-0218)
+
+A kind registered with `max_attempts` > 1 (and `retry_delay_s`, `retry_max_delay_s`) may raise
+`RetryLaterError("safe message")` for a passing condition (e.g. the malware scanner is down).
+`run_job` then puts the row back to `queued` with the message and re-raises, so SAQ runs the
+job again after `retry_delay_s`, doubling per attempt up to `retry_max_delay_s` (SAQ adds
+jitter). On the last attempt the row fails with the message. Any other exception still fails
+the job at once. `start_job` counts every attempt in `attempts`.
+
+## Queue monitor (T-0218, diff §4.7)
+
+The System console's endpoints live in the admin module (`/api/v1/admin/system/queues...`,
+`admin/system_router.py`, `system_admin` only) and call only this service. SAQ's own web UI is
+never mounted (it has no KERP auth).
+
+* **Counts** (`queue_statuses`): per queue SAQ's `queued`, `active` and `scheduled` (Redis,
+  deployment-wide: e-mail and cron jobs included) and the age of the oldest queued job; plus the
+  `failed` job rows per queue (`failed_counts`, under the caller's RLS).
+* **Cron jobs** (`cron_statuses`): the batch worker's crons (`registry.CRON_SCHEDULES`; there is
+  no cron queue). `scheduler.tracked` records each run's start, end and outcome in Redis
+  (`<prefix>:cron:<name>`); the next run is the time SAQ has the `cron:<name>` job scheduled.
+* **Failed jobs** (`list_failed_jobs`): kind, queue, project code (projects service), attempts,
+  error class (read from the sanitised error: `Internal error (X)` -> `X`, the worker's own
+  texts -> `Cancelled` / `Aborted`, any other `JobError` text -> `JobError`) and the message
+  (<= 500 characters). Never the payload, the result or SAQ kwargs; outbound e-mail payloads are
+  not job rows at all.
+* **Retry** (`retry_failed_job`, `failed` only) and **abort** (`abort_job`, `queued` or
+  `running`): the row must be visible to the caller's tenant-level request session under normal
+  RLS (else 404). The change is written in a unit of work bound to the job's own scope (what the
+  worker binds; no bypass role) and audited in the request session in the tenant-level chain
+  `admin-system:<tenant>` (`event` `job_retried` / `job_aborted`, job id, kind, queue, project
+  id; actor = the caller). A retry is enqueued after its commit with the kind's retry settings;
+  an abort fails the row with `Aborted by an administrator`, then the router aborts the SAQ job
+  (best effort: the worker never starts a `failed` row, and `finish_job(only_running=True)`
+  never overwrites an aborted one).
+* Visibility: under ADR 0016 (T-0274) a `system_admin` reads every project's job rows; until it
+  lands, only tenant-level rows and the projects of the caller's read scope are listed (TD-451).
+
 ## Worker (rule 1)
 
 `run_job` gets `job_id`, `tenant_id`, `project_id`, `request_id` as SAQ kwargs and opens a unit
@@ -73,6 +111,9 @@ BYPASSRLS). Broker enqueue retry/backoff and a heal on `GET /jobs/{id}`: TD-304.
 
 ## Tests
 
+`tests/test_jobs_retry.py` (retry later), `tests/test_queue_monitor.py` (the console API with a
+fake monitor; SQLite and PostgreSQL), `tests/test_queue_monitor_saq.py` (counts, abort, cron
+records and a retried job on real SAQ; needs `KERP_REDIS_URL`),
 `tests/test_jobs.py` (SQLite and PostgreSQL, no Redis: a recording broker) and
 `tests/test_jobs_saq.py` (real SAQ on Redis; needs `KERP_REDIS_URL`, set in CI's PostgreSQL step).
 `tests/test_rls_bypass.py` runs jobs through the real SAQ workers under PostgreSQL RLS and

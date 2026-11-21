@@ -153,3 +153,196 @@ export async function fetchIsSystemAdmin(api: ApiClient, userId: string): Promis
   });
   return response.ok;
 }
+
+// --- admin grants, projects, members (T-0039, T-0012, T-0014; diff §4.1) ---------------------
+
+export type AdminGrantKind = components["schemas"]["AdminGrantKind"];
+export type ProjectUpdate = components["schemas"]["ProjectUpdate"];
+export type Member = components["schemas"]["MemberRead"];
+export type UserSummary = components["schemas"]["UserSummary"];
+/** A user with the tenant-level admin grants they hold (never personas). */
+export type GrantedUser = components["schemas"]["UserRead"] & { grants: AdminGrantKind[] };
+
+/** Every account with its admin grants (System admins only; 403 for everyone else). */
+export async function fetchGrantedUsers(api: ApiClient): Promise<GrantedUser[]> {
+  const [users, grants] = await Promise.all([
+    api.GET("/api/v1/admin/users"),
+    api.GET("/api/v1/admin/grants"),
+  ]);
+  if (!users.data) throw new AdminApiError(users.response.status);
+  if (!grants.data) throw new AdminApiError(grants.response.status);
+  const held = grants.data;
+  return users.data
+    .map((u) => ({ ...u, grants: held.filter((g) => g.user_id === u.id).map((g) => g.grant) }))
+    .sort((a, b) => a.display_name.localeCompare(b.display_name));
+}
+
+/** Give or remove a grant; `last`: the last System admin cannot be removed (409). */
+export async function setAdminGrant(
+  api: ApiClient,
+  userId: string,
+  grant: AdminGrantKind,
+  on: boolean,
+): Promise<"ok" | "last"> {
+  const { response } = on
+    ? await api.POST("/api/v1/admin/grants", { body: { user_id: userId, grant } })
+    : await api.DELETE("/api/v1/admin/grants/{user_id}/{grant}", {
+        params: { path: { user_id: userId, grant } },
+      });
+  if (response.ok || response.status === 404) return "ok"; // 404: already removed
+  if (response.status === 409) return "last";
+  throw new AdminApiError(response.status);
+}
+
+/** A project as the client reads it (`GET /projects`). */
+export type Project = Awaited<ReturnType<typeof fetchProjects>>[number];
+
+export async function fetchProjects(api: ApiClient) {
+  const { data, response } = await api.GET("/api/v1/projects");
+  if (!data) throw new AdminApiError(response.status);
+  return [...data].sort((a, b) => a.code.localeCompare(b.code));
+}
+
+/** `forbidden`: no `create_projects` grant (403); `duplicate`: the code is taken (409). */
+export type SaveResult = "ok" | "forbidden" | "duplicate";
+
+function saved(status: number, ok: boolean): SaveResult {
+  if (ok) return "ok";
+  if (status === 403) return "forbidden";
+  if (status === 409) return "duplicate";
+  throw new AdminApiError(status);
+}
+
+/** Create a project with the deployment's defaults; the creator becomes its PER-09. */
+export async function createProject(api: ApiClient, code: string, name: string): Promise<SaveResult> {
+  const { response } = await api.POST("/api/v1/projects", { body: { code, name } });
+  return saved(response.status, response.ok);
+}
+
+export async function updateProject(
+  api: ApiClient,
+  id: string,
+  body: ProjectUpdate,
+): Promise<SaveResult> {
+  const { response } = await api.PATCH("/api/v1/projects/{project_id}", {
+    params: { path: { project_id: id } },
+    body,
+  });
+  return saved(response.status, response.ok);
+}
+
+export async function setLobbyVisible(api: ApiClient, id: string, visible: boolean): Promise<void> {
+  const { response } = await api.PUT("/api/v1/projects/{project_id}/lobby", {
+    params: { path: { project_id: id } },
+    body: { visible_in_lobby: visible },
+  });
+  if (!response.ok) throw new AdminApiError(response.status);
+}
+
+export async function fetchMembers(api: ApiClient, projectId: string): Promise<Member[]> {
+  const { data, response } = await api.GET("/api/v1/admin/projects/{project_id}/members", {
+    params: { path: { project_id: projectId } },
+  });
+  if (!data) throw new AdminApiError(response.status);
+  return [...data].sort((a, b) => a.display_name.localeCompare(b.display_name));
+}
+
+/** An active account by exact e-mail, or `null` (404). */
+export async function lookupUser(api: ApiClient, email: string): Promise<UserSummary | null> {
+  const { data, response } = await api.POST("/api/v1/admin/users/lookup", {
+    body: { email: email.trim() },
+  });
+  if (data) return data;
+  if (response.status === 404) return null;
+  throw new AdminApiError(response.status);
+}
+
+/** The member's individual grants (team-derived ones are read-only, ADR 0008). */
+export function directGrants(member: Member | undefined): GrantIn[] {
+  return (member?.grants ?? [])
+    .filter((g) => g.source === "direct")
+    .map(({ persona, site_node_id }) => (site_node_id ? { persona, site_node_id } : { persona }));
+}
+
+/** Set the user's complete individual persona set on a project; `sod`: confirm first (409). */
+export async function assignMember(
+  api: ApiClient,
+  projectId: string,
+  userId: string,
+  grants: GrantIn[],
+  confirmSod: boolean,
+): Promise<"ok" | "sod"> {
+  const { error, response } = await api.PUT(
+    "/api/v1/admin/projects/{project_id}/members/{user_id}",
+    {
+      params: { path: { project_id: projectId, user_id: userId } },
+      body: { grants, confirm_sod: confirmSod },
+    },
+  );
+  if (response.ok) return "ok";
+  if (response.status === 409 && conflictDetail(error).sod_warning === true) return "sod";
+  throw new AdminApiError(response.status);
+}
+
+/**
+ * Grants without repeats of (persona, site), in first-seen order: PER-07 may be held once per
+ * site (backend `MemberAssign`), so merging by persona alone would drop a site.
+ */
+export function mergeGrants(...lists: readonly GrantIn[][]): GrantIn[] {
+  const merged = new Map<string, GrantIn>();
+  for (const g of lists.flat()) merged.set(`${g.persona}|${g.site_node_id ?? ""}`, g);
+  return [...merged.values()];
+}
+
+/** A multi-project add failed at `projectId`; the projects before it were saved. */
+export class AddToProjectError extends AdminApiError {
+  constructor(
+    readonly projectId: string,
+    status: number,
+  ) {
+    super(status);
+  }
+}
+
+/**
+ * Add `grants` to the user's individual grants on each project in turn (one action, several
+ * of the admin's projects; merged by persona and site, so no grant is dropped). `confirmFirst`
+ * sends `confirm_sod: true` for the first project only, the one the shown warning named; the
+ * others go with `false`. Stops at the next project that needs the SoD confirmation and returns
+ * it with the projects still to do, so every confirmation follows a warning naming its project.
+ */
+export async function addToProjects(
+  api: ApiClient,
+  userId: string,
+  projectIds: readonly string[],
+  grants: GrantIn[],
+  confirmFirst: boolean,
+): Promise<string[]> {
+  for (const [i, projectId] of projectIds.entries()) {
+    let res: "ok" | "sod";
+    try {
+      const members = await fetchMembers(api, projectId);
+      const current = directGrants(members.find((m) => m.user_id === userId));
+      const confirm = confirmFirst && i === 0;
+      res = await assignMember(api, projectId, userId, mergeGrants(current, grants), confirm);
+    } catch (e) {
+      throw new AddToProjectError(projectId, e instanceof AdminApiError ? e.status : 0);
+    }
+    if (res === "sod") return projectIds.slice(i);
+  }
+  return [];
+}
+
+/** Remove the user's individual personas; `team`: their access is only team-derived (409). */
+export async function removeMember(
+  api: ApiClient,
+  projectId: string,
+  userId: string,
+): Promise<"ok" | "team"> {
+  const { response } = await api.DELETE("/api/v1/admin/projects/{project_id}/members/{user_id}", {
+    params: { path: { project_id: projectId, user_id: userId } },
+  });
+  if (response.ok || response.status === 404) return "ok";
+  if (response.status === 409) return "team";
+  throw new AdminApiError(response.status);
+}

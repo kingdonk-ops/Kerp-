@@ -1,5 +1,5 @@
 # KERP local dev stack (T-0003): PostgreSQL 16 + PostGIS + ltree, Redis 7, MinIO,
-# and the SAQ job worker (T-0015, profile "worker").
+# and the SAQ job worker (T-0015) with the ClamAV scanner (T-0218), profile "worker".
 # Dev only: fixed throwaway credentials, ports bound to localhost. Use `make up` / `make test-pg`
 # (see Makefile and backend/README.md "Local PostgreSQL stack").
 #
@@ -55,9 +55,30 @@ services:
       timeout: 5s
       retries: 15
 
+  # ClamAV malware scanner (T-0218, TD-211) for the upload verify job: clamd on TCP 3310.
+  # Opt-in with the worker (profile "worker", or "scanner" alone): the first start downloads
+  # the signature database (freshclam), which takes a few minutes and needs the network.
+  # Until clamd answers, uploads stay `verifying` and the verify job retries with back-off.
+  # clamd scans streams up to its StreamMaxLength (ClamAV default 25M); the worker below
+  # refuses larger files itself (KERP_UPLOAD_SCAN_MAX_BYTES), they end `verify_failed`.
+  clamd:
+    profiles: ["worker", "scanner"]
+    image: clamav/clamav:1.4.3
+    ports:
+      - "127.0.0.1:${KERP_CLAMD_PORT:-3310}:3310"
+    volumes:
+      - kerp-clamav-db:/var/lib/clamav
+    healthcheck:
+      test: ["CMD", "clamdcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 20
+      start_period: 300s
+
   # SAQ worker (T-0015): the backend image running both job queues (interactive + batch).
   # Opt-in profile, so `make up` stays fast: `make worker` builds and starts it.
   # Run the migrations first (`alembic upgrade head`) so oe_jobs_job exists.
+  # Uploads are scanned by the clamd service above (T-0218).
   worker:
     profiles: ["worker"]
     build: ./backend
@@ -66,11 +87,18 @@ services:
       KERP_ENVIRONMENT: development
       KERP_DATABASE_URL: postgresql+psycopg://kerp_app:kerp_app@postgres:5432/kerp_test
       KERP_REDIS_URL: redis://redis:6379/0
+      KERP_UPLOAD_SCANNER: clamd
+      KERP_CLAMD_ADDRESS: tcp://clamd:3310
+      KERP_UPLOAD_SCAN_MAX_BYTES: "26214400"  # clamd's default StreamMaxLength (25M)
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+      # Started, not healthy: the signature download may take minutes; the verify job
+      # retries until clamd answers.
+      clamd:
+        condition: service_started
     # The image's HEALTHCHECK probes the API's /health; the worker serves no HTTP.
     healthcheck:
       disable: true
@@ -79,3 +107,4 @@ services:
 volumes:
   kerp-pg-data:
   kerp-minio-data:
+  kerp-clamav-db:

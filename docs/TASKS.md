@@ -3,11 +3,11 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 77/298 tasks done (26%) · **ready now:** 23 · **epics awaiting breakdown:** 49
+**Overall:** 80/299 tasks done (27%) · **ready now:** 21 · **epics awaiting breakdown:** 49
 
 | Phase | Tasks done | Progress |
 |---|---|---|
-| 0 · Platform foundations | 77/112 | `██████░░░░` 69% |
+| 0 · Platform foundations | 80/113 | `███████░░░` 71% |
 | 1 · Asset & Quality backbone | 0/160 (+2 epics) | `░░░░░░░░░░` 0% |
 | 2 · Welding quality | 0/11 | `░░░░░░░░░░` 0% |
 | 3 · Logistics | 0/2 (+7 epics) | `░░░░░░░░░░` 0% |
@@ -80,13 +80,14 @@
 | ✅ | [T-0025](../tracker/tasks/T-0025.md) | Reusable UI shells: RegisterPage, DetailPage (gate banner, tabs, audit), Dynamic Form Renderer | frontend | M | T-0024, T-0017 | #42 |
 | ✅ | [T-0045](../tracker/tasks/T-0045.md) | NFR budget harness: warn-only CI performance job + 300-question form-open budget (< 1.5 s) | frontend | S | T-0025 | #118 |
 | ✅ | [T-0047](../tracker/tasks/T-0047.md) | Dynamic Form Renderer: localised template strings (plain string or per-locale map, fallback to the template default language) | frontend | S | T-0025 | #74 |
-| ▶ | [T-0026](../tracker/tasks/T-0026.md) | Admin UI: System admin grants (appoint Project Admins), user manager, project creation, persona + site scope assignment with SoD warning | frontend | M | T-0024, T-0014, T-0039 |  |
+| ✅ | [T-0026](../tracker/tasks/T-0026.md) | Admin UI: System admin grants (appoint Project Admins), user manager, project creation, persona + site scope assignment with SoD warning | frontend | M | T-0024, T-0014, T-0039 | #147 |
 | ▶ | [T-0041](../tracker/tasks/T-0041.md) | Lobby screens: lobby list (internal users), project-code entry, Active requests panel with status chips, rejection reason and Request again after cooldown | frontend | M | T-0040, T-0050, T-0051, T-0042 |  |
 | ✅ | [T-0042](../tracker/tasks/T-0042.md) | Top-bar project picker wired to memberships + post-login landing (one project -> in, several -> last used, none -> lobby) | frontend | S | T-0014, T-0024 | #108 |
 | ⚫ | [T-0048](../tracker/tasks/T-0048.md) | Devices screen: list enrolled devices, revoke with wipe warning (admin and own devices) | frontend | S | T-0043, T-0024 |  |
 | ✅ | [T-0051](../tracker/tasks/T-0051.md) | Admin access-request inbox and devices screens: pending requests for the user's PER-09 projects (approve with persona/site scope, reject with optional reason); enrolled devices list and revoke with wipe warning (admin and own devices) | frontend | M | T-0050, T-0042, T-0043, T-0024 | #134 |
-| ⬜ | [T-0053](../tracker/tasks/T-0053.md) | Invite link screens: one-click 'Join project' for signed-in users, invite token carried through sign-in, land in the project (lobby skipped) | frontend | S | T-0052, T-0042, T-0055, T-0026 |  |
-| ▶ | [T-0055](../tracker/tasks/T-0055.md) | Web sign-in with Microsoft (Entra ID SSO): button when enabled, callback landing, translated refusals | frontend | S | T-0054, T-0042 |  |
+| ▶ | [T-0053](../tracker/tasks/T-0053.md) | Invite link screens: one-click 'Join project' for signed-in users, invite token carried through sign-in, land in the project (lobby skipped) | frontend | S | T-0052, T-0042, T-0055, T-0026 |  |
+| ✅ | [T-0055](../tracker/tasks/T-0055.md) | Web sign-in with Microsoft (Entra ID SSO): button when enabled, callback landing, translated refusals | frontend | S | T-0054, T-0042 | #146 |
+| ▶ | [T-0331](../tracker/tasks/T-0331.md) | Admin → Users screen: System admin creates / deactivates / reactivates accounts; PER-09 invites a user by e-mail to one of its projects (persona(s) + site + SoD confirm), link shown once, open invites listed / re-sent / revoked | frontend | S | T-0026 |  |
 | ▶ | [T-0027](../tracker/tasks/T-0027.md) | Playwright setup + Phase 0 exit journey | e2e | S | T-0023, T-0024, T-0018 |  |
 | ⚫ | [T-0056](../tracker/tasks/T-0056.md) | Transactional e-mails for access-request decisions (approve / reject) via the outbound e-mail service | admin | S | T-0050, T-0058 |  |
 | ⬜ | [T-0078](../tracker/tasks/T-0078.md) | Screens: create your password at invite acceptance, forgot password and reset password (web and Android) | frontend | S | T-0053, T-0059, T-0077 |  |
@@ -110,10 +111,10 @@
 | ✅ | [T-0071](../tracker/tasks/T-0071.md) | Load the caller's memberships once per request | projects | S | — | #57 |
 | ✅ | [T-0072](../tracker/tasks/T-0072.md) | Duplicated tab keeps its session: cross-tab refresh lock and token hand-off | frontend | M | T-0037 | #105 |
 | ✅ | [T-0081](../tracker/tasks/T-0081.md) | CI speed 1: SQLite test DB from a migrated template + pytest-xdist, SQLite and PostgreSQL backend tests as parallel jobs, docs-only PRs skip app jobs, --durations | platform | M | — | #140 |
-| ▶ | [T-0218](../tracker/tasks/T-0218.md) | uploads: ClamAV scanner (clamd INSTREAM) in the worker replacing the stub, signature on the file row, scanner PING for health | uploads | S | T-0016, T-0213, T-0215 |  |
+| ✅ | [T-0218](../tracker/tasks/T-0218.md) | uploads + jobs (System console backends): ClamAV scanner (clamd INSTREAM) in the worker replacing the stub, signature on the file row, scanner PING for health; queue monitor API for System admins (queue depths, cron runs, failed jobs without payloads, retry/abort) | uploads | M | T-0016, T-0213, T-0215, T-0015, T-0214, T-0039 | #148 |
 | ✅ | [T-0082](../tracker/tasks/T-0082.md) | CI speed 2: PostgreSQL tests on a per-test copy of a migrated template database, pytest-xdist on PostgreSQL, fsync-off CI Postgres, coverage floor on the PostgreSQL run | platform | M | T-0081 | #141 |
 | ⬜ | [T-0219](../tracker/tasks/T-0219.md) | admin: deployment stats (counts + byte totals via module stats providers under normal RLS) and health probes at /api/v1/admin/system | admin | M | T-0014, T-0015, T-0016, T-0039, T-0218, T-0274 |  |
-| ▶ | [T-0220](../tracker/tasks/T-0220.md) | jobs: queue monitor API for System admins (queue depths, cron runs, failed jobs without payloads, retry/abort) | jobs | S | T-0015, T-0214, T-0039 |  |
+| ⚫ | [T-0220](../tracker/tasks/T-0220.md) | jobs: queue monitor API for System admins (queue depths, cron runs, failed jobs without payloads, retry/abort) | jobs | S | T-0015, T-0214, T-0039 |  |
 | ✅ | [T-0083](../tracker/tasks/T-0083.md) | CI speed 3: frontend-only PRs skip the backend jobs (per-component change detection in ci.yml detect) | platform | S | T-0082 | #142 |
 | ⬜ | [T-0221](../tracker/tasks/T-0221.md) | uploads: quarantine monitor API — rejected/verifying/expired upload rows and counts of every project, re-check stuck files, sweep now | uploads | S | T-0218, T-0215, T-0039, T-0274 |  |
 | ⬜ | [T-0222](../tracker/tasks/T-0222.md) | admin: read-only audit explorer over the hash-chain ledger (filters, verify one chain, verify all as a batch job) | admin | M | T-0006, T-0043, T-0039, T-0015, T-0274 |  |
@@ -123,7 +124,7 @@
 | ▶ | [T-0230](../tracker/tasks/T-0230.md) | settings: typed runtime settings registry extending T-0044 (code-declared entries, per-key storage, Redis cache + pub/sub invalidation, bounds 422, audit, no secrets) | settings | M | T-0044, T-0039, T-0006 |  |
 | ⬜ | [T-0228](../tracker/tasks/T-0228.md) | notifications: broadcast e-mail — server-side audience resolution (System admin tenant-wide, PER-09 own projects), batch dispatch, broadcast opt-out, per-broadcast stats | notifications | M | T-0019, T-0058, T-0226, T-0014, T-0049 |  |
 | ⬜ | [T-0231](../tracker/tasks/T-0231.md) | settings: client bootstrap config API GET /api/v1/settings/client (client-visible entries only) | settings | S | T-0230 |  |
-| ⬜ | [T-0224](../tracker/tasks/T-0224.md) | Frontend: Admin → System console — deployment stats + health, queue monitor, upload quarantine | frontend | M | T-0026, T-0219, T-0220, T-0221 |  |
+| ⬜ | [T-0224](../tracker/tasks/T-0224.md) | Frontend: Admin → System console — deployment stats + health, queue monitor, upload quarantine | frontend | M | T-0026, T-0219, T-0218, T-0221 |  |
 | ⬜ | [T-0225](../tracker/tasks/T-0225.md) | Frontend: Admin → System → Audit log (filters, verify chain, verify all) and legal-hold toggle on the project admin page | frontend | S | T-0026, T-0222, T-0223 |  |
 | ⬜ | [T-0229](../tracker/tasks/T-0229.md) | Frontend: Admin → Communications — broadcast composer, delivery stats and history, automated template editor | frontend | M | T-0026, T-0226, T-0227, T-0228 |  |
 | ⬜ | [T-0232](../tracker/tasks/T-0232.md) | Frontend: Admin → System → Settings — editable registry by category with bounds, read-only deployment configuration | frontend | S | T-0026, T-0230 |  |
