@@ -57,7 +57,8 @@ requests go through the generated client; every string through `t()` (`invite.*`
 
 ## Open invitations panel (`src/admin/PendingInvites.tsx`)
 
-On the project members screen: see `src/admin/README.md`.
+On the project members screen and on Admin → Users (T-0331), where invites are created: see
+`src/admin/README.md`.
 
 ## Not here yet
 

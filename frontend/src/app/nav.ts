@@ -70,7 +70,8 @@ export const NAV_ITEMS = [
   { group: "controlsInsights", id: "p6Schedule" },
   { group: "controlsInsights", id: "reporting" },
   { group: "controlsInsights", id: "moneyMirror" },
-  { group: "admin", id: "users" },
+  // Users: accounts (System admins) and invites by e-mail (PER-09, System admins; T-0331).
+  { group: "admin", id: "users", path: "/admin/users", requires: "projectAdmin" },
   { group: "admin", id: "personas" },
   // System = deployment settings, admin grants (T-0026), devices (T-0051); Devices is open to
   // PER-09 too, so the item lands there.

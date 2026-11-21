@@ -95,7 +95,8 @@ src/
   ITPs, field time, progress, look-ahead); an item shows under its group only once its
   screen exists — the module task that ships the screen gives the item its `path`. An item
   with `requires: "projectAdmin"` shows only to PER-09 holders and System admins. Built so
-  far: Admin → System (Devices) and Admin → Access requests (T-0051, `src/admin/README.md`).
+  far: Admin → Users (T-0331), Admin → System (Devices) and Admin → Access requests (T-0051,
+  `src/admin/README.md`).
   The top bar links Profile → **My devices** (`/profile/devices`).
 - **Project picker and landing (T-0042, diff §4.1, §6.1).** The top-bar picker lists the
   caller's projects from `GET /api/v1/me/projects` (memberships, T-0014) as "code — name",

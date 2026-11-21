@@ -5,6 +5,7 @@ import { AdminDevicesPage, MyDevicesPage } from "../admin/DevicesPage";
 import { MembersPage } from "../admin/MembersPage";
 import { ProjectsPage } from "../admin/ProjectsPage";
 import { SystemGrantsPage } from "../admin/SystemGrantsPage";
+import { UsersPage } from "../admin/UsersPage";
 import { RequireAuth } from "../auth/RequireAuth";
 import { SSO_RETURN_PATH } from "../auth/sso";
 import { InvitePage } from "../invite/InvitePage";
@@ -40,6 +41,7 @@ export const routes: RouteObject[] = [
             path: group.path.slice(1),
             element: <NavGroupPage group={group.id} />,
           })),
+          { path: "admin/users", element: <UsersPage /> },
           { path: "admin/access-requests", element: <AccessRequestsPage /> },
           { path: "admin/system/devices", element: <AdminDevicesPage /> },
           { path: "admin/system/grants", element: <SystemGrantsPage /> },
