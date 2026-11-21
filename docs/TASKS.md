@@ -3,12 +3,12 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 85/300 tasks done (28%) · **ready now:** 21 · **epics awaiting breakdown:** 49
+**Overall:** 85/307 tasks done (28%) · **ready now:** 21 · **epics awaiting breakdown:** 49
 
 | Phase | Tasks done | Progress |
 |---|---|---|
 | 0 · Platform foundations | 85/114 | `███████░░░` 75% |
-| 1 · Asset & Quality backbone | 0/160 (+2 epics) | `░░░░░░░░░░` 0% |
+| 1 · Asset & Quality backbone | 0/167 (+2 epics) | `░░░░░░░░░░` 0% |
 | 2 · Welding quality | 0/11 | `░░░░░░░░░░` 0% |
 | 3 · Logistics | 0/2 (+7 epics) | `░░░░░░░░░░` 0% |
 | 4 · Execution | 0/0 (+15 epics) | `░░░░░░░░░░` 0% |
@@ -159,7 +159,7 @@
 | ⬜ | [T-0112](../tracker/tasks/T-0112.md) | Equipment calibration register + lifecycle + SAQ OCR cert ingest + QA-review-on-discrepancy + supersede lock + hard gate (as of inspection date) | equipment | M | T-0015, T-0016, T-0111, T-0139 |  |
 | ⬜ | [T-0113](../tracker/tasks/T-0113.md) | qms: master ITP template authoring + audit registers + calibration records | qms | M | T-0111 |  |
 | ⬜ | [T-0114](../tracker/tasks/T-0114.md) | construction_control: conformance criteria + hold/witness evaluation via run_checks (no own inspection table) | construction_control | M | T-0113 |  |
-| 🟥 | [T-0115](../tracker/tasks/T-0115.md) | inspection_requests: RFI/call-out workflow (draft→requested→confirmed→witnessed\|waived\|no_show\|failed) + client delay attribution *(blocked by TD-045)* | inspection_requests | M | T-0111 |  |
+| ⬜ | [T-0115](../tracker/tasks/T-0115.md) | inspection_requests: RFI record — request + slots, anchors, linked inspections, party points, discipline configuration, draft API, issue with RFI numbering and notice, cancel | inspection_requests | M | T-0111, T-0113 |  |
 | ⬜ | [T-0247](../tracker/tasks/T-0247.md) | uploads: image derivative tiers — tablet proxy and report rendition (SAQ batch, Pillow lazy), derivative rows, file available only after scan + derivatives | uploads | M | T-0016, T-0169 |  |
 | ⚫ | [T-0116](../tracker/tasks/T-0116.md) | ncr: Non-Conformance Reports + dispositions (scrap/rework/repair/use-as-is) anchored to any node or Item (anchor_role recorded) | ncr | S | T-0111 |  |
 | ⬜ | [T-0311](../tracker/tasks/T-0311.md) | issues: issue templates (one-engine kind issue) — revision metadata (type, category, flag defaults, step per section), categories value list, default template per category × type, system → tenant/pack → project copy layers | issues | M | T-0110, T-0108, T-0034 |  |
@@ -293,16 +293,23 @@
 | ⬜ | [T-0310](../tracker/tasks/T-0310.md) | signing: offline formal sign-off acceptance at sync — no grant for device_pin_offline, intent version resolved at occurred_at (intent_outdated flag, never 409), signer standing from durable identity events (signer_inactive, never effective → QA queue) | signing | M | T-0289, T-0143, T-0162, T-0177, T-0181, T-0244, T-0014 |  |
 | ⬜ | [T-0291](../tracker/tasks/T-0291.md) | signing: wire attestation into the phase-1 formal sign-offs (inspection approve, ITP hold/witness single-row sign-off, internal_qa substitution approval) and print the attestation block on the inspection PDF | signing | M | T-0289, T-0310, T-0150, T-0114, T-0185, T-0158, T-0313 |  |
 | ▶ | [T-0292](../tracker/tasks/T-0292.md) | delegations: narrow delegation of authority — oe_delegations_delegation (time-bound, per project and kind), create/list/revoke API, audit, resolution service (never confers authority) | delegations | M | T-0010, T-0014, T-0006, T-0019 |  |
-| ⬜ | [T-0293](../tracker/tasks/T-0293.md) | delegations: route hold-point call-outs, verification items and SLA reminders/escalations to active delegates; act on behalf with the delegate's own persona, credentials and SoD; "signed by X on behalf of Y" in the ledger and PDF | delegations | M | T-0292, T-0289, T-0291, T-0181, T-0182, T-0115 |  |
+| ⬜ | [T-0293](../tracker/tasks/T-0293.md) | delegations: route hold-point call-outs, verification items and SLA reminders/escalations to active delegates; act on behalf with the delegate's own persona, credentials and SoD; "signed by X on behalf of Y" in the ledger and PDF | delegations | M | T-0292, T-0289, T-0291, T-0181, T-0182, T-0115, T-0333, T-0335 |  |
 | ⬜ | [T-0294](../tracker/tasks/T-0294.md) | Frontend: delegations — My delegations (create, revoke), project delegations list for PER-09, "acting for" chip in queues and sign dialogs | frontend | S | T-0292, T-0031 |  |
 | ▶ | [T-0295](../tracker/tasks/T-0295.md) | identity: internal-commercial data boundary for external accounts — route and schema data class internal_commercial, 404/field omission for is_internal=false, contract test over all routes | identity | S | T-0010, T-0049 |  |
-| 🟥 | [T-0296](../tracker/tasks/T-0296.md) | identity: external inspection party persona (third-party inspector, NDT/test lab) — capabilities, individual assignment, granted subtree, witness attendance on named hold/witness points (pending TD-435) *(blocked by TD-435)* | identity | M | T-0010, T-0014, T-0115, T-0295 |  |
+| 🟥 | [T-0296](../tracker/tasks/T-0296.md) | identity: external inspection party persona (third-party inspector, NDT/test lab) — capabilities, individual assignment, granted subtree, witness attendance on named hold/witness points (pending TD-435) *(blocked by TD-435)* | identity | M | T-0010, T-0014, T-0115, T-0333, T-0295 |  |
 | ▶ | [T-0298](../tracker/tasks/T-0298.md) | identity: SCIM bearer tokens — oe_identity_scim_token (hashed, shown once, expiry, rotation with overlap, revoke), token authentication bound to the deployment tenant, SCIM-only routes | identity | M | T-0014, T-0006, T-0068 |  |
 | ⬜ | [T-0299](../tracker/tasks/T-0299.md) | identity: SCIM 2.0 /Users for Entra provisioning — discovery endpoints, filter by userName/externalId, create without credentials, PATCH/PUT/DELETE deprovision to is_active=false with session revocation, last System admin protected | identity | M | T-0298, T-0244, T-0054, T-0310 |  |
 | ⬜ | [T-0300](../tracker/tasks/T-0300.md) | Frontend: Admin → Identity provisioning — SCIM base URL, tokens (create shown once, rotate, revoke, last used, expiry) | frontend | S | T-0298, T-0246 |  |
 | ⬜ | [T-0301](../tracker/tasks/T-0301.md) | metering: module + storage ledger oe_metering_storage_event — hooks on upload available/expired/deleted, derivatives, archive registry (DEEP_ARCHIVE tier changes, restore copies), content-addressed attribution | metering | M | T-0016, T-0247, T-0233, T-0237, T-0240 |  |
 | ⬜ | [T-0302](../tracker/tasks/T-0302.md) | metering: daily usage snapshot oe_metering_daily_snapshot — nightly SAQ cron on the batch worker, UNIQUE NULLS NOT DISTINCT (tenant, project, date, metric), storage from the ledger, seats from last_active_at, counts shared with T-0219 stats providers | metering | M | T-0301, T-0219, T-0243, T-0226 |  |
 | ⬜ | [T-0306](../tracker/tasks/T-0306.md) | settings: feature flags — registry category feature_flags (bool), per-project overrides, effective flags in the client bootstrap, FEATURE_DISABLED guard, staged rollout by pilot projects | settings | M | T-0230, T-0231, T-0248 |  |
+| ⬜ | [T-0333](../tracker/tasks/T-0333.md) | inspection_requests: slot lifecycle after issue — confirm, reschedule back to requested with history, attendance, witnessed/waived/no_show/failed, comments, offline outcome at sync; WITNESS_REQUIREMENT check on inspection.submit | inspection_requests | M | T-0115, T-0114, T-0150, T-0126, T-0177 |  |
+| ⬜ | [T-0334](../tracker/tasks/T-0334.md) | inspection_requests: client delay attribution — reason codes, delay records on no_show/failed/reschedule with cause party, open/close, cause change, internal-only delays API | inspection_requests | S | T-0333, T-0295 |  |
+| ⬜ | [T-0335](../tracker/tasks/T-0335.md) | inspection_requests: call-out notifications — recipient resolution (named witness, PER-15 fallback by granted subtree), in-app/push per event, RFI e-mail templates, reminder cron | inspection_requests | S | T-0333, T-0019, T-0058, T-0144 |  |
+| ⬜ | [T-0336](../tracker/tasks/T-0336.md) | inspection_requests: RFI notification PDF — one layout, title and field set per discipline (mechanical/coating/civil), revisions on issue/reschedule/cancel/close, results rendition kept for the dossier | inspection_requests | M | T-0333, T-0158, T-0136 |  |
+| ⬜ | [T-0337](../tracker/tasks/T-0337.md) | inspection_requests: RFI calendar API (slots by date range, visibility by persona and granted subtree) + tablet pull-scope provider | inspection_requests | S | T-0333, T-0147 |  |
+| ⬜ | [T-0338](../tracker/tasks/T-0338.md) | Frontend: RFI register, create/issue draft with slots, detail with history and comments, confirm/reschedule/outcome/waive/cancel actions; PER-15 client view | inspection_requests | M | T-0333, T-0334, T-0335, T-0336 |  |
+| ⬜ | [T-0339](../tracker/tasks/T-0339.md) | Frontend: RFI calendar — month/week/day/agenda in the main web app and the PER-15 client view, and offline read-only on the tablet from the local store | inspection_requests | M | T-0337, T-0338, T-0142, T-0149 |  |
 
 ## Phase 2 — Welding quality
 
@@ -352,7 +359,7 @@
 | 🧩 | [E-04-12](../tracker/tasks/E-04-12.md) | planner: work plans (shutdown/break-in/campaign) in overlay or interrupt mode, resource pool (groups, people, crews, rosters), allocation grid by day/shift, capacity check, overlay Gantt, commit into programme | planner | L | E-04-01, E-04-07, T-0101, T-0018, T-0019, T-0118 |  |
 | 🧩 | [E-04-13](../tracker/tasks/E-04-13.md) | scaffolding: scaffold register (location, build/approve/tag data, files, photos), lifecycle, tagging on one-engine inspections, automatic re-inspection tasks + overdue gate, build/modify/dismantle requests, QR card | scaffolding | L | T-0101, T-0103, T-0111, T-0118, T-0016, T-0019, E-04-07 |  |
 | 🧩 | [E-04-14](../tracker/tasks/E-04-14.md) | scope_changes: change-of-scope register anchored to RSW/node (current-scope snapshot, proposed lines, photos, walk-down, party responses), agree then scope revision via asset service, portal exposure, variation link | scope_changes | L | T-0101, T-0102, T-0016, T-0018 |  |
-| 🧩 | [E-04-15](../tracker/tasks/E-04-15.md) | calendar: unified personal and project calendar — core/calendar provider registry (personal and project layers), P6/work-plan linkage with readiness conflict badges, month/week/day/agenda views, revocable iCal feed | calendar | L | T-0104, T-0112, T-0115, T-0118, T-0152, T-0181, T-0183, T-0266, T-0267, E-03-03, E-03-06, E-04-01, E-04-07, E-04-11, E-04-12 |  |
+| 🧩 | [E-04-15](../tracker/tasks/E-04-15.md) | calendar: unified personal and project calendar — core/calendar provider registry (personal and project layers), P6/work-plan linkage with readiness conflict badges, month/week/day/agenda views, revocable iCal feed | calendar | L | T-0104, T-0112, T-0115, T-0337, T-0118, T-0152, T-0181, T-0183, T-0266, T-0267, E-03-03, E-03-06, E-04-01, E-04-07, E-04-11, E-04-12 |  |
 
 ## Phase 5 — Documents, collaboration & AI
 
