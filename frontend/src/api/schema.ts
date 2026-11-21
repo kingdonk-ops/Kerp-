@@ -2058,6 +2058,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/system/projects/{project_id}/legal-hold": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Legal Hold
+         * @description Put the project on legal hold or take it off; its hold as it now stands.
+         */
+        put: operations["set_legal_hold_api_v1_admin_system_projects__project_id__legal_hold_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/access-requests": {
         parameters: {
             query?: never;
@@ -3383,6 +3403,38 @@ export interface components {
             keys: components["schemas"]["JsonWebKey"][];
         };
         /**
+         * LegalHoldChange
+         * @description ``PUT /admin/system/projects/{id}/legal-hold`` (T-0223, diff §4.7): put the project on
+         *     legal hold or take it off. ``system_admin`` only; a reason (1-500 characters after
+         *     trimming) is required both ways and goes to the audit ledger.
+         */
+        LegalHoldChange: {
+            /** On */
+            on: boolean;
+            /** Reason */
+            reason: string;
+        };
+        /**
+         * LegalHoldRead
+         * @description A project's legal hold as the System console shows it. Reason, setter and time
+         *     describe the active hold; all three are ``null`` while it is off.
+         */
+        LegalHoldRead: {
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /** Legal Hold */
+            legal_hold: boolean;
+            /** Legal Hold Reason */
+            legal_hold_reason: string | null;
+            /** Legal Hold Set By */
+            legal_hold_set_by: string | null;
+            /** Legal Hold Set At */
+            legal_hold_set_at: string | null;
+        };
+        /**
          * LevelDefCreate
          * @description ``POST .../level-defs``. ``allowed_parent_keys`` empty = a root level (``depth`` 0).
          */
@@ -4299,6 +4351,11 @@ export interface components {
             locale: string;
             /** Visible In Lobby */
             visible_in_lobby: boolean;
+            /**
+             * Legal Hold
+             * @description the project is on legal hold (T-0223): it cannot be deleted; the reason is shown in the System console only
+             */
+            legal_hold: boolean;
             /** Revision */
             revision: number;
             /**
@@ -9834,6 +9891,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["QuarantineJobRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_legal_hold_api_v1_admin_system_projects__project_id__legal_hold_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LegalHoldChange"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LegalHoldRead"];
                 };
             };
             /** @description Validation Error */

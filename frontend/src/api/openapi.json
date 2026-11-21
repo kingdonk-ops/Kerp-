@@ -7560,6 +7560,66 @@
         }
       }
     },
+    "/api/v1/admin/system/projects/{project_id}/legal-hold": {
+      "put": {
+        "tags": [
+          "admin",
+          "admin"
+        ],
+        "summary": "Set Legal Hold",
+        "description": "Put the project on legal hold or take it off; its hold as it now stands.",
+        "operationId": "set_legal_hold_api_v1_admin_system_projects__project_id__legal_hold_put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Project Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LegalHoldChange"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LegalHoldRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/access-requests": {
       "post": {
         "tags": [
@@ -10691,6 +10751,86 @@
         ],
         "title": "JsonWebKeySet"
       },
+      "LegalHoldChange": {
+        "properties": {
+          "on": {
+            "type": "boolean",
+            "title": "On"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "on",
+          "reason"
+        ],
+        "title": "LegalHoldChange",
+        "description": "``PUT /admin/system/projects/{id}/legal-hold`` (T-0223, diff §4.7): put the project on\nlegal hold or take it off. ``system_admin`` only; a reason (1-500 characters after\ntrimming) is required both ways and goes to the audit ledger."
+      },
+      "LegalHoldRead": {
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Project Id"
+          },
+          "legal_hold": {
+            "type": "boolean",
+            "title": "Legal Hold"
+          },
+          "legal_hold_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Legal Hold Reason"
+          },
+          "legal_hold_set_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Legal Hold Set By"
+          },
+          "legal_hold_set_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Legal Hold Set At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "project_id",
+          "legal_hold",
+          "legal_hold_reason",
+          "legal_hold_set_by",
+          "legal_hold_set_at"
+        ],
+        "title": "LegalHoldRead",
+        "description": "A project's legal hold as the System console shows it. Reason, setter and time\ndescribe the active hold; all three are ``null`` while it is off."
+      },
       "LevelDefCreate": {
         "properties": {
           "key": {
@@ -13025,6 +13165,11 @@
             "type": "boolean",
             "title": "Visible In Lobby"
           },
+          "legal_hold": {
+            "type": "boolean",
+            "title": "Legal Hold",
+            "description": "the project is on legal hold (T-0223): it cannot be deleted; the reason is shown in the System console only"
+          },
           "revision": {
             "type": "integer",
             "title": "Revision"
@@ -13055,6 +13200,7 @@
           "currency_code",
           "locale",
           "visible_in_lobby",
+          "legal_hold",
           "revision",
           "created_at",
           "updated_at",

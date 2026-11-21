@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 341 · **Closed:** 148
+**Open:** 342 · **Closed:** 148
 
 ## decision (40)
 
@@ -330,7 +330,7 @@
 | [TD-498](../tracker/todo/TD-498.md) | Unskip the T-0027 module-toggle step when the first toggleable module merges | T-0027 | planner |
 | [TD-499](../tracker/todo/TD-499.md) | All-Projects for a system_admin who is a member of every project and holds no portfolio persona: /me/projects has no system_admin flag, so the picker cannot offer the scope | T-0276 | implementer |
 
-## bug (8)
+## bug (9)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -342,6 +342,7 @@
 | [TD-375](../tracker/todo/TD-375.md) | mypy 2.3.1 (local toolchain) reports var-annotated in app/core/audit/guard.py:66 and app/modules/admin/service.py:122 on untouched dev code | T-0052 | implementer |
 | [TD-471](../tracker/todo/TD-471.md) | CEL parity: divergences between celpy and cel-js found by the T-0110 edge probe (pinned as known_gap fixtures) | T-0110, T-0017 | implementer |
 | [TD-490](../tracker/todo/TD-490.md) | Admin -> Users invite form: a SoD 409 that returns after the user edited the form re-arms confirm_sod for the edited form (fields stay editable while the send is pending) | T-0331 | reviewer |
+| [TD-503](../tracker/todo/TD-503.md) | Flaky: test_auth_magic_link_field_workers lockout test asserts Retry-After == 60 on the wall clock | T-0223 | implementer |
 
 ## risk (33)
 

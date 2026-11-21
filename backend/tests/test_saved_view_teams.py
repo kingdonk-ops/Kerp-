@@ -472,14 +472,20 @@ def _legacy_view(
 
 @pytest.fixture
 def legacy(tmp_path: Path) -> Iterator[tuple[Config, World, uuid.UUID]]:
-    """A database at 0031 with a legacy team view (``team_id`` = X), then upgraded to head."""
+    """A database at 0031 with a legacy team view (``team_id`` = X), then upgraded to head.
+
+    The world is built at head through the ORM (whose models are head's: a column added to a
+    project or team table later than 0031 has no place at 0031), then the database goes down to
+    0031 for the legacy rows written through the frozen ``_LEGACY`` table."""
     cfg = Config(str(ALEMBIC_INI))
     cfg.attributes.update(url=database_url(tmp_path), configure_logger=False)
-    command.upgrade(cfg, "0031")
+    command.upgrade(cfg, "head")
     db = Database(database_url(tmp_path))
     try:
         seed_tenants(db, *FIXTURE_TENANTS)
         world = _world(db)
+        db.dispose()  # no pooled connection holds the schema the downgrade replaces
+        command.downgrade(cfg, "0031")
         view_id = _legacy_view(db, world.home, "Legacy", world.x)
         _legacy_view(db, world.home, "Legacy private", None)
         command.upgrade(cfg, "head")

@@ -10,7 +10,9 @@ project is the one in the path:
   (``access``: ``member`` or ``system_admin`` where it holds no membership).
 * edit / delete: the ``admin`` capability on that project (Project Administrator, or a
   ``system_admin``: PER-09 equivalent), else 403.
-  Delete answers 409 while team-derived members remain (unlink the teams first, T-0073).
+  Delete answers 409 while team-derived members remain (unlink the teams first, T-0073),
+  and 409 ``{code: LEGAL_HOLD_ACTIVE}`` while the project is on legal hold (T-0223; a System
+  admin sets and clears it at ``/api/v1/admin/system/projects/{id}/legal-hold``).
 * create: the caller's tenant-level ``create_projects`` grant ("Project Admin", appointed by
   a System admin through ``/api/v1/admin/grants``), else 403 (diff §4.1, TD-184, T-0039). The
   creator is granted PER-09 on the new project in the same transaction.
@@ -175,6 +177,10 @@ def delete_project(
     _admin(grants, project_id, is_admin)
     try:
         service.delete_project(session, project_id, actor_id=principal.user_id)
+    except service.LegalHoldActiveError as exc:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, {"code": "LEGAL_HOLD_ACTIVE", "message": str(exc)}
+        ) from exc
     except memberships.TeamGrantsPresentError as exc:
         # Team-derived members are ended by unlinking the teams (T-0073, ADR 0008).
         raise HTTPException(

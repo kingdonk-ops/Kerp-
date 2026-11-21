@@ -474,11 +474,16 @@ def test_migration_0033_freezes_the_models_fallback_literals() -> None:
     migration = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(migration)
     assert migration.DEFAULTS == {"status": DEFAULT_STATUS, "site_timezone": DEFAULT_TIMEZONE}
-    # The SQLite copy is the live table at 0032 plus the defaults: same columns, constraints.
+    # The SQLite copy is the table at 0032 plus the defaults: the live table without what
+    # later revisions added (0037, legal hold: ``test_project_legal_hold``).
     frozen = migration._frozen_project(with_defaults=True)
     live = Project.__table__
-    assert {c.name for c in frozen.columns} == {c.name for c in live.columns}
-    assert {c.name for c in frozen.constraints} == {c.name for c in live.constraints}
+    later_columns = {"legal_hold", "legal_hold_reason", "legal_hold_set_by", "legal_hold_set_at"}
+    later_constraints = {"ck_oe_projects_project_legal_hold_reason"}
+    assert {c.name for c in frozen.columns} == {c.name for c in live.columns} - later_columns
+    assert {c.name for c in frozen.constraints} == (
+        {c.name for c in live.constraints} - later_constraints
+    )
     assert {i.name for i in frozen.indexes} == {i.name for i in live.indexes}
 
 

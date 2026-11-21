@@ -23,6 +23,13 @@ The lobby (T-0040, diff §4.1) reads projects the caller is not a member of only
 row, and the membership-based policy is not widened (edge spec §6 amendments). On PostgreSQL
 it calls the ``SECURITY DEFINER`` functions of migration ``0021``, which check the caller
 themselves; on SQLite the same rule runs here.
+
+**Legal hold** (T-0223, diff §4.7): ``set_legal_hold`` puts a project on hold or takes it off,
+with a reason, and appends ``legal_hold_set`` / ``legal_hold_cleared`` to the tenant-level
+System console chain ``admin-system:<tenant>`` (a System admin need not be a member, so the
+project's own chain gets nothing). While on, ``delete_project`` raises
+``LegalHoldActiveError`` before touching anything. Other modules (the project archive, T-0233)
+ask ``is_on_legal_hold`` before any delete. Only a System admin may set it: the router's check.
 """
 
 from __future__ import annotations
@@ -48,6 +55,7 @@ from app.core.auth.access import (
     project_access,
     resolve_scope,
 )
+from app.core.db import utcnow
 from app.core.tenancy.context import TenancyContext
 from app.core.tenancy.rls import bind_tenancy, session_tenancy
 from app.core.tenancy.scope import get_or_404
@@ -60,6 +68,7 @@ from app.modules.settings import service as deployment_settings
 
 __all__ = [
     "DuplicateProjectCodeError",
+    "LegalHoldActiveError",
     "LobbyRef",
     "ProjectSummary",
     "add_created_listener",
@@ -67,11 +76,13 @@ __all__ = [
     "create_project",
     "delete_project",
     "get_project",
+    "is_on_legal_hold",
     "list_projects",
     "live_project_ids",
     "lobby_projects",
     "lobby_projects_by_id",
     "project_by_code",
+    "set_legal_hold",
     "set_lobby_visibility",
     "site_zone",
     "tenant_projects",
@@ -79,6 +90,9 @@ __all__ = [
 ]
 
 CHAIN_PREFIX: Final = "project:"
+# The tenant-level System console chain (diff §4.7); equal to ``jobs.service.CONSOLE_CHAIN``
+# (tested), spelled out here because the jobs module depends on this one.
+LEGAL_HOLD_CHAIN: Final = "admin-system:{tenant_id}"
 # The unique ``(tenant_id, code)`` constraint (models.py): a violation is a duplicate code.
 CODE_CONSTRAINT: Final = "uq_oe_projects_project_tenant_code"
 # The narrow lobby read of migration 0021 (PostgreSQL).
@@ -119,6 +133,10 @@ def add_created_listener(listener: CreatedListener) -> None:
 
 class DuplicateProjectCodeError(ValueError):
     """The tenant already has a project with this code (the API answers 409)."""
+
+
+class LegalHoldActiveError(RuntimeError):
+    """The project is on legal hold (the API answers 409 ``LEGAL_HOLD_ACTIVE``)."""
 
 
 def _tenant_id(session: Session) -> uuid.UUID:
@@ -294,12 +312,23 @@ def update_project(
     return project
 
 
+def _locked(session: Session, project_id: uuid.UUID) -> Project:
+    """The live project, its row locked for the transaction (``FOR UPDATE`` on PostgreSQL), so
+    a delete and a concurrent legal-hold change cannot both pass their check."""
+    project = get_project(session, project_id)
+    session.refresh(project, with_for_update=True)
+    return project
+
+
 def delete_project(
     session: Session, project_id: uuid.UUID, *, actor_id: uuid.UUID | None = None
 ) -> None:
     """Soft-delete the project and revoke every membership on it; it then 404s everywhere
-    (its code stays taken)."""
-    project = get_project(session, project_id)
+    (its code stays taken). ``LegalHoldActiveError`` while it is on legal hold: nothing
+    changes."""
+    project = _locked(session, project_id)
+    if project.legal_hold:
+        raise LegalHoldActiveError(f"project {project.code!r} is on legal hold")
     revoked = memberships.revoke_project(session, project_id, actor_id=actor_id)
     project.soft_delete()
     project.updated_by = actor_id
@@ -325,6 +354,55 @@ def set_lobby_visibility(
         project.updated_by = actor_id
         session.flush()
         _audit(session, project, "update", actor_id, fields=["visible_in_lobby"])
+    return project
+
+
+def is_on_legal_hold(session: Session, project_id: uuid.UUID) -> bool:
+    """Whether the project is on legal hold (T-0223): the contract for every module that
+    deletes project data (the project archive, T-0233); such a delete must refuse while it is.
+    Any session that can see the project row (bound to it, a member, a System admin);
+    ``OutOfScopeError`` (404) for an unknown, deleted or other tenant's project."""
+    return get_project(session, project_id).legal_hold
+
+
+def set_legal_hold(
+    session: Session,
+    project_id: uuid.UUID,
+    on: bool,
+    reason: str,
+    *,
+    actor_id: uuid.UUID | None = None,
+) -> Project:
+    """Put the project on legal hold (``on``) or take it off, for ``reason`` (T-0223).
+
+    Needs a tenant-level session (the System console's request session). Setting records the
+    reason, the actor and the time; a new reason while on replaces them; clearing empties all
+    three. Each change appends ``legal_hold_set`` / ``legal_hold_cleared`` (project id, code,
+    reason) to ``admin-system:<tenant>`` in the same transaction; a call that changes nothing
+    writes nothing. Whether the caller may (``system_admin`` only) is the router's.
+    """
+    context = session_tenancy(session)
+    if context is None or context.project_id is not None:
+        raise RuntimeError("the legal hold needs a tenant-level bound session")
+    project = _locked(session, project_id)
+    if project.legal_hold is on and (not on or project.legal_hold_reason == reason):
+        return project
+    if on:
+        project.legal_hold_reason, project.legal_hold_set_by = reason, actor_id
+        project.legal_hold_set_at = utcnow()
+    else:
+        project.legal_hold_reason = project.legal_hold_set_by = project.legal_hold_set_at = None
+    project.legal_hold = on
+    project.updated_by = actor_id
+    session.flush()
+    payload = {
+        "event": "legal_hold_set" if on else "legal_hold_cleared",
+        "project_id": str(project.id),
+        "code": project.code,
+        "reason": reason,
+    }
+    chain = LEGAL_HOLD_CHAIN.format(tenant_id=context.tenant_id)
+    audit.append(session, chain, payload, actor_id=actor_id, source="api")
     return project
 
 

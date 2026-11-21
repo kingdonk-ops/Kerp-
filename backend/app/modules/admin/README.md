@@ -284,6 +284,13 @@ bypass role, no `SECURITY DEFINER` function, no purge (TD-397):
 | `POST /system/uploads/{file_id}/recheck` | 202 `{job_id, project_id, kind, status: queued}` for a stuck `verifying` file (its verify job is not `queued`/`running`) whose bytes still exist; 409 `NOT_VERIFYING` / `CHECK_RUNNING` / `OBJECT_GONE`; 404 unknown |
 | `POST /system/uploads/sweep?project=` | 202 `{job_id, project_id, kind: uploads.sweep_orphans, status: queued}`; 404 unknown or deleted project |
 
+Legal hold (T-0223; detail in `app/modules/projects/README.md` *Legal hold*), through the
+projects service:
+
+| Endpoint | Answer |
+|---|---|
+| `PUT /system/projects/{project_id}/legal-hold` | body `{on, reason}` (reason 1–500 characters, both ways; 422 otherwise). `{project_id, legal_hold, legal_hold_reason, legal_hold_set_by, legal_hold_set_at}`; 404 unknown, deleted or other tenant's project. While on, `DELETE /api/v1/projects/{id}` answers 409 `LEGAL_HOLD_ACTIVE` |
+
 ## Audit
 
 Tenant-level chains: `admin-user:<user>` (create, update), `admin-user-lookup:<caller>` (every
@@ -293,7 +300,8 @@ lookup), `project-members:<project>` (`assign` with added / removed / grants / `
 and reason; the invitee by account id) and `project-invites` (`refuse` of a token that matches
 no invite), `admin-system:<tenant>` (System console: `job_retried`, `job_aborted` with job id,
 kind, queue and project id; T-0218; `upload_rechecked` with file, project and job id,
-`upload_sweep_queued` with project and job id; T-0221). Invite entries never carry a token, a hash, a password or an e-mail address. An accepted invite also writes the usual
+`upload_sweep_queued` with project and job id; T-0221; `legal_hold_set`, `legal_hold_cleared`
+with project id, code and reason; T-0223). Invite entries never carry a token, a hash, a password or an e-mail address. An accepted invite also writes the usual
 `assign` entry on `project-members:<project>`.
 
 ## Audit explorer (`/api/v1/admin/system/audit`, T-0222, diff §4.7)

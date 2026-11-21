@@ -7,9 +7,9 @@ modules carries the project's `id` as its `project_id`.
 
 | File | What |
 |---|---|
-| `models.py` | `oe_projects_project` (`BaseRecordMixin`, tenant-level row; migration `0008`, membership-based RLS since `0015`, `visible_in_lobby` since `0021`, DB-side `status`/`site_timezone` defaults since `0033`) |
-| `schemas.py` | `ProjectCreate` / `ProjectUpdate` / `ProjectRead`, `LobbyVisibility`, `PolygonGeoJSON`; timezone, ISO 4217, BCP 47 validation from `app.core.locale` (shared with the settings module) |
-| `service.py` | `create_project`, `get_project`, `list_projects`, `live_project_ids` (the jobs scheduler, T-0214), `update_project`, `delete_project`, `site_zone`, `bind_project` (project-scoped routers, T-0217), `tenant_projects` (every live project a `system_admin` session sees, T-0275), `set_lobby_visibility`, the narrow lobby read `lobby_projects` / `project_by_code` (T-0040) and `lobby_projects_by_id` (access requests, T-0050) |
+| `models.py` | `oe_projects_project` (`BaseRecordMixin`, tenant-level row; migration `0008`, membership-based RLS since `0015`, `visible_in_lobby` since `0021`, DB-side `status`/`site_timezone` defaults since `0033`, legal hold since `0037`) |
+| `schemas.py` | `ProjectCreate` / `ProjectUpdate` / `ProjectRead`, `LobbyVisibility`, `LegalHoldChange` / `LegalHoldRead`, `PolygonGeoJSON`; timezone, ISO 4217, BCP 47 validation from `app.core.locale` (shared with the settings module) |
+| `service.py` | `create_project`, `get_project`, `list_projects`, `live_project_ids` (the jobs scheduler, T-0214), `update_project`, `delete_project`, `site_zone`, `bind_project` (project-scoped routers, T-0217), `tenant_projects` (every live project a `system_admin` session sees, T-0275), `set_lobby_visibility`, `set_legal_hold` / `is_on_legal_hold` (T-0223), the narrow lobby read `lobby_projects` / `project_by_code` (T-0040) and `lobby_projects_by_id` (access requests, T-0050) |
 | `router.py` | `GET/POST /api/v1/projects`, `GET/PATCH/DELETE /api/v1/projects/{id}`, `PUT /api/v1/projects/{id}/lobby`, the module toggle `GET /api/v1/projects/{id}/modules`, `PUT /api/v1/projects/{id}/modules/{name}` (T-0084) |
 
 ## Record
@@ -23,6 +23,7 @@ modules carries the project's `id` as its `project_id`.
 | `currency_code` | active ISO 4217 code; default: the deployment setting |
 | `locale` | BCP 47 `ll[-Ssss][-RR|-nnn]`; default: the deployment setting |
 | `visible_in_lobby` | listed in the lobby for internal users (T-0040, diff §4.1); default `false`; changed only through `PUT /projects/{id}/lobby`, not `PATCH` (422) |
+| `legal_hold`, `legal_hold_reason`, `legal_hold_set_by`, `legal_hold_set_at` | legal hold (T-0223, diff §4.7); default off; changed only by a System admin through `PUT /api/v1/admin/system/projects/{id}/legal-hold`. Reason (≤ 500), setter and time describe the active hold and are cleared with it; CHECK `ck_oe_projects_project_legal_hold_reason`: on needs a reason and a time. `ProjectRead` shows only `legal_hold` |
 
 **Defaults for new projects** (T-0044, diff §4.4). `POST /projects` may omit `status`,
 `site_timezone`, `currency_code` and `locale` (never send `null`, 422); `create_project` then
@@ -76,6 +77,30 @@ request's scope was resolved from, so they are read once per request, T-0071):
   audited as `revoked_memberships`), so memberships of a deleted project confer nothing.
   While team-derived members remain (T-0073, ADR 0008) it answers 409 `team_links_present`:
   a System admin unlinks the project's teams first, so derived grants never outlive their link.
+  While the project is on legal hold it answers 409 `{code: LEGAL_HOLD_ACTIVE}` and nothing
+  changes.
+
+## Legal hold (T-0223, diff §4.7)
+
+A System admin puts a project on legal hold, or takes it off, through the System console:
+`PUT /api/v1/admin/system/projects/{id}/legal-hold` with `{on, reason}` (route in
+`app/modules/admin/system_projects_router.py`; everyone else, PER-09 included, 403; a reason of
+1–500 characters after trimming is required both ways, 422 otherwise; unknown, deleted or other
+tenant's project 404). It answers `LegalHoldRead`: `project_id`, `legal_hold`,
+`legal_hold_reason`, `legal_hold_set_by`, `legal_hold_set_at`.
+
+`set_legal_hold(session, project_id, on, reason, actor_id=)` needs a tenant-level session. Each
+change appends `{event: legal_hold_set | legal_hold_cleared, project_id, code, reason}` to the
+tenant-level System console chain `admin-system:<tenant>` (`LEGAL_HOLD_CHAIN`, equal to
+`jobs.service.CONSOLE_CHAIN`) in the same transaction; a System admin need not be a member, so
+the project's own chain gets nothing. A call that changes nothing (off to off, on with the same
+reason) writes nothing; a new reason while on is a change.
+
+While on, `delete_project` raises `LegalHoldActiveError` (API: 409 `LEGAL_HOLD_ACTIVE`) before
+touching the row or its memberships. **Other modules** that delete project data (the project
+archive, T-0233) must call `is_on_legal_hold(session, project_id)` first and refuse while it is
+`True`; any session that sees the project row may ask (`OutOfScopeError` for an unknown or
+deleted project). There is no hard purge (TD-401); retention rules stay TD-175.
 
 ## Module toggle (T-0084)
 
@@ -148,4 +173,4 @@ access = projects.bind_project(session, principal, grants, project_id, require=C
 
 `tests/test_projects.py` (SQLite and PostgreSQL; the PostGIS geometry check runs only on
 PostgreSQL, TD-052). The module toggle: `tests/test_module_toggle.py`. The lobby flag and narrow read: `tests/test_lobby.py`,
-`tests/test_rls_lobby.py`.
+`tests/test_rls_lobby.py`. The legal hold: `tests/test_project_legal_hold.py`.
