@@ -134,6 +134,29 @@ MAGIC_LINK_REQUEST_POLICY: Final = LockoutPolicy(
 )
 
 
+# Magic-link requests per tenant + client address, whatever the e-mail (T-0345, audit item 12):
+# the same numbers as ``PASSWORD_RESET_CLIENT_POLICY`` (20 back to back, no lock after
+# requests 1-19, then the usual escalation over one hour), checked before the per-address
+# cap, so one client cannot post a stream of different addresses. Every request counts.
+MAGIC_LINK_CLIENT_POLICY: Final = LockoutPolicy(
+    free_attempts=19,
+    base_delay=timedelta(seconds=30),
+    max_delay=timedelta(minutes=15),
+    window=timedelta(hours=1),
+)
+
+# Entra ID SSO starts per tenant + client address (T-0345, TD-323): every start stores a
+# 10-minute state entry for an unauthenticated caller. SSO is the everyday sign-in of company
+# staff, who may share one office address, so the budget is wider: 60 back to back (no lock
+# after starts 1-59), then the usual escalation over one hour. Every start counts.
+SSO_START_CLIENT_POLICY: Final = LockoutPolicy(
+    free_attempts=59,
+    base_delay=timedelta(seconds=30),
+    max_delay=timedelta(minutes=15),
+    window=timedelta(hours=1),
+)
+
+
 # Unauthenticated wipe confirmations per client address (T-0212, TD-298): every refused call
 # appends an audit entry (T-0080), so a client gets 11 attempts back to back (no lock after
 # failures 1-10), then the usual escalation. A right secret clears the client's counter. Keyed
@@ -209,3 +232,13 @@ class ProgressiveLockout:
     def succeeded(self, subject: str) -> None:
         """The secret was right: forget the failures and lift the lock."""
         self.store.clear_failures(self._key(subject))
+
+    def failures(self, subject: str) -> int:
+        """How many attempts the subject's live counter holds (read-only, T-0345)."""
+        return self.store.failure_count(self._key(subject))
+
+    def at_limit(self, subject: str) -> bool:
+        """The subject has used every attempt of the hard cap (``max_attempts``): the next one
+        is refused as exhausted. Always ``False`` for a policy without a cap."""
+        cap = self.policy.max_attempts
+        return cap is not None and self.failures(subject) >= cap

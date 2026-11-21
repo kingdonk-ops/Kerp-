@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 369 · **Closed:** 153
+**Open:** 368 · **Closed:** 155
 
 ## decision (40)
 
@@ -11,7 +11,6 @@
 |---|---|---|---|
 | [TD-096](../tracker/todo/TD-096.md) | Approved coating ITR dropped the residual-dust rating row the ITP requires; Grating and Gridmesh ITR has no approved version: confirm with the client before shipping default templates | T-0113 | planner |
 | [TD-293](../tracker/todo/TD-293.md) | Do pilot crews share tablets? Confirm with the pilot team before go-live; if yes, add a shared-device task (device row per (device_id, user), whole-device wipe warning) | T-0143 | planner |
-| [TD-301](../tracker/todo/TD-301.md) | Field PIN API details not in the spec: PIN set via enrolment (409 PIN_ALREADY_SET), PUT /devices/{id}/pin from a bound session without the old PIN, 401 codes PIN_INVALID/PIN_EXHAUSTED, failed_offline only on unlock | T-0038 | implementer |
 | [TD-317](../tracker/todo/TD-317.md) | Confirm lobby project-code lookup rate limits (30/h per user, 1000/h deployment, 1-15 min escalating lockout) | T-0040 | coordinator |
 | [TD-329](../tracker/todo/TD-329.md) | Module map: access requests live in the new access_requests module (router mount /api/v1/<module>), not admin/lobby as T-0050 and lobby README assumed; planner to align the module map and T-0050 front-matter | T-0050 | reviewer |
 | [TD-335](../tracker/todo/TD-335.md) | Planner sizing: SSO-sized security flows landed at ~3.8k changed lines (M guideline < ~800); split such tasks further in future phases | T-0054 | reviewer |
@@ -49,6 +48,7 @@
 | [TD-484](../tracker/todo/TD-484.md) | RFI notification e-mail: may it carry the date/time/location, the RFI PDF attachment and an .ics invite, and go to client distribution addresses without a KERP account? | T-0335 | planner |
 | [TD-486](../tracker/todo/TD-486.md) | RFI witness check: may an unmet hold-point (H) witness requirement be overridden per record (ADR 0004 Amendment A), or is it non-overridable? | T-0333 | planner |
 | [TD-514](../tracker/todo/TD-514.md) | How is a passed or LOCKED_FOR_TURNOVER inspection corrected? Define void-and-reissue (revision suffix, supersedes link, ledger, MDR shows latest) | — | planner |
+| [TD-538](../tracker/todo/TD-538.md) | Confirm the per-client limits on magic-link requests (20 per hour, the password-reset numbers) and Entra SSO starts (60 per hour) for crews and offices behind one shared address | T-0345 | implementer |
 
 ## spec-gap (71)
 
@@ -194,7 +194,7 @@
 | [TD-510](../tracker/todo/TD-510.md) | Deployment-config view lacks the mail reply-to of diff §4.7: Settings has no reply-to field yet | T-0230 | implementer |
 | [TD-533](../tracker/todo/TD-533.md) | CEL client runtime has no evaluation step budget (cel-js exposes no step hook; server is the hard gate) | T-0341 | implementer |
 
-## later (149)
+## later (148)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -282,7 +282,6 @@
 | [TD-314](../tracker/todo/TD-314.md) | Override UI: Request override on a blocked gate, approver inbox, i18n for validation.override_* notification kinds | T-0035 | implementer |
 | [TD-318](../tracker/todo/TD-318.md) | Narrow the void-path except OperationalError in validation _persist_findings to LockNotAvailable (55P03) | T-0035 | coordinator |
 | [TD-321](../tracker/todo/TD-321.md) | Access-request notification to PER-09 holders is not pinned or cleared on decision, and System admins without a membership get none | T-0050 | implementer |
-| [TD-323](../tracker/todo/TD-323.md) | Rate-limit GET /auth/sso/entra/start per client (each call stores a 10-minute state entry in Redis) | T-0054 | implementer |
 | [TD-325](../tracker/todo/TD-325.md) | Access-request RLS: add WITH CHECK so the requester can only set status pending/withdrawn on their own row | T-0050 | reviewer |
 | [TD-326](../tracker/todo/TD-326.md) | Notifications service helper to notify project members from a tenant-level session, replacing the access_requests _ProjectBinding re-bind | T-0050 | reviewer |
 | [TD-328](../tracker/todo/TD-328.md) | persona_holders does not filter deactivated users, so deactivated PER-09 holders still get access-request inbox rows | T-0050 | reviewer |
@@ -548,6 +547,8 @@
 | ✅ | [TD-297](../tracker/todo/TD-297.md) | Admin UI screen for deployment settings (Admin > System) is not planned in any task | Planner, 2026-11-21: task T-0232 created (per the 2026-11-16 product-owner decision) |
 | ✅ | [TD-298](../tracker/todo/TD-298.md) | Rate-limit the unauthenticated wipe-confirmed endpoint (every refusal appends an audit entry) |  |
 | ✅ | [TD-300](../tracker/todo/TD-300.md) | Field PIN idle is measured from the session's last renewal (refresh token iat), not from its last authenticated request | Product owner, 2026-11-16: idle measured from the refresh token iat (as built in T-0038); early prompt of up to one access-token lifetime accepted |
+| ✅ | [TD-301](../tracker/todo/TD-301.md) | Field PIN API details not in the spec: PIN set via enrolment (409 PIN_ALREADY_SET), PUT /devices/{id}/pin from a bound session without the old PIN, 401 codes PIN_INVALID/PIN_EXHAUSTED, failed_offline only on unlock | Built by T-0345: points (1), (3), (4) confirmed as built; point (2) amended per the 2026-11-16 ruling. PUT /devices/{id}/pin on a device at the PIN-failure limit needs a fresh online sign-in (password, magic link or SSO within 5 minutes, never renewed by PIN unlock; token claims auth_time/amr), else 401 code FRESH_SIGN_IN_REQUIRED and nothing changes. Below the limit unchanged. T-0143 builds the client against this. |
+| ✅ | [TD-323](../tracker/todo/TD-323.md) | Rate-limit GET /auth/sso/entra/start per client (each call stores a 10-minute state entry in Redis) | T-0345: per-client SSO_START_CLIENT_POLICY (60 back to back, then 30 s doubling to 15 min over 1 h, keyed tenant + client address like the password-reset request) on GET and form-POST /auth/sso/entra/start, counted before the state entry is stored; 429 + Retry-After. |
 | ✅ | [TD-336](../tracker/todo/TD-336.md) | Mail: settle send-log rows stuck in queued (enqueue failed or Redis payload lost); no re-enqueue is possible because the payload (with the link token) is never persisted | Fixed in T-0346: hourly batch cron expire_mail_cron (jobs/scheduler.py) runs core mail expire_queued per deployment scope and marks rows still queued an hour past the 24 h payload TTL failed with error_code 'payload_expired' (the audit's code, not 'not_enqueued') through fail_unavailable, which now only changes a row still queued; tests in tests/test_jobs_schedule.py and tests/test_mail.py. |
 | ✅ | [TD-384](../tracker/todo/TD-384.md) | T-0075 SoD fix: 'plus their existing rows' cannot keep a sod_pending user's stale row of the link | user decision 2026-11-21: accept the implemented reading. The sync gets the expected set minus the sod_pending users; a pending user's stale rows of that link are excess and revoked; --fix --confirm-sod then adds the correct row. T-0075 AC reworded |
 | ✅ | [TD-385](../tracker/todo/TD-385.md) | T-0075 reconcile: a live link to a deleted project expects no derived rows (rows it holds are excess, --fix revokes) | user decision 2026-11-21: accept. A live link to a deleted project expects no derived rows (matches the teams service, TD-358); rows it holds are excess and --fix revokes them; after a project restore reconcile expects them again. T-0075 AC reworded |

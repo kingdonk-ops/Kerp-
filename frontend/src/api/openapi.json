@@ -108,7 +108,7 @@
           "auth"
         ],
         "summary": "Request Magic Link",
-        "description": "Send a one-time sign-in link (15 min) to a Field Worker's e-mail (PER-14, diff §4.2).\n\nAlways ``202`` (unknown, inactive, non-Field-Worker and other-tenant addresses included),\nso the answer reveals no accounts or personas. The request only counts the attempt; the\nlookup, the eligibility check, the link and its e-mail run after the response (T-0057).\nWith `invite_token` (a pending invite naming PER-14 also makes its invitee eligible) the\ninvite is accepted when the link is redeemed; the link itself never carries it (T-0052).",
+        "description": "Send a one-time sign-in link (15 min) to a Field Worker's e-mail (PER-14, diff §4.2).\n\nAlways ``202`` (unknown, inactive, non-Field-Worker and other-tenant addresses included),\nso the answer reveals no accounts or personas. The request only counts the attempt; the\nlookup, the eligibility check, the link and its e-mail run after the response (T-0057).\nWith `invite_token` (a pending invite naming PER-14 also makes its invitee eligible) the\ninvite is accepted when the link is redeemed; the link itself never carries it (T-0052).\nRequests are limited per client address (any e-mail), then per address: `429` with\n`Retry-After` (T-0345).",
         "operationId": "request_magic_link_api_v1_auth_magic_link_post",
         "requestBody": {
           "content": {
@@ -277,7 +277,7 @@
           "auth"
         ],
         "summary": "Refresh",
-        "description": "Rotate: the refresh token is spent and a new pair is issued. Reuse revokes the session.\n\nThe new refresh token keeps the session's end (sign-in + 12 h); after it, sign in again.\nThe web SPA sends the cookie; an allow-listed native app sends ``refresh_token``. A\nsession of a device with a PIN that was idle too long gets `401 {code: PIN_REQUIRED}`\n(the token is not spent: unlock with it and the PIN).",
+        "description": "Rotate: the refresh token is spent and a new pair is issued. Reuse revokes the session,\nexcept a retry within 30 seconds of the token being spent (a lost answer): a plain `401`\nthat leaves the session alive (T-0345).\n\nThe new refresh token keeps the session's end (sign-in + 12 h); after it, sign in again.\nThe web SPA sends the cookie; an allow-listed native app sends ``refresh_token``. A\nsession of a device with a PIN that was idle too long gets `401 {code: PIN_REQUIRED}`\n(the token is not spent: unlock with it and the PIN).",
         "operationId": "refresh_api_v1_auth_refresh_post",
         "security": [
           {
@@ -570,6 +570,9 @@
           "404": {
             "description": "SSO is not offered by this deployment"
           },
+          "429": {
+            "description": "Too many starts from this client; retry after `Retry-After` seconds"
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -595,6 +598,9 @@
           },
           "404": {
             "description": "SSO is not offered by this deployment"
+          },
+          "429": {
+            "description": "Too many starts from this client; retry after `Retry-After` seconds"
           }
         },
         "requestBody": {
@@ -867,7 +873,7 @@
           "devices"
         ],
         "summary": "Change Pin",
-        "description": "Set a new field PIN for this device, from a signed-in session of the device (diff\n§4.2: the PIN is changed after an online sign-in; the old PIN is not needed). Clears the\ndevice's PIN failures.",
+        "description": "Set a new field PIN for this device, from a signed-in session of the device (diff\n§4.2: the PIN is changed after an online sign-in; the old PIN is not needed). Clears the\ndevice's PIN failures.\n\nAt the PIN-failure limit (``PIN_EXHAUSTED``) clearing them needs a fresh online sign-in\n(TD-301, product owner 2026-11-16): a session started by password, magic link or SSO at\nmost 5 minutes ago and never renewed by PIN unlock. Any other session gets ``401`` with\n``code: FRESH_SIGN_IN_REQUIRED`` and nothing changes (T-0345).",
         "operationId": "change_pin_api_v1_devices__device_id__pin_put",
         "security": [
           {
@@ -899,6 +905,9 @@
         "responses": {
           "204": {
             "description": "Successful Response"
+          },
+          "401": {
+            "description": "Not authenticated. With `code: FRESH_SIGN_IN_REQUIRED`: the device is at the PIN-failure limit and this session is not a fresh online sign-in (sign in again, then change the PIN within 5 minutes)"
           },
           "403": {
             "description": "Not a session of this device"

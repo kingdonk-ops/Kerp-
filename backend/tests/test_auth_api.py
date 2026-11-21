@@ -446,14 +446,19 @@ def test_refresh_rotates_both_tokens_in_the_same_session(
     assert refresh(client, rotated["refresh_token"]).status_code == 200
 
 
-def test_refresh_token_reuse_revokes_the_whole_session(client: TestClient) -> None:
+def test_spent_refresh_token_is_refused_at_once_without_ending_the_session(
+    client: TestClient,
+) -> None:
+    """Within the 30-second retry grace (T-0345) a spent token is refused, but the session
+    survives: the client may just have lost the answer. A replay after the grace revokes
+    the whole session (``test_auth_sessions``, on an injected clock)."""
     tokens = _login(client)
     rotated = token_body(refresh(client, tokens["refresh_token"]))
-    # The old refresh token is replayed (stolen copy): rejected, and the session is killed.
-    replay = refresh(client, tokens["refresh_token"])
-    assert replay.status_code == 401
-    assert client.get(ME, headers=_bearer(rotated["access_token"])).status_code == 401
-    assert refresh(client, rotated["refresh_token"]).status_code == 401
+    retry = refresh(client, tokens["refresh_token"])
+    assert retry.status_code == 401
+    assert retry.headers["www-authenticate"] == 'Bearer error="invalid_token"'
+    assert client.get(ME, headers=_bearer(rotated["access_token"])).status_code == 200
+    assert refresh(client, rotated["refresh_token"]).status_code == 200
 
 
 def test_access_token_cannot_be_used_to_refresh(client: TestClient) -> None:

@@ -10,8 +10,9 @@ not to a server session:
    enrolled device (``X-KERP-Device-Id``) the session is bound to it at once; the device's
    PIN is **not** reset by a sign-in.
 2. The 6-digit PIN is set once at enrolment (``POST /devices/enrol`` with ``pin``) and can
-   be changed later from a session of the device (``PUT /devices/{device_id}/pin``). Its
-   scrypt hash lives on the device row.
+   be changed later from a session of the device (``PUT /devices/{device_id}/pin``); at the
+   PIN-failure limit only from a fresh online sign-in (``FRESH_SIGN_IN_REQUIRED``, TD-301,
+   T-0345). Its scrypt hash lives on the device row.
 3. ``POST /auth/refresh`` rotates a session of a device with a PIN normally while its last
    renewal is less than ``KERP_PIN_IDLE_MINUTES`` (default 30) ago. After a longer idle it
    answers ``401 {code: PIN_REQUIRED}`` without spending the token, and
@@ -81,6 +82,19 @@ class PinGateError(Exception):
 def pin_gate_response(code: PinCode) -> JSONResponse:
     return JSONResponse(
         {"detail": PIN_DETAILS[code], "code": code},
+        status_code=401,
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+
+# ``PUT /devices/{id}/pin`` on a device at the PIN-failure limit from a session that is not a
+# fresh online sign-in (TD-301, T-0345): sign in again, then change the PIN.
+FRESH_SIGN_IN_REQUIRED: Final = "FRESH_SIGN_IN_REQUIRED"
+
+
+def fresh_sign_in_required() -> JSONResponse:
+    return JSONResponse(
+        {"detail": "Sign in again to change the PIN", "code": FRESH_SIGN_IN_REQUIRED},
         status_code=401,
         headers={"WWW-Authenticate": "Bearer"},
     )

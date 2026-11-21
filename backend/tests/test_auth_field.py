@@ -29,6 +29,7 @@ from app.core.auth import devices
 from app.core.auth import service as service_module
 from app.core.auth.device_signal import DEVICE_HEADER, DEVICE_REVOKED_CODE
 from app.core.auth.field import (
+    FRESH_SIGN_IN_REQUIRED,
     PIN_EXHAUSTED,
     PIN_INVALID,
     PIN_REQUIRED,
@@ -38,7 +39,12 @@ from app.core.auth.field import (
     magic_link_digest,
     sender_from_settings,
 )
-from app.core.auth.lockout import LOGIN_ACCOUNT_POLICY, PIN_POLICY
+from app.core.auth.lockout import (
+    LOGIN_ACCOUNT_POLICY,
+    MAGIC_LINK_CLIENT_POLICY,
+    PASSWORD_RESET_CLIENT_POLICY,
+    PIN_POLICY,
+)
 from app.core.auth.models import DEVICE_ACTIVE
 from app.core.auth.passwords import verify_password
 from app.core.auth.revocation import (
@@ -363,6 +369,35 @@ def test_magic_link_requests_are_throttled_per_address(h: Harness) -> None:
     h.request_link()
 
 
+def _magic_from(h: Harness, client: str, email: str) -> httpx.Response:
+    """A magic-link request from another client address (``request.client``)."""
+    other = TestClient(h.client.app, client=(client, 40000))
+    return other.post(MAGIC, json={"email": email})
+
+
+def test_magic_link_requests_are_throttled_per_client(h: Harness) -> None:
+    """T-0345 (audit item 12): one client posting many different addresses is limited, as
+    for password reset (20 back to back, then 30 s doubling), before the per-address cap."""
+    flooder, other = "203.0.113.77", "198.51.100.8"
+    for n in range(20):
+        assert _magic_from(h, flooder, f"random{n}@example.test").status_code == 202
+    locked = _magic_from(h, flooder, ALICE)
+    assert locked.status_code == 429
+    assert locked.headers["retry-after"] == "30"
+    # The refused request never reached the per-address counter: another client still has
+    # the address's 4 back-to-back requests (3 free + the one that arms its lock).
+    for _ in range(4):
+        assert _magic_from(h, other, ALICE).status_code == 202
+    assert _magic_from(h, other, ALICE).status_code == 429  # now the per-address cap
+    assert _magic_from(h, other, CAROL).status_code == 202  # the second client is not limited
+    # The flooder's lock escalates like every policy once it has passed.
+    h.clock.now += 30
+    assert _magic_from(h, flooder, "late@example.test").status_code == 202
+    again = _magic_from(h, flooder, "later@example.test")
+    assert (again.status_code, again.headers["retry-after"]) == (429, "60")
+    assert MAGIC_LINK_CLIENT_POLICY == PASSWORD_RESET_CLIENT_POLICY  # mirrors password reset
+
+
 # --- the PIN belongs to the device (T-0038) -------------------------------------------------
 
 
@@ -677,10 +712,25 @@ def test_pin_belongs_to_its_own_device(h: Harness) -> None:
 
 
 def test_replayed_refresh_token_on_unlock_revokes_the_session(h: Harness) -> None:
+    """A replay after the 30-second retry grace (T-0345) still revokes the session."""
     tokens, _device = h.field_device()
+    h.tokens_clock.now = h.tokens_clock.real - timedelta(seconds=31)  # unlocked 31 s ago
     new = token_body(h.unlock(tokens["refresh_token"]))
+    h.tokens_clock.now = h.tokens_clock.real
     assert h.unlock(tokens["refresh_token"]).status_code == 401
     assert h.unlock(new["refresh_token"]).status_code == 401
+
+
+def test_a_retried_unlock_within_the_grace_does_not_end_the_session(h: Harness) -> None:
+    """T-0345: the device lost the answer to its unlock and retries with the same token."""
+    tokens, _device = h.field_device()
+    h.tokens_clock.now = h.tokens_clock.real - timedelta(seconds=30)
+    new = token_body(h.unlock(tokens["refresh_token"]))
+    h.tokens_clock.now = h.tokens_clock.real
+    retry = h.unlock(tokens["refresh_token"])
+    assert retry.status_code == 401
+    assert retry.json() == {"detail": "Not authenticated"}  # plain, no PIN code
+    assert h.unlock(new["refresh_token"]).status_code == 200  # the session lives on
 
 
 def test_logged_out_field_session_cannot_be_unlocked(h: Harness) -> None:
@@ -820,6 +870,162 @@ def test_a_new_sessions_first_binding_by_enrolment_clears_the_stop(h: Harness) -
     assert _code(h.unlock(fresh["refresh_token"])) is None  # not a session of the device yet
     assert h.enrol(fresh, device, pin=None).status_code == 200  # its first binding
     assert h.unlock(fresh["refresh_token"]).status_code == 200
+
+
+# --- PIN change at the PIN-failure limit needs a fresh sign-in (TD-301, T-0345) ---------------
+
+
+def _change_pin(h: Harness, tokens: dict[str, str], device: uuid.UUID) -> httpx.Response:
+    return h.client.put(
+        f"/api/v1/devices/{device}/pin", json={"pin": OTHER_PIN}, headers=h.bearer(tokens)
+    )
+
+
+def _pin_actions(h: Harness, device: uuid.UUID) -> list[str]:
+    with h.db.unit_of_work(ROOT) as s:
+        return [e.payload["action"] for e in chain_entries(s, f"device:{device}")]
+
+
+def _snapshot(h: Harness, device: uuid.UUID) -> Any:
+    """The device's PIN columns and its audit actions."""
+    return h.row_pin(device), _pin_actions(h, device)
+
+
+def _assert_refused_and_unchanged(
+    h: Harness, response: httpx.Response, device: uuid.UUID, refresh_token: str, before: Any
+) -> None:
+    assert response.status_code == 401, response.text
+    assert response.json() == {
+        "detail": "Sign in again to change the PIN",
+        "code": FRESH_SIGN_IN_REQUIRED,
+    }
+    assert response.headers["www-authenticate"] == "Bearer"
+    # Nothing changed: the PIN, the stop and the audit chain are as they were.
+    assert _snapshot(h, device) == before
+    assert _code(h.unlock(refresh_token)) == PIN_EXHAUSTED
+
+
+@pytest.mark.parametrize("minutes_ago", [0, 4.5])
+def test_at_the_limit_a_fresh_sign_in_changes_the_pin_and_clears_the_stop(
+    h: Harness, minutes_ago: float
+) -> None:
+    _first, device = h.field_device()
+    tokens = h.sign_in_on(device, minutes_ago=minutes_ago)  # magic link on the device
+    _exhaust(h, tokens["refresh_token"])
+    assert _change_pin(h, tokens, device).status_code == 204
+    assert h.unlock(tokens["refresh_token"], OTHER_PIN).status_code == 200
+    assert _pin_actions(h, device)[-1] == "pin_changed"
+
+
+def test_at_the_limit_a_fresh_password_sign_in_counts_too(h: Harness) -> None:
+    _first, device = h.field_device()
+    response = h.client.post(
+        LOGIN, json={"email": ALICE, "password": PASSWORD}, headers={DEVICE_HEADER: str(device)}
+    )
+    tokens = token_body(response)
+    _exhaust(h, tokens["refresh_token"])
+    assert _change_pin(h, tokens, device).status_code == 204
+
+
+def test_at_the_limit_a_six_minute_old_sign_in_gets_401(h: Harness) -> None:
+    _first, device = h.field_device()
+    tokens = h.sign_in_on(device, minutes_ago=6)
+    _exhaust(h, tokens["refresh_token"])
+    before = _snapshot(h, device)
+    response = _change_pin(h, tokens, device)
+    _assert_refused_and_unchanged(h, response, device, tokens["refresh_token"], before)
+    # The client sends the user to sign in: a new sign-in on the device ends the stop.
+    signed_in = h.sign_in_on(device)
+    assert h.unlock(signed_in["refresh_token"]).status_code == 200
+
+
+def test_at_the_limit_a_refreshed_session_older_than_5_minutes_gets_401(h: Harness) -> None:
+    _first, device = h.field_device()
+    tokens = h.sign_in_on(device, minutes_ago=6)
+    refreshed = token_body(refresh(h.client, tokens["refresh_token"]))  # brand-new tokens
+    _exhaust(h, refreshed["refresh_token"])
+    before = _snapshot(h, device)
+    response = _change_pin(h, refreshed, device)
+    _assert_refused_and_unchanged(h, response, device, refreshed["refresh_token"], before)
+
+
+def test_at_the_limit_a_pin_renewed_session_gets_401_even_within_5_minutes(h: Harness) -> None:
+    _first, device = h.field_device()
+    tokens = h.sign_in_on(device)
+    renewed = token_body(h.unlock(tokens["refresh_token"]))  # renewed by the PIN
+    _exhaust(h, renewed["refresh_token"])
+    before = _snapshot(h, device)
+    response = _change_pin(h, renewed, device)
+    _assert_refused_and_unchanged(h, response, device, renewed["refresh_token"], before)
+
+
+def test_at_the_limit_a_token_from_before_the_sign_in_claims_gets_401(h: Harness) -> None:
+    """Backward compatibility fails closed: a token without ``auth_time``/``amr`` (issued
+    before T-0345) is never a fresh sign-in, but works as before below the limit."""
+    _first, device = h.field_device()
+    tokens = h.sign_in_on(device)
+    claims = h.runtime.tokens.verify(tokens["access_token"], "access")
+    legacy = h.runtime.tokens.issue(
+        "access",
+        user_id=claims.user_id,
+        tenant_id=claims.tenant_id,
+        session_id=claims.session_id,
+        device_id=device,
+    )
+    assert legacy.claims.auth_time is None
+    old = {"access_token": legacy.token}
+    _wrong_pins(h, tokens["refresh_token"], 3)
+    assert _change_pin(h, old, device).status_code == 204  # below the limit: unchanged
+    _exhaust(h, tokens["refresh_token"])
+    before = _snapshot(h, device)
+    response = _change_pin(h, old, device)
+    _assert_refused_and_unchanged(h, response, device, tokens["refresh_token"], before)
+
+
+@pytest.mark.parametrize("renewal", ["none", "refresh", "pin"])
+def test_below_the_limit_any_bound_session_changes_the_pin(h: Harness, renewal: str) -> None:
+    """TD-301 point (2) unchanged below the limit: no recent-sign-in window."""
+    _first, device = h.field_device()
+    tokens = h.sign_in_on(device, minutes_ago=10)
+    if renewal == "refresh":
+        tokens = token_body(refresh(h.client, tokens["refresh_token"]))
+    elif renewal == "pin":
+        tokens = token_body(h.unlock(tokens["refresh_token"]))
+    delays = _wrong_pins(h, tokens["refresh_token"], 5)  # locked, but not at the limit
+    assert delays
+    assert _change_pin(h, tokens, device).status_code == 204
+    # The change cleared the failures: the new PIN unlocks at once, no lock to wait out.
+    assert h.unlock(tokens["refresh_token"], OTHER_PIN).status_code == 200
+
+
+def test_the_session_records_how_and_when_it_was_signed_in(h: Harness) -> None:
+    """``auth_time`` / ``amr`` ride on every token of the session: rotation copies them, a PIN
+    unlock marks the session ``pin`` without moving the sign-in time (T-0345)."""
+    _first, device = h.field_device()
+    tokens = h.sign_in_on(device, minutes_ago=3)
+    claims = h.runtime.tokens.verify(tokens["refresh_token"], "refresh")
+    signed_in = claims.auth_time
+    assert signed_in is not None
+    assert abs(signed_in - (h.tokens_clock.real - timedelta(minutes=3))) < timedelta(seconds=1)
+    assert claims.amr == ("magic_link",)
+    assert h.runtime.tokens.verify(tokens["access_token"], "access").amr == ("magic_link",)
+
+    rotated = token_body(refresh(h.client, tokens["refresh_token"]))
+    for kind in ("access", "refresh"):
+        rotated_claims = h.runtime.tokens.verify(rotated[f"{kind}_token"], kind)  # type: ignore[arg-type]
+        assert (rotated_claims.auth_time, rotated_claims.amr) == (signed_in, ("magic_link",))
+
+    unlocked = token_body(h.unlock(rotated["refresh_token"]))
+    pin_claims = h.runtime.tokens.verify(unlocked["refresh_token"], "refresh")
+    assert (pin_claims.auth_time, pin_claims.amr) == (signed_in, ("magic_link", "pin"))
+    # Sticky: a later rotation keeps the mark, a second unlock does not repeat it.
+    again = token_body(refresh(h.client, unlocked["refresh_token"]))
+    assert h.runtime.tokens.verify(again["access_token"], "access").amr == ("magic_link", "pin")
+    twice = token_body(h.unlock(again["refresh_token"]))
+    assert h.runtime.tokens.verify(twice["refresh_token"], "refresh").amr == ("magic_link", "pin")
+
+    password = token_body(h.client.post(LOGIN, json={"email": ALICE, "password": PASSWORD}))
+    assert h.runtime.tokens.verify(password["access_token"], "access").amr == ("pwd",)
 
 
 def test_a_revoked_device_is_refused_through_the_did_claim_without_the_binding(

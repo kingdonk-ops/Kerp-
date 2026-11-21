@@ -629,7 +629,7 @@ def test_a_credential_bound_start_right_after_a_password_set_in_the_same_session
         assert user is not None
         auth_service.set_password(user, NEW_PASSWORD)
         s.flush()
-        pair = service.start_session(s, user, credential_bound=True)
+        pair = service.start_session(s, user, method="pwd", credential_bound=True)
         assert pair.access.claims.user_id == fresh
     # A real change between the read and the lock is still refused.
     with api.db.unit_of_work(TenancyContext(tenant_id=T1)) as s:
@@ -638,7 +638,7 @@ def test_a_credential_bound_start_right_after_a_password_set_in_the_same_session
         stale = User(id=user.id, tenant_id=user.tenant_id, email=user.email)
         stale.password_hash, stale.password_changed_at = user.password_hash, None
         with pytest.raises(AuthenticationError):
-            service.start_session(s, stale, credential_bound=True)
+            service.start_session(s, stale, method="pwd", credential_bound=True)
 
 
 # --- the narrow system path always restores the caller's context --------------------------------

@@ -261,3 +261,49 @@ def test_remaining_is_never_negative() -> None:
     assert claims.remaining(now) == timedelta(seconds=30)
     assert claims.remaining(now + timedelta(minutes=5)) == timedelta(0)
     assert claims.remaining() <= timedelta(seconds=30)
+
+
+# --- the session's sign-in claims (T-0345) ---------------------------------------------------
+
+
+@pytest.mark.parametrize("token_type", ["access", "refresh"])
+def test_sign_in_claims_round_trip(service: TokenService, token_type: str) -> None:
+    signed_in = datetime(2026, 11, 21, 8, 30, 15, 123456, tzinfo=UTC)
+    issued = service.issue(
+        token_type,  # type: ignore[arg-type]
+        **IDS,
+        auth_time=signed_in,
+        amr=["magic_link", "pin"],
+    )
+    payload = jwt.decode(issued.token, options={"verify_signature": False})
+    assert payload["amr"] == ["magic_link", "pin"]
+    claims = service.verify(issued.token, token_type)  # type: ignore[arg-type]
+    assert claims == issued.claims
+    assert claims.auth_time == signed_in  # exact to the microsecond, like ``iat``
+    assert claims.amr == ("magic_link", "pin")
+
+
+def test_a_token_without_sign_in_claims_still_verifies(service: TokenService, keys: KeySet) -> None:
+    """Backward compatible: tokens issued before T-0345 carry neither claim."""
+    claims = service.verify(_sign_raw(keys, _base_payload()), "access")
+    assert claims.auth_time is None
+    assert claims.amr == ()
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"auth_time": "1700000000"},
+        {"auth_time": True},
+        {"amr": "pwd"},
+        {"amr": [1]},
+        {"amr": [""]},
+        {"amr": {"pwd": True}},
+    ],
+)
+def test_malformed_sign_in_claims_are_rejected(
+    service: TokenService, keys: KeySet, change: dict[str, object]
+) -> None:
+    payload = {**_base_payload(), **change}
+    with pytest.raises(InvalidTokenError):
+        service.verify(_sign_raw(keys, payload), "access")
