@@ -162,6 +162,10 @@ KERP_ENVIRONMENT=development uvicorn app.main:create_app --factory --reload
   (`tests/pg_databases.py`). So `-n auto` works there too, and every test still runs on real,
   committed PostgreSQL with RLS as `kerp_app`. This needs `KERP_TEST_OWNER_URL` (a role that
   may create databases); without it the suite falls back to the shared database, serially.
+- In CI `backend-pg` is split into parallel shards by test file (T-0086,
+  `scripts/shard_tests.py`); the coverage floor applies to all shards combined
+  (`backend-pg-coverage`). A new test file needs nothing: it weighs the mean until the next
+  rebalance (`docs/WORKFLOW.md`, "`backend-pg` shards").
 
 The backend defaults to `KERP_ENVIRONMENT=production` (T-0070), which refuses to sign tokens
 without a configured key, so a local server must opt in to `development` (ephemeral key,

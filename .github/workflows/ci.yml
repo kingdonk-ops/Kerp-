@@ -119,12 +119,19 @@ jobs:
         run: pytest -n auto --durations=25
 
   # The full suite again on PostgreSQL 16 + PostGIS + ltree as the NOSUPERUSER NOBYPASSRLS
-  # runtime role, so RLS applies, with the coverage floor (T-0082). Runs in parallel with
-  # `backend` (T-0081).
+  # runtime role, so RLS applies (T-0082). Runs in parallel with `backend` (T-0081), split into
+  # parallel shards by test file (T-0086, scripts/shard_tests.py): every test file runs in
+  # exactly one shard. The coverage floor is enforced on all shards combined, in
+  # backend-pg-coverage. needs.backend-pg.result is the matrix aggregate: one shard failing,
+  # cancelled or skipped makes it non-success, and ci-gate fails.
   backend-pg:
     needs: detect
     if: needs.detect.outputs.backend == 'true'
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false # report every failing shard, not only the first
+      matrix:
+        shard: [1, 2, 3, 4] # backend-pg-coverage's SHARDS must equal the count (test_workflows)
     services:
       postgres:
         image: postgis/postgis:16-3.4
@@ -179,14 +186,85 @@ jobs:
           -c "SELECT pg_reload_conf()"
           -c "SHOW fsync"
       # Each test gets its own copy of a per-worker migrated template database
-      # (tests/pg_databases.py), so the workers never share a database (T-0082).
-      - name: Tests (PostgreSQL + RLS)
+      # (tests/pg_databases.py), so the workers never share a database (T-0082). This shard
+      # runs only its own files; an empty slice fails (pytest without paths would run all).
+      # The per-shard floor is off (--cov-fail-under=0): the floor from pyproject.toml applies
+      # to the combined data in backend-pg-coverage. The JUnit report (xunit1: per-file
+      # timings) feeds scripts/shard_tests.py weights when rebalancing.
+      - name: Tests (PostgreSQL + RLS, one shard)
         env:
           KERP_DATABASE_URL: postgresql+psycopg://kerp_app:kerp_app@localhost:5432/kerp_test
           KERP_TEST_OWNER_URL: postgresql+psycopg://kerp:kerp@localhost:5432/kerp_test
           KERP_REDIS_URL: redis://localhost:6379/0
-        # exit 5 = no tests collected (before the DB layer exists) — allowed
-        run: pytest -n auto --durations=25 || [ $? -eq 5 ]
+          SHARD: ${{ matrix.shard }}
+          SHARDS: ${{ strategy.job-total }}
+        run: |
+          set -euo pipefail
+          python ../scripts/shard_tests.py files --shard "$SHARD" --of "$SHARDS" \
+            > "$RUNNER_TEMP/shard-files.txt"
+          mapfile -t files < "$RUNNER_TEMP/shard-files.txt"
+          echo "shard $SHARD/$SHARDS: ${#files[@]} test files"
+          [ "${#files[@]}" -gt 0 ]
+          pytest -n auto --durations=25 --cov-fail-under=0 \
+            -o junit_family=xunit1 --junitxml="junit-pg-$SHARD.xml" "${files[@]}"
+          mv .coverage ".coverage.pg-$SHARD"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-pg-${{ matrix.shard }}
+          path: |
+            backend/.coverage.pg-${{ matrix.shard }}
+            backend/junit-pg-${{ matrix.shard }}.xml
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7
+
+  # The PostgreSQL shards together (T-0086): the shards' collections must add up to the full
+  # suite, each test exactly once, and the combined coverage of all shards must reach the same
+  # floor as before (read from backend/pyproject.toml, never copied here).
+  backend-pg-coverage:
+    needs: [detect, backend-pg]
+    if: needs.detect.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    env:
+      KERP_ENVIRONMENT: test
+      SHARDS: 4 # = the backend-pg matrix size (test_workflows)
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/pyproject.toml
+      - name: Install
+        run: |
+          python -m pip install -U pip
+          pip install -e ".[dev]"
+      - name: Shards cover the full collection exactly once
+        run: python ../scripts/shard_tests.py verify-collection --of "$SHARDS"
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: coverage-pg-*
+          merge-multiple: true
+          path: ${{ runner.temp }}/pg-coverage
+      - name: Combined coverage floor (all shards)
+        run: |
+          set -euo pipefail
+          ls -la "$RUNNER_TEMP/pg-coverage"
+          for n in $(seq 1 "$SHARDS"); do
+            [ -s "$RUNNER_TEMP/pg-coverage/.coverage.pg-$n" ] \
+              || { echo "::error::coverage data of shard $n is missing"; exit 1; }
+          done
+          found="$(find "$RUNNER_TEMP/pg-coverage" -name '.coverage.*' | wc -l)"
+          [ "$found" -eq "$SHARDS" ] # no stray data file from anything but the shards
+          floor="$(python ../scripts/shard_tests.py coverage-floor)"
+          echo "coverage floor (pyproject.toml): $floor%"
+          coverage combine "$RUNNER_TEMP/pg-coverage"
+          coverage report --show-missing --fail-under="$floor"
 
   # Backend container image (T-0004): build + smoke test on every run, read-only token.
   # On a push the smoke-tested image itself is saved and handed to backend-publish (TD-051).
@@ -286,7 +364,7 @@ jobs:
   # smoke-tested (saved there, loaded here), never a rebuild, and checks by digest that the
   # registry serves exactly that image (TD-051).
   backend-publish:
-    needs: [detect, backend, backend-pg, backend-image]
+    needs: [detect, backend, backend-pg, backend-pg-coverage, backend-image]
     if: github.event_name == 'push' && needs.detect.outputs.backend == 'true'
     runs-on: ubuntu-latest
     permissions:
@@ -411,7 +489,7 @@ jobs:
   # backend-pg (RLS applies: the API runs as kerp_app), Redis, the API (uvicorn, development)
   # and the built frontend, both started by e2e/playwright.config.ts. See e2e/README.md.
   e2e:
-    needs: [detect, backend, backend-pg, frontend]
+    needs: [detect, backend, backend-pg, backend-pg-coverage, frontend]
     if: always() && needs.detect.outputs.e2e == 'true' && !contains(needs.*.result, 'failure')
     runs-on: ubuntu-latest
     services:
@@ -484,7 +562,7 @@ jobs:
   # Single required check for branch rules. Passes only if every job succeeded or skipped
   # because it is expected to (component absent, or publish on a non-push) — scripts/ci_gate.py.
   ci-gate:
-    needs: [detect, tracker, backend, backend-pg, backend-image, backend-publish, frontend, perf, e2e]
+    needs: [detect, tracker, backend, backend-pg, backend-pg-coverage, backend-image, backend-publish, frontend, perf, e2e]
     if: always()
     runs-on: ubuntu-latest
     steps:

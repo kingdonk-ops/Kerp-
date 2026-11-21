@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 344 · **Closed:** 148
+**Open:** 345 · **Closed:** 148
 
 ## decision (39)
 
@@ -191,7 +191,7 @@
 | [TD-501](../tracker/todo/TD-501.md) | Playwright journey for T-0276 (system_admin without membership opens project B; non-admin sees only its projects) once the e2e harness exists (T-0027) | T-0276 | implementer |
 | [TD-508](../tracker/todo/TD-508.md) | Verify the e2e suite on the make up compose stack, and give it its own database | T-0027 | implementer |
 
-## later (137)
+## later (138)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -332,6 +332,7 @@
 | [TD-498](../tracker/todo/TD-498.md) | Unskip the T-0027 module-toggle step when the first toggleable module merges | T-0027 | planner |
 | [TD-499](../tracker/todo/TD-499.md) | All-Projects for a system_admin who is a member of every project and holds no portfolio persona: /me/projects has no system_admin flag, so the picker cannot offer the scope | T-0276 | implementer |
 | [TD-512](../tracker/todo/TD-512.md) | Split the backend-pg CI job into parallel shards | T-0086 | coordinator |
+| [TD-513](../tracker/todo/TD-513.md) | CI: the SQLite backend job (~6.5 min) becomes the critical path once backend-pg is sharded | T-0086 | implementer |
 
 ## bug (8)
 
