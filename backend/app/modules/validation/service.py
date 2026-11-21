@@ -32,7 +32,7 @@ from collections.abc import Callable, Collection, Iterable, Mapping
 from functools import cache
 from typing import TYPE_CHECKING, Any, Final
 
-from sqlalchemy import ColumnElement, select
+from sqlalchemy import ColumnElement, or_, select
 from sqlalchemy.exc import IntegrityError, OperationalError, SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -293,11 +293,25 @@ def delete_rule(
 
 
 def resolve_rule_set(session: Session, key: str, kind: str) -> RuleSet:
-    """The most specific visible set named ``key``: project, else tenant, else system."""
+    """The most specific set named ``key`` of the session's own scope: its bound project's,
+    else the tenant's, else the system's.
+
+    Candidates are filtered to the session's own project explicitly: visibility is wider than
+    the own scope for a portfolio reader (``allowed_project_ids``) and a ``system_admin``
+    session (ADR 0016), and another project's set must never decide this session's gate.
+    """
     context = _context(session)
+    own_scope = (
+        RuleSet.project_id.is_(None)
+        if context.project_id is None
+        else or_(RuleSet.project_id.is_(None), RuleSet.project_id == context.project_id)
+    )
     candidates = session.scalars(
         select(RuleSet).where(
-            RuleSet.tenant_id == context.tenant_id, RuleSet.key == key, RuleSet.kind == kind
+            RuleSet.tenant_id == context.tenant_id,
+            RuleSet.key == key,
+            RuleSet.kind == kind,
+            own_scope,
         )
     ).all()
     if not candidates:

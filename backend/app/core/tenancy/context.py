@@ -28,18 +28,23 @@ class TenancyContext:
     * ``project_id``: the single project the session *writes* (``app.current_project_id``).
     * ``allowed_project_ids``: further projects the session may *read*
       (``app.allowed_project_ids``, edge spec §6 amendments, TD-053). Bound only from the
-      user's memberships, never from request parameters. There is no implicit
-      "every project of the tenant" scope.
+      user's memberships, never from request parameters. The only "every project of the
+      tenant" scope is ``is_system_admin`` (below).
     * ``site_node_ids``: Asset-Site scoping (diff §4, PER-07). ``None`` means unrestricted;
-      a set limits every ``SiteScopedMixin`` row to those sites (ORM layer).
+      a set limits every ``SiteScopedMixin`` row to those sites (ORM layer). Ignored for an
+      ``is_system_admin`` context, which is never site-filtered (ADR 0016).
     * ``member_project_ids``: every project the user holds a membership in, whatever the
       persona (``app.member_project_ids``, T-0014). It widens only the tenant-level rows that
       *describe* a project (the project row, its memberships; ``MembershipScopedMixin``),
       never project-scoped records.
     * ``is_system_admin``: the caller holds the ``system_admin`` grant (``app.is_system_admin``,
-      T-0014, diff §4.1). Loaded server-side at authentication, never from the request; a
-      script or provisioning job may set it explicitly. It reads every project row and
-      membership and writes admin grants, but reads no project-scoped record.
+      T-0014, diff §4.1). Loaded server-side at authentication from the caller's own grant
+      row (``resolve_request_scope``, JWT ``sub`` + ``tid``), never from token claims,
+      headers, query parameters or bodies; a script or provisioning job may set it
+      explicitly. It reads every project row and membership, writes admin grants, and reads
+      and writes the project-scoped records of every project of its own tenant without a
+      membership (ADR 0016, T-0274); never another tenant's, and tenant-level rows keep the
+      exact write rule (a project-bound admin session writes none).
     * ``admin_project_ids``: the projects where the user holds PER-09 Project Administrator
       (``app.admin_project_ids``, T-0050). Bound only from the user's memberships; it widens
       only the rows a project's administrators decide on (access requests), never

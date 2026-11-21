@@ -198,18 +198,22 @@ def test_a_client_portal_user_bound_to_a_cannot_list_or_fetch_b(
         assert [p["code"] for p in mine] == ["A"]
 
 
-def test_a_system_admin_lists_every_project_but_reads_no_project_record(
-    db: Database, seed: Seed
-) -> None:
+def test_a_system_admin_lists_every_project_and_reads_its_records(db: Database, seed: Seed) -> None:
     root = _as(seed.alice, is_system_admin=True)
     assert sorted(_rows(db, root, "SELECT code FROM oe_projects_project")) == [("A",), ("B",)]
     members = "SELECT count(*) FROM auth_project_membership"
     assert _rows(db, root, members) == [(3,)]
+    # ADR 0016 (T-0274): without any membership the admin reads B's project-scoped record.
     records = "SELECT count(*) FROM audit_ledger WHERE project_id = :b"
-    assert _rows(db, root, records, b=seed.b) == [(0,)]
-    # The record exists: a session bound to B (with a membership there) reads it.
+    assert _rows(db, root, records, b=seed.b) == [(1,)]
     bound_b = _as(seed.bob, project_id=seed.b, member_project_ids=frozenset({seed.a, seed.b}))
     assert _rows(db, bound_b, records, b=seed.b) == [(1,)]
+    # A non-admin outside B still reads nothing of it, membership-described or not.
+    bound_a = _as(seed.portal, project_id=seed.a, member_project_ids=frozenset({seed.a}))
+    assert _rows(db, bound_a, records, b=seed.b) == [(0,)]
+    assert _rows(db, _as(seed.bob, member_project_ids=frozenset({seed.b})), records, b=seed.b) == [
+        (0,)
+    ]
 
 
 def test_a_plain_tenant_session_sees_no_project_or_foreign_membership(

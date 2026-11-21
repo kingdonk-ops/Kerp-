@@ -8,10 +8,15 @@ tenant to the project dimension. Every table that carries ``tenant_id`` gets::
     CREATE POLICY tenant_level_read_policy ... FOR SELECT USING (<tenant-level row>)
     CREATE POLICY allowed_projects_read_policy ... FOR SELECT USING (<allowed project row>)
 
-``<exact>`` is ``tenant_id = app.current_tenant_id AND project_id IS NOT DISTINCT FROM
-app.current_project_id`` (edge spec §6). A session reads, inserts, updates and deletes rows
-of exactly its scope: a project session writes only its project, and a tenant-level session
-(no project) writes only tenant-level rows. Permissive policies are OR-ed per command, so
+``<exact>`` is ``tenant_id = app.current_tenant_id AND (project_id IS NOT DISTINCT FROM
+app.current_project_id OR (project_id IS NOT NULL AND app.is_system_admin))`` (edge spec §6,
+ADR 0016). A session reads, inserts, updates and deletes rows of exactly its scope: a project
+session writes only its project, and a tenant-level session (no project) writes only
+tenant-level rows. A ``system_admin`` session (``app.is_system_admin``, ADR 0016, T-0274)
+additionally reads and writes the *project* rows of every project of its own tenant; it never
+crosses the tenant clause, and its tenant-level writes follow the exact rule like anyone's (a
+project-bound admin session still never creates, changes or deletes a tenant-level row, nor
+demotes a project row to one). Permissive policies are OR-ed per command, so
 the second policy only adds *read* access to the tenant's tenant-level rows
 (``project_id IS NULL``). A project session cannot create, demote a row to, change or
 delete a tenant-level row. The third policy (T-0010, TD-053) adds *read* access to rows of
@@ -155,7 +160,8 @@ RLS_EXEMPT: Final[frozenset[str]] = frozenset()
 
 _TENANT_EXPR: Final = f"NULLIF(current_setting('{TENANT_SETTING}', true), '')::uuid"
 _PROJECT_EXPR: Final = f"NULLIF(current_setting('{PROJECT_SETTING}', true), '')::uuid"
-# Read, insert, update and delete: exactly the bound scope.
+# Exactly the bound scope. The special policies (membership, admin grant, access request,
+# invite, team) use it for their writes; it is unchanged by ADR 0016.
 SCOPE_ROW_SQL: Final = (
     f"tenant_id = {_TENANT_EXPR} AND project_id IS NOT DISTINCT FROM {_PROJECT_EXPR}"
 )
@@ -171,6 +177,14 @@ ALLOWED_PROJECT_ROW_SQL: Final = (
 _USER_EXPR: Final = f"NULLIF(current_setting('{USER_SETTING}', true), '')::uuid"
 SYSTEM_ADMIN_SQL: Final = (
     f"COALESCE(NULLIF(current_setting('{SYSTEM_ADMIN_SETTING}', true), '')::boolean, false)"
+)
+# Read, insert, update and delete of ``project_isolation_policy`` (ADR 0016, T-0274): the
+# exact scope, or a project row of the bound tenant for a ``system_admin`` session. The admin
+# disjunct never matches a tenant-level row (``project_id IS NULL``), so tenant-level writes
+# keep the exact rule, and never another tenant (the tenant clause is outside the OR).
+PROJECT_ISOLATION_SQL: Final = (
+    f"tenant_id = {_TENANT_EXPR} AND (project_id IS NOT DISTINCT FROM {_PROJECT_EXPR}"
+    f" OR (project_id IS NOT NULL AND {SYSTEM_ADMIN_SQL}))"
 )
 
 
@@ -472,7 +486,7 @@ def rls_policy_sql(table: str, policy: RlsPolicy | None = None) -> list[str]:
         f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY",
         f"DROP POLICY IF EXISTS {POLICY_NAME} ON {table}",
         f"CREATE POLICY {POLICY_NAME} ON {table} FOR ALL "
-        f"USING ({SCOPE_ROW_SQL}) WITH CHECK ({SCOPE_ROW_SQL})",
+        f"USING ({PROJECT_ISOLATION_SQL}) WITH CHECK ({PROJECT_ISOLATION_SQL})",
         f"DROP POLICY IF EXISTS {READ_POLICY_NAME} ON {table}",
         f"CREATE POLICY {READ_POLICY_NAME} ON {table} FOR SELECT USING ({TENANT_LEVEL_ROW_SQL})",
         f"DROP POLICY IF EXISTS {ALLOWED_READ_POLICY_NAME} ON {table}",

@@ -93,8 +93,8 @@ def _project(db: Database, code: str) -> uuid.UUID:
 
 
 class Api:
-    """ALICE: System admin (and, until T-0274, a PER-01 reader of HOME so she reads its jobs).
-    BOB: PER-09 of every project. CAROL: no grant at all."""
+    """ALICE: System admin with no membership anywhere (ADR 0016: she reads every project's
+    jobs, T-0274, TD-451). BOB: PER-09 of every project. CAROL: no grant at all."""
 
     def __init__(self, client: TestClient, db: Database) -> None:
         self.client, self.db = client, db
@@ -104,7 +104,6 @@ class Api:
         self.home, self.away = _project(db, "HOME"), _project(db, "AWAY")
         for project in (self.home, self.away):
             grant_persona(db, T1, self.users[BOB], Persona.PROJECT_ADMINISTRATOR.value, project)
-        grant_persona(db, T1, self.users[ALICE], Persona.OPERATIONS_MANAGEMENT.value, self.home)
         self._headers: dict[str, dict[str, str]] = {}
 
     def headers(self, email: str) -> dict[str, str]:
@@ -309,9 +308,7 @@ def test_the_failed_list_pages_and_bounds_its_limit(api: Api) -> None:
 # --- retry and abort ------------------------------------------------------------------------
 
 
-def test_a_system_admin_retries_a_failed_job_audited(
-    api: Api, dispatched: list[JobRef]
-) -> None:
+def test_a_system_admin_retries_a_failed_job_audited(api: Api, dispatched: list[JobRef]) -> None:
     job_id = api.job(project=api.home)
     dispatched.clear()
     response = api.client.post(f"{QUEUES}/failed/{job_id}/retry", headers=api.headers(ALICE))
@@ -446,30 +443,56 @@ def test_the_retry_uses_the_kind_s_back_off(api: Api, dispatched: list[JobRef]) 
     assert [(r.max_attempts, r.retry_delay_s) for r in dispatched[-1:]] == [(5, 2)]
 
 
-# --- invisible jobs: another project, another tenant (review round 1, CLAUDE.md §6) ---------
+# --- every project of the tenant, without a membership (ADR 0016, T-0274, TD-451) -----------
 
 
-@pytest.mark.parametrize("where", ["away_project", "other_tenant"])
+def test_a_system_admin_without_membership_lists_retries_and_aborts_any_projects_job(
+    api: Api, dispatched: list[JobRef], monitor: FakeMonitor
+) -> None:
+    # ALICE holds no membership in AWAY; her system_admin grant alone shows its job rows.
+    failed = api.job(project=api.away)
+    queued = api.job(project=api.away, status="queued")
+    alice = api.headers(ALICE)
+    listed = {r["id"]: r for r in api.client.get(f"{QUEUES}/failed", headers=alice).json()}
+    assert listed[str(failed)]["project_code"] == "AWAY"
+    assert str(queued) not in listed
+    dispatched.clear()
+    retry = api.client.post(f"{QUEUES}/failed/{failed}/retry", headers=alice)
+    assert retry.status_code == 202, retry.text
+    row = api.row(failed, api.away)
+    assert (row.status, row.updated_by) == ("queued", api.users[ALICE])
+    assert [(r.job_id, r.project_id) for r in dispatched] == [(failed, api.away)]
+    abort = api.client.post(f"{QUEUES}/{queued}/abort", headers=alice)
+    assert abort.status_code == 200, abort.text
+    assert api.row(queued, api.away).status == "failed"
+    assert monitor.aborted == [("interactive", str(queued), jobs.ABORTED)]
+    assert [(e["event"], e["job_id"], e["project_id"]) for e in api.chain()] == [
+        ("job_retried", str(failed), str(api.away)),
+        ("job_aborted", str(queued), str(api.away)),
+    ]
+
+
+# --- invisible jobs: another tenant (review round 1, CLAUDE.md §6) ---------------------------
+
+
+@pytest.mark.parametrize("project", [False, True], ids=["tenant-level", "project"])
 @pytest.mark.parametrize("state", ["failed", "queued"])
 def test_a_job_the_admin_cannot_see_is_404_and_untouched(
-    api: Api, dispatched: list[JobRef], monitor: FakeMonitor, where: str, state: str
+    api: Api, dispatched: list[JobRef], monitor: FakeMonitor, project: bool, state: str
 ) -> None:
-    # AWAY is outside ALICE's read scope (until T-0274, TD-451); T2 is another tenant, never
-    # visible. Retry and abort answer 404, change nothing, enqueue and audit nothing, and
+    # T2 is another tenant, never visible to T1's system_admin (ADR 0016 never crosses
+    # tenants). Retry and abort answer 404, change nothing, enqueue and audit nothing, and
     # the job is neither listed nor counted.
-    if where == "other_tenant":
-        seed_tenants(api.db, T2)
-        tenant, project = T2, None
-    else:
-        tenant, project = T1, api.away
-    job_id = api.job(project=project, status=state, tenant=tenant)
-    before = api.row(job_id, project, tenant)
+    seed_tenants(api.db, T2)
+    tenant, project_id = T2, (uuid.uuid4() if project else None)
+    job_id = api.job(project=project_id, status=state, tenant=tenant)
+    before = api.row(job_id, project_id, tenant)
     dispatched.clear()
     alice = api.headers(ALICE)
     retry = api.client.post(f"{QUEUES}/failed/{job_id}/retry", headers=alice)
     abort = api.client.post(f"{QUEUES}/{job_id}/abort", headers=alice)
     assert (retry.status_code, abort.status_code) == (404, 404), (retry.text, abort.text)
-    after = api.row(job_id, project, tenant)
+    after = api.row(job_id, project_id, tenant)
     assert (after.status, after.error, after.updated_by, after.finished_at) == (
         before.status,
         before.error,
@@ -485,9 +508,7 @@ def test_a_job_the_admin_cannot_see_is_404_and_untouched(
     assert [q["failed"] for q in overview["queues"]] == [0, 0]
 
 
-def test_the_overview_is_503_when_the_queue_is_unreachable(
-    api: Api, monitor: FakeMonitor
-) -> None:
+def test_the_overview_is_503_when_the_queue_is_unreachable(api: Api, monitor: FakeMonitor) -> None:
     async def broken(queue: QueueName) -> QueueCounts:
         raise ConnectionError("redis down")
 

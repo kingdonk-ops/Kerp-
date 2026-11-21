@@ -42,7 +42,10 @@ the tenant. Changing a core RLS policy needs an ADR (CLAUDE.md §6).
    claims, headers, query parameters, bodies or any other client value. Admin grants are
    tenant rows and every policy also requires `tenant_id = app.current_tenant_id`, so the flag
    is never true across tenants: an admin of tenant A sees nothing of tenant B. An
-   impersonation session (ADR 0015) binds it false.
+   impersonation session (ADR 0015) binds it false. *(T-0274 note:)* for **requests** that is
+   the only binder; four server-internal contexts also bind it for a narrow read of their own
+   tables (jobs scheduler, teams reconcile, onboarding, the invite-token lookup), never from a
+   client value; their wider reach since this ADR is TD-462.
 4. **Authority unchanged.** `system_admin` alone gives `V`, `C`, `E` and project administration
    (PER-09 equivalent) on every project, **never `A` or `S`**: no hold release, inspection
    approval or cryptographic co-sign. To act as an approver a `system_admin` must hold the

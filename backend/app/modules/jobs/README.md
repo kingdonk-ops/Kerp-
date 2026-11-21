@@ -87,8 +87,9 @@ never mounted (it has no KERP auth).
   an abort fails the row with `Aborted by an administrator`, then the router aborts the SAQ job
   (best effort: the worker never starts a `failed` row, and `finish_job(only_running=True)`
   never overwrites an aborted one).
-* Visibility: under ADR 0016 (T-0274) a `system_admin` reads every project's job rows; until it
-  lands, only tenant-level rows and the projects of the caller's read scope are listed (TD-451).
+* Visibility: under ADR 0016 (T-0274) a `system_admin` session reads (and the console retries
+  and aborts) the job rows of every project of its tenant without a membership, under normal
+  RLS; never another tenant's (TD-451).
 
 ## Worker (rule 1)
 
@@ -106,7 +107,8 @@ not know, one bound unit of work per scope. `scheduler.py` (T-0214) runs it ever
 minutes as an SAQ cron job on the batch worker (`CronJob(unique=True)`: one run per tick across
 replicas). Its scopes (`deployment_scopes`) are the `KERP_DEFAULT_TENANT_ID` tenant-level scope
 plus one per live project, listed by `projects.live_project_ids` in a tenant-level unit of work
-bound with `is_system_admin=True` (reads project rows, never project-scoped records; no
+bound with `is_system_admin=True` (it reads only the project rows; since ADR 0016 that flag
+would also show every project's records of the tenant, but the read touches no other table; no
 BYPASSRLS). Broker enqueue retry/backoff and a heal on `GET /jobs/{id}`: TD-304.
 
 ## Tests

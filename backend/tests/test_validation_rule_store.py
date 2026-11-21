@@ -44,7 +44,7 @@ from app.modules.validation.service import (
 )
 from tests.audit_support import migrated_database
 from tests.db_support import ON_POSTGRES
-from tests.tenancy_support import CTX_A, CTX_B, CTX_C, CTX_T1
+from tests.tenancy_support import ADMIN_A, ADMIN_T1, CTX_A, CTX_B, CTX_C, CTX_T1, PA, PB, T1
 
 BACKEND = Path(__file__).resolve().parents[1]
 USER = uuid.UUID("00000000-0000-4000-8000-00000000e001")
@@ -384,6 +384,60 @@ def test_the_most_specific_layer_wins_and_projects_are_isolated(db: Database) ->
     assert reasons == {"a": "project", "b": "tenant", "t1": "tenant"}
     with db.unit_of_work(CTX_C) as s, pytest.raises(RuleSetNotFoundError):
         run_checks({}, "demo.submit", session=s)  # another tenant sees nothing
+
+
+@pytest.mark.parametrize(
+    ("ctx", "expected"),
+    [
+        (CTX_T1, "tenant"),
+        (ADMIN_T1, "tenant"),
+        (ADMIN_A, "tenant"),
+        (CTX_A, "tenant"),
+        (TenancyContext(tenant_id=T1, allowed_project_ids=frozenset({PB})), "tenant"),
+        (
+            TenancyContext(tenant_id=T1, project_id=PA, allowed_project_ids=frozenset({PB})),
+            "tenant",
+        ),
+        (TenancyContext(tenant_id=T1, project_id=PB, is_system_admin=True), "project-b"),
+        (CTX_B, "project-b"),
+    ],
+    ids=[
+        "tenant-level",
+        "tenant-level-admin",
+        "admin-bound-to-a",
+        "member-of-a",
+        "portfolio-reader-of-b",
+        "a-with-b-allowed",
+        "admin-bound-to-b",
+        "member-of-b",
+    ],
+)
+def test_a_rule_set_resolves_only_from_the_sessions_own_scope(
+    db: Database, ctx: TenancyContext, expected: str
+) -> None:
+    # A session that can *read* another project's set (a system_admin, ADR 0016; a portfolio
+    # reader, T-0010) still resolves its own project's set, else the tenant/system set: never
+    # another project's, which would run the wrong (here: non-blocking) rules (T-0274 review).
+    tenant_id = make_set(db, CTX_T1, layer="tenant")
+    add(db, CTX_T1, tenant_id, cel_rule("ten", "false", params={"message": "tenant"}))
+    project_b = make_set(db, CTX_B)
+    add(db, CTX_B, project_b, cel_rule("prj", "false", params={"message": "project-b"}))
+    with db.unit_of_work(ctx) as s:
+        resolved = resolve_rule_set(s, "demo.submit", "check")
+        assert resolved.id == (project_b if expected == "project-b" else tenant_id)
+        result = run_checks({}, "demo.submit", session=s)
+    assert (result.blocked, result.reason) == (True, expected)
+
+
+def test_without_an_own_or_tenant_set_another_projects_set_is_not_found(db: Database) -> None:
+    make_set(db, CTX_B)
+    for ctx in (
+        ADMIN_T1,
+        ADMIN_A,
+        TenancyContext(tenant_id=T1, allowed_project_ids=frozenset({PB})),
+    ):
+        with db.unit_of_work(ctx) as s, pytest.raises(RuleSetNotFoundError):
+            resolve_rule_set(s, "demo.submit", "check")
 
 
 def test_a_project_cannot_change_tenant_or_other_project_rules(db: Database) -> None:
