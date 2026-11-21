@@ -39,6 +39,8 @@ __all__ = [
 
 API_PREFIX: Final = "/api/v1"
 DEFAULT_PACKAGE: Final = "app.modules"
+# Optional ``<module>/setting_defs.py`` declaring the module's runtime settings (T-0230).
+SETTING_DEFS_MODULE: Final = "setting_defs"
 JOB_HANDLERS_MODULE: Final = "jobs"  # optional ``<module>/jobs.py`` with ``register_job`` handlers
 
 
@@ -97,19 +99,32 @@ def mount_modules(app: FastAPI, registry: ModuleRegistry) -> None:
         app.include_router(router, prefix=API_PREFIX + manifest.route_prefix, dependencies=gate)
 
 
+def _import_optional(registry: ModuleRegistry, submodule: str) -> list[str]:
+    imported: list[str] = []
+    for manifest in registry:
+        name = f"{registry.package}.{manifest.name}.{submodule}"
+        if importlib.util.find_spec(name) is not None:
+            importlib.import_module(name)
+            imported.append(name)
+    return imported
+
+
 def import_job_handlers(registry: ModuleRegistry) -> list[str]:
     """Import ``<module>/jobs.py`` of every module that has one (T-0015).
 
     Its ``register_job`` decorators register the module's job handlers. The API needs the
     kinds to enqueue them, the worker to run them. Returns the imported module paths.
     """
-    imported: list[str] = []
-    for manifest in registry:
-        name = f"{registry.package}.{manifest.name}.{JOB_HANDLERS_MODULE}"
-        if importlib.util.find_spec(name) is not None:
-            importlib.import_module(name)
-            imported.append(name)
-    return imported
+    return _import_optional(registry, JOB_HANDLERS_MODULE)
+
+
+def import_setting_defs(registry: ModuleRegistry) -> list[str]:
+    """Import ``<module>/setting_defs.py`` of every module that has one (T-0230, diff §4.7).
+
+    It declares the module's runtime settings in the settings registry; every API and worker
+    process needs all of them (the System console lists them). Returns the imported paths.
+    """
+    return _import_optional(registry, SETTING_DEFS_MODULE)
 
 
 def install_modules(app: FastAPI, package: str = DEFAULT_PACKAGE) -> ModuleRegistry:
@@ -118,4 +133,5 @@ def install_modules(app: FastAPI, package: str = DEFAULT_PACKAGE) -> ModuleRegis
     setattr(app.state, STATE_KEY, registry)
     mount_modules(app, registry)
     import_job_handlers(registry)
+    import_setting_defs(registry)
     return registry

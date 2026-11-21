@@ -50,14 +50,15 @@ def create_upload(
     request: Request,
 ) -> UploadTicket:
     projects.bind_project(session, principal, grants, project_id, require=Capability.CREATE)
-    settings = _settings(request)
+    # Runtime settings (T-0230), never above the deployment's KERP_UPLOAD_* limits.
+    max_bytes, expires_in = service.upload_limits(session, _settings(request))
     try:
         file, upload = service.presign_upload(
             session,
             get_storage(),
             body,
-            max_bytes=settings.upload_max_bytes,
-            expires_in=settings.upload_url_seconds,
+            max_bytes=max_bytes,
+            expires_in=expires_in,
             actor_id=principal.user_id,
         )
     except service.FileTooLargeError as exc:

@@ -144,7 +144,7 @@ def test_file_table_meets_the_record_contract_and_is_under_rls() -> None:
 def test_uploads_module_is_loaded_and_registers_its_jobs() -> None:
     manifest = discover_modules().get("uploads")
     assert manifest.toggleable is False
-    assert set(manifest.depends_on) == {"jobs", "projects"}
+    assert set(manifest.depends_on) == {"jobs", "projects", "settings"}
     assert JOB_REGISTRY.get(service.VERIFY_KIND).queue == "interactive"
     assert JOB_REGISTRY.get(service.VERIFY_LARGE_KIND).queue == "batch"
     assert JOB_REGISTRY.get(service.SWEEP_KIND).queue == "batch"

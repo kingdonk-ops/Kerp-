@@ -40,6 +40,7 @@ from app.core.tenancy.scope import OutOfScopeError
 from app.modules.jobs import mail as jobs_mail
 from app.modules.jobs.broker import LoopDispatcher, SaqBroker
 from app.modules.jobs.service import set_dispatcher, set_queue_monitor
+from app.modules.settings import cache as settings_cache
 
 
 async def _out_of_scope_handler(_request: Request, _exc: Exception) -> JSONResponse:
@@ -79,7 +80,13 @@ def create_app(
             set_dispatcher(dispatcher)
         # The System console's queue monitor reads SAQ through the same broker (T-0218).
         set_queue_monitor(broker)
+        # Runtime settings (T-0230): values cached in Redis; this process drops its copy when
+        # any API or worker process changes one (pub/sub). Without Redis: no cache.
+        cached_settings = settings_cache.open_cache(settings.redis_url)
+        settings_cache.install(cached_settings)
         yield
+        settings_cache.install(None)
+        cached_settings.close()
         set_queue_monitor(None)
         if broker is not None and dispatcher is not None and mail_dispatcher is not None:
             set_dispatcher(None)
