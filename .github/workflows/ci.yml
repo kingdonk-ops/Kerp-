@@ -190,8 +190,9 @@ jobs:
       # runs only its own files; an empty slice fails (pytest without paths would run all).
       # The per-shard floor is off (--cov-fail-under=0): the floor from pyproject.toml applies
       # to the combined data in backend-pg-coverage. The JUnit report (xunit1: per-file
-      # timings) feeds scripts/shard_tests.py weights when rebalancing.
-      - name: Tests (PostgreSQL + RLS, one shard)
+      # timings) feeds scripts/shard_tests.py weights when rebalancing. The step name is read by
+      # backend/tests/test_dev_infra.py (Makefile defaults = this env).
+      - name: Tests (PostgreSQL + RLS)
         env:
           KERP_DATABASE_URL: postgresql+psycopg://kerp_app:kerp_app@localhost:5432/kerp_test
           KERP_TEST_OWNER_URL: postgresql+psycopg://kerp:kerp@localhost:5432/kerp_test
