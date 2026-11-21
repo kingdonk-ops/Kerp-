@@ -14,7 +14,8 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import select
+from sqlalchemy import select, text
+from sqlalchemy.orm import Session
 
 from app.core.audit.service import chain_entries
 from app.core.auth.access import SYSTEM_ADMIN, Grant, Persona, resolve_scope
@@ -24,6 +25,7 @@ from app.core.db import Base, BaseRecordMixin, Database
 from app.core.mail.models import MailSend
 from app.core.mail.queue import QueuedMail, mail_enqueuer, set_mail_enqueuer
 from app.core.mail.service import Delivery, deliver
+from app.core.mail.service import send_mail as real_send_mail
 from app.core.mail.templates import TEMPLATES, render
 from app.core.mail.transport import FakeTransport, PermanentMailError
 from app.core.module_loader.loader import discover_modules
@@ -694,6 +696,40 @@ def test_a_mail_the_service_refuses_never_undoes_the_decision(
     approved = api.approve(PAM, request_id)
     assert approved.status_code == 200, approved.text
     assert api.mine(EXT)[0]["status"] == "approved"
+    assert outbox.decisions() == []
+
+
+def test_a_database_error_after_the_send_log_write_never_undoes_the_decision(
+    api: Api, outbox: Outbox, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The real ``send_mail`` adds and flushes the ``queued`` row and stages the mail; then a
+    real database error follows (on PostgreSQL it aborts the transaction). The SAVEPOINT
+    around the mail takes all of it back and the decision commits."""
+    send_ids: list[uuid.UUID] = []
+
+    def write_then_fail(session: Session, *args: Any, **kwargs: Any) -> uuid.UUID:
+        send_ids.append(real_send_mail(session, *args, **kwargs))
+        session.execute(text("SELECT 1 FROM kerp_no_such_table"))
+        raise AssertionError("unreachable: the statement above fails")
+
+    monkeypatch.setattr(service, "send_mail", write_then_fail)
+    request_id = api.filed(EXT, api.hid, api.ticket("HID", EXT))
+    approved = api.approve(PAM, request_id)
+    assert approved.status_code == 200, approved.text
+    assert api.mine(EXT)[0]["status"] == "approved"
+    assert len(send_ids) == 1  # the row was written before the error
+    with api.db.unit_of_work(ROOT) as s:
+        keys = [r.template_key for r in s.scalars(select(MailSend))]
+        assert s.get(MailSend, send_ids[0]) is None
+    assert [k for k in keys if k.startswith("access_requests.")] == []
+    assert outbox.decisions() == []
+
+
+def test_no_e_mail_for_a_deleted_project(api: Api, outbox: Outbox) -> None:
+    request_id = api.filed(EXT, api.gone, api.ticket("GONE", EXT))
+    deleted = api.client.delete(f"/api/v1/projects/{api.gone}", headers=api.headers(PAM))
+    assert deleted.status_code == 204
+    assert api.act(ROOT_ADMIN, request_id, "reject", {"reason": "Synthetic"}).status_code == 200
     assert outbox.decisions() == []
 
 

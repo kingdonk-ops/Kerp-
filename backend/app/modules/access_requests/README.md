@@ -116,9 +116,10 @@ service (`app.core.mail.service.send_mail`, T-0058), in the deciding unit of wor
   Nothing of the project beyond code and name, no personas, ids or the decider's name.
 - The mail is handed to the queue only **after the commit** and sent by the SAQ worker
   (interactive queue); every send is a `mail_send_log` row (`queued`, then `sent`, `failed`,
-  `suppressed`, ...). `send_mail` runs inside a SAVEPOINT: an address or a text the mail
-  service refuses (or a failed log write) is logged with its type only and rolled back to it,
-  and the decision stands. A failed or bounced send happens later in the worker and never
+  `suppressed`, ...). Everything the mail does in the request (the project and requester
+  reads, `send_mail`'s log row and staged mail) runs inside a SAVEPOINT: an address or a text
+  the mail service refuses, or a database error on the way (which on PostgreSQL aborts the
+  transaction), is logged with its type only and rolled back to it, and the decision stands. A failed or bounced send happens later in the worker and never
   touches the decision. A rolled-back decision (e.g. 409 `sod_confirmation_required`) queues
   nothing.
 - No e-mail when the requester's account is gone or deactivated, or the project was deleted.

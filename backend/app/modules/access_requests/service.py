@@ -545,9 +545,24 @@ def _one_line(text: str) -> str:
 
 def _queue_decision_mail(session: Session, request: AccessRequest) -> bool:
     """Queue the decision e-mail to the requester in the deciding unit of work; ``False`` when
-    none was queued. Skipped (logged, no address) for a requester who is gone or deactivated
-    or a project since deleted; an address or a text the mail service refuses, or a failed
-    send-log write, is logged and rolled back to the SAVEPOINT, and the decision stands."""
+    none was queued. Everything it does (the reads, the send-log write, the staged mail) runs
+    inside a SAVEPOINT: an address or a text the mail service refuses, or a database error on
+    the way (on PostgreSQL one aborts the transaction), is logged and rolled back to it, so
+    nothing of the mail is kept and the decision commits."""
+    try:
+        with session.begin_nested():
+            return _send_decision_mail(session, request)
+    except (InvalidAddressError, TemplateError, SQLAlchemyError) as exc:
+        # Only the type: never the address or the text.
+        _logger.warning(
+            "access-request e-mail of request %s not queued: %s", request.id, type(exc).__name__
+        )
+        return False
+
+
+def _send_decision_mail(session: Session, request: AccessRequest) -> bool:
+    """``send_mail`` the decision; skipped (logged, no address) for a requester who is gone or
+    deactivated or a project since deleted."""
     project_id = request.requested_project_id
     project = projects.lobby_projects_by_id(session, [project_id]).get(project_id)
     requester = users.users_by_id(session, [request.requester_id]).get(request.requester_id)
@@ -564,13 +579,5 @@ def _queue_decision_mail(session: Session, request: AccessRequest) -> bool:
         if request.rejection_reason:
             template = REJECTED_TEMPLATE
             context["reason"] = _one_line(request.rejection_reason)
-    try:
-        with session.begin_nested():
-            send_mail(session, template.key, requester.email, context)
-    except (InvalidAddressError, TemplateError, SQLAlchemyError) as exc:
-        # Only the type: never the address or the text.
-        _logger.warning(
-            "access-request e-mail of request %s not queued: %s", request.id, type(exc).__name__
-        )
-        return False
+    send_mail(session, template.key, requester.email, context)
     return True
