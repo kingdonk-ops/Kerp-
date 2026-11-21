@@ -407,10 +407,31 @@ jobs:
           path: frontend/perf-results.json
           if-no-files-found: ignore
 
+  # Playwright journeys on the real stack (T-0027): the same PostgreSQL service + init script as
+  # backend-pg (RLS applies: the API runs as kerp_app), Redis, the API (uvicorn, development)
+  # and the built frontend, both started by e2e/playwright.config.ts. See e2e/README.md.
   e2e:
     needs: [detect, backend, backend-pg, frontend]
     if: always() && needs.detect.outputs.e2e == 'true' && !contains(needs.*.result, 'failure')
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: kerp
+          POSTGRES_PASSWORD: kerp
+          POSTGRES_DB: kerp_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U kerp" --health-interval 5s
+          --health-timeout 5s --health-retries 10
+      redis:
+        # Tag kept for readability; the digest decides what is pulled (compose uses the same).
+        image: redis:7-alpine@sha256:7f7d30b7fdd09467bac58198a1f166dd69789d348d4fe859cccb20e0cf287fbe # redis:7-alpine
+        ports: ["6379:6379"]
+    env:
+      KERP_E2E_DATABASE_URL: postgresql+psycopg://kerp_app:kerp_app@localhost:5432/kerp_test
+      KERP_E2E_REDIS_URL: redis://localhost:6379/0
     defaults:
       run:
         working-directory: e2e
@@ -418,10 +439,41 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/pyproject.toml
+      - name: Install backend
+        working-directory: backend
+        run: |
+          python -m pip install -U pip
+          pip install -e ".[dev]"
+      # The seed lives outside backend/, so the backend job's ruff does not see it.
+      - name: Lint seed
+        run: ruff check --config ../backend/pyproject.toml seed
+      # Same script as backend-pg and docker-compose.yml: ltree + postgis and the NOSUPERUSER
+      # NOBYPASSRLS runtime role kerp_app (globalSetup refuses any other role).
+      - name: Create non-superuser app role (RLS must not be bypassed)
+        env:
+          PGPASSWORD: kerp
+        run: >-
+          psql -h localhost -U kerp -d kerp_test -v ON_ERROR_STOP=1
+          -f ../infra/postgres/initdb/20-kerp-app.sql
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "22"
+          cache: npm
+          cache-dependency-path: |
+            e2e/package-lock.json
+            frontend/package-lock.json
+      # The suite builds and previews the frontend itself (playwright.config.ts webServer).
+      - name: Install frontend
+        working-directory: frontend
+        run: npm ci
       - run: npm ci && npx playwright install --with-deps chromium
+      - name: Lint + types (suite)
+        run: npm run lint && npm run typecheck
       - run: npx playwright test
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: failure()

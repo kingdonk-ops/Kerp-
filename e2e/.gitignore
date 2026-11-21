@@ -1,0 +1,4 @@
+# Playwright output (CI uploads the HTML report when the suite fails)
+playwright-report/
+test-results/
+blob-report/
