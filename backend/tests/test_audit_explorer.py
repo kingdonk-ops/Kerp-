@@ -547,3 +547,12 @@ def test_the_job_refuses_a_requester_who_is_not_a_system_admin(
         audit_jobs.verify_all(_context(api, {"requested_by": str(api.users[ALICE])}))
     )
     assert result["ok"] is True
+
+
+def test_the_job_is_tenant_level_and_the_core_refuses_an_unsafe_payload_key(api: Api) -> None:
+    alice = {"requested_by": str(api.users[ALICE])}
+    in_project = TenancyContext(tenant_id=T1, project_id=api.home)
+    with pytest.raises(jobs.JobError, match="tenant-level"):
+        audit_explorer.run_verify_all(api.db, in_project, uuid.uuid4(), alice)
+    with api.db.unit_of_work(ROOT) as s, pytest.raises(ValueError, match="payload key"):
+        audit.list_entries(s, audit.EntryFilter(flag='x"]'), limit=1)
