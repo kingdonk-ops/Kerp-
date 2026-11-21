@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 348 · **Closed:** 149
+**Open:** 349 · **Closed:** 149
 
 ## decision (40)
 
@@ -193,7 +193,7 @@
 | [TD-508](../tracker/todo/TD-508.md) | Verify the e2e suite on the make up compose stack, and give it its own database | T-0027 | implementer |
 | [TD-510](../tracker/todo/TD-510.md) | Deployment-config view lacks the mail reply-to of diff §4.7: Settings has no reply-to field yet | T-0230 | implementer |
 
-## later (138)
+## later (139)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -334,6 +334,7 @@
 | [TD-498](../tracker/todo/TD-498.md) | Unskip the T-0027 module-toggle step when the first toggleable module merges | T-0027 | planner |
 | [TD-499](../tracker/todo/TD-499.md) | All-Projects for a system_admin who is a member of every project and holds no portfolio persona: /me/projects has no system_admin flag, so the picker cannot offer the scope | T-0276 | implementer |
 | [TD-504](../tracker/todo/TD-504.md) | Registry: reset an entry to its code default (delete the stored row) for the Settings screen T-0232 | T-0230 | implementer |
+| [TD-506](../tracker/todo/TD-506.md) | PG test templates collide between concurrent runs on one server (kerp_tmpl_*_<worker> ignores the database name) | T-0223 | implementer |
 | [TD-511](../tracker/todo/TD-511.md) | Drop the read-only oe_settings_deployment table (destructive migration, needs an ADR) | T-0230 | implementer |
 
 ## bug (9)
