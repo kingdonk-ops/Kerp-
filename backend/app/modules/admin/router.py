@@ -26,6 +26,8 @@ bound with, loaded from the grants table at authentication, never from the reque
 
 * System console (``system_router.py``, T-0218): ``/system/queues...``, ``system_admin`` only
   (403 for everyone else, PER-09 included).
+* Upload quarantine monitor (``system_uploads_router.py``, T-0221): ``/system/uploads...``,
+  ``system_admin`` only (403 for everyone else, PER-09 included).
 
 No endpoint takes or returns a tenant id. Tenant-level grants are not personas: they are
 never assignable through the membership endpoints.
@@ -76,6 +78,7 @@ from app.modules.admin.schemas import (
     UserUpdate,
 )
 from app.modules.admin.system_router import router as system_router
+from app.modules.admin.system_uploads_router import router as system_uploads_router
 from app.modules.teams import service as teams
 
 router = APIRouter(tags=["admin"])
@@ -371,3 +374,7 @@ router.include_router(audit_router)
 # --- System console: queue monitor (T-0218): ``system_router.py`` ------------------------------
 
 router.include_router(system_router)
+
+# --- System console: upload quarantine monitor (T-0221): ``system_uploads_router.py`` -------
+
+router.include_router(system_uploads_router)

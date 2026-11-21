@@ -3,11 +3,11 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 90/310 tasks done (29%) · **ready now:** 25 · **epics awaiting breakdown:** 49
+**Overall:** 91/310 tasks done (29%) · **ready now:** 24 · **epics awaiting breakdown:** 49
 
 | Phase | Tasks done | Progress |
 |---|---|---|
-| 0 · Platform foundations | 88/116 | `███████░░░` 76% |
+| 0 · Platform foundations | 89/116 | `███████░░░` 77% |
 | 1 · Asset & Quality backbone | 2/168 (+2 epics) | `░░░░░░░░░░` 1% |
 | 2 · Welding quality | 0/11 | `░░░░░░░░░░` 0% |
 | 3 · Logistics | 0/2 (+7 epics) | `░░░░░░░░░░` 0% |
@@ -119,7 +119,7 @@
 | ▶ | [T-0219](../tracker/tasks/T-0219.md) | admin: deployment stats (counts + byte totals via module stats providers under normal RLS) and health probes at /api/v1/admin/system | admin | M | T-0014, T-0015, T-0016, T-0039, T-0218, T-0274 |  |
 | ⚫ | [T-0220](../tracker/tasks/T-0220.md) | jobs: queue monitor API for System admins (queue depths, cron runs, failed jobs without payloads, retry/abort) | jobs | S | T-0015, T-0214, T-0039 |  |
 | ✅ | [T-0083](../tracker/tasks/T-0083.md) | CI speed 3: frontend-only PRs skip the backend jobs (per-component change detection in ci.yml detect) | platform | S | T-0082 | #142 |
-| ▶ | [T-0221](../tracker/tasks/T-0221.md) | uploads: quarantine monitor API — rejected/verifying/expired upload rows and counts of every project, re-check stuck files, sweep now | uploads | S | T-0218, T-0215, T-0039, T-0274 |  |
+| ✅ | [T-0221](../tracker/tasks/T-0221.md) | uploads: quarantine monitor API — rejected/verifying/expired upload rows and counts of every project, re-check stuck files, sweep now | uploads | S | T-0218, T-0215, T-0039, T-0274 | #159 |
 | ✅ | [T-0222](../tracker/tasks/T-0222.md) | admin: read-only audit explorer over the hash-chain ledger (filters, verify one chain, verify all as a batch job) | admin | M | T-0006, T-0043, T-0039, T-0015, T-0274 | #161 |
 | ▶ | [T-0223](../tracker/tasks/T-0223.md) | projects: per-project legal hold (flag + reason, System admin only, audited) blocking soft delete with 409 LEGAL_HOLD_ACTIVE (ADR) | projects | S | T-0012, T-0039 |  |
 | ▶ | [T-0226](../tracker/tasks/T-0226.md) | core mail: delivery ledger — delivered status from SES delivery events, recipient_user_id/project_id/broadcast_id, stats and searchable history (ADR) | platform | M | T-0058 |  |

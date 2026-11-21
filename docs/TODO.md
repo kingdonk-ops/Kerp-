@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 339 · **Closed:** 147
+**Open:** 341 · **Closed:** 147
 
 ## decision (39)
 
@@ -49,7 +49,7 @@
 | [TD-484](../tracker/todo/TD-484.md) | RFI notification e-mail: may it carry the date/time/location, the RFI PDF attachment and an .ics invite, and go to client distribution addresses without a KERP account? | T-0335 | planner |
 | [TD-486](../tracker/todo/TD-486.md) | RFI witness check: may an unmet hold-point (H) witness requirement be overridden per record (ADR 0004 Amendment A), or is it non-overridable? | T-0333 | planner |
 
-## spec-gap (66)
+## spec-gap (67)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -117,6 +117,7 @@
 | [TD-479](../tracker/todo/TD-479.md) | code_uniqueness scopes: per_parent and per_level compare within the level, per_project across every level both ways; codes are case-sensitive, never trimmed | T-0101 | implementer |
 | [TD-480](../tracker/todo/TD-480.md) | code_pattern is a 'validation/generation pattern': T-0101 validates node codes against it as an RE2 regex; generation (and its syntax, e.g. {seq:4}) is undefined | T-0101 | implementer |
 | [TD-481](../tracker/todo/TD-481.md) | oe_asset_node columns the spec does not name or type: name, planned_start/planned_finish, Numeric(18,4) quantities, list-of-ids lineage; display_code for a level missing on the path | T-0101 | implementer |
+| [TD-488](../tracker/todo/TD-488.md) | Quarantine re-check: AC says 'staging object still exists', but a stuck file's bytes may be only in the quarantine copy (scanner outage, T-0218); implemented as staging OR quarantine copy exists, else 409 OBJECT_GONE | T-0221 | implementer |
 | [TD-494](../tracker/todo/TD-494.md) | Audit explorer: which verifications are audited console actions (single-chain verify, verify-all request and outcome) | T-0222 | implementer |
 | [TD-500](../tracker/todo/TD-500.md) | GET /me/projects does not return per-project capabilities; the frontend mirrors the backend persona matrix to gate A/S actions (projects/capabilities.tsx) | T-0276 | implementer |
 
@@ -342,7 +343,7 @@
 | [TD-471](../tracker/todo/TD-471.md) | CEL parity: divergences between celpy and cel-js found by the T-0110 edge probe (pinned as known_gap fixtures) | T-0110, T-0017 | implementer |
 | [TD-490](../tracker/todo/TD-490.md) | Admin -> Users invite form: a SoD 409 that returns after the user edited the form re-arms confirm_sod for the edited form (fields stay editable while the send is pending) | T-0331 | reviewer |
 
-## risk (32)
+## risk (33)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -376,8 +377,9 @@
 | [TD-372](../tracker/todo/TD-372.md) | Invite preview/accept refusals are audited per attempt without a per-user throttle (ledger growth by a signed-in user) | T-0052 | implementer |
 | [TD-376](../tracker/todo/TD-376.md) | Password-reset and magic-link requests defer the account-dependent work to after the response: on a kept-alive connection the time until the next request is served may still differ by path (measure; move the deferred half to the SAQ worker if it does) | T-0077 | implementer |
 | [TD-377](../tracker/todo/TD-377.md) | Invite setup-preview and accept-with-password (not signed in) have no per-client or per-link throttle; every refusal writes an audit entry | T-0059 | implementer |
-| [TD-455](../tracker/todo/TD-455.md) | Queue monitor: retry/abort commit the job write before the audit entry (two transactions); an audit-commit failure leaves the action unaudited | T-0218 | implementer |
+| [TD-455](../tracker/todo/TD-455.md) | Queue monitor: retry/abort commit the job write before the audit entry (two transactions); an audit-commit failure leaves the action unaudited | T-0218, T-0221 | implementer |
 | [TD-462](../tracker/todo/TD-462.md) | Internal contexts that bind is_system_admin=True for a narrow read (jobs scheduler deployment_scopes, teams reconcile, onboarding, the invite token lookup) now also see every project-scoped record of the tenant under ADR 0016 | T-0274 | implementer |
+| [TD-497](../tracker/todo/TD-497.md) | Quarantine re-check: a second verify job can still overlap one whose worker thread is mid-check after a queue-monitor abort (failed/ABORTED while the to_thread verify_upload runs on) or a queue-monitor retry of the replaced failed job; the later job finds the shared quarantine object gone and rejects a clean file as missing_object, the other leaves an orphan content object (fail-safe, nothing published unscanned) | T-0221 | implementer |
 
 ## Closed
 
