@@ -161,7 +161,9 @@ The punch or NCR is an **issue** of the `issues` module, raised through the post
   roles/level keys it requires and cannot be attached to an anchor that lacks them.
 - **Templates are versioned** (ADR 0003 §6). Records pin `template_revision_id`; new records use
   the latest revision. A client-variant template is a copy with a `derived_from` link and a
-  compare view, not an inheritance overlay (TD-107).
+  compare view, not an inheritance overlay (TD-107). Templates are authored in the **shared
+  template designer** for inspection and issue templates (epic E-01-03, after Pilot-0; user,
+  2026-11-21); until then they come from client packs, seeds and the API.
 - **Close-out bulk signing (TD-095).** An ITP close-out may sign all `R`/`S`/`M` rows of one party
   with one date in one action (one sign-off ledger entry per row, same signer and date); `H` and
   `W` points are always signed individually — a bulk request that includes any `H` or `W` row is

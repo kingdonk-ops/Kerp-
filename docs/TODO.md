@@ -3,9 +3,9 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 300 · **Closed:** 137
+**Open:** 299 · **Closed:** 138
 
-## decision (41)
+## decision (40)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -48,7 +48,6 @@
 | [TD-439](../tracker/todo/TD-439.md) | Feature flags: who toggles them, project overrides, and what a flag may gate | T-0306 | planner |
 | [TD-442](../tracker/todo/TD-442.md) | Issues: may an internal punch/NCR be assigned to an external account (subcontractor) who must then see it? Planner default: no (422), internal issues are invisible to every is_internal=false caller | T-0314 | planner |
 | [TD-443](../tracker/todo/TD-443.md) | Issues on a path with no work-anchor node (audit findings above the work-anchor level, condition surveys): create_issue skips + notifies (planner default) vs allowing issues without a work anchor | T-0316, T-0312 | planner |
-| [TD-444](../tracker/todo/TD-444.md) | Pilot-0 scope after the issues re-plan: T-0311-T-0314 replace T-0116/T-0117 in the Phase 1 pilot subset; screens T-0318-T-0320, upgrade/escalate, create_issue and pins outside the gate (planner default) | T-0311, T-0312, T-0313, T-0314 | planner |
 | [TD-445](../tracker/todo/TD-445.md) | MDR gate: mdr_effect alone governs mdr.compile (the open-Cat-A-punch clause is replaced); Cat A punch templates default to mdr_effect=blocks; Cat A always blocks work completion (planner default) | T-0314, E-05-05 | planner |
 
 ## spec-gap (56)
@@ -481,3 +480,4 @@
 | ✅ | [TD-385](../tracker/todo/TD-385.md) | T-0075 reconcile: a live link to a deleted project expects no derived rows (rows it holds are excess, --fix revokes) | user decision 2026-11-21: accept. A live link to a deleted project expects no derived rows (matches the teams service, TD-358); rows it holds are excess and --fix revokes them; after a project restore reconcile expects them again. T-0075 AC reworded |
 | ✅ | [TD-386](../tracker/todo/TD-386.md) | audit ledger: concurrent appends to one chain race on SQLite (seq unique violation → 500) | on SQLite _lock_chain takes the database write lock (a no-op UPDATE on audit_ledger) before the tail read, so a second appender waits for the first to commit and links to it (fix/audit-ledger-sqlite-race) |
 | ✅ | [TD-396](../tracker/todo/TD-396.md) | System console and project archive: may a System admin see project-scoped records (upload quarantine rows, audit entries, archive contents) of projects where they hold no membership? | Answered by the user's decision of 2026-11-21: system_admin has global read/admin visibility across all projects of the tenant without a membership (docs/decisions/0016-system-admin-global-visibility.md, accepted; diff §4.1; T-0274-T-0276). Quarantine rows and audit chains of every project, archive export/download/restore of any project; count-only functions and membership gates dropped (T-0219, T-0221, T-0222, T-0224, T-0233, T-0237, T-0239, T-0240, T-0241). |
+| ✅ | [TD-444](../tracker/todo/TD-444.md) | Pilot-0 scope after the issues re-plan: T-0311-T-0314 replace T-0116/T-0117 in the Phase 1 pilot subset; screens T-0318-T-0320, upgrade/escalate, create_issue and pins outside the gate (planner default) | Product owner (user, 2026-11-21): T-0318 (register, raise, punch detail) and a slimmed T-0319 (NCR detail workflow up to the ncr_close_verify sign-off) join the Pilot-0 gate, with T-0311-T-0314 and the seeded starting templates T-0322 (T-0108 transitively). Flag-override, upgrade and raise-external dialogs split to T-0321 after the pilot; T-0315, T-0317 stay outside the pilot; shared template designer epic E-01-03 after Pilot-0. |

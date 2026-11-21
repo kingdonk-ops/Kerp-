@@ -82,7 +82,9 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
     panel is the authoritative channel).
   - **Phase 1 subset:** T-0101, T-0103 (hierarchy + Items), T-0107 (equipment import; in T-0146's gate since PR #51 round 3), T-0110
     (field registry + CEL), T-0111 (inspection record), T-0311–T-0314 (issues engine: templates, punch, NCR,
-    flags; replace the dropped T-0116/T-0117, user 2026-11-21, issues.md; scope TD-444), T-0119
+    flags; replace the dropped T-0116/T-0117, user 2026-11-21, issues.md), T-0322 (seeded
+    starting issue templates), T-0318/T-0319 (issues register, raise, punch and NCR detail
+    screens; product owner 2026-11-21, TD-444 resolved), T-0119
     (signing), T-0126/T-0127 (offline sync), T-0133 (field checkout; its P6 tests split to
     T-0166, outside the pilot — user, 2026-11-13, R2a), T-0130 (inspections register +
     calibration-gated tool pick; user, 2026-11-13, R2a), T-0141–T-0145 (Android build, SQLCipher

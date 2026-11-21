@@ -3,7 +3,8 @@
 Covers MOD-09 (master spec). Decisions are the **product owner's (user, 2026-11-21)** unless
 marked **(planner default)**; planner defaults can be changed through a `decision` TODO.
 This replaces the separate `ncr` and `punchlist` modules of the earlier plan: tasks T-0116 and
-T-0117 are dropped and re-planned as T-0311–T-0320 (§12).
+T-0117 are dropped and re-planned as T-0311–T-0322 and epic E-01-03 (§12). Pilot-0 gate
+(user, 2026-11-21): T-0311–T-0314, T-0318, T-0319, T-0322.
 
 Anchors follow [ADR 0003](../../decisions/0003-configurable-breakdown-and-terminology.md) §2,
 templates and layers follow ADR 0003 §4/§6 and
@@ -34,6 +35,11 @@ shared registry ([quality-and-inspection.md](quality-and-inspection.md) §One fi
 
 Designed the same way inspection templates are, only simpler.
 
+- **Authoring.** Templates are authored in the **shared template designer** used by inspection
+  and issue templates alike (epic E-01-03, after Pilot-0; one engine, no per-module designer).
+  For Pilot-0 the starting templates — `painting`, `blasting`, `civil`, `mechanical`, `welding`
+  × punch / NCR, plus an internal audit finding template (punch and NCR, `internal` +
+  `excluded`) — are **authored by us and seeded as tenant defaults** (user, 2026-11-21; T-0322).
 - **One engine (planner default).** An issue template is a one-engine form template of kind
   **`issue`** in the forms template store (T-0110), like ITP templates are kind `itp`
   (quality-and-inspection.md §ITP authoring): same field-type registry, sections, CEL
@@ -171,9 +177,24 @@ gates, tiles and registers means any non-terminal state.
   - `completion_effect` (planner default name): `blocks | none`; default `blocks` for NCR
     templates. For punch the completion gate is Cat A (§6) and `completion_effect` is ignored.
 - **Per-issue override** only by QA authority or the project's PER-09, with a mandatory reason,
-  audited (ledger entry with old value, new value, reason, actor); shown in the issue history.
-  This is an explicit user exception to PER-09's SoD block on loosening `check` rules
-  (ADR 0004 §5): PER-09 changes an issue's flag, never a rule.
+  audited (ledger entry with old value, new value, reason, actor, direction); shown in the issue
+  history. This is an explicit user exception to PER-09's SoD block on loosening `check` rules
+  (ADR 0004 §5): PER-09 changes an issue's flag, never a rule, and only within these guardrails
+  (user, 2026-11-21):
+  - **Locked origins.** An issue with `origin = client` or `external_audit` can never be set
+    `visibility = internal` or `mdr_effect = excluded` (422).
+  - **Once client-seen, never internal again.** `client_seen_at` is set the first time an
+    `is_internal = false` account reads the issue (API or offline pull) or it is included in a
+    client-facing output (portal, client-exported PDF, MDR) (planner default for "has been
+    client-visible"); after that `client → internal` is refused (422).
+  - **No widening by override.** `internal → client` is not an override; it goes through "Raise
+    external NCR from this" (§7) (422).
+  - **Loosening** — `mdr_effect` towards `excluded` (`blocks → register_only | excluded`,
+    `register_only → excluded`), `completion_effect` `blocks → none`, or `client → internal`
+    before `client_seen_at` — needs the reason, **notifies the project's QA authority**
+    (`qa_reviewer_persona`, high priority), is marked `loosening` in the ledger entry, filterable
+    in the audit trail and **counted in QMS KPIs** (loosening overrides per project and period).
+  - **Tightening** (towards `blocks`) needs only the reason.
 - **Client-raised issues are always `client`** (`origin = client` or raised by an
   `is_internal = false` account): visibility cannot be overridden to `internal` (422).
 - **Clients never see internal issues.** For every `is_internal = false` caller (client PER-15,
@@ -297,6 +318,9 @@ superseded drawing revision stays on that revision (planner default).
 | T-0315 | upgrade punch → NCR, raise external NCR from an internal issue |
 | T-0316 | `create_issue` post-submit action, auto-raise from `INSPECTED_FAILED`, inspection `issue_category` |
 | T-0317 | spatial pins on drawings |
-| T-0318 | screens: issues register, raise (online/offline), punch detail |
-| T-0319 | screens: NCR steps and actions, upgrade / raise-external dialogs, flag override |
+| T-0318 | screens: issues register, raise (online/offline), punch detail (Pilot-0) |
+| T-0319 | screens: NCR detail workflow up to the `ncr_close_verify` sign-off (Pilot-0) |
 | T-0320 | screens: issue template settings (categories, defaults, library copy) |
+| T-0321 | screens: flag override, upgrade and raise-external dialogs; signing ceremony for `ncr_close_verify` (after Pilot-0) |
+| T-0322 | seed the Pilot-0 starting issue templates as tenant defaults (Pilot-0) |
+| E-01-03 | shared template designer for inspection and issue templates (after Pilot-0) |
