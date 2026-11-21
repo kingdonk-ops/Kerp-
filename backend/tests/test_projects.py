@@ -475,7 +475,7 @@ def test_migration_0033_freezes_the_models_fallback_literals() -> None:
     spec.loader.exec_module(migration)
     assert migration.DEFAULTS == {"status": DEFAULT_STATUS, "site_timezone": DEFAULT_TIMEZONE}
     # The SQLite copy is the table at 0032 plus the defaults: the live table without what
-    # later revisions added (0037, legal hold: ``test_project_legal_hold``).
+    # later revisions added (0038, legal hold: ``test_project_legal_hold``).
     frozen = migration._frozen_project(with_defaults=True)
     live = Project.__table__
     later_columns = {"legal_hold", "legal_hold_reason", "legal_hold_set_by", "legal_hold_set_at"}

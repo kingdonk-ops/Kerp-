@@ -240,14 +240,14 @@ def test_the_database_refuses_a_hold_without_a_reason(db: Database) -> None:
         s.execute(update(Project).where(Project.id == project_id).values(legal_hold=True))
 
 
-def test_migration_0037_freezes_the_table_it_copies() -> None:
+def test_migration_0038_freezes_the_table_it_copies() -> None:
     versions = Path(__file__).resolve().parents[1] / "migrations" / "versions"
-    spec = importlib.util.spec_from_file_location("m0037", next(versions.glob("0037_*.py")))
+    spec = importlib.util.spec_from_file_location("m0038", next(versions.glob("0038_*.py")))
     assert spec is not None
     assert spec.loader is not None
     migration = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(migration)
-    # The SQLite copy at 0037 is the live table: same columns, constraints and indexes.
+    # The SQLite copy at 0038 is the live table: same columns, constraints and indexes.
     frozen = migration._frozen_project(with_hold=True)
     live = Project.__table__
     assert {c.name for c in frozen.columns} == {c.name for c in live.columns}

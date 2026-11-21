@@ -30,7 +30,7 @@ DEFAULT_TIMEZONE: Final = "Australia/Perth"  # master spec §4.1
 DEFAULT_CURRENCY: Final = "AUD"
 DEFAULT_LOCALE: Final = "en-AU"
 MAX_LEGAL_HOLD_REASON: Final = 500
-# While on, a hold has its reason and the time it was set (migration 0037, T-0223). The
+# While on, a hold has its reason and the time it was set (migration 0038, T-0223). The
 # actor may be ``None`` (provisioning), like ``created_by``.
 LEGAL_HOLD_CHECK: Final = (
     "NOT legal_hold OR (legal_hold_reason IS NOT NULL AND legal_hold_set_at IS NOT NULL)"
@@ -58,7 +58,7 @@ class Project(Base, BaseRecordMixin):
         UniqueConstraint("tenant_id", "code", name="uq_oe_projects_project_tenant_code"),
         CheckConstraint("project_id IS NULL", name="tenant_level"),
         CheckConstraint("status IN (" + ", ".join(f"'{s}'" for s in STATUSES) + ")", name="status"),
-        CheckConstraint(LEGAL_HOLD_CHECK, name="legal_hold_reason"),  # migration 0037
+        CheckConstraint(LEGAL_HOLD_CHECK, name="legal_hold_reason"),  # migration 0038
         rls_table_info(RlsPolicy("membership", project_column="id")),  # T-0014, migration 0015
     )
 
@@ -80,7 +80,7 @@ class Project(Base, BaseRecordMixin):
     )  # T-0040, migration 0021
     legal_hold: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default=false()
-    )  # T-0223, migration 0037
+    )  # T-0223, migration 0038
     legal_hold_reason: Mapped[str | None] = mapped_column(
         String(MAX_LEGAL_HOLD_REASON), nullable=True
     )

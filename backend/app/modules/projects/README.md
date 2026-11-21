@@ -7,7 +7,7 @@ modules carries the project's `id` as its `project_id`.
 
 | File | What |
 |---|---|
-| `models.py` | `oe_projects_project` (`BaseRecordMixin`, tenant-level row; migration `0008`, membership-based RLS since `0015`, `visible_in_lobby` since `0021`, DB-side `status`/`site_timezone` defaults since `0033`, legal hold since `0037`) |
+| `models.py` | `oe_projects_project` (`BaseRecordMixin`, tenant-level row; migration `0008`, membership-based RLS since `0015`, `visible_in_lobby` since `0021`, DB-side `status`/`site_timezone` defaults since `0033`, legal hold since `0038`) |
 | `schemas.py` | `ProjectCreate` / `ProjectUpdate` / `ProjectRead`, `LobbyVisibility`, `LegalHoldChange` / `LegalHoldRead`, `PolygonGeoJSON`; timezone, ISO 4217, BCP 47 validation from `app.core.locale` (shared with the settings module) |
 | `service.py` | `create_project`, `get_project`, `list_projects`, `live_project_ids` (the jobs scheduler, T-0214), `project_counts` (live and soft-deleted, System console stats, T-0219), `update_project`, `delete_project`, `site_zone`, `bind_project` (project-scoped routers, T-0217), `tenant_projects` (every live project a `system_admin` session sees, T-0275), `set_lobby_visibility`, `set_legal_hold` / `is_on_legal_hold` (T-0223), the narrow lobby read `lobby_projects` / `project_by_code` (T-0040) and `lobby_projects_by_id` (access requests, T-0050) |
 | `router.py` | `GET/POST /api/v1/projects`, `GET/PATCH/DELETE /api/v1/projects/{id}`, `PUT /api/v1/projects/{id}/lobby`, the module toggle `GET /api/v1/projects/{id}/modules`, `PUT /api/v1/projects/{id}/modules/{name}` (T-0084) |
@@ -102,7 +102,7 @@ archive, T-0233) must call `is_on_legal_hold(session, project_id)` first and ref
 `True`; any session that sees the project row may ask (`OutOfScopeError` for an unknown or
 deleted project). There is no hard purge (TD-401); retention rules stay TD-175.
 
-The columns on `oe_projects_project` (migration `0037`) are a core-table change recorded in
+The columns on `oe_projects_project` (migration `0038`) are a core-table change recorded in
 [ADR 0018](../../../../docs/decisions/0018-project-legal-hold.md).
 
 ## Module toggle (T-0084)

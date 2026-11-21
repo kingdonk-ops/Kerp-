@@ -15,8 +15,8 @@ On PostgreSQL it is ``ADD COLUMN`` and ``ADD CONSTRAINT``. SQLite cannot add a c
 constraint, so batch mode copies the table; it gets the frozen definition below (no
 reflection, so offline ``--sql`` works and later model changes stay out).
 
-Revision ID: 0037
-Revises: 0036
+Revision ID: 0038
+Revises: 0037
 Create Date: 2026-11-21
 """
 
@@ -27,8 +27,8 @@ from alembic import op
 
 from app.core.db import GUID, JSONType
 
-revision: str = "0037"
-down_revision: str | None = "0036"
+revision: str = "0038"
+down_revision: str | None = "0037"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
@@ -48,7 +48,7 @@ def _hold_columns() -> list[sa.Column[object]]:
 
 
 def _frozen_project(*, with_hold: bool) -> sa.Table:
-    """``oe_projects_project`` as of revision 0036 (SQLite), or as of this one."""
+    """``oe_projects_project`` as of revision 0037 (SQLite), or as of this one."""
     name = f"ck_{TABLE}"
     hold: list[sa.SchemaItem] = []
     if with_hold:

@@ -3,7 +3,7 @@
 - **Status:** accepted (2026-11-21; records the core-table change that diff §4.7 *Legal hold*
   requires an ADR for; resolves TD-502)
 - **Date:** 2026-11-21
-- **Affects:** T-0223 (this change, migration `0037_project_legal_hold.py`), T-0233 (project
+- **Affects:** T-0223 (this change, migration `0038_project_legal_hold.py`), T-0233 (project
   archive, must consult the hold), T-0219 / the System console (`/api/v1/admin/system/*`); the
   `oe_projects_project` core table; diff §4.7 *Legal hold*, §4.1; TD-175 (retention rules),
   TD-401 (no hard purge). Builds on ADR 0016 (system_admin global visibility).
@@ -23,7 +23,7 @@ functions of `0021` and `0023`), so any change to it is recorded here.
 
 ## Decision
 
-1. **Columns on the project row.** Migration `0037` adds to `oe_projects_project`:
+1. **Columns on the project row.** Migration `0038` adds to `oe_projects_project`:
    - `legal_hold` `BOOLEAN NOT NULL DEFAULT false`;
    - `legal_hold_reason` `VARCHAR(500)` NULL;
    - `legal_hold_set_by` user id NULL (no FK, like `created_by`);
