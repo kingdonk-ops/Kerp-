@@ -184,7 +184,7 @@
 | [TD-474](../tracker/todo/TD-474.md) | Unit registry for `measurement` fields: unit catalogue, SI storage and conversion with a shared vector file (ADR 0002 units-v1 port) | T-0110 | implementer |
 | [TD-482](../tracker/todo/TD-482.md) | asset_management: node edit (code / name / attributes, with display_path and display_code rewrite of the subtree), node delete and level def delete are not built in T-0101 | T-0101 | implementer |
 
-## later (134)
+## later (135)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -322,6 +322,7 @@
 | [TD-489](../tracker/todo/TD-489.md) | Invite and password screens polish from the #152 review (race-fix test, wrong-user README wording, resend link cache, sessionStorage note) | T-0053 | reviewer |
 | [TD-491](../tracker/todo/TD-491.md) | Admin -> Users polish from the #154 review: test that no invite token is in the mutation cache; require a name on Create account | T-0331 | reviewer |
 | [TD-493](../tracker/todo/TD-493.md) | fields/form engine polish from the #156 review | T-0110 | reviewer |
+| [TD-498](../tracker/todo/TD-498.md) | Unskip the T-0027 module-toggle step when the first toggleable module merges | T-0027 | planner |
 
 ## bug (8)
 
