@@ -72,6 +72,13 @@ The register shows the latest response per party as columns, so the familiar lay
 `scope_change.submitted`, `scope_change.responded`, `scope_change.agreed`,
 `scope_change.implemented`, `scope_change.rejected`.
 
+Emitted through the transactional outbox (ADR 0007, E-05-07) from the module's `service.py` in
+the same transaction as the transition (T-0285). Consumer: the **ITP alignment watchdog**
+(`quality-and-inspection.md` §ITP authoring, assignment and propagation; T-0189):
+`scope_change.agreed` and `scope_change.implemented` make it check whether the active ITPs of
+the scope change's anchor still cover the agreed scope; it only proposes, and a human (PER-06)
+decides (user, 2026-11-21).
+
 ## 6. Suggested breakdown
 
 1. Record, lifecycle, responses, snapshot of current scope (M).

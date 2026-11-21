@@ -259,3 +259,24 @@ allocations for their area (Dexie cache) so supervisors see who is booked where.
 9. Stats rollup + PDF/XLSX pack (M).
 10. E2E: create shutdown plan in interrupt mode → allocate → issue → approve (portal) → commit →
     programme shows plan and displaced work (S).
+
+## 15. Unified calendar (user, 2026-11-21; epic E-04-15, Phase 4)
+
+A personal and project calendar over every dated record; built when Phase 4 is broken down.
+- **Provider registry** `core/calendar`, mirroring `core/refs` (handover.md §5.1): each module
+  registers a calendar provider from its manifest; providers apply the caller's project RLS and
+  site scope; no cross-module joins.
+- **Personal layer** (`scope=mine`): assigned inspections, generic/scaffold/tagout tasks, pending
+  QA verifications, shift and roster dates (§3.2, §4), handover due dates.
+- **Project layers**: calibrations, credentials and welder continuity, material use-by,
+  deliveries, inspections and RFIs, P6 activities, shutdown windows and committed work-plan lines
+  (§8.1).
+- **Readiness conflicts** are computed by the compliance module (`quality-and-inspection.md`
+  §Schedule readiness conflicts) and shown as badges on the expiring resource and on the affected
+  P6 activity, plan line or inspection; work-plan lines register a readiness target provider
+  (§6). The Look-Ahead board (E-04-02) shows the same conflicts as constraint blockers.
+- **Views:** month, week, day and timeline/agenda in the project's IANA time zone, layer chips,
+  quick-preview cards, saved presets.
+- **iCal feed** `GET /api/v1/calendar/ical/{token}.ics`: token-authenticated without a JWT, so it
+  follows ADR 0013 (proposed) and waits for decision TD-419.
+

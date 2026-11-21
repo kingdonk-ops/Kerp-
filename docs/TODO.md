@@ -3,9 +3,9 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 268 · **Closed:** 134
+**Open:** 289 · **Closed:** 135
 
-## decision (18)
+## decision (30)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -19,16 +19,28 @@
 | [TD-348](../tracker/todo/TD-348.md) | T-0073: deleting a project with team-derived members answers 409 (unlink teams first); T-0013 to confirm or cascade | T-0073 | implementer |
 | [TD-373](../tracker/todo/TD-373.md) | Invite acceptance and SoD: accept proceeds (audited sod_warning) when the invitee gained a conflicting persona after the inviter confirmed | T-0052 | implementer |
 | [TD-378](../tracker/todo/TD-378.md) | First password at invite acceptance: should an internal-domain account without credentials (company member who never signed in through Entra ID) be refused? | T-0059 | implementer |
-| [TD-396](../tracker/todo/TD-396.md) | System console and project archive: may a System admin see project-scoped records (upload quarantine rows, audit entries, archive contents) of projects where they hold no membership? | T-0221, T-0222, T-0233, T-0237, T-0239, T-0240 | planner |
 | [TD-397](../tracker/todo/TD-397.md) | Upload quarantine: keep the bytes of rejected (infected) uploads for re-scan and purge, or keep deleting them at rejection (T-0016)? | T-0218, T-0221 | planner |
-| [TD-398](../tracker/todo/TD-398.md) | Runtime settings: auth/security values from the 2026-11-21 paste (refresh hours, PIN idle, PIN lockout, scanner on/off, region, mail sender, AI provider) stay read-only deployment configuration? | T-0230 | planner |
+| [TD-398](../tracker/todo/TD-398.md) | Runtime settings: auth/security values from the 2026-11-21 paste (refresh hours, PIN idle, PIN lockout, scanner on/off, region, mail sender, AI provider) stay read-only deployment configuration? | T-0230, T-0187, T-0189 | planner |
 | [TD-399](../tracker/todo/TD-399.md) | Broadcast e-mail: may a System admin e-mail all users / any project's users, given diff §4.1 'only a project's PER-09 may send a notification through the API'? | T-0228 | planner |
 | [TD-400](../tracker/todo/TD-400.md) | E-mail template editor: text overrides of the i18n blocks (planner default) or full HTML body editing? | T-0227 | planner |
 | [TD-401](../tracker/todo/TD-401.md) | Project restore: audit chains when restoring as a new project (hash covers tenant/project ids), and hard deletion of projects (not in the spec) | T-0239, T-0240 | planner |
 | [TD-404](../tracker/todo/TD-404.md) | Pilot-0: is the ClamAV scanner (T-0218) required live in the pilot deployment, or is the stub with KERP_UPLOAD_SCANNER_ALLOW_STUB accepted for the pilot? | T-0218, T-0146 | planner |
 | [TD-407](../tracker/todo/TD-407.md) | Admin 'Resend invite' for an invited user: re-send the user's pending project invites (T-0052) or a password-setup e-mail, never a magic link for non-Field-Workers; via core mail, not notifications | T-0244 | planner |
+| [TD-410](../tracker/todo/TD-410.md) | Public unauthenticated inspection capture links (pasted T-0179 part 2/3): accept ADR 0013 (no-JWT endpoint, tenant from deployment config, project bound from the link token) or keep capture authenticated (PER-14 magic link)? | T-0252, T-0253, T-0254, T-0255 | planner |
+| [TD-411](../tracker/todo/TD-411.md) | Equipment (oe_equipment_asset) as an inspection anchor: accept ADR 0014 amending ADR 0003 (a third exclusive anchor for standalone equipment inspections only)? | T-0250, T-0111, T-0288 | planner |
+| [TD-412](../tracker/todo/TD-412.md) | Fleet vehicles and plant in the Phase-1 equipment register: pull this part of E-03-07 into Phase 1 (equipment_class, requires_calibration, custodian) or wait for Phase 3? | T-0249, T-0112, E-03-07 | planner |
+| [TD-413](../tracker/todo/TD-413.md) | Post-submit notify_users: SMS has no channel and e-mail may not carry project data beyond code and name (diff §4.6) — confirm in-app + push + e-mail link only | T-0256 | planner |
+| [TD-414](../tracker/todo/TD-414.md) | QA verification gates on existing records: which equipment, credentials and heat/MTR records count as verified when T-0260/T-0261/T-0265 land, and do imports start unverified? | T-0260, T-0261, T-0265 | planner |
+| [TD-418](../tracker/todo/TD-418.md) | SLA escalation 'grants co-review authority' to PER-02 / PER-13: widen who may approve QA verifications, or escalation notifies and reassigns only? | T-0182 | planner |
+| [TD-419](../tracker/todo/TD-419.md) | Calendar iCal feed GET /api/v1/calendar/ical/{token}.ics: a second token-authenticated no-JWT endpoint — decide with ADR 0013 (same tenant-from-JWT conflict) | E-04-15 | planner |
+| [TD-422](../tracker/todo/TD-422.md) | Shelf-life extension approver when the requester is PER-06: PER-13 Quality Director approves (user) — PER-13 has 'audit oversight', not QA approval (A), in the persona matrix | T-0184, T-0185, T-0187, T-0188 | planner |
+| [TD-423](../tracker/todo/TD-423.md) | Internal-QA product substitution: may the Quality Engineer who raises it also approve it (user: 'raises and approves directly'), or does it need a second QE (no self-approval, as T-0184 and T-0140)? | T-0185 | planner |
+| [TD-426](../tracker/todo/TD-426.md) | System admin impersonation (user's pasted 'T-0076'): may a system_admin act as another user, or only view as them? Accept ADR 0015 with (a) full impersonation, (b) admin-member projects only, (c) read-only view-as, or (d) target consent by one-time code | T-0277, T-0278, T-0279, T-0280 | planner |
+| [TD-427](../tracker/todo/TD-427.md) | system_admin global visibility (ADR 0016): should reads of project records by a system_admin who holds no membership on that project be access-logged? | T-0274, T-0275 | planner |
+| [TD-429](../tracker/todo/TD-429.md) | Pasted 'pending_qa_review' is not an inspection lifecycle state: keep auto-generated ITPs out of oe_inspections_inspection until QA activates them (planner default), or add a new state? And re-pinning PENDING lines on master propagation | T-0188, T-0281 | planner |
+| [TD-431](../tracker/todo/TD-431.md) | QA reviewer's own certificate/credential/MTR upload: verify immediately (user's T-0181 paste) or four eyes (TD-070 default)? | T-0181, T-0260, T-0261, T-0265 | planner |
 
-## spec-gap (50)
+## spec-gap (58)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -82,6 +94,14 @@
 | [TD-405](../tracker/todo/TD-405.md) | Archive file layout: files/assets/<asset_code>/<work_anchor_code>/ assumes a fixed two-level tree; the breakdown is configurable (ADR 0003) | T-0235, T-0236 | planner |
 | [TD-406](../tracker/todo/TD-406.md) | User account status: derive invited/active/deactivated from is_active + first_login_at instead of a stored status column; backfill of first_login_at for existing accounts | T-0243 | planner |
 | [TD-408](../tracker/todo/TD-408.md) | Image derivatives addendum vs the spec: content-addressed keys (not /original.<ext>), 'available' (not 'complete'), derivative rows, annotation frame under EXIF orientation, per-field patch path of an annotation | T-0247, T-0156, T-0157 | planner |
+| [TD-416](../tracker/todo/TD-416.md) | Overlap: T-0112's 'OCR discrepancy raises QA review task' vs the unified QA verification queue (T-0181) — route through the queue without enlarging the Pilot-0 gate | T-0260, T-0112, T-0181 | planner |
+| [TD-417](../tracker/todo/TD-417.md) | New record sources 'automation' and 'public_link' extend RECORD_SOURCES (BaseRecordMixin + audit ledger): core vocabulary change needs an ADR | T-0180, T-0253 | planner |
+| [TD-420](../tracker/todo/TD-420.md) | SLA reminders for override requests and tagout follow-ups without altering the M1-frozen oe_validation_override shape | T-0264 | planner |
+| [TD-421](../tracker/todo/TD-421.md) | Material batch/lot entity with use-by dates is unspecified: who owns it (materials E-03-03 or site_inventory E-03-04), and original_use_by_date immutable + effective_use_by_date changed only by an approved shelf-life extension | E-03-03 | planner |
+| [TD-424](../tracker/todo/TD-424.md) | No baseline approved product list exists: define a project register of approved products per specified product code (planner default T-0269) | T-0269 | planner |
+| [TD-425](../tracker/todo/TD-425.md) | CEL helper eligibility.is_product_approved cannot do I/O and must run offline: pure function over a resolved approvals map | T-0270 | planner |
+| [TD-428](../tracker/todo/TD-428.md) | ITP templates: line-item structure, approval authority and the ITP instance on an anchor are not specified in T-0113 / quality-and-inspection.md (pasted T-0187/T-0188 assume oe_qms_itp_template, draft → approved, is_customized) | T-0113, T-0187, T-0188, T-0281 | planner |
+| [TD-430](../tracker/todo/TD-430.md) | New rule kind itp_assignment in the ADR 0004 rule store (scope → approved ITP template): context variables, action vocabulary, editors | T-0188 | planner |
 
 ## missed (7)
 
@@ -137,7 +157,7 @@
 | [TD-365](../tracker/todo/TD-365.md) | Frontend translations of the password policy codes and the password policy in /auth/config | T-0077 | implementer |
 | [TD-394](../tracker/todo/TD-394.md) | Approve access request: site picker for PER-07 site scope once the asset hierarchy API exists | T-0051 | implementer |
 
-## later (119)
+## later (120)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -260,6 +280,7 @@
 | [TD-392](../tracker/todo/TD-392.md) | Device registry: scoped admin device list endpoint (System admin: all users; PER-09: its projects' members) to replace the client's per-user fan-out | T-0051 | implementer |
 | [TD-393](../tracker/todo/TD-393.md) | Expose is_system_admin on GET /auth/me so the client need not probe GET /admin/grants for Admin nav visibility | T-0051 | implementer |
 | [TD-403](../tracker/todo/TD-403.md) | Stats and export providers for modules that land later: NCR, punch, equipment, credentials, materials/MTR, MDR, welding | T-0219, T-0235 | planner |
+| [TD-415](../tracker/todo/TD-415.md) | Inspection follow-ups (oe_inspections_follow_up) move to the generic tasks module when E-04-07 is broken down | T-0257, T-0288, E-04-07 | planner |
 
 ## bug (6)
 
@@ -446,3 +467,4 @@
 | ✅ | [TD-384](../tracker/todo/TD-384.md) | T-0075 SoD fix: 'plus their existing rows' cannot keep a sod_pending user's stale row of the link | user decision 2026-11-21: accept the implemented reading. The sync gets the expected set minus the sod_pending users; a pending user's stale rows of that link are excess and revoked; --fix --confirm-sod then adds the correct row. T-0075 AC reworded |
 | ✅ | [TD-385](../tracker/todo/TD-385.md) | T-0075 reconcile: a live link to a deleted project expects no derived rows (rows it holds are excess, --fix revokes) | user decision 2026-11-21: accept. A live link to a deleted project expects no derived rows (matches the teams service, TD-358); rows it holds are excess and --fix revokes them; after a project restore reconcile expects them again. T-0075 AC reworded |
 | ✅ | [TD-386](../tracker/todo/TD-386.md) | audit ledger: concurrent appends to one chain race on SQLite (seq unique violation → 500) | on SQLite _lock_chain takes the database write lock (a no-op UPDATE on audit_ledger) before the tail read, so a second appender waits for the first to commit and links to it (fix/audit-ledger-sqlite-race) |
+| ✅ | [TD-396](../tracker/todo/TD-396.md) | System console and project archive: may a System admin see project-scoped records (upload quarantine rows, audit entries, archive contents) of projects where they hold no membership? | Answered by the user's decision of 2026-11-21: system_admin has global read/admin visibility across all projects of the tenant without a membership (docs/decisions/0016-system-admin-global-visibility.md, accepted; diff §4.1; T-0274-T-0276). Quarantine rows and audit chains of every project, archive export/download/restore of any project; count-only functions and membership gates dropped (T-0219, T-0221, T-0222, T-0224, T-0233, T-0237, T-0239, T-0240, T-0241). |
