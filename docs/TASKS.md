@@ -3,11 +3,11 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 77/278 tasks done (28%) · **ready now:** 23 · **epics awaiting breakdown:** 48
+**Overall:** 78/278 tasks done (28%) · **ready now:** 22 · **epics awaiting breakdown:** 48
 
 | Phase | Tasks done | Progress |
 |---|---|---|
-| 0 · Platform foundations | 77/112 | `██████░░░░` 69% |
+| 0 · Platform foundations | 78/112 | `███████░░░` 70% |
 | 1 · Asset & Quality backbone | 0/140 (+1 epics) | `░░░░░░░░░░` 0% |
 | 2 · Welding quality | 0/11 | `░░░░░░░░░░` 0% |
 | 3 · Logistics | 0/2 (+7 epics) | `░░░░░░░░░░` 0% |
@@ -86,7 +86,7 @@
 | ⚫ | [T-0048](../tracker/tasks/T-0048.md) | Devices screen: list enrolled devices, revoke with wipe warning (admin and own devices) | frontend | S | T-0043, T-0024 |  |
 | ✅ | [T-0051](../tracker/tasks/T-0051.md) | Admin access-request inbox and devices screens: pending requests for the user's PER-09 projects (approve with persona/site scope, reject with optional reason); enrolled devices list and revoke with wipe warning (admin and own devices) | frontend | M | T-0050, T-0042, T-0043, T-0024 | #134 |
 | ⬜ | [T-0053](../tracker/tasks/T-0053.md) | Invite link screens: one-click 'Join project' for signed-in users, invite token carried through sign-in, land in the project (lobby skipped) | frontend | S | T-0052, T-0042, T-0055, T-0026 |  |
-| ▶ | [T-0055](../tracker/tasks/T-0055.md) | Web sign-in with Microsoft (Entra ID SSO): button when enabled, callback landing, translated refusals | frontend | S | T-0054, T-0042 |  |
+| ✅ | [T-0055](../tracker/tasks/T-0055.md) | Web sign-in with Microsoft (Entra ID SSO): button when enabled, callback landing, translated refusals | frontend | S | T-0054, T-0042 | #146 |
 | ▶ | [T-0027](../tracker/tasks/T-0027.md) | Playwright setup + Phase 0 exit journey | e2e | S | T-0023, T-0024, T-0018 |  |
 | ⚫ | [T-0056](../tracker/tasks/T-0056.md) | Transactional e-mails for access-request decisions (approve / reject) via the outbound e-mail service | admin | S | T-0050, T-0058 |  |
 | ⬜ | [T-0078](../tracker/tasks/T-0078.md) | Screens: create your password at invite acceptance, forgot password and reset password (web and Android) | frontend | S | T-0053, T-0059, T-0077 |  |

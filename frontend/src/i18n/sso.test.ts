@@ -1,21 +1,9 @@
 import { describe, expect, it } from "vitest";
 
+import { SSO_ERROR_CODES } from "../auth/sso";
 import { i18n } from "./index";
 
-/**
- * The `error` codes the Entra ID SSO callback redirects with (T-0054,
- * `backend/app/core/auth/entra.py` CLIENT_CODES + DEVICE_REVOKED). Each needs a message.
- */
-const SSO_ERROR_CODES = [
-  "SSO_GUEST",
-  "SSO_NO_ACCOUNT",
-  "SSO_ACCOUNT_DEACTIVATED",
-  "SSO_EMAIL_UNVERIFIED",
-  "SSO_ACCOUNT_LINKED_ELSEWHERE",
-  "SSO_FAILED",
-  "DEVICE_REVOKED",
-] as const;
-
+/** The callback's `error` codes (T-0054) are listed once, in `src/auth/sso.ts`. */
 describe("SSO refusal messages", () => {
   it.each(SSO_ERROR_CODES)("translates %s", (code) => {
     const key = `auth.sso.errors.${code}`;

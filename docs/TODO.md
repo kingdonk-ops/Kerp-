@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 301 · **Closed:** 135
+**Open:** 302 · **Closed:** 135
 
 ## decision (38)
 
@@ -123,7 +123,7 @@
 | [TD-337](../tracker/todo/TD-337.md) | Web/Android route /magic-link#<token> that redeems the e-mailed sign-in link (POST /auth/magic-link/redeem); the e-mail now links there | T-0058 | implementer |
 | [TD-388](../tracker/todo/TD-388.md) | saved_views: wire the my_teams filter op | T-0074 | reviewer |
 
-## deferred (38)
+## deferred (39)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -165,6 +165,7 @@
 | [TD-365](../tracker/todo/TD-365.md) | Frontend translations of the password policy codes and the password policy in /auth/config | T-0077 | implementer |
 | [TD-394](../tracker/todo/TD-394.md) | Approve access request: site picker for PER-07 site scope once the asset hierarchy API exists | T-0051 | implementer |
 | [TD-432](../tracker/todo/TD-432.md) | Digest-pin the postgis/postgis:16-3.4 CI service image (ci.yml): the implementer sandbox could not reach the Docker Hub registry API to resolve its digest (redis is pinned); resolve with docker buildx imagetools inspect and drop the strict xfail in scripts/tests/test_workflows.py | T-0033 | implementer |
+| [TD-446](../tracker/todo/TD-446.md) | E2E journey: Sign in with Microsoft against the fake OIDC provider (T-0054) lands in the project, once the Playwright harness (T-0027) exists | T-0055 | implementer |
 
 ## later (123)
 

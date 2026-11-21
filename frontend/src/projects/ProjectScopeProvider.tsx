@@ -10,6 +10,7 @@ import {
 } from "react";
 
 import { useServices } from "../app/services";
+import type { KeyValueStorage } from "../auth/tokenStore";
 import { useAuth } from "../auth/AuthProvider";
 import { fetchMyProjects, hasPortfolioPersona, type ProjectSummary } from "./directory";
 
@@ -50,6 +51,20 @@ function encode(scope: ProjectScope): string | null {
   if (scope.kind === "all") return "all";
   if (scope.kind === "project") return `project:${scope.projectId}`;
   return null;
+}
+
+/**
+ * Remembers `projectId` as the user's scope on this client, so the next landing opens it
+ * (used after a sign-in that joined a project, diff §4.1). Dropped like any remembered scope
+ * once the project is not in the user's list.
+ */
+export function rememberProjectScope(
+  preferences: KeyValueStorage,
+  userId: string,
+  projectId: string,
+): void {
+  const raw = encode({ kind: "project", projectId });
+  if (raw !== null) preferences.setItem(scopeStorageKey(userId), raw);
 }
 
 function decode(raw: string | null): ProjectScope | null {

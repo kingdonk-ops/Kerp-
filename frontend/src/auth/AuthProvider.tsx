@@ -22,6 +22,8 @@ interface AuthContextValue {
   status: AuthStatus;
   user: CurrentUser | null;
   login: (email: string, password: string) => Promise<void>;
+  /** Takes over the session the SSO callback set as a cookie (T-0055); see `TokenStore`. */
+  adoptCookieSession: () => void;
   logout: () => Promise<void>;
   retry: () => void;
 }
@@ -64,6 +66,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [api, queryClient, tokens],
   );
 
+  const adoptCookieSession = useCallback(() => {
+    tokens.adoptCookieSession();
+    // A tab that was already signed in reloads `me` for the session just adopted.
+    void queryClient.resetQueries({ queryKey: ME_QUERY_KEY });
+  }, [queryClient, tokens]);
+
   const logout = useCallback(async () => {
     try {
       await api.POST("/api/v1/auth/logout");
@@ -85,10 +93,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       status,
       user: hasSession ? (me.data ?? null) : null,
       login,
+      adoptCookieSession,
       logout,
       retry: () => void me.refetch(),
     };
-  }, [hasSession, me, login, logout]);
+  }, [hasSession, me, login, adoptCookieSession, logout]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

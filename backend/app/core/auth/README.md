@@ -162,7 +162,7 @@ start-up warning naming the required optional claims.
    T-0080); otherwise a new session, the refresh cookie (`kerp_refresh`, as for password
    login) and `303` to `<KERP_WEB_ORIGIN or deployment>/login/sso-return?status=signed_in`.
    The SPA then calls `/auth/refresh` (cookie transport) for its access token; no token is ever
-   in a URL. Landing page: T-0055.
+   in a URL. Landing page: `/login/sso-return` in the SPA (T-0055, `frontend/README.md`).
 5. **Native** (the state has an `app_challenge`; `device_id` is then required): never a token
    in a redirect. A single-use **exchange code** (256 bits, stored as SHA-256, 60 s, bound to
    the user, the `device_id` and the app challenge) and `303` to the verified App Link
