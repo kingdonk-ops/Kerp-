@@ -21,6 +21,9 @@ if (result.ok) {
   "cel-js / WebAssembly" is not needed: a pure-JS evaluator works offline in the bundle.
 - **Encoding**: `tests/contract/README.md`. Plain JSON numbers are CEL doubles; ints are
   `{"$int": "3"}` (decoded to `bigint`), timestamps `{"$timestamp": "..."}` (decoded to `Date`).
+  JSON objects are decoded to `Map` (cel-js cannot read an object with a `constructor` key, and
+  a `Map` has no prototype keys). A `$timestamp` that is not a real instant in years 1–9999
+  (30 February, hour 24) is malformed, as on the server.
   A malformed context throws; CEL failures are returned as `{ok: false, code, message}`.
 - **Error codes**: `errors.ts` (`CEL_ERROR_CODES`, equal to the fixture file's `error_codes`)
   and the cel-js code mapping.
@@ -30,4 +33,6 @@ if (result.ok) {
 - **Limits**: expressions over 4096 UTF-8 bytes return `INVALID_ARGUMENT` before parsing.
 - **Caching**: compiled programs are cached per expression text (LRU, 1024 entries).
 - Results are range-checked: an int outside int64 becomes `INT_OVERFLOW` (cel-js uses unbounded
-  `bigint`). Remaining divergences are pinned `known_gap` fixtures (TD-041).
+  `bigint`). Remaining divergences are pinned `known_gap` fixtures (TD-041, TD-471): among them
+  `matches()` (JS `RegExp`, not RE2), string ordering of astral characters, impossible dates in
+  `timestamp('...')` and string extensions (`trim`, `split`, ...) that the server does not have.

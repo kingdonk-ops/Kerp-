@@ -300,8 +300,10 @@ export const en = {
     form: {
       submit: "Submit",
       requiredMark: "required",
+      outOfRange: "This value is outside the allowed range.",
       errors: {
         required: "This field is required.",
+        typeMismatch: "This value does not fit the field.",
         ruleError: "This rule could not be evaluated. Check the related fields.",
       },
     },

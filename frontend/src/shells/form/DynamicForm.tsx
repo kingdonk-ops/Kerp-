@@ -58,6 +58,7 @@ export function DynamicForm({
   const errorText = (error: FieldError): string => {
     if (error.kind === "required") return t("shells.form.errors.required");
     if (error.kind === "invalid") return tx(error.message);
+    if (error.kind === "type_mismatch") return t("shells.form.errors.typeMismatch");
     return t("shells.form.errors.ruleError");
   };
 
@@ -102,7 +103,8 @@ export function DynamicForm({
                 field={field}
                 tx={tx}
                 id={id}
-                value={Object.hasOwn(values, field.field_key) ? values[field.field_key] : undefined}
+                // Calculated fields show the engine's result; the others the entered value.
+                value={[evaluation.values, values].find((source) => Object.hasOwn(source, field.field_key))?.[field.field_key]}
                 required={required}
                 invalid={shownError !== undefined}
                 describedBy={describedBy === "" ? undefined : describedBy}
@@ -111,6 +113,11 @@ export function DynamicForm({
               {shownError !== undefined && (
                 <p id={errorId} className="text-sm text-danger">
                   {errorText(shownError)}
+                </p>
+              )}
+              {evaluation.failed.has(field.field_key) && (
+                <p role="status" className="text-sm text-danger">
+                  {t("shells.form.outOfRange")}
                 </p>
               )}
             </div>
@@ -165,6 +172,13 @@ function FieldControl({ field, tx, id, value, required, invalid, describedBy, on
           ))}
         </select>
       );
+    case "calculated":
+      return (
+        <output id={id} className={`${INPUT} flex items-center`} aria-describedby={describedBy}>
+          {text}
+        </output>
+      );
+    case "numeric":
     case "number":
       return (
         <input
@@ -188,5 +202,7 @@ function FieldControl({ field, tx, id, value, required, invalid, describedBy, on
           onChange={(e) => { onChange(e.target.value); }}
         />
       );
+    default: // measurement, photo, signature, instrument_ref: capture controls: TD-476
+      return null;
   }
 }

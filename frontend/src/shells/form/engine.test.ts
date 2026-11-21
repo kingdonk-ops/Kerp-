@@ -300,10 +300,13 @@ describe("evaluateForm — hostile keys and malformed data", () => {
   it("fails closed instead of throwing on a malformed value", () => {
     const result = evaluateForm(RULES, { checked: { $int: "abc" } });
     expect(result.visible.has("shown")).toBe(false);
+    // Every rule fails closed (cond is required); the malformed answer itself is reported as
+    // not fitting its field (T-0110: the answer shape is checked before the field's rule).
     expect(result.errors).toEqual({
       cond: { kind: "required" },
-      checked: { kind: "rule_error", code: "INVALID_ARGUMENT" },
+      checked: { kind: "type_mismatch" },
     });
+    expect(result.valid).toBe(false);
   });
 
   it("fails closed instead of throwing on a malformed extra context", () => {

@@ -14,6 +14,7 @@ FastAPI modular monolith (see `docs/spec/` and `CLAUDE.md` §6).
 | `app/core/body_limit.py` | App-wide request body limit (`KERP_MAX_BODY_BYTES`, 413) |
 | `app/core/tenancy/` | Project-scoped RLS, tenancy context, ORM scope + soft-delete filter, the `tenants` directory + provisioning (`python -m app.core.tenancy.provision`) — see its `README.md` |
 | `app/core/cel/` | CEL rule evaluation (celpy, lazy) with the KERP error taxonomy — see its `README.md` |
+| `app/core/fields/` | The one field-type palette, form-template lint and server-side form evaluation (same semantics as the client) — see its `README.md` |
 | `app/core/audit/` | Hash-chained, append-only audit ledger (`append`, `verify_chain`; REVOKE + triggers) — see its `README.md` |
 | `app/core/auth/` | Users, scrypt passwords, EdDSA/RS256 JWTs + JWKS, rotating refresh, Redis `jti` revocation — see its `README.md` |
 | `app/core/mail/` | Outbound e-mail: `send_mail` (enqueue after commit), SES / fake / log transports, i18n templates, send log, bounce/complaint suppression, SNS endpoint — see its `README.md` |

@@ -1,0 +1,16 @@
+{
+  "format": "kerp-field-types/1",
+  "description": "The one field-type palette (core/fields). backend/app/core/fields/registry.py and frontend/src/lib/fields/registry.ts must both equal `types`. `value` names the answer shape; shapes and rules: tests/contract/README.md.",
+  "types": [
+    {"key": "numeric", "aliases": ["number"], "value": "number", "rangeable": true},
+    {"key": "text", "aliases": [], "value": "string", "rangeable": false},
+    {"key": "boolean", "aliases": [], "value": "boolean", "rangeable": false},
+    {"key": "select", "aliases": [], "value": "option", "rangeable": false},
+    {"key": "date", "aliases": [], "value": "date", "rangeable": false},
+    {"key": "measurement", "aliases": [], "value": "measurement", "rangeable": true},
+    {"key": "photo", "aliases": [], "value": "attachments", "rangeable": false},
+    {"key": "signature", "aliases": [], "value": "attachment", "rangeable": false},
+    {"key": "instrument_ref", "aliases": [], "value": "instrument", "rangeable": false},
+    {"key": "calculated", "aliases": [], "value": "computed", "rangeable": true}
+  ]
+}

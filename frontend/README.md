@@ -49,6 +49,7 @@ src/
   password/   forgot password (`/forgot-password`), `/reset-password#<token>`, new-password form
   lib/api/    API client (bearer token, single-flight refresh rotation + one retry on 401)
   lib/cel/    offline CEL rule evaluation (@marcbachmann/cel-js), parity with the server
+  lib/fields/ the one field-type palette and answer shapes (mirrors backend app/core/fields)
   lobby/      lobby screens: lobby list, project-code entry, Active requests panel (README.md)
   perf/       NFR performance budgets: budgets.json (single config), measurements, CI reporter
   pages/      route components (incl. the lobby route `/lobby`, built from `src/lobby/`)

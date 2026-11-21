@@ -256,6 +256,56 @@ describe("DynamicForm", () => {
     });
   });
 
+  describe("shared palette (T-0110)", () => {
+    // Synthetic DFT template: two readings, their calculated average with a range.
+    const DFT: FormTemplate = {
+      fields: [
+        { field_key: "dft_1", label: "Reading 1", data_type: "numeric", required: true },
+        { field_key: "dft_2", label: "Reading 2", data_type: "numeric", required: true },
+        {
+          field_key: "dft_avg",
+          label: "Average",
+          data_type: "calculated",
+          expression: "(fields.dft_1 + fields.dft_2) / 2.0",
+          range: { min: 240, max: "asset.dft_max" },
+        },
+        { field_key: "grade", label: "Grade", data_type: "select", options: [{ value: "A", label: "A" }] },
+        { field_key: "evidence", label: "Evidence", data_type: "photo" },
+      ],
+    };
+    const context = { asset: { dft_max: 260 } };
+
+    it("shows a calculated field read-only, flags it out of range and submits it", () => {
+      const onSubmit = vi.fn();
+      render(<DynamicForm template={DFT} context={context} onSubmit={onSubmit} />);
+      const average = screen.getByLabelText("Average");
+      expect(average.tagName).toBe("OUTPUT");
+      expect(average).toHaveTextContent("");
+
+      fireEvent.change(screen.getByLabelText(/Reading 1/), { target: { value: "250" } });
+      fireEvent.change(screen.getByLabelText(/Reading 2/), { target: { value: "255" } });
+      expect(average).toHaveTextContent("252.5");
+      expect(screen.queryByText(i18n.t("shells.form.outOfRange"))).not.toBeInTheDocument();
+
+      fireEvent.change(screen.getByLabelText(/Reading 2/), { target: { value: "300" } });
+      expect(average).toHaveTextContent("275");
+      expect(screen.getByText(i18n.t("shells.form.outOfRange"))).toBeInTheDocument();
+
+      // Out of range is a flagged result, not a validation error: the form still submits.
+      submit();
+      expect(onSubmit).toHaveBeenCalledWith({ dft_1: 250, dft_2: 300, dft_avg: 275 });
+    });
+
+    it("reports an answer that does not fit its field type", () => {
+      const onSubmit = vi.fn();
+      const initialValues = { dft_1: 250, dft_2: 255, grade: "Z" };
+      render(<DynamicForm template={DFT} context={context} initialValues={initialValues} onSubmit={onSubmit} />);
+      submit();
+      expect(screen.getByText(i18n.t("shells.form.errors.typeMismatch"))).toBeInTheDocument();
+      expect(onSubmit).not.toHaveBeenCalled();
+    });
+  });
+
   it("uses a custom submit label and disables the form while busy", () => {
     render(<DynamicForm template={TEMPLATE} onSubmit={vi.fn()} submitLabel="Record result" busy />);
     expect(screen.getByRole("button", { name: "Record result" })).toBeDisabled();
