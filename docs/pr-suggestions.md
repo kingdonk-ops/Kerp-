@@ -3,7 +3,45 @@
 > **Generated — do not hand-edit.** Rebuild with `python scripts/pr_suggestions.py rebuild`.
 > A running digest of everything agents surfaced on merged PRs — review notes, must-fix items, suggestions, nits, follow-ups and ideas — so nothing is lost after a squash-merge. Formal follow-ups also live as `TD-xxx` in `tracker/todo/` and on [TODO.md](TODO.md); this file is the readable skim. Each item links back to its PR or review for full context.
 
-_Repo `kingdonk-ops/Kerp-`, base `dev` · 145 merged PRs · 144 with surfaced notes._
+_Repo `kingdonk-ops/Kerp-`, base `dev` · 146 merged PRs · 145 with surfaced notes._
+
+---
+
+## PR #148 — T-0218: ClamAV scanner + System-console queue monitor API (bundle: absorbs T-0220)
+task `T-0218` · merged 2026-11-21 · by `kingdonk-ops` · [PR](https://github.com/kingdonk-ops/Kerp-/pull/148)
+
+**TODOs raised**
+
+- TD-451 (deferred) — queue monitor sees only rows the caller's RLS shows until T-0274 (ADR 0016)
+- TD-452 (spec-gap) — over-scan-limit files rejected as `verify_failed` (no dedicated reason code in §4.7)
+- (TD-447/448 re-raised as TD-451/452: those ids are used on the T-0026 branch for other items.) TD-211 can be resolved after merge.
+
+**Review by `kingdonk-ops` — KERP-REVIEW: CHANGES_REQUESTED patch-id=c5a724bd7249eedd425df2eaaab3fe9b16f49a5a** · [full review](https://github.com/kingdonk-ops/Kerp-/pull/148#pullrequestreview-6003863079)
+
+- _Must fix_
+  1. `backend/app/modules/jobs/service.py:535` (retry) and `:562` (abort): the write that follows runs in a unit of work bound to the job's own tenant and project (`_own_scope`, `:539`/`:565`). The only thing stopping a System admin from changing a job they cannot see (another project, or another tenant) is the `get_job(session, ...)` check in the caller's session, and no test covers it. I replaced it with an unscoped `session.get(Job, job_id)` and all 20 tests in `tests/test_queue_monitor.py` still passed. CLAUDE.md §6 requires cross-tenant → 404 as a contract.
+     **Fixed looks like:** tests in `backend/tests/test_queue_monitor.py` (SQLite and PostgreSQL) covering (a) a failed job in `AWAY` (outside ALICE's read scope, the fixture already creates it) and (b) a failed job of another tenant. Retry and abort must both return 404. The row's status, error and `updated_by` must not change. Nothing may be dispatched or written to the `admin-system:` chain. Neither job may appear in `/failed` or in the `failed` count. With the visibility check removed, these tests must fail.
+  2. The audit gap your notes accept is not tracked. If the request session's commit fails after the job write has committed, the retry or abort goes unaudited. CLAUDE.md §5 requires a TODO in the same PR for anything accepted but not done.
+     **Fixed looks like:** raise it with `python scripts/tracker.py new-todo --kind risk --title "Queue monitor: retry/abort commit the job write before the audit entry (two transactions); an audit-commit failure leaves the action unaudited" --task T-0218 --source implementer`. R
+
+- _Suggestions (non-blocking)_
+  - **TODO id collision:** PR #145 (`claudek/dreamy-pasteur-7ir6um`) added a different `TD-451` at 07:16, after this branch claimed it at 07:13. This PR is not at fault, but whichever merges second will fail `check-ids`. The coordinator should have #145 re-raise its id.
+  - **Retry soon after an abort:** SAQ refuses to enqueue a key while its `abort:<key>` marker exists, which is 5 s after the abort. A retry inside that window is dropped silently. The T-0214 sweep then skips the row because `has_job` still sees the aborted SAQ job, so the row stays `queued`. Check the return value of `queue.enqueue` in `SaqBroker.enqueue`, or raise a `later` TODO.
+  - **`GET /system/queues` with Redis unreachable:** an exception in `monitor.counts` surfaces as a 500. Mapping it to 503 would match the README's "503 without Redis".
+  - **`_console_audit` check order:** it raises `RuntimeError` for a project-bound session only after the job write has committed. Today the request session is always tenant-level, but checking `session_tenancy(session)` before the write would make the order safe.
+  - **T-0221 heads-up:** §4.7's "re-queue the check of a file stuck in `verifying` whose staging object still exists" now has to account for files whose staging copy is gone but whose quarantine copy is kept after a scanner outage. Consider a note on T-0221 or a `later` TODO.
+
+**Review by `kingdonk-ops` — KERP-REVIEW: APPROVED patch-id=1bc9e5af41879aea49698223102c173dbb2503c2** · [full review](https://github.com/kingdonk-ops/Kerp-/pull/148#pullrequestreview-6004021746)
+
+- _Must fix_
+  None.
+
+- _Suggestions (non-blocking)_
+  - `admin/system_router.py` `queue_overview`: `except Exception` also turns programming errors in `queue_statuses`/`cron_statuses` into a 503. Consider narrowing it to connection/timeout errors (`ConnectionError`, `OSError`, redis `ConnectionError`/`TimeoutError`) so real bugs still show up as 500s.
+  - Informational: TD-451 is also used by another session's open PR #145. This PR claimed it first, so #145 has to re-raise its TODO with `new-todo`.
+  KERP-REVIEW: APPROVED patch-id=1bc9e5af41879aea49698223102c173dbb2503c2
+  ---
+  _Generated by [Claude Code](https://claude.ai/code)_
 
 ---
 
