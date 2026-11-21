@@ -27,11 +27,27 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0 # PRs: diff against the merge base with the target branch
+      # Components that exist run. On a pull_request whose changes are tracker-only
+      # (scripts/ci_changes.py) the app jobs are skipped; ci-gate accepts "false" flags as
+      # expected skips. Push and workflow_dispatch always run everything that exists.
       - id: d
+        env:
+          BASE_REF: ${{ github.base_ref }}
         run: |
-          echo "backend=$([ -f backend/pyproject.toml ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
-          echo "frontend=$([ -f frontend/package.json ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
-          echo "e2e=$([ -f e2e/package.json ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+          tracker_only=false
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            git diff --name-only --no-renames "origin/$BASE_REF...HEAD" > "$RUNNER_TEMP/changed.txt"
+            echo "changed files:"; cat "$RUNNER_TEMP/changed.txt"
+            result="$(python3 scripts/ci_changes.py < "$RUNNER_TEMP/changed.txt")"
+            echo "$result"
+            [ "$result" = "tracker_only=true" ] && tracker_only=true
+          fi
+          flag() { [ "$tracker_only" = false ] && [ -f "$1" ] && echo true || echo false; }
+          echo "backend=$(flag backend/pyproject.toml)" >> "$GITHUB_OUTPUT"
+          echo "frontend=$(flag frontend/package.json)" >> "$GITHUB_OUTPUT"
+          echo "e2e=$(flag e2e/package.json)" >> "$GITHUB_OUTPUT"
 
   tracker:
     runs-on: ubuntu-latest
