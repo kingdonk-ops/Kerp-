@@ -50,7 +50,11 @@ describe("navigation items (diff §6.1)", () => {
     expect(links[0]).toHaveAttribute("href", "/execution/inspections");
   });
 
-  it("registers no item while no module screen is built", () => {
+  it("registers only the built screens: Admin system and access requests, for project admins", () => {
     for (const group of NAV_GROUP_IDS) expect(registeredNavItems(group)).toEqual([]);
+    const admins = new Set(["projectAdmin"] as const);
+    expect(
+      NAV_GROUP_IDS.flatMap((g) => registeredNavItems(g, NAV_ITEMS, admins)).map((i) => i.path),
+    ).toEqual(["/admin/system/devices", "/admin/access-requests"]);
   });
 });
