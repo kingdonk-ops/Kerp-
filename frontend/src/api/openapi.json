@@ -5853,6 +5853,16 @@
               }
             }
           },
+          "409": {
+            "description": "`code: CANNOT_DEACTIVATE_SELF`: the caller tried to deactivate their own account (refused and audited, T-0085); or, with a plain `detail` and no `code`, the last active System admin cannot be deactivated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserUpdateRefusal"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -15631,6 +15641,32 @@
         "type": "object",
         "title": "UserUpdate",
         "description": "``PATCH /admin/users/{id}``: rename, deactivate (``is_active: false``) or reactivate."
+      },
+      "UserUpdateRefusal": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "CANNOT_DEACTIVATE_SELF"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "UserUpdateRefusal",
+        "description": "A 409 from ``PATCH /admin/users/{id}``. With ``code: CANNOT_DEACTIVATE_SELF`` the\ncaller tried to deactivate their own account (T-0085); the last-active-System-admin\nrefusal answers ``detail`` only, so ``code`` is optional."
       },
       "ValidationError": {
         "properties": {

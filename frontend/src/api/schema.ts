@@ -5412,6 +5412,18 @@ export interface components {
             /** Is Active */
             is_active?: boolean | null;
         };
+        /**
+         * UserUpdateRefusal
+         * @description A 409 from ``PATCH /admin/users/{id}``. With ``code: CANNOT_DEACTIVATE_SELF`` the
+         *     caller tried to deactivate their own account (T-0085); the last-active-System-admin
+         *     refusal answers ``detail`` only, so ``code`` is optional.
+         */
+        UserUpdateRefusal: {
+            /** Detail */
+            detail: string;
+            /** Code */
+            code?: "CANNOT_DEACTIVATE_SELF" | null;
+        };
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -8993,6 +9005,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UserRead"];
+                };
+            };
+            /** @description `code: CANNOT_DEACTIVATE_SELF`: the caller tried to deactivate their own account (refused and audited, T-0085); or, with a plain `detail` and no `code`, the last active System admin cannot be deactivated */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserUpdateRefusal"];
                 };
             };
             /** @description Validation Error */
