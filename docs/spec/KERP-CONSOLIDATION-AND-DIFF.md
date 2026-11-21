@@ -729,6 +729,8 @@ tokens): registration refuses them. The §4.4 settings become registry entries;
 | `max_upload_size_mb` | 100 | 1 – `KERP_UPLOAD_MAX_BYTES` | uploads (T-0016) |
 | `presigned_url_ttl_minutes` | 15 | 1 – 60 (capped by `KERP_UPLOAD_URL_SECONDS`) | uploads |
 | `max_photo_annotations` | 50 | 1–50 | forms (T-0156) |
+| `tablet_proxy_max_px`, `tablet_proxy_quality` (category `uploads_media`; user, 2026-11-21) | 1280, 72 | 640–2560, 40–95 | image derivatives (T-0247) |
+| `report_image_max_px`, `report_image_quality` (category `uploads_media`; user, 2026-11-21) | 1024, 68 | 480–2048, 40–95 | image derivatives (T-0247) |
 | `max_video_duration_s`, `max_video_size_mb` | 60, 100 | 5–600, 1–500 | forms, media probe (T-0167, T-0169) |
 | `max_audio_duration_s`, `max_audio_size_mb` | 300, 10 | 5–1800, 1–100 | forms, media probe |
 | `cosign_pin_token_ttl_minutes` | 5 | 1–15 | signing (T-0162) |

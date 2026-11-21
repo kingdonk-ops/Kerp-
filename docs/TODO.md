@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 266 · **Closed:** 132
+**Open:** 267 · **Closed:** 132
 
 ## decision (19)
 
@@ -29,7 +29,7 @@
 | [TD-404](../tracker/todo/TD-404.md) | Pilot-0: is the ClamAV scanner (T-0218) required live in the pilot deployment, or is the stub with KERP_UPLOAD_SCANNER_ALLOW_STUB accepted for the pilot? | T-0218, T-0146 | planner |
 | [TD-407](../tracker/todo/TD-407.md) | Admin 'Resend invite' for an invited user: re-send the user's pending project invites (T-0052) or a password-setup e-mail, never a magic link for non-Field-Workers; via core mail, not notifications | T-0244 | planner |
 
-## spec-gap (50)
+## spec-gap (51)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -83,6 +83,7 @@
 | [TD-402](../tracker/todo/TD-402.md) | Audit ledger has no event-type field: explorer filters by chain-key prefix plus an optional payload 'event' key | T-0222 | planner |
 | [TD-405](../tracker/todo/TD-405.md) | Archive file layout: files/assets/<asset_code>/<work_anchor_code>/ assumes a fixed two-level tree; the breakdown is configurable (ADR 0003) | T-0235, T-0236 | planner |
 | [TD-406](../tracker/todo/TD-406.md) | User account status: derive invited/active/deactivated from is_active + first_login_at instead of a stored status column; backfill of first_login_at for existing accounts | T-0243 | planner |
+| [TD-408](../tracker/todo/TD-408.md) | Image derivatives addendum vs the spec: content-addressed keys (not /original.<ext>), 'available' (not 'complete'), derivative rows, annotation frame under EXIF orientation, per-field patch path of an annotation | T-0247, T-0156, T-0157 | planner |
 
 ## missed (7)
 

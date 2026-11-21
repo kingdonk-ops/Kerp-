@@ -118,7 +118,8 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
   - **Also in the gate through dependencies** (T-0146 depends on them transitively): T-0102,
     T-0112, T-0113, T-0114, T-0118, T-0124, T-0128, T-0134, T-0138 (via T-0107), T-0139, T-0140
     (inspection date and self-approval, via T-0150) and T-0136 (terminology layer, via the PDF T-0158; user,
-    2026-11-13, R5a). T-0104 is no longer in the gate.
+    2026-11-13, R5a). T-0104 is no longer in the gate. T-0247 (image derivatives, via T-0147,
+    T-0157, T-0158 and T-0168; user addendum 2026-11-21).
   - **Not in the pilot:** inspection calendar, general recurrence and work orders (TD-217); the P6
     half of the checkout contract (T-0166).
   - **Deferred for the pilot:** P6 import/export (T-0104–T-0106, T-0125, T-0129, T-0166), Phase 2,
@@ -248,6 +249,11 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
   table names (`auth_user`, `oe_projects_project`, `mail_send_log`); ADRs for every core-table
   change. Raised: TD-396–TD-407. Updated: T-0026, T-0146 (notes only), T-0140, T-0156, T-0162,
   T-0167, T-0169, T-0174 (registry entries), TD-046, TD-175, TD-211, TD-297 (resolved by T-0232).
+  Second addendum the same day (image derivative tiers): `quality-and-inspection.md` §Image
+  derivatives and §Annotation frame, four `uploads_media` registry entries (diff §4.7). New:
+  T-0247 (uploads, M, phase 1; in the Pilot-0 gate through T-0147/T-0157/T-0158/T-0168).
+  Updated: T-0147, T-0156, T-0157, T-0158, T-0159 (note), T-0168, T-0230, T-0235, T-0239.
+  Raised: TD-408 (reconciliation with the upload model, ADR 0005 path, EXIF frame).
 
 ## Key engineering decisions (baked into the spec — see consolidation diff)
 

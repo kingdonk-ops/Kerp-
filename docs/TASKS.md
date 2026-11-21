@@ -3,12 +3,12 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 71/201 tasks done (35%) · **ready now:** 25 · **epics awaiting breakdown:** 47
+**Overall:** 71/202 tasks done (35%) · **ready now:** 25 · **epics awaiting breakdown:** 47
 
 | Phase | Tasks done | Progress |
 |---|---|---|
 | 0 · Platform foundations | 71/103 | `██████░░░░` 69% |
-| 1 · Asset & Quality backbone | 0/89 (+1 epics) | `░░░░░░░░░░` 0% |
+| 1 · Asset & Quality backbone | 0/90 (+1 epics) | `░░░░░░░░░░` 0% |
 | 2 · Welding quality | 0/9 | `░░░░░░░░░░` 0% |
 | 3 · Logistics | 0/0 (+7 epics) | `░░░░░░░░░░` 0% |
 | 4 · Execution | 0/0 (+14 epics) | `░░░░░░░░░░` 0% |
@@ -149,6 +149,7 @@
 | ⬜ | [T-0113](../tracker/tasks/T-0113.md) | qms: master ITP template authoring + audit registers + calibration records | qms | M | T-0111 |  |
 | ⬜ | [T-0114](../tracker/tasks/T-0114.md) | construction_control: conformance criteria + hold/witness evaluation via run_checks (no own inspection table) | construction_control | M | T-0113 |  |
 | 🟥 | [T-0115](../tracker/tasks/T-0115.md) | inspection_requests: RFI/call-out workflow (draft→requested→confirmed→witnessed\|waived\|no_show\|failed) + client delay attribution *(blocked by TD-045)* | inspection_requests | M | T-0111 |  |
+| ⬜ | [T-0247](../tracker/tasks/T-0247.md) | uploads: image derivative tiers — tablet proxy and report rendition (SAQ batch, Pillow lazy), derivative rows, file available only after scan + derivatives | uploads | M | T-0016, T-0169 |  |
 | ⬜ | [T-0116](../tracker/tasks/T-0116.md) | ncr: Non-Conformance Reports + dispositions (scrap/rework/repair/use-as-is) anchored to any node or Item (anchor_role recorded) | ncr | S | T-0111 |  |
 | ⬜ | [T-0117](../tracker/tasks/T-0117.md) | punchlist: Cat A/B/C punch items + spatial pins on drawings | punchlist | S | T-0111 |  |
 | ▶ | [T-0118](../tracker/tasks/T-0118.md) | credentials: qualification-type catalogue + credential records with certificate/VOC uploads + expiry (feeds eligibility) | credentials | M | T-0012, T-0016 |  |
@@ -168,7 +169,7 @@
 | ⬜ | [T-0145](../tracker/tasks/T-0145.md) | Delta-sync budget: 1,000 records pulled and applied in < 30 s on simulated 4G (warn-only in the NFR job) | sync | S | T-0126, T-0045 |  |
 | ⬜ | [T-0172](../tracker/tasks/T-0172.md) | Client clock: per-action device_wall_time + monotonic_ms + clock_session_id on every outbox mutation, time anchors from /api/v1/time, Android elapsedRealtime plugin | frontend | M | T-0127, T-0141, T-0147 |  |
 | ⬜ | [T-0128](../tracker/tasks/T-0128.md) | Frontend: asset tree + Asset-Details (attributes, items, inspections over descendants) | frontend | M | T-0101, T-0103, T-0025 |  |
-| ⬜ | [T-0147](../tracker/tasks/T-0147.md) | Sync scope: download picks as checkouts, download candidates with state and size, device/project-scoped pull-deltas with has_more paging and remove deltas | sync | M | T-0126, T-0133, T-0111, T-0016, T-0043, T-0044 |  |
+| ⬜ | [T-0147](../tracker/tasks/T-0147.md) | Sync scope: download picks as checkouts, download candidates with state and size, device/project-scoped pull-deltas with has_more paging and remove deltas | sync | M | T-0126, T-0133, T-0111, T-0016, T-0043, T-0044, T-0247 |  |
 | ⬜ | [T-0148](../tracker/tasks/T-0148.md) | Sync: client-generated UUIDv7 ids on offline create + answer conflict flag from the per-field apply | sync | S | T-0126, T-0111 |  |
 | ⬜ | [T-0149](../tracker/tasks/T-0149.md) | Frontend: download-for-offline screen (candidates with state and size), paged pull into the storage contract, local purge | frontend | M | T-0147, T-0127, T-0172 |  |
 | ⬜ | [T-0150](../tracker/tasks/T-0150.md) | inspections: review and return — SUBMITTED and RETURNED states, signed submit with attachments-complete check, approve, return with reason, review rounds | inspections | M | T-0111, T-0119, T-0140, T-0016, T-0019, T-0147, T-0148, T-0177 |  |
@@ -178,8 +179,8 @@
 | ⬜ | [T-0154](../tracker/tasks/T-0154.md) | asset_management: Item scan identifiers (barcode / QR / NFC UID) + lookup endpoint | asset_management | S | T-0103 |  |
 | ⬜ | [T-0155](../tracker/tasks/T-0155.md) | Frontend: scan-to-locate — camera barcode/QR and Android NFC, offline lookup over downloaded Items, online fallback, manual tag search | frontend | M | T-0154, T-0141, T-0149 |  |
 | ⬜ | [T-0156](../tracker/tasks/T-0156.md) | forms: photo answer value — capture time, location and versioned annotation JSON, validated server-side, read-only after submit | forms | S | T-0110, T-0016 |  |
-| ⬜ | [T-0157](../tracker/tasks/T-0157.md) | Frontend: photo capture with location and time + annotation editor (arrow, ellipse, rectangle, freehand, text), offline | frontend | M | T-0156, T-0127, T-0046 |  |
-| ⬜ | [T-0158](../tracker/tasks/T-0158.md) | inspections: inspection PDF report (SAQ batch job, PyMuPDF lazy) with annotations burned in, signatures and review history | inspections | M | T-0150, T-0156, T-0116, T-0117, T-0016, T-0136, T-0167 |  |
+| ⬜ | [T-0157](../tracker/tasks/T-0157.md) | Frontend: photo capture with location and time + annotation editor (arrow, ellipse, rectangle, freehand, text), offline | frontend | M | T-0156, T-0127, T-0046, T-0247 |  |
+| ⬜ | [T-0158](../tracker/tasks/T-0158.md) | inspections: inspection PDF report (SAQ batch job, PyMuPDF lazy) with annotations burned in, signatures and review history | inspections | M | T-0150, T-0156, T-0116, T-0117, T-0016, T-0136, T-0167, T-0247 |  |
 | ⬜ | [T-0159](../tracker/tasks/T-0159.md) | inspections: batch inspection PDF export (ZIP + index.csv, max 500) + export action on the review queue | inspections | S | T-0158, T-0153 |  |
 | ⬜ | [T-0160](../tracker/tasks/T-0160.md) | reporting: Pilot-0 dashboard tiles — progress, overdue, open defects (API + Overview screen) | reporting | M | T-0150, T-0152, T-0116, T-0117, T-0024, T-0025 |  |
 | ▶ | [T-0162](../tracker/tasks/T-0162.md) | identity: client online signing PIN — own table, server-side per-signer rate limit and lockout, single-use co-sign token | identity | S | T-0010, T-0038 |  |
@@ -187,7 +188,7 @@
 | ⬜ | [T-0164](../tracker/tasks/T-0164.md) | Frontend: hand to client on the inspector's tablet — online PIN, challenge/assertion QR exchange with offline verify, provisional wet signature; PIN-gated hand-back | frontend | M | T-0162, T-0163, T-0174, T-0143, T-0165 |  |
 | ⬜ | [T-0165](../tracker/tasks/T-0165.md) | Frontend: inspector capture screen — open a downloaded inspection, answer with autosave, resume after crash, sign and submit; start an ad-hoc inspection on a downloaded Item or anchor | frontend | M | T-0149, T-0148, T-0150, T-0130, T-0047, T-0025, T-0127 |  |
 | ⬜ | [T-0167](../tracker/tasks/T-0167.md) | forms: video, audio and barcode field types — value schemas, limits, CEL support, shared fixtures | forms | S | T-0110, T-0156 |  |
-| ⬜ | [T-0168](../tracker/tasks/T-0168.md) | forms: reference images on template questions — upload, caption, frozen with the template revision, delivered in the pull scope | forms | S | T-0110, T-0016, T-0147 |  |
+| ⬜ | [T-0168](../tracker/tasks/T-0168.md) | forms: reference images on template questions — upload, caption, frozen with the template revision, delivered in the pull scope | forms | S | T-0110, T-0016, T-0147, T-0247 |  |
 | ⬜ | [T-0169](../tracker/tasks/T-0169.md) | uploads: SAQ media probe for video/audio (container, codec, duration, size), rejected-with-reason, attachment complete only after the probe | uploads | S | T-0016, T-0167 |  |
 | ⬜ | [T-0170](../tracker/tasks/T-0170.md) | Frontend: video and audio note capture and playback (limits enforced on device, poster frame, offline) | frontend | M | T-0167, T-0157, T-0127 |  |
 | ⬜ | [T-0171](../tracker/tasks/T-0171.md) | Frontend: barcode/QR answer field (scanner adapter, manual entry) + reference images shown on questions offline | frontend | S | T-0167, T-0168, T-0155, T-0047 |  |

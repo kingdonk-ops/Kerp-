@@ -64,7 +64,9 @@ the audit ledger; no hard purge), TD-403 (providers of later modules), TD-405 (f
     project code and name), the file inventory with SHA-256 and size of every file, and the
     folder-name mapping;
   - `files/tree/<node code per level from the root>/[<item code>/]{reports,photos,attachments}/`
-    for anchored evidence (photos as original plus annotated with the annotation burned in,
+    for anchored evidence (photos as the full-resolution original plus, where an annotation
+    exists, a copy rendered from the original with the annotation burned in; derivatives
+    (`quality-and-inspection.md` §Image derivatives) are not exported and are regenerated on restore;
     inspection PDFs of T-0158), and `files/{quals,equipment,materials,mdr,reports}/` for
     register files (TD-405: the breakdown is configurable, ADR 0003, so the tree folders follow
     the project's levels instead of a fixed asset/work-anchor pair).
