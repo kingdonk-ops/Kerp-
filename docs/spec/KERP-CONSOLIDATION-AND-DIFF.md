@@ -143,8 +143,20 @@ Wins over any earlier text on tenant selection, tenant administrators and projec
     and Project Admins, create and deactivate user accounts, revoke devices (§4.3), edit
     deployment settings (§4.4), and grant PER-09 on any project (e.g. to recover a project whose
     admins left). The last System admin cannot be removed. System admins can list every project
-    row and every membership (the "tenant administrator" of edge spec §6) but read no
-    project-scoped records without a membership like any other user.
+    row and every membership (the "tenant administrator" of edge spec §6).
+    - **system_admin global project visibility (user, 2026-11-21; ADR 0016, TD-396 resolved).**
+      A `system_admin` can list and open every project of the tenant (top-bar picker and the
+      All-Projects portfolio scope) and read and administer project-scoped operational records
+      across all projects without a membership row. `app.is_system_admin` is bound only on the
+      server from the verified JWT's user and the admin-grants table, never from a client value,
+      and never applies across tenants. Writes stay attributed to the admin as for any user;
+      whether non-member reads are access-logged is TD-427 (default: no).
+    - **Quality and signing authority unchanged.** `system_admin` alone grants `V`, `C`, `E` and
+      project administration (PER-09 equivalent) across all projects, **never `A` or `S`**: no
+      hold release, no inspection approval, no cryptographic co-sign. To act as an approver, a
+      System admin must hold the qualified persona (PER-02, PER-06, PER-07, PER-11) and the
+      credentials on that project; that assignment triggers the audited `sod_warning: true`
+      record (below).
   - **`create_projects`** ("Project Admin") — granted and revoked by a System admin only. Allows
     `POST /api/v1/projects`. The creator is granted **PER-09 Project Administrator** on the new
     project automatically, in the same transaction. Revoking `create_projects` removes no
@@ -160,10 +172,13 @@ Wins over any earlier text on tenant selection, tenant administrators and projec
   `create_projects` nor PER-09 gives hold release, inspection sign-off or any `A`/`S` capability.
   Those come only from a qualified persona on that project (edge spec §5.2) **and** the
   credentials the action requires (TD-099/TD-100), checked at the action. An admin who also holds
-  such a persona acts under that persona.
+  such a persona acts under that persona. Global visibility (ADR 0016) changes
+  none of this.
 - **PER-09 combined with a hold-authority persona** (PER-02, PER-06, PER-07, PER-11) on the same
   project is allowed. The assignment API returns a warning the UI must show before saving, and
-  the assignment is written to the audit ledger with `sod_warning: true` (TD-151).
+  the assignment is written to the audit ledger with `sod_warning: true` (TD-151). The same
+  applies to a hold-authority persona assigned to a `system_admin`, and to the `system_admin`
+  grant given to a holder of one (ADR 0016).
 - **One URL, no subdomains.** Every project is reached under the same origin; the active project
   is chosen in the app, never by host name.
 - **Landing after sign-in.** One project → straight into it. Several → the project last used
@@ -451,6 +466,35 @@ Wins over any earlier text on tenant selection, tenant administrators and projec
   worker's link; the worker can still sign in by password where they have one, or unlock
   offline with the PIN within the grace (offline grace, above).
 
+- **Support impersonation (user paste "T-0076", 2026-11-21) — pending decision TD-426; ADR 0015
+  proposed; tasks T-0277–T-0280 blocked.** Nothing below may be built until TD-426 is decided.
+  A `system_admin` may start a time-boxed session as a non-admin user to see that user's exact
+  projects, personas, capabilities and site scope:
+  - `POST /api/v1/admin/users/{id}/impersonate` (`system_admin`, reason required): never a
+    deactivated user (422) or another `system_admin` (`403 CANNOT_IMPERSONATE_SYSTEM_ADMIN`), never
+    nested. It issues a separate **impersonation token** (T-0008 keys; `sub` = target, `imp` =
+    admin, own `sid`/`jti`) that expires after `impersonation_max_minutes` (runtime registry
+    §4.7, default 30, 5–60) or with the admin's session, whichever is earlier, and has **no refresh
+    token** (an exception to the 15-minute access rule above, single-session and revocable at
+    once). It is bound to no device and refused by device-bound field endpoints (§4.3).
+  - The request context is built from the target's memberships with `app.is_system_admin` false,
+    so impersonation never widens what the admin already sees (ADR 0016).
+  - `POST /api/v1/auth/impersonation/exit` revokes the token's `jti` and `sid` (Redis); the
+    admin's own session was never replaced and resumes. Admin logout, force sign-out (§4.8) or
+    loss of the grant ends it as well.
+  - **Guardrail**, enforced centrally (one route classification plus the T-0010 capability
+    check, covered by a contract test over all routes; unclassified mutating routes are refused):
+    `403 IMPERSONATION_ACTION_FORBIDDEN` for any `A` or `S` action (sign-off, signing ledger,
+    client co-sign, inspection submit/approve, hold release, override decisions), password, PIN
+    and device changes, admin grants, memberships, invites, access-request decisions, teams,
+    settings, project creation and `/api/v1/admin/*` mutations. **Planner default (TD-426 option
+    (c)): read-only "view as"**, every mutating request refused except exit and logout.
+  - **Audit**: `impersonation.started` (admin, target, reason, IP, user agent, expiry),
+    `impersonation.ended`, `impersonation.denied` in the chain `admin-impersonation:<tenant>`;
+    ledger entries written during impersonation carry `created_by` = target and
+    `impersonated_by_user_id` = admin inside the hash (ledger hash v3, ADR 0015). Impersonation
+    never updates the target's last login, activity, presence or last-used project.
+
 ### 4.3 Devices (user, 2026-11-13; TD-164, decision 17a — Pilot-0 scope)
 
 - **Device registry.** Every field client (Capacitor Android build, field PWA) enrols on first
@@ -639,21 +683,20 @@ Tasks: T-0218–T-0232 and T-0248; the user directory is §4.8; the project arch
 
 **System console** (`/api/v1/admin/system/*`, T-0219–T-0225). Only `system_admin`; every other
 caller, PER-09 included, gets **403** (an admin surface, not a project record). Every action is
-written to the audit ledger. Record reads keep project RLS: System admins read no
-project-scoped record without a membership (§4.1; TD-396), and no console endpoint widens a
-project RLS policy or uses a bypass role; where a non-member needs an overview it gets counts
-from a count-only function. The project archive follows the same rule (export, download and
-restore from a registry archive in either mode need a membership, live or held at the
-project's deletion; restore from an uploaded zip the caller already holds needs `system_admin`
-only; `modules/documents-and-mdr.md` §Access).
+written to the audit ledger. Record reads use the normal project RLS, which since ADR 0016
+shows a `system_admin` every project of the tenant without a membership (§4.1; TD-396
+resolved); no console endpoint uses a bypass role. The project archive follows the same rule
+(`system_admin` exports, downloads and restores any project of the tenant;
+`modules/documents-and-mdr.md` §Access). Simplified by ADR 0016 (system_admin global
+visibility).
 
 - **Deployment stats** (T-0219): counts and byte totals only, never rows: projects (active,
   soft-deleted), users (active, deactivated), enrolled devices, and per module the counts it
   contributes (asset nodes, Items, inspections when those modules exist; TD-403). Each module
   contributes through its own `service.py` (a stats-provider registry, no cross-module table
-  access). Where RLS would hide rows, the count comes from a **count-only `SECURITY DEFINER`
-  function** (pinned `search_path`, `EXECUTE` revoked from `PUBLIC`, same pattern as ADR 0012),
-  introduced with an ADR. Object-store totals (object count and bytes per storage class
+  access). Counts run under the caller's normal RLS, which shows a `system_admin` every project
+  (ADR 0016), so no `SECURITY DEFINER` function is needed; a table that still hid rows would get
+  a TODO, never a bypass. Object-store totals (object count and bytes per storage class
   `STANDARD | GLACIER_IR | DEEP_ARCHIVE`) come from a `batch` SAQ job (listing is slow) and are
   shown with their "as of" time. **Health probes**: PostgreSQL, Redis, object store, malware
   scanner (ClamAV `PING`); each with a short timeout, answering status and latency only, never
@@ -671,22 +714,17 @@ only; `modules/documents-and-mdr.md` §Access).
   replacing the stub (TD-211). Rejected bytes stay deleted at rejection (T-0016): nothing
   infected is kept at rest, so there is nothing to purge (TD-397). Actions: re-queue the check of
   a file stuck in `verifying` whose staging object still exists; run a project's orphan sweep
-  now. **Rows only where the admin holds a membership:** the list reads `oe_uploads_file`
-  under normal project RLS, so it shows full rows (project code, file id, original filename,
-  size, SHA-256, status, reason, signature, uploader id, times) only for projects where the
-  admin is a member. For every other project it shows **counts only**, per project and status
-  (and reason code), from a count-only `SECURITY DEFINER` function of the T-0219 pattern
-  (pinned `search_path`, `EXECUTE` revoked from `PUBLIC`, returns numbers only; ADR). The
-  uploads RLS policy is **not widened** and **no bypass role** is used; the count function
-  accepts only project, status and reason filters (never a file id, hash or filename, so it is no
-  existence oracle). To act on rows of such a project the admin first grants themselves a
-  membership (audited, T-0014; TD-396); the orphan sweep is housekeeping that returns no rows
-  and is exempt.
+  now. The list reads `oe_uploads_file` under the normal project RLS, which shows a
+  `system_admin` full rows (project code, file id, original filename, size, SHA-256, status,
+  reason, signature, uploader id, times) of **every project** of the tenant (ADR 0016), plus
+  counts per project, status and reason code from the same RLS read; no bypass role and no
+  count-only function (simplified by ADR 0016).
 - **Audit explorer** (T-0222): read-only over the hash-chain ledger (§4); no endpoint ever
   changes a ledger row. Reads under normal RLS: tenant-level chains (grants, users, devices,
-  deployment settings, mail suppression, teams, the system console) in full; project chains
-  only of projects where the admin holds a membership (TD-396). Filters: actor, device, chain-key
-  prefix (entity type), payload `event` key or flag such as `sod_warning` (TD-402), date range.
+  deployment settings, mail suppression, teams, the system console) and the project chains
+  of every project (ADR 0016; TD-396 resolved). Filters: actor, device, chain-key
+  prefix (entity type), payload `event` key or flag such as `sod_warning` (TD-402), impersonator
+  (`impersonated_by_user_id`, ADR 0015, once built), date range.
   **Verify chain integrity** recomputes the ledger rules (contiguous `seq`, `prev_hash` links,
   recomputed `content_hash`): one chain synchronously, all readable chains as a `batch` SAQ job
   with a report. Anchoring chain heads outside the database stays TD-058.
@@ -749,6 +787,7 @@ tokens): registration refuses them. The §4.4 settings become registry entries;
 | `max_audio_duration_s`, `max_audio_size_mb` | 300, 10 | 5–1800, 1–100 | forms, media probe |
 | `cosign_pin_token_ttl_minutes` | 5 | 1–15 | signing (T-0162) |
 | `provisional_cosign_client_reminder_hours`, `provisional_cosign_escalation_hours` | 24, 72 | 1–720 (client < escalation) | signing (T-0174) |
+| `impersonation_max_minutes` (not client-visible; pending TD-426) | 30 | 5–60 | support impersonation (§4.2, T-0277) |
 
 Read-only **deployment configuration** (shown, never edited at runtime; TD-046, TD-398):
 refresh-token lifetime (`KERP_REFRESH_TOKEN_HOURS`, 12), PIN idle (`KERP_PIN_IDLE_MINUTES`, 30),
@@ -875,6 +914,8 @@ Module screens register their nav items in these groups. Individual items may mo
 The top-bar **Project Switcher** is the project picker of §4.1: it lists the user's projects
 (from memberships), remembers the last project per user on this client, offers All-Projects to portfolio
 personas, and links to the lobby ("Browse / join another project"; product owner, 2026-11-14).
+For a `system_admin` it lists every project of the tenant, marking those reached without a
+membership ("Admin access"), and All-Projects covers all of them (ADR 0016; T-0276).
 
 ### 6.2 Field client storage (user, 2026-11-13; TD-161, decision 16a + d)
 
@@ -1048,19 +1089,16 @@ the navigation **and** refused by the API (403 for admin surfaces).
 
 | Area | Screens | Who | Tasks |
 |---|---|---|---|
-| **Users** | user directory (status, presence, sessions, logins, grants, filters, search; resend invite, force sign-out, activate/deactivate); user detail with memberships across projects (§4.8) | `system_admin`; PER-09 memberships tab for its own projects | T-0026, T-0246 |
-| **System** | deployment stats + health; queue monitor (retry / abort); upload quarantine (re-check, sweep now); runtime settings (editable registry + read-only deployment configuration); admin grants (T-0026); devices (T-0048); audit log (filters, verify chain); legal hold on the project admin page | `system_admin` | T-0224, T-0225, T-0232 |
+| **Users** | user directory (status, presence, sessions, logins, grants, filters, search; resend invite, force sign-out, activate/deactivate); user detail with memberships across projects (§4.8); "Login as user (support)" with reason, and the impersonation banner with Exit on every screen (§4.2 *Support impersonation*; pending TD-426) | `system_admin`; PER-09 memberships tab for its own projects | T-0026, T-0246, T-0280 |
+| **System** | deployment stats + health; queue monitor (retry / abort); upload quarantine (rows of every project; re-check, sweep now); runtime settings (editable registry + read-only deployment configuration); admin grants (T-0026); devices (T-0048); audit log (filters, verify chain); legal hold on the project admin page | `system_admin` | T-0224, T-0225, T-0232 |
 | **Communications** | broadcast composer (audience, count, send); delivery stats (cards) and history; automated e-mail templates (edit, preview, test send, reset) | `system_admin`; PER-09 composer and stats for its own projects | T-0229 |
-| **Project archives** | archive list; export; storage tier toggle; download; start a deep-archive restore; restore wizard (deleted project or new project) | `system_admin`; export, download and restore from a registry archive (either mode) also need a membership on that project (live, or held when it was deleted); restore from an uploaded zip needs `system_admin` only | T-0241 (epic E-01-02) |
+| **Project archives** | archive list; export; storage tier toggle; download; start a deep-archive restore; restore wizard (deleted project or new project) | `system_admin` (any project of the tenant, live or deleted; ADR 0016) | T-0241 (epic E-01-02) |
 
-Numbers on these screens are counts and states only (§4.7); a screen never shows a project
-record the caller could not open in the project itself. This holds for the upload quarantine
-(rows only of member projects, counts for the rest), the audit explorer (project chains only of
-member projects) and the project archives (export, download and restore from a registry
-archive, in either mode, need a membership on that project, live or held when it was deleted;
-only a zip the caller uploads, whose bytes they already hold, restores without one; restore as
-new makes the restoring admin PER-09 of the new project, audited;
-`modules/documents-and-mdr.md` §Access; TD-396).
+A screen never shows a project record the caller could not open in the project itself. Since
+ADR 0016 a `system_admin` opens every project of the tenant, so the upload quarantine shows
+rows of every project, the audit explorer every project chain, and the project archives allow
+export, download and restore of any project (restore as new still makes the restoring admin
+PER-09 of the new project, audited; `modules/documents-and-mdr.md` §Access; TD-396 resolved).
 
 ---
 

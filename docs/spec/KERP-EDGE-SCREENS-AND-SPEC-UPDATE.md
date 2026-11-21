@@ -550,6 +550,29 @@ credentials (TD-099/TD-100). PER-09 together with a hold-authority persona (PER-
 PER-07, PER-11) on the same project is allowed, but warns at assignment and is written to the
 audit ledger. Full model: `KERP-CONSOLIDATION-AND-DIFF.md` §4.1.
 
+**system_admin global visibility (user, 2026-11-21; ADR 0016).** A `system_admin` has `V`,
+`C`, `E` and project administration (PER-09 equivalent) on every project of the tenant without
+a membership, and never `A` or `S`; approving or signing still needs one of the qualified
+personas above plus credentials on that project, and assigning one to a `system_admin` warns and
+is audited with `sod_warning: true`.
+
+**Support impersonation (user paste "T-0076", 2026-11-21) — pending decision TD-426; ADR 0015
+proposed; T-0277–T-0280 blocked.** While a `system_admin` views KERP as another user
+(`KERP-CONSOLIDATION-AND-DIFF.md` §4.2 *Support impersonation*), the session has exactly that
+user's personas, tiers and site scope from this matrix, **minus `A` and `S`**: approvals, hold
+release, inspection submit/approve, override decisions, signing and co-sign answer
+`403 IMPERSONATION_ACTION_FORBIDDEN` (planner default: every mutation is refused, read-only
+"view as"). UI contract (T-0280):
+- **Admin → Users** row and user detail: action **"Login as user (support)"**, `system_admin`
+  only, hidden for deactivated users and other System admins; a modal asks for the reason
+  (required) and states the time limit (`impersonation_max_minutes`, default 30).
+- **Impersonation banner** on every screen, phone and tablet widths included, high contrast, not
+  dismissible, above the top bar: "Viewing as {target_name} ({target_email}) — impersonated by
+  {admin_name} · {remaining} remaining" (plus "read-only" under the default) and **"Exit
+  impersonation"**. Exit or expiry returns to the admin's own session on Admin → Users with a
+  notice. Forbidden actions are disabled and the 403 is shown inline. Nothing of the impersonated
+  session is stored offline. Strings through `t()`.
+
 ---
 
 ## 6. Project-Scoped Row-Level Security Architecture (Item 8)
@@ -591,8 +614,19 @@ CREATE POLICY project_isolation_policy ON functional_tags
     `app.is_system_admin` (`true` or unset). It is never read from token claims, request
     parameters or headers.
   - **Projects and memberships** use the membership-based policy: a row is visible when its
-    project is in `app.allowed_project_ids` or `app.is_system_admin` is true. Project-scoped
-    records still need a membership, also for a System admin.
+    project is in `app.allowed_project_ids` or `app.is_system_admin` is true.
+  - **Project-scoped records (user, 2026-11-21; ADR 0016).** Within the session's tenant,
+    `app.is_system_admin = 'true'` satisfies project visibility of `project_isolation_policy` in
+    USING and in WITH CHECK, for project rows only:
+    `tenant_id = app.current_tenant_id AND (project_id IS NOT DISTINCT FROM
+    app.current_project_id OR (project_id IS NOT NULL AND app.is_system_admin = 'true'))`.
+    This is the user's single-policy SQL (`is_system_admin OR project_id = current_project OR
+    (no bound project AND project_id = ANY(allowed_project_ids))`) mapped onto the implemented
+    layout: the portfolio read through `app.allowed_project_ids` stays its own
+    `allowed_projects_read_policy`, and tenant-level rows keep their stricter write rule. The flag
+    never crosses tenants; non-admins stay 404 cross-project; an impersonation session binds it
+    false (ADR 0015). T-0274 lands it as a new frozen migration (T-0033 convention) and updates the
+    four RLS-bypass contract tests to assert exactly this.
   - **Admin grants** are tenant-level rows with no project, so they have their own policy: a user
     reads their own grant rows (`user_id = app.current_user_id`, a new session setting bound from
     the verified token's `sub` alongside the tenant); a session with

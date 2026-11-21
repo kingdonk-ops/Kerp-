@@ -3,12 +3,12 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 72/235 tasks done (31%) · **ready now:** 25 · **epics awaiting breakdown:** 48
+**Overall:** 72/242 tasks done (30%) · **ready now:** 24 · **epics awaiting breakdown:** 48
 
 | Phase | Tasks done | Progress |
 |---|---|---|
-| 0 · Platform foundations | 72/103 | `███████░░░` 70% |
-| 1 · Asset & Quality backbone | 0/119 (+1 epics) | `░░░░░░░░░░` 0% |
+| 0 · Platform foundations | 72/109 | `██████░░░░` 66% |
+| 1 · Asset & Quality backbone | 0/120 (+1 epics) | `░░░░░░░░░░` 0% |
 | 2 · Welding quality | 0/10 | `░░░░░░░░░░` 0% |
 | 3 · Logistics | 0/2 (+7 epics) | `░░░░░░░░░░` 0% |
 | 4 · Execution | 0/0 (+15 epics) | `░░░░░░░░░░` 0% |
@@ -110,10 +110,10 @@
 | ✅ | [T-0071](../tracker/tasks/T-0071.md) | Load the caller's memberships once per request | projects | S | — | #57 |
 | ✅ | [T-0072](../tracker/tasks/T-0072.md) | Duplicated tab keeps its session: cross-tab refresh lock and token hand-off | frontend | M | T-0037 | #105 |
 | ▶ | [T-0218](../tracker/tasks/T-0218.md) | uploads: ClamAV scanner (clamd INSTREAM) in the worker replacing the stub, signature on the file row, scanner PING for health | uploads | S | T-0016, T-0213, T-0215 |  |
-| ⬜ | [T-0219](../tracker/tasks/T-0219.md) | admin: deployment stats (counts + byte totals via module stats providers and count-only SECURITY DEFINER functions) and health probes at /api/v1/admin/system | admin | M | T-0014, T-0015, T-0016, T-0039, T-0218 |  |
+| ⬜ | [T-0219](../tracker/tasks/T-0219.md) | admin: deployment stats (counts + byte totals via module stats providers under normal RLS) and health probes at /api/v1/admin/system | admin | M | T-0014, T-0015, T-0016, T-0039, T-0218, T-0274 |  |
 | ▶ | [T-0220](../tracker/tasks/T-0220.md) | jobs: queue monitor API for System admins (queue depths, cron runs, failed jobs without payloads, retry/abort) | jobs | S | T-0015, T-0214, T-0039 |  |
-| ⬜ | [T-0221](../tracker/tasks/T-0221.md) | uploads: quarantine monitor API — rejected/verifying/expired upload rows of member projects, counts for the others, re-check stuck files, sweep now | uploads | S | T-0218, T-0215, T-0039, T-0219 |  |
-| ▶ | [T-0222](../tracker/tasks/T-0222.md) | admin: read-only audit explorer over the hash-chain ledger (filters, verify one chain, verify all as a batch job) | admin | M | T-0006, T-0043, T-0039, T-0015 |  |
+| ⬜ | [T-0221](../tracker/tasks/T-0221.md) | uploads: quarantine monitor API — rejected/verifying/expired upload rows and counts of every project, re-check stuck files, sweep now | uploads | S | T-0218, T-0215, T-0039, T-0274 |  |
+| ⬜ | [T-0222](../tracker/tasks/T-0222.md) | admin: read-only audit explorer over the hash-chain ledger (filters, verify one chain, verify all as a batch job) | admin | M | T-0006, T-0043, T-0039, T-0015, T-0274 |  |
 | ▶ | [T-0223](../tracker/tasks/T-0223.md) | projects: per-project legal hold (flag + reason, System admin only, audited) blocking soft delete with 409 LEGAL_HOLD_ACTIVE (ADR) | projects | S | T-0012, T-0039 |  |
 | ▶ | [T-0226](../tracker/tasks/T-0226.md) | core mail: delivery ledger — delivered status from SES delivery events, recipient_user_id/project_id/broadcast_id, stats and searchable history (ADR) | platform | M | T-0058 |  |
 | ▶ | [T-0227](../tracker/tasks/T-0227.md) | core mail: automated template overrides — per template + locale subject/text blocks with revisions, preview, test send to self, reset to shipped default | platform | M | T-0058, T-0039 |  |
@@ -124,6 +124,12 @@
 | ⬜ | [T-0225](../tracker/tasks/T-0225.md) | Frontend: Admin → System → Audit log (filters, verify chain, verify all) and legal-hold toggle on the project admin page | frontend | S | T-0026, T-0222, T-0223 |  |
 | ⬜ | [T-0229](../tracker/tasks/T-0229.md) | Frontend: Admin → Communications — broadcast composer, delivery stats and history, automated template editor | frontend | M | T-0026, T-0226, T-0227, T-0228 |  |
 | ⬜ | [T-0232](../tracker/tasks/T-0232.md) | Frontend: Admin → System → Settings — editable registry by category with bounds, read-only deployment configuration | frontend | S | T-0026, T-0230 |  |
+| ⬜ | [T-0274](../tracker/tasks/T-0274.md) | tenancy: system_admin global project visibility (ADR 0016) — additive migration replacing project_isolation_policy on every project-scoped table through the frozen-DDL helper, ORM scope mirror, RLS contract tests updated | tenancy | M | T-0007, T-0014, T-0033 |  |
+| ⬜ | [T-0275](../tracker/tasks/T-0275.md) | identity/projects: system_admin capabilities on every project (V, C, E, administer; never A or S), all projects in GET /projects and /me/projects, SoD warning for hold personas on system_admins | identity | S | T-0274, T-0010, T-0014, T-0042 |  |
+| ⬜ | [T-0276](../tracker/tasks/T-0276.md) | Frontend: project picker and All-Projects scope show every project for a system_admin (badge for admin access without membership; no A/S actions) | frontend | S | T-0275, T-0042, T-0024 |  |
+| 🟥 | [T-0277](../tracker/tasks/T-0277.md) | identity: system_admin impersonation token — POST /admin/users/{id}/impersonate and /auth/impersonation/exit, single-session impersonation JWT (no refresh), target RLS with is_system_admin = false (blocked by TD-426) *(blocked by TD-426)* | identity | M | T-0006, T-0008, T-0010, T-0014, T-0039, T-0043, T-0230, T-0274 |  |
+| 🟥 | [T-0278](../tracker/tasks/T-0278.md) | identity: central impersonation guardrail — 403 IMPERSONATION_ACTION_FORBIDDEN for A/S authority, signing, co-sign, inspection submit/approve, hold release, overrides and credential/device/grant mutations; route-classification contract test (blocked by TD-426) *(blocked by TD-426)* | identity | M | T-0277, T-0010 |  |
+| 🟥 | [T-0279](../tracker/tasks/T-0279.md) | audit: dual-identity ledger entries during impersonation — impersonated_by_user_id column, ledger hash v3, attribution in the audit explorer (ADR 0015; blocked by TD-426) *(blocked by TD-426)* | audit | S | T-0006, T-0043, T-0277 |  |
 
 ## Phase 1 — Asset & Quality backbone
 
@@ -205,11 +211,11 @@
 | ⬜ | [T-0166](../tracker/tasks/T-0166.md) | sync: P6 re-import during a field checkout — tests 10 and 12 and checked-out records on the change-impact report (split from T-0133) | sync | S | T-0133, T-0104 |  |
 | 🧩 | [E-01-01](../tracker/tasks/E-01-01.md) | register views: column catalogue (level/item-type fields, ancestors, rollups, cross-module providers), filter AST, shared saved views, grouped totals, bulk actions | saved_views | L | T-0020, T-0025, T-0102 |  |
 | ✅ | [E-01-02](../tracker/tasks/E-01-02.md) | project export and retention archive: self-contained zip (offline HTML viewer, categorised files, restorable row dump), S3 storage tiering, deep-archive restore, restore as deleted or new project | archive | L | T-0015, T-0016, T-0026, T-0101, T-0103, T-0111, T-0158 | #137 |
-| ⬜ | [T-0233](../tracker/tasks/T-0233.md) | archive: module + project archive registry (oe_archive_project_archive), export request API, status lifecycle, completion notifications | archive | S | T-0015, T-0016, T-0019, T-0058, T-0039, T-0223 |  |
+| ⬜ | [T-0233](../tracker/tasks/T-0233.md) | archive: module + project archive registry (oe_archive_project_archive), export request API, status lifecycle, completion notifications | archive | S | T-0015, T-0016, T-0019, T-0058, T-0039, T-0223, T-0274 |  |
 | ⬜ | [T-0234](../tracker/tasks/T-0234.md) | archive: package builder — export-provider contract, manifest + SHA-256 inventory, project_data.json/.js, db_restore_manifest.jsonl.gz, streamed zip; providers for projects, memberships, uploads, audit | archive | M | T-0233, T-0006, T-0016 |  |
 | ⬜ | [T-0235](../tracker/tasks/T-0235.md) | archive: export providers for asset hierarchy, Items and inspections + anchored file tree (reports, original and annotated photos, attachments) | asset_management | M | T-0234, T-0101, T-0103, T-0111, T-0150, T-0156, T-0158 |  |
 | ⬜ | [T-0236](../tracker/tasks/T-0236.md) | archive: offline HTML viewer (index.html + viewer-assets) — hierarchy, Items, inspections, audit hashes, relative file links, zero network | frontend | M | T-0235, T-0024 |  |
-| ⬜ | [T-0237](../tracker/tasks/T-0237.md) | archive: storage tier change (CopyObject STANDARD/GLACIER_IR ↔ DEEP_ARCHIVE) and presigned download | archive | S | T-0233, T-0014 |  |
+| ⬜ | [T-0237](../tracker/tasks/T-0237.md) | archive: storage tier change (CopyObject STANDARD/GLACIER_IR ↔ DEEP_ARCHIVE) and presigned download | archive | S | T-0233, T-0014, T-0274 |  |
 | ⬜ | [T-0238](../tracker/tasks/T-0238.md) | archive: deep-archive restore (RestoreObject Bulk/Standard), SAQ cron polling, ready notification and temporary-copy expiry | archive | S | T-0237, T-0214 |  |
 | ⬜ | [T-0239](../tracker/tasks/T-0239.md) | archive: restore — validate archive (manifest SHA-256s, schema versions, audit chains) and restore a soft-deleted project | archive | M | T-0234, T-0235, T-0016, T-0237 |  |
 | ⬜ | [T-0240](../tracker/tasks/T-0240.md) | archive: restore as a new project — deterministic id remap, rebuilt ltree paths, copied objects, archived audit chains as evidence (ADR) | archive | M | T-0239 |  |
@@ -250,6 +256,7 @@
 | ⬜ | [T-0270](../tracker/tasks/T-0270.md) | eligibility/forms: is_product_approved CEL helper (pure, dual-runtime parity fixtures) over context.product_approvals resolved by the eligibility service | materials | S | T-0185, T-0269, T-0139, T-0110, T-0017 |  |
 | ⬜ | [T-0271](../tracker/tasks/T-0271.md) | materials/inspections: substitutions in the offline reference bundle, substitution_id bound on the answer, read-only substitution note on the inspection and its PDF | materials | M | T-0270, T-0147, T-0158, T-0111 |  |
 | ⬜ | [T-0272](../tracker/tasks/T-0272.md) | Frontend: product selector shows approved substitutes badged "Approved Substitute (ref)" with the equivalency document viewable offline; selecting binds substitution_id | materials | S | T-0271, T-0165 |  |
+| 🟥 | [T-0280](../tracker/tasks/T-0280.md) | Frontend: Admin → Users 'Login as user (support)' with reason modal, persistent impersonation banner with countdown and Exit, session hand-back (blocked by TD-426) *(blocked by TD-426)* | frontend | M | T-0246, T-0026, T-0277, T-0278, T-0279 |  |
 
 ## Phase 2 — Welding quality
 

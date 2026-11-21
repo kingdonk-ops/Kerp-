@@ -23,7 +23,8 @@ That conflicts with three binding rules:
    anonymous principal anywhere in KERP.
 3. **Diff §4.1 and the RLS model** (`app/core/tenancy/README.md`): a session reads and writes
    only the project it is bound to; project scope comes from the caller's memberships, never
-   from request parameters; System admins read no project-scoped record without a membership.
+   from request parameters; System admins read every project of the tenant (ADR 0016,
+   superseding the earlier membership rule), which does not concern anonymous callers.
    No row-returning RLS bypass exists, and count-only bypasses need their own ADR (ADR 0012).
 
 The capture is wanted for real cases (drivers, subcontractor operators and visitors who do a

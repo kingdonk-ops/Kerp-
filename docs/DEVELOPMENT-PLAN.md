@@ -304,6 +304,25 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
   uploaded-zip restore needs the caller's own upload (`file_id` readable under upload RLS, else
   404).
 
+- **2026-11-21 — system_admin global visibility (user decision) and support impersonation
+  (user-supplied task; planner pass):** the user amended diff §4.1: a `system_admin` lists,
+  opens, reads and administers every project of the tenant without a membership, never with `A`
+  or `S` (ADR 0016, **accepted**; edge spec §5/§6; core RLS change). New: T-0274 (tenancy, M,
+  phase 0: `project_isolation_policy` + frozen migration on top of in-flight T-0033, ORM scope,
+  the four RLS-bypass contract tests updated, not weakened), T-0275 (identity, S, phase 0:
+  capabilities, project lists, SoD warning), T-0276 (frontend, S, phase 0: picker and
+  All-Projects). T-0014, T-0042 and T-0033 untouched. TD-396 resolved; PR #137 content
+  simplified (membership gates and count-only `SECURITY DEFINER` functions for admins dropped):
+  diff §4.7, §6.1, §6.5, `documents-and-mdr.md` §Access/§Package/§Registry/§Restore, T-0219,
+  T-0221 (no longer depends on T-0219), T-0222, T-0224, T-0233, T-0237, T-0239, T-0240, T-0241;
+  ADR 0013 context sentence. Raised: TD-427 (access log of non-member admin reads; default no).
+  The user's support impersonation task "T-0076" (id taken: PER-16 Project Viewer, done) became
+  T-0277 (token + target RLS, M, phase 0), T-0278 (central guardrail + route contract test, M,
+  phase 0), T-0279 (dual-identity ledger hash v3, S, phase 0), T-0280 (Admin → Users action and
+  banner, M, phase 1, after T-0246), all **blocked by TD-426** (ADR 0015 proposed; planner
+  default: read-only "view as"). Spec: diff §4.2 *Support impersonation*, §4.7 registry entry
+  `impersonation_max_minutes`, §6.5, edge spec §5. **Pilot-0 gate unchanged.**
+
 ## Key engineering decisions (baked into the spec — see consolidation diff)
 
 | Area | Decision |
@@ -318,6 +337,7 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
 | Calibration | lifecycle + SAQ OCR + supersede-lock + hard CEL gate (expired tool blocked) |
 | Frontend | 8-group IA on 4 pillars (nav mapping diff §6.1); RegisterPage/DetailPage/Dynamic Form Renderer first; **Dexie** offline outbox for web PWA apps |
 | Access (2026-11-13) | One hidden tenant per deployment; System admins appoint Project Admins (`create_projects`); creator gets PER-09; lobby + access requests; project picker; one URL; admin roles never confer hold/sign-off (diff §4.1) |
+| Admin visibility (2026-11-21) | `system_admin` sees and administers every project of its tenant without a membership (RLS `app.is_system_admin`, server-bound, never cross-tenant), never `A`/`S` (ADR 0016) |
 | Teams (2026-11-13) | Tenant-level teams, managed by System admins; a team links to several projects with one role (persona) per project; effective access = individual memberships ∪ team-derived grants, stored as membership rows keyed by source type/id (diff §4.1, ADR 0008); new PER-16 Project Viewer; teams are not planner crews; saved views share to several linked teams |
 | Sessions & devices (2026-11-13) | 15 min access, 12 h refresh from sign-in (daily re-login); hybrid device PIN, offline unlock independent of the server session; offline window 7 days default, 14 max; device registry + remote revoke/wipe (diff §4.2–§4.4) |
 | Login & lobby (2026-11-14) | Access-request lifecycle (`pending/approved/rejected/withdrawn`, reason, 24 h re-request cooldown) shown in the lobby; lobby list for internal staff only (Entra sign-in or `KERP_INTERNAL_EMAIL_DOMAINS`); single-use invite tokens bound to the e-mail (invites in the Pilot-0 gate); offline grace 24 h after session end binds edits, 7-day window only an upper bound (TD-257); Entra ID SSO identity only (OIDC + PKCE, no group mapping, no auto-create, same 12 h session), promoted for internal staff with password sign-in kept; magic links for Field Workers (PER-14) only (TD-136); externals never SSO: password set at invite acceptance (e-mailed invite only) + self-service reset (NIST 800-63B style, min 8); invite re-send rotates tokens; outbound e-mail via SES in Pilot-0 (diff §4.1, §4.2, §4.5, §4.6) |

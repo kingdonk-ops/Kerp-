@@ -3,9 +3,9 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 284 · **Closed:** 134
+**Open:** 285 · **Closed:** 135
 
-## decision (27)
+## decision (28)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -19,7 +19,6 @@
 | [TD-348](../tracker/todo/TD-348.md) | T-0073: deleting a project with team-derived members answers 409 (unlink teams first); T-0013 to confirm or cascade | T-0073 | implementer |
 | [TD-373](../tracker/todo/TD-373.md) | Invite acceptance and SoD: accept proceeds (audited sod_warning) when the invitee gained a conflicting persona after the inviter confirmed | T-0052 | implementer |
 | [TD-378](../tracker/todo/TD-378.md) | First password at invite acceptance: should an internal-domain account without credentials (company member who never signed in through Entra ID) be refused? | T-0059 | implementer |
-| [TD-396](../tracker/todo/TD-396.md) | System console and project archive: may a System admin see project-scoped records (upload quarantine rows, audit entries, archive contents) of projects where they hold no membership? | T-0221, T-0222, T-0233, T-0237, T-0239, T-0240 | planner |
 | [TD-397](../tracker/todo/TD-397.md) | Upload quarantine: keep the bytes of rejected (infected) uploads for re-scan and purge, or keep deleting them at rejection (T-0016)? | T-0218, T-0221 | planner |
 | [TD-398](../tracker/todo/TD-398.md) | Runtime settings: auth/security values from the 2026-11-21 paste (refresh hours, PIN idle, PIN lockout, scanner on/off, region, mail sender, AI provider) stay read-only deployment configuration? | T-0230 | planner |
 | [TD-399](../tracker/todo/TD-399.md) | Broadcast e-mail: may a System admin e-mail all users / any project's users, given diff §4.1 'only a project's PER-09 may send a notification through the API'? | T-0228 | planner |
@@ -36,6 +35,8 @@
 | [TD-419](../tracker/todo/TD-419.md) | Calendar iCal feed GET /api/v1/calendar/ical/{token}.ics: a second token-authenticated no-JWT endpoint — decide with ADR 0013 (same tenant-from-JWT conflict) | E-04-15 | planner |
 | [TD-422](../tracker/todo/TD-422.md) | Shelf-life extension approver when the requester is PER-06: PER-13 Quality Director approves (user) — PER-13 has 'audit oversight', not QA approval (A), in the persona matrix | T-0184, T-0185 | planner |
 | [TD-423](../tracker/todo/TD-423.md) | Internal-QA product substitution: may the Quality Engineer who raises it also approve it (user: 'raises and approves directly'), or does it need a second QE (no self-approval, as T-0184 and T-0140)? | T-0185 | planner |
+| [TD-426](../tracker/todo/TD-426.md) | System admin impersonation (user's pasted 'T-0076'): may a system_admin act as another user, or only view as them? Accept ADR 0015 with (a) full impersonation, (b) admin-member projects only, (c) read-only view-as, or (d) target consent by one-time code | T-0277, T-0278, T-0279, T-0280 | planner |
+| [TD-427](../tracker/todo/TD-427.md) | system_admin global visibility (ADR 0016): should reads of project records by a system_admin who holds no membership on that project be access-logged? | T-0274, T-0275 | planner |
 
 ## spec-gap (56)
 
@@ -462,3 +463,4 @@
 | ✅ | [TD-384](../tracker/todo/TD-384.md) | T-0075 SoD fix: 'plus their existing rows' cannot keep a sod_pending user's stale row of the link | user decision 2026-11-21: accept the implemented reading. The sync gets the expected set minus the sod_pending users; a pending user's stale rows of that link are excess and revoked; --fix --confirm-sod then adds the correct row. T-0075 AC reworded |
 | ✅ | [TD-385](../tracker/todo/TD-385.md) | T-0075 reconcile: a live link to a deleted project expects no derived rows (rows it holds are excess, --fix revokes) | user decision 2026-11-21: accept. A live link to a deleted project expects no derived rows (matches the teams service, TD-358); rows it holds are excess and --fix revokes them; after a project restore reconcile expects them again. T-0075 AC reworded |
 | ✅ | [TD-386](../tracker/todo/TD-386.md) | audit ledger: concurrent appends to one chain race on SQLite (seq unique violation → 500) | on SQLite _lock_chain takes the database write lock (a no-op UPDATE on audit_ledger) before the tail read, so a second appender waits for the first to commit and links to it (fix/audit-ledger-sqlite-race) |
+| ✅ | [TD-396](../tracker/todo/TD-396.md) | System console and project archive: may a System admin see project-scoped records (upload quarantine rows, audit entries, archive contents) of projects where they hold no membership? | Answered by the user's decision of 2026-11-21: system_admin has global read/admin visibility across all projects of the tenant without a membership (docs/decisions/0016-system-admin-global-visibility.md, accepted; diff §4.1; T-0274-T-0276). Quarantine rows and audit chains of every project, archive export/download/restore of any project; count-only functions and membership gates dropped (T-0219, T-0221, T-0222, T-0224, T-0233, T-0237, T-0239, T-0240, T-0241). |
