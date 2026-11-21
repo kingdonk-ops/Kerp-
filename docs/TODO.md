@@ -3,9 +3,9 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 349 · **Closed:** 149
+**Open:** 348 · **Closed:** 150
 
-## decision (40)
+## decision (39)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -48,7 +48,6 @@
 | [TD-442](../tracker/todo/TD-442.md) | Issues: may an internal punch/NCR be assigned to an external account (subcontractor) who must then see it? Planner default: no (422), internal issues are invisible to every is_internal=false caller | T-0314 | planner |
 | [TD-484](../tracker/todo/TD-484.md) | RFI notification e-mail: may it carry the date/time/location, the RFI PDF attachment and an .ics invite, and go to client distribution addresses without a KERP account? | T-0335 | planner |
 | [TD-486](../tracker/todo/TD-486.md) | RFI witness check: may an unmet hold-point (H) witness requirement be overridden per record (ADR 0004 Amendment A), or is it non-overridable? | T-0333 | planner |
-| [TD-502](../tracker/todo/TD-502.md) | ADR for the legal-hold columns on oe_projects_project (core-table change, T-0223) | T-0223 | implementer |
 
 ## spec-gap (69)
 
@@ -542,3 +541,4 @@
 | ✅ | [TD-456](../tracker/todo/TD-456.md) | Template settings and project-level records: confirm the planner defaults (preset table, health_safety area, informal submit is final, allows_project_level issue categories, at most one equipment link, MDR location overlap rule) | Product owner (user, 2026-11-21): all items approved except item 7 (discipline replacing issue_category). Decided instead: inspection templates keep the optional issue_category, pointing at the issue category value list, which holds non-discipline categories (vehicle, equipment, pre-start, general, ...) alongside disciplines (painting, blasting, ...), because e.g. issues from a vehicle pre-start have no discipline; raise-time fallback is issue_category x type (none -> general). There is no separate discipline field; the Templates list filters by area and issue category. |
 | ✅ | [TD-463](../tracker/todo/TD-463.md) | Server: refuse self-deactivation on PATCH /admin/users/{id} (Admin → Users only hides the button) | T-0085: the server refuses self-deactivation (409 CANNOT_DEACTIVATE_SELF, audited); the UI shows the message. |
 | ✅ | [TD-492](../tracker/todo/TD-492.md) | Phase 0 exit 'module toggled': no shipped module is toggleable yet (every manifest has toggleable=False), so the e2e journey cannot switch one off and on | User, 2026-11-21: planner default (a) accepted. T-0027 tests the refusals now (platform module 409, unknown module 404, state unchanged); the switch-off/switch-on step is test.skip with TD-492 in the reason until the first toggleable module merges, whose task removes the skip. |
+| ✅ | [TD-502](../tracker/todo/TD-502.md) | ADR for the legal-hold columns on oe_projects_project (core-table change, T-0223) | ADR 0018 (docs/decisions/0018-project-legal-hold.md), accepted 2026-11-21: legal-hold columns on oe_projects_project (additive, no RLS change); reason/set_by/set_at describe the active hold only, history in admin-system:<tenant>; ProjectRead exposes only the flag; delete 409 LEGAL_HOLD_ACTIVE; is_on_legal_hold contract for the archive (T-0233) |

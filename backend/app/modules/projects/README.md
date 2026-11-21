@@ -102,6 +102,9 @@ archive, T-0233) must call `is_on_legal_hold(session, project_id)` first and ref
 `True`; any session that sees the project row may ask (`OutOfScopeError` for an unknown or
 deleted project). There is no hard purge (TD-401); retention rules stay TD-175.
 
+The columns on `oe_projects_project` (migration `0037`) are a core-table change recorded in
+[ADR 0018](../../../../docs/decisions/0018-project-legal-hold.md).
+
 ## Module toggle (T-0084)
 
 `GET /api/v1/projects/{id}/modules` lists every loaded module in dependency order with
