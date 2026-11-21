@@ -34,6 +34,12 @@ Batch pipeline (**SAQ `batch`** queue, heavy libs lazy):
 `Σ unsigned ITP hold points > 0`. Final dossiers and commercial Delay Notices are signed with
 **pyHanko** (ETSI **PAdES-B-LTA** + **RFC 3161** timestamp).
 
+**Signature evidence (enterprise roadmap, 2026-11-21).** The dossier prints, for every formal
+sign-off it contains, the attestation block of `quality-and-inspection.md` §Signing attestation
+(signer, persona, "on behalf of" for a delegate, intent statement and version, re-auth method,
+time, device id, IP) through the shared `signing` renderer (T-0291); sign-offs without an
+attestation (Pilot-0) say so.
+
 ### Material traceability in the MDR (user, 2026-11-21; E-05-05, from T-0184)
 For every subsystem or asset where a material batch with an approved shelf-life extension was
 used (`materials-and-traceability.md` §Shelf-life extension), the dossier attaches under the

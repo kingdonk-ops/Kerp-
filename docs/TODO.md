@@ -3,9 +3,9 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 289 · **Closed:** 135
+**Open:** 297 · **Closed:** 135
 
-## decision (30)
+## decision (37)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -39,6 +39,13 @@
 | [TD-427](../tracker/todo/TD-427.md) | system_admin global visibility (ADR 0016): should reads of project records by a system_admin who holds no membership on that project be access-logged? | T-0274, T-0275 | planner |
 | [TD-429](../tracker/todo/TD-429.md) | Pasted 'pending_qa_review' is not an inspection lifecycle state: keep auto-generated ITPs out of oe_inspections_inspection until QA activates them (planner default), or add a new state? And re-pinning PENDING lines on master propagation | T-0188, T-0281 | planner |
 | [TD-431](../tracker/todo/TD-431.md) | QA reviewer's own certificate/credential/MTR upload: verify immediately (user's T-0181 paste) or four eyes (TD-070 default)? | T-0181, T-0260, T-0261, T-0265 | planner |
+| [TD-433](../tracker/todo/TD-433.md) | Signing attestation (e-signature) details: which sign-offs are formal, re-authentication methods, offline device-PIN re-entry, IP capture | T-0289, T-0290, T-0291 | planner |
+| [TD-434](../tracker/todo/TD-434.md) | Narrow delegation of authority: already-assigned items, who may create a delegation, length, delegator authority, chaining | T-0292, T-0293, T-0294, E-06-07 | planner |
+| [TD-435](../tracker/todo/TD-435.md) | External inspection party (third-party inspector, NDT/test lab subcontractor): new persona PER-17, PER-15 with a party type, or no persona? Plus the internal-commercial boundary for external accounts | T-0295, T-0296, T-0297 | planner |
+| [TD-436](../tracker/todo/TD-436.md) | Usage metering: attribution of content-addressed bytes, seat definition, snapshot time, cost-centre reference | T-0301, T-0302, T-0303, T-0304 | planner |
+| [TD-437](../tracker/todo/TD-437.md) | SCIM 2.0 provisioning: users only, create allowed, deactivate never delete, last System admin, device handling | T-0298, T-0299 | planner |
+| [TD-438](../tracker/todo/TD-438.md) | Machine credentials (ADR 0017): service-account representation and who manages API keys | T-0298, T-0307, T-0308, T-0309 | planner |
+| [TD-439](../tracker/todo/TD-439.md) | Feature flags: who toggles them, project overrides, and what a flag may gate | T-0306 | planner |
 
 ## spec-gap (58)
 
@@ -157,7 +164,7 @@
 | [TD-365](../tracker/todo/TD-365.md) | Frontend translations of the password policy codes and the password policy in /auth/config | T-0077 | implementer |
 | [TD-394](../tracker/todo/TD-394.md) | Approve access request: site picker for PER-07 site scope once the asset hierarchy API exists | T-0051 | implementer |
 
-## later (120)
+## later (121)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -281,6 +288,7 @@
 | [TD-393](../tracker/todo/TD-393.md) | Expose is_system_admin on GET /auth/me so the client need not probe GET /admin/grants for Admin nav visibility | T-0051 | implementer |
 | [TD-403](../tracker/todo/TD-403.md) | Stats and export providers for modules that land later: NCR, punch, equipment, credentials, materials/MTR, MDR, welding | T-0219, T-0235 | planner |
 | [TD-415](../tracker/todo/TD-415.md) | Inspection follow-ups (oe_inspections_follow_up) move to the generic tasks module when E-04-07 is broken down | T-0257, T-0288, E-04-07 | planner |
+| [TD-440](../tracker/todo/TD-440.md) | In-app IP allowlisting is not built: network restrictions live in the WAF / Entra Conditional Access; revisit only if a client contract requires per-project IP rules | — | planner |
 
 ## bug (6)
 

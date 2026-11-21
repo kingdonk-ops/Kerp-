@@ -556,6 +556,14 @@ a membership, and never `A` or `S`; approving or signing still needs one of the 
 personas above plus credentials on that project, and assigning one to a `system_admin` warns and
 is audited with `sod_warning: true`.
 
+**External inspection party (enterprise roadmap, user 2026-11-21) — pending decision TD-435;
+T-0296/T-0297 blocked.** Third-party inspectors and lab/NDT subcontractors who attend witness
+points and submit certificates have no fitting persona. The planner recommends a new **PER-17
+External Inspection Party** (individual assignment only, granted subtree, `V`, `C` on its own
+submissions and witness attendance, `S` only for witness lines naming it, never `A`); the matrix
+above is unchanged until TD-435 is decided. Independently, accounts with `is_internal = false`
+never read `internal_commercial` routes or fields, whatever their persona (diff §4.9, T-0295).
+
 **Support impersonation (user paste "T-0076", 2026-11-21) — pending decision TD-426; ADR 0015
 proposed; T-0277–T-0280 blocked.** While a `system_admin` views KERP as another user
 (`KERP-CONSOLIDATION-AND-DIFF.md` §4.2 *Support impersonation*), the session has exactly that

@@ -115,7 +115,7 @@ The foundational security, enterprise directory, and contextual authentication b
 * Implements a granular permission structure: `[module]:[resource]:[action]:[scope]` (e.g., `field_ops:itp_step:sign_off:assigned_subcontractor`).
 
 #### 4. Cross-Module Links & Interactions
-* **Upstream**: Corporate Identity Provider (SAML/SCIM).
+* **Upstream**: Corporate Identity Provider. As built: Entra ID OIDC sign-in, identity only (consolidation diff §4.5), and SCIM 2.0 user provisioning/deprovisioning after Pilot-0 (diff §4.9, ADR 0017); no SAML, no group-to-role mapping.
 * **Downstream to [MOD-06] & [MOD-08]**: Blocks allocation of workers to high-risk tasks or ITP step sign-offs if tickets/accreditations are expired or missing.
 * **Downstream to [MOD-11]**: Generates cryptographically validated audit manifests for every signature embedded in final Handover Data Books.
 

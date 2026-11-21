@@ -68,6 +68,11 @@ changed only by an approved extension).
 - **MDR:** the dossier attaches the original MTR/batch certificate and every approved extension
   certificate in chronological order (`documents-and-mdr.md` §Material traceability in the MDR).
 
+- **Attested approval (enterprise roadmap, 2026-11-21).** QA approval of an extension is a formal
+  sign-off (`shelf_life_extension_approve`): re-authentication, intent statement and evidence in
+  the sign-off ledger (`quality-and-inspection.md` §Signing attestation; T-0184 AC, T-0289).
+  A delegate may approve only with their own QA persona and credentials (§Delegation of authority).
+
 ## Product substitutions (user, 2026-11-21; planner defaults; T-0185, T-0269–T-0273)
 A register of approved substitutes for specified products (coatings, consumables, components),
 with traceable authority, used by the product-spec check on inspections.
@@ -103,6 +108,10 @@ with traceable authority, used by the product-spec check on inspections.
 - **MDR:** every inspection or asset that references a `substitution_id` brings the approved
   substitution record (or the linked TQ approval) and its equivalency document into the dossier
   (`documents-and-mdr.md` §Material traceability in the MDR).
+
+- **Attested approval (enterprise roadmap, 2026-11-21).** The internal_qa approval is a formal
+  sign-off (`substitution_approve`, T-0291) and the TQ approval of the client_tq route is one too
+  (`tq_approve`, Phase 5); see `quality-and-inspection.md` §Signing attestation.
 
 ## Cutting interface
 Confirmed cutting plans post net stock consumption + new offcuts to `site_inventory`; the

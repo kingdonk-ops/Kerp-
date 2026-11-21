@@ -788,6 +788,8 @@ tokens): registration refuses them. The §4.4 settings become registry entries;
 | `cosign_pin_token_ttl_minutes` | 5 | 1–15 | signing (T-0162) |
 | `provisional_cosign_client_reminder_hours`, `provisional_cosign_escalation_hours` | 24, 72 | 1–720 (client < escalation) | signing (T-0174) |
 | `impersonation_max_minutes` (not client-visible; pending TD-426) | 30 | 5–60 | support impersonation (§4.2, T-0277) |
+| `signing_reauth_ttl_minutes` (not client-visible; enterprise roadmap 2026-11-21) | 5 | 1–15 | signing attestation (T-0289) |
+| `api_key_rate_per_minute` (not client-visible) | 600 | 60–6000 | API keys (§4.9, T-0308) |
 
 Read-only **deployment configuration** (shown, never edited at runtime; TD-046, TD-398):
 refresh-token lifetime (`KERP_REFRESH_TOKEN_HOURS`, 12), PIN idle (`KERP_PIN_IDLE_MINUTES`, 30),
@@ -797,6 +799,16 @@ assistant, Phase 5). **Client bootstrap** (API T-0231, phase 0; client consumpti
 phase 1): `GET /api/v1/settings/client` (the paste's
 `/api/v1/config/client`, under the settings module's mount) for any signed-in user returns the
 client-visible entries only; web and Android read it at sign-in and at every sync.
+
+**Feature flags** (user, 2026-11-21, enterprise roadmap; T-0306; TD-439). Category
+`feature_flags` of the registry, type `bool` only, declared in code by the owning module. A flag
+may be overridden per project (`oe_settings_project_value`, project RLS; only entries marked
+`project_overridable`); effective value = project override → tenant value → code default. Only a
+`system_admin` sets flags; PER-09 reads its projects' effective flags. **Staged rollout:** a flag
+is switched on for named pilot projects first, then tenant-wide (an explicit project `false`
+still wins). A flag gates availability only (UI entry points; the feature's endpoints answer 404
+`FEATURE_DISABLED` while off); it never relaxes authorization, `run_checks` or RLS, and turning
+it off deletes nothing. The client bootstrap returns the effective flags of the active project.
 
 ### 4.8 User directory, account state and presence (user, 2026-11-21; planner defaults)
 
@@ -839,6 +851,94 @@ additive and need an ADR (CLAUDE.md §6).
   PER-07 site scope, team-derived rows shown read-only with their team, the PER-09 + hold-persona
   SoD warning returned before commit and audited `sod_warning: true` (§4.1, TD-151), PER-15 and
   PER-09 individual only.
+
+### 4.9 Enterprise identity and access (user, 2026-11-21, enterprise roadmap; planner defaults)
+
+The user's enterprise roadmap of 2026-11-21, applied through the coordinator's assessment that
+the user approved. E-signature and delegation are in `modules/quality-and-inspection.md`
+(§Signing attestation, §Delegation of authority); metering is §4.10; feature flags are in §4.7.
+
+- **SCIM provisioning (after Pilot-0; T-0298–T-0300; ADR 0017; TD-437).** Entra ID provisions
+  and deprovisions KERP accounts through SCIM 2.0 at `/scim/v2/` (off unless
+  `KERP_SCIM_ENABLED`). This is the "provisioning" source of accounts named in §4.5; Entra
+  groups still never map to personas, grants or teams, so `/Groups` is not supported.
+  - **Users:** create (no credentials, memberships or grants; `is_internal` derived as in §4.1),
+    filter by `userName` (= e-mail) or `externalId` (= Entra object id, linked like an SSO link:
+    an account linked to a different oid → 409), PATCH/PUT, DELETE.
+  - **Deprovisioning** (`active = false` or DELETE) sets `auth_user.is_active = false` (never a
+    hard delete) and revokes every live session at once through force sign-out's revoke (§4.8):
+    the next request is 401, not `DEVICE_REVOKED`, and no device is wiped. Reactivation restores
+    sign-in only. The last active System admin cannot be deactivated (409, audited, System admins
+    notified).
+  - **Token:** a bearer token per Entra application, created by a `system_admin`, shown once,
+    stored only as a SHA-256 hash, with expiry (default 365 days, max 730), rotation (the old
+    token stays valid 24 h) and revocation; the tenant is bound from deployment configuration and
+    the hash looked up under tenant RLS (ADR 0017); SCIM tokens work only on `/scim/v2/*`;
+    uniform 401; per-token rate limit; `Authorization` scrubbed from logs; every change audited.
+- **External parties (guest / subcontractor witness access; T-0295–T-0297; TD-435).** There is
+  no cross-tenant guest model: a deployment has one tenant (§4.1), and clients, subcontractors,
+  third-party inspectors and labs are ordinary accounts with `is_internal = false`, invited by
+  e-mail with a password (§4.1, §4.2, never SSO) and given individual memberships. PER-15 covers
+  client witness and co-sign. Gaps the roadmap closes:
+  - **Internal-commercial boundary (T-0295; restrictive planner default):** routes and response
+    fields classed `internal_commercial` (rates, cost, CBS burn, estimates, internal commercial
+    registers) answer 404 or are omitted for every `is_internal = false` caller, whatever persona
+    a PER-09 assigned; a contract test requires every route to declare its class. Client-facing
+    claim verification for PER-15 is declared `project` explicitly.
+  - **External inspection party (T-0296, T-0297; blocked by TD-435):** a third-party inspector
+    or lab/NDT subcontractor attends witness points that name them and submits certificates and
+    reports that land unverified in the QA verification queue. A new persona (planner
+    recommendation PER-17, individual assignment only, no `A`) is a core matrix change and waits
+    for TD-435.
+- **API keys and service accounts (Phase 5, alongside E-05-07; T-0307–T-0309; ADR 0017;
+  TD-438).** A service account is an `auth_user` with `account_type = service` (never signs in
+  interactively; excluded from seats, presence and broadcasts) holding project memberships. Its
+  API keys are tenant- or project-scoped, with `read`/`write` scopes and a required expiry
+  (≤ 365 days), stored hashed, shown once, revocable at once, audited, and rate limited per key
+  (`api_key_rate_per_minute`, §4.7). The tenant comes from the key (ADR 0017). Capabilities are
+  scopes ∩ memberships, and **`A` and `S` are always removed**: no sign-off, approval, hold
+  release, co-sign, attestation or confirmation of an AI proposal is ever made with a key.
+  Interactive-only routes (`/auth/*`, `/signing/reauth`, devices, PIN, invites, admin grants,
+  `/admin/*` mutations, SCIM) refuse keys. Records written with a key carry `source="api"`.
+  Outbound webhooks (HMAC) stay in E-05-07.
+- **Network restrictions (IP allowlisting).** Not built in KERP: source-IP restrictions are
+  infrastructure configuration (AWS WAF IP sets in front of the API and web app, Entra
+  Conditional Access named locations for SSO users), documented in
+  `docs/deploy/network-access.md`. KERP trusts forwarded client IPs only from
+  `FORWARDED_ALLOW_IPS`. Per-project IP rules: TD-440 (later).
+
+### 4.10 Usage metering (user, 2026-11-21, enterprise roadmap; planner defaults TD-436)
+
+Step 1 is cheap data capture now (Phase 1, T-0301, T-0302); advisories, statements and screens
+come later (Phase 6, T-0303–T-0305, epic E-06-05). Rules:
+
+- **Counts and bytes only.** No currency amount is stored, computed or sent by KERP; money stays
+  a read-only mirror (§1). A project's cost centre is a reference (`external_source` +
+  `external_id` + `synced_at` when it comes from the ERP) in a metering table, not a column of
+  `oe_projects_project`.
+- **Storage ledger** `oe_metering_storage_event` (module `metering`, `BaseRecordMixin` + RLS):
+  written through `metering/service.py` by the uploads file lifecycle (`available` adds a
+  reference, `expired`/swept/deleted removes it; rejected files never count), the image
+  derivatives (T-0247), the project archive registry (E-01-02: `ready`, tier changes, restore
+  copies). Cold archives count as `DEEP_ARCHIVE` (§4.7 storage classes). Idempotent through a
+  partial unique index on plain columns; soft delete only; nothing cascades into it.
+- **Content-addressed bytes (TD-408, TD-436).** Physical bytes are counted once per object
+  (tenant-wide and for its project); logical bytes per referencing file row. An object
+  referenced from several projects is attributed in full to each project's figures and marked
+  shared, while the tenant total counts it once. Derivatives go with their original; archives
+  with the archived project.
+- **Daily snapshot** `oe_metering_daily_snapshot`: one row per tenant (`project_id` null) or
+  project, date and metric, `UNIQUE NULLS NOT DISTINCT (tenant_id, project_id, snapshot_date,
+  metric_key)` as a partial index over live rows (PostgreSQL 16; no expressions in keys), soft
+  delete only, retained. Built by an SAQ cron on the `batch` worker after midnight in the
+  deployment's default site timezone; re-runs overwrite a date idempotently. Storage from the
+  ledger; seats from `auth_user.last_active_at` (§4.8), never audit-log scans; counts through the
+  stats-provider registry shared with deployment stats (§4.7, T-0219). Public capture
+  submissions are counted only if TD-410 accepts ADR 0013.
+- **Soft limits never block.** Quota policies (tenant default, per-project override) only raise
+  advisories (in-app and e-mail) to PER-09 holders and System admins.
+- **E-mail carries a link and the project code/name only** (§4.6); numbers stay in the app and
+  in the statement CSV download.
 
 ---
 
@@ -1093,6 +1193,8 @@ the navigation **and** refused by the API (403 for admin surfaces).
 | **System** | deployment stats + health; queue monitor (retry / abort); upload quarantine (rows of every project; re-check, sweep now); runtime settings (editable registry + read-only deployment configuration); admin grants (T-0026); devices (T-0048); audit log (filters, verify chain); legal hold on the project admin page | `system_admin` | T-0224, T-0225, T-0232 |
 | **Communications** | broadcast composer (audience, count, send); delivery stats (cards) and history; automated e-mail templates (edit, preview, test send, reset) | `system_admin`; PER-09 composer and stats for its own projects | T-0229 |
 | **Project archives** | archive list; export; storage tier toggle; download; start a deep-archive restore; restore wizard (deleted project or new project) | `system_admin` (any project of the tenant, live or deleted; ADR 0016) | T-0241 (epic E-01-02) |
+| **Identity and access** | SCIM provisioning (base URL, tokens: create once, rotate, revoke; §4.9); service accounts and API keys (Phase 5, §4.9); feature flags with project overrides (§4.7) | `system_admin` | T-0300, T-0309, T-0306 |
+| **Usage** | usage trends, storage by class, seats, quota policies and advisories, cost-centre references; project usage report with monthly CSV for PER-09/PER-02 (§4.10, Phase 6) | `system_admin`; PER-09/PER-02 for their projects | T-0305 |
 
 A screen never shows a project record the caller could not open in the project itself. Since
 ADR 0016 a `system_admin` opens every project of the tenant, so the upload quarantine shows
