@@ -130,7 +130,7 @@
 | [TD-327](../tracker/todo/TD-327.md) | Frontend i18n key notifications.kind.access_requests.requested for the inbox (needed when the access-request UI lands) | T-0050 | reviewer |
 | [TD-337](../tracker/todo/TD-337.md) | Web/Android route /magic-link#<token> that redeems the e-mailed sign-in link (POST /auth/magic-link/redeem); the e-mail now links there | T-0058 | implementer |
 | [TD-388](../tracker/todo/TD-388.md) | saved_views: wire the my_teams filter op | T-0074 | reviewer |
-| [TD-463](../tracker/todo/TD-463.md) | Server: refuse self-deactivation on PATCH /admin/users/{id} (Admin → Users only hides the button) | T-0331 | implementer |
+| [TD-463](../tracker/todo/TD-463.md) | Server: refuse self-deactivation on PATCH /admin/users/{id} (Admin → Users only hides the button) | T-0331, T-0085 | implementer |
 | [TD-487](../tracker/todo/TD-487.md) | Frontend: Admin -> System grants page needs the SoD confirm step for system_admin on a hold-authority holder (POST /admin/grants 409 sod_confirmation_required, confirm_sod), plus the same warning for hold personas on system_admins in member/invite/team UIs | T-0275 | implementer |
 
 ## deferred (47)
@@ -141,8 +141,8 @@
 | [TD-041](../tracker/todo/TD-041.md) | CEL parity gaps between celpy 0.5.0 and @marcbachmann/cel-js 8 (pinned known_gap fixtures) must be closed or accepted before T-0131 | T-0017, T-0018 | implementer |
 | [TD-047](../tracker/todo/TD-047.md) | Automate refresh of backend/requirements*.lock (uv pip compile output): Dependabot pip does not find *.lock files or re-run uv; options: scheduled uv --upgrade workflow opening a PR, or Renovate pip-compile manager | T-0028, T-0032 | implementer |
 | [TD-074](../tracker/todo/TD-074.md) | Handover: offline drafting on tablets via the Dexie outbox | E-04-11 | planner |
-| [TD-122](../tracker/todo/TD-122.md) | Bind the request's project scope from the authorised project (tenancy context is tenant-level after T-0008) | T-0008 | implementer |
-| [TD-129](../tracker/todo/TD-129.md) | Guard the module toggle API (PUT /api/v1/modules/{name}) with the admin capability tier once RBAC lands (T-0010/T-0014) | T-0011 | implementer |
+| [TD-122](../tracker/todo/TD-122.md) | Bind the request's project scope from the authorised project (tenancy context is tenant-level after T-0008) | T-0008, T-0084 | implementer |
+| [TD-129](../tracker/todo/TD-129.md) | Guard the module toggle API (PUT /api/v1/modules/{name}) with the admin capability tier once RBAC lands (T-0010/T-0014) | T-0011, T-0084 | implementer |
 | [TD-140](../tracker/todo/TD-140.md) | Compile-on-save checks CEL rules only at top-level variables; field-level type checking against kind context schemas | T-0018 | implementer |
 | [TD-146](../tracker/todo/TD-146.md) | Send the selected project scope with API requests and key cached queries by scope | T-0024 | implementer |
 | [TD-147](../tracker/todo/TD-147.md) | Field-worker sign-in screens: magic-link request/redeem and 6-digit PIN unlock in the SPA | T-0024 | implementer |
