@@ -220,6 +220,32 @@ def test_the_magic_link_puts_the_token_only_in_the_link_fragment() -> None:
     assert lowered.count("http") == 2  # only the link (twice)
 
 
+def test_a_public_link_is_a_plain_page_of_the_app_without_a_fragment() -> None:
+    """A template may link an ordinary page (the lobby, T-0063) only when it says so
+    (``public_link``); it then carries no secret and its URL has no fragment."""
+    template = MailTemplate(
+        "access_requests.approved",
+        params=("project_code", "project_name"),
+        link_path="/",
+        public_link=True,
+    )
+    rendered = render(
+        template,
+        {"project_code": "SYN", "project_name": "Synthetic site"},
+        locale="en-AU",
+        app_name="KERP",
+        web_origin="https://kerp.example.test/",
+    )
+    assert "https://kerp.example.test/\n" in rendered.text
+    assert "#" not in rendered.text
+    assert rendered.html.count('href="https://kerp.example.test/"') == 1
+    assert rendered.html.lower().count("http") == 2  # the link and its copyable fallback
+    with pytest.raises(ValueError, match="public link"):
+        MailTemplate("test.bad", link_path="/x", secret="token", public_link=True)
+    with pytest.raises(ValueError, match="public link"):
+        MailTemplate("test.bad", public_link=True)
+
+
 def test_html_escapes_context_values() -> None:
     registry = TemplateRegistry()
     template = registry.add(MailTemplate("test.escaped", params=("expires_minutes",)))

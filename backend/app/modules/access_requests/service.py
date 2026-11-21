@@ -24,6 +24,13 @@ holders of its project and System admins.
   the PER-09 + hold-authority ``sod_warning`` / ``confirm_sod`` rule, audited on
   ``project-members:<project>``) in the same transaction. A request is never decided by its
   requester.
+* **Decision e-mail** (T-0063, diff §4.1, §4.6): approving or rejecting queues an e-mail to
+  the requester through the core mail service (``send_mail``, in the deciding unit of work and
+  inside a SAVEPOINT). It is handed to the queue only after the commit and sent by the worker,
+  so a mail problem (an address the service refuses, a failed or bounced send) never fails or
+  rolls back the decision; the lobby panel stays the authoritative channel. Project code and
+  name, the outcome, the rejection reason if any, and a link to the app (``/``: the lobby or
+  the project picker); nothing else of the project or the request.
 
 Audit chain (tenant-level): ``access-requests:<project>``: ``request``, ``withdraw``,
 ``approve`` (grants, ``sod_warning``), ``reject`` (reason); the actor is the requester or the
@@ -33,6 +40,7 @@ decider.
 from __future__ import annotations
 
 import dataclasses
+import logging
 import uuid
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -49,6 +57,9 @@ from app.core.auth import service as users
 from app.core.auth.access import Grant, Persona, persona_holders
 from app.core.auth.models import User
 from app.core.auth.tokens import TokenService
+from app.core.mail.addresses import InvalidAddressError
+from app.core.mail.service import send_mail
+from app.core.mail.templates import MailTemplate, TemplateError, register_template
 from app.core.tenancy.context import TenancyContext
 from app.core.tenancy.rls import SESSION_INFO_KEY, bind_tenancy, session_tenancy
 from app.modules.access_requests.models import (
@@ -88,6 +99,36 @@ SUBJECT_TYPE: Final = "access_requests.request"
 # The lobby panel shows decided requests of the last 30 days (planner default, diff §4.1).
 PANEL_WINDOW: Final = timedelta(days=30)
 _PARAM_MAX: Final = 200  # notification parameter values are at most 200 characters
+
+# The decision e-mails (T-0063). The link is the app itself (no secret): signed in, the
+# requester lands in the lobby, or the project picker once they have a project.
+DECISION_LINK: Final = "/"
+APPROVED_TEMPLATE: Final = register_template(
+    MailTemplate(
+        "access_requests.approved",
+        params=("project_code", "project_name"),
+        link_path=DECISION_LINK,
+        public_link=True,
+    )
+)
+REJECTED_TEMPLATE: Final = register_template(
+    MailTemplate(
+        "access_requests.rejected",
+        params=("project_code", "project_name", "reason"),
+        link_path=DECISION_LINK,
+        public_link=True,
+    )
+)
+REJECTED_NO_REASON_TEMPLATE: Final = register_template(
+    MailTemplate(
+        "access_requests.rejected_no_reason",
+        params=("project_code", "project_name"),
+        link_path=DECISION_LINK,
+        public_link=True,
+    )
+)
+
+_logger = logging.getLogger("kerp.access_requests")
 
 
 class AccessRequestNotFoundError(LookupError):
@@ -465,6 +506,7 @@ def approve(
     request.updated_by = actor
     session.flush()
     _audit(session, request, "approve", actor, grants=request.granted, sod_warning=warn)
+    _queue_decision_mail(session, request)
     return request, warn
 
 
@@ -488,4 +530,47 @@ def reject(
     request.updated_by = actor
     session.flush()
     _audit(session, request, "reject", actor, reason=request.rejection_reason)
+    _queue_decision_mail(session, request)
     return request
+
+
+# --- the decision e-mail --------------------------------------------------------------------
+
+
+def _one_line(text: str) -> str:
+    """``text`` with every run of whitespace (line breaks included) as one space: a mail
+    text value may not hold a line break."""
+    return " ".join(text.split())
+
+
+def _queue_decision_mail(session: Session, request: AccessRequest) -> bool:
+    """Queue the decision e-mail to the requester in the deciding unit of work; ``False`` when
+    none was queued. Skipped (logged, no address) for a requester who is gone or deactivated
+    or a project since deleted; an address or a text the mail service refuses, or a failed
+    send-log write, is logged and rolled back to the SAVEPOINT, and the decision stands."""
+    project_id = request.requested_project_id
+    project = projects.lobby_projects_by_id(session, [project_id]).get(project_id)
+    requester = users.users_by_id(session, [request.requester_id]).get(request.requester_id)
+    if project is None or requester is None or not requester.is_active:
+        _logger.info("access-request e-mail of request %s skipped: no recipient", request.id)
+        return False
+    context: dict[str, object] = {
+        "project_code": project.code,
+        "project_name": _one_line(project.name),
+    }
+    template = APPROVED_TEMPLATE
+    if request.status == REJECTED:
+        template = REJECTED_NO_REASON_TEMPLATE
+        if request.rejection_reason:
+            template = REJECTED_TEMPLATE
+            context["reason"] = _one_line(request.rejection_reason)
+    try:
+        with session.begin_nested():
+            send_mail(session, template.key, requester.email, context)
+    except (InvalidAddressError, TemplateError, SQLAlchemyError) as exc:
+        # Only the type: never the address or the text.
+        _logger.warning(
+            "access-request e-mail of request %s not queued: %s", request.id, type(exc).__name__
+        )
+        return False
+    return True

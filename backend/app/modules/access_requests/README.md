@@ -4,7 +4,8 @@ The stateful access-request lifecycle of diff §4.1 (product owner, 2026-11-14):
 follows, withdraws and re-files requests; the project's PER-09 holders (and System admins)
 approve or reject them; the requester, who is not a member, learns the outcome from the
 lobby's "Active requests" panel. Discovery (lobby list, code lookup, lookup tickets) is the
-`lobby` module (T-0040); invites are T-0052; outcome e-mails are T-0056 (TD-084).
+`lobby` module (T-0040); invites are T-0052. Approve and reject also e-mail the requester
+(*Decision e-mails* below, T-0063).
 
 | File | What |
 |---|---|
@@ -73,8 +74,8 @@ params `project_code`, `requester`; subject `access_requests.request:<id>`). Not
 are project-scoped, so the service re-binds its session to the project for that write and back,
 in the same transaction (the pattern of the validation module's project seeding); the
 requester reads nothing of the project through it. The requester gets no notification: they
-are not a member, and `GET /mine` is the authoritative outcome channel. The outcome e-mail is
-T-0056 (TD-084).
+are not a member, and `GET /mine` is the authoritative outcome channel; the decision e-mail
+(below) is a courtesy copy.
 
 ### Active requests (`GET /mine`)
 
@@ -95,6 +96,32 @@ hold-authority persona (PER-02, PER-06, PER-07, PER-11) needs `confirm_sod: true
 `{"code": "sod_confirmation_required", "sod_warning": true}`; with it the response and both
 audit entries carry `sod_warning: true` (TD-151). Assigning PER-09 adds no hold or signing
 capability.
+
+## Decision e-mails (T-0063, diff §4.1, §4.6)
+
+`approve` and `reject` queue a transactional e-mail to the requester through the core mail
+service (`app.core.mail.service.send_mail`, T-0058), in the deciding unit of work:
+
+| Outcome | Template | Context |
+|---|---|---|
+| approved | `access_requests.approved` | `project_code`, `project_name` |
+| rejected with a reason | `access_requests.rejected` | `project_code`, `project_name`, `reason` |
+| rejected without one | `access_requests.rejected_no_reason` | `project_code`, `project_name` |
+
+- Texts are the i18n keys `mail.access_requests.<template>.subject|intro|action|outro` in
+  `app/core/mail/locales/en-AU.json`; the locale is the deployment default (accounts carry no
+  locale yet). Project name and reason are put on one line first (a mail text holds none).
+- One link, `<KERP_WEB_ORIGIN>/`: the app itself, where the signed-in requester lands in the
+  lobby or the project picker. It carries no secret (`MailTemplate(public_link=True)`).
+  Nothing of the project beyond code and name, no personas, ids or the decider's name.
+- The mail is handed to the queue only **after the commit** and sent by the SAQ worker
+  (interactive queue); every send is a `mail_send_log` row (`queued`, then `sent`, `failed`,
+  `suppressed`, ...). `send_mail` runs inside a SAVEPOINT: an address or a text the mail
+  service refuses (or a failed log write) is logged with its type only and rolled back to it,
+  and the decision stands. A failed or bounced send happens later in the worker and never
+  touches the decision. A rolled-back decision (e.g. 409 `sod_confirmation_required`) queues
+  nothing.
+- No e-mail when the requester's account is gone or deactivated, or the project was deleted.
 
 ## Visibility (RLS, edge spec §6 amendments)
 
@@ -121,5 +148,6 @@ Tenant-level chain `access-requests:<project>`: `request` (`has_message`), `with
 ## Tests
 
 `tests/test_access_requests.py` (SQLite and PostgreSQL: discovery and tickets, lifecycle,
-cooldown boundary, panel, deciders, ORM visibility), `tests/test_rls_access_requests.py`
+cooldown boundary, panel, deciders, ORM visibility, decision e-mails with a capturing queue
+and the fake mail transport), `tests/test_rls_access_requests.py`
 (PostgreSQL as `kerp_app`: the policy in raw SQL, the narrow read function).

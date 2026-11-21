@@ -54,7 +54,7 @@ from app.core.tenancy.scope import get_or_404
 
 if TYPE_CHECKING:
     from app.core.auth.deps import Principal
-from app.modules.projects.models import Project
+from app.modules.projects.models import TABLE, Project
 from app.modules.projects.schemas import DEFAULTED_FIELDS, ProjectCreate, ProjectUpdate
 from app.modules.settings import service as deployment_settings
 
@@ -78,6 +78,8 @@ __all__ = [
 ]
 
 CHAIN_PREFIX: Final = "project:"
+# The unique ``(tenant_id, code)`` constraint (models.py): a violation is a duplicate code.
+CODE_CONSTRAINT: Final = "uq_oe_projects_project_tenant_code"
 # The narrow lobby read of migration 0021 (PostgreSQL).
 LOBBY_FUNCTION: Final = "kerp_lobby_projects"
 CODE_FUNCTION: Final = "kerp_lobby_project_by_code"
@@ -125,6 +127,20 @@ def _tenant_id(session: Session) -> uuid.UUID:
     return context.tenant_id
 
 
+def is_duplicate_code(dialect_name: str, orig: BaseException | None) -> bool:
+    """Whether a driver error is the unique ``(tenant_id, code)`` violation.
+
+    PostgreSQL names the violated constraint (``diag.constraint_name`` of psycopg), so only
+    ``CODE_CONSTRAINT`` counts there, never the message text. SQLite gives only a message
+    (``UNIQUE constraint failed: <table>.tenant_id, <table>.code``), matched on the column.
+    """
+    if dialect_name == "postgresql":
+        diag = getattr(orig, "diag", None)
+        return getattr(diag, "constraint_name", None) == CODE_CONSTRAINT
+    message = str(orig)
+    return message.startswith("UNIQUE constraint failed") and message.endswith(f"{TABLE}.code")
+
+
 def _flush(session: Session, code: str) -> None:
     """Flush; the unique ``(tenant_id, code)`` violation becomes ``DuplicateProjectCodeError``.
 
@@ -133,7 +149,7 @@ def _flush(session: Session, code: str) -> None:
     try:
         session.flush()
     except IntegrityError as exc:
-        if "code" not in str(exc.orig):
+        if not is_duplicate_code(session.get_bind().dialect.name, exc.orig):
             raise
         raise DuplicateProjectCodeError(f"a project with code {code!r} already exists") from exc
 

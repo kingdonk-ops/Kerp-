@@ -7,7 +7,7 @@ RLS against the migrated schema. Raw-SQL policy checks as ``kerp_app``:
 """
 
 import uuid
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -18,9 +18,14 @@ from sqlalchemy import select
 
 from app.core.audit.service import chain_entries
 from app.core.auth.access import SYSTEM_ADMIN, Grant, Persona, resolve_scope
-from app.core.auth.models import ProjectMembership
+from app.core.auth.models import ProjectMembership, User
 from app.core.auth.tokens import TokenService
 from app.core.db import Base, BaseRecordMixin, Database
+from app.core.mail.models import MailSend
+from app.core.mail.queue import QueuedMail, mail_enqueuer, set_mail_enqueuer
+from app.core.mail.service import Delivery, deliver
+from app.core.mail.templates import TEMPLATES, render
+from app.core.mail.transport import FakeTransport, PermanentMailError
 from app.core.module_loader.loader import discover_modules
 from app.core.tenancy.context import TenancyContext
 from app.core.tenancy.rls import (
@@ -573,3 +578,158 @@ def test_only_the_requester_files_a_request(api: Api) -> None:
         s.rollback()
     with api.db.unit_of_work(api.as_user(EXT)) as s:
         assert s.scalars(select(AccessRequest)).all() == []
+
+
+# --- decision e-mails (T-0063, from T-0056; diff §4.1, §4.6) ---------------------------------
+
+WEB = "https://kerp.example.test"
+
+
+class Outbox:
+    """The mail enqueuer: what core hands to the queue once a request has committed."""
+
+    def __init__(self) -> None:
+        self.mails: list[QueuedMail] = []
+
+    def __call__(self, mails: Sequence[QueuedMail]) -> None:
+        self.mails.extend(mails)
+
+    def decisions(self) -> list[QueuedMail]:
+        return [m for m in self.mails if m.template_key.startswith("access_requests.")]
+
+
+@pytest.fixture
+def outbox() -> Iterator[Outbox]:
+    earlier, box = mail_enqueuer(), Outbox()
+    set_mail_enqueuer(box)
+    yield box
+    set_mail_enqueuer(earlier)
+
+
+def _deliver(db: Database, mail: QueuedMail, transport: FakeTransport) -> str:
+    """The worker's side (``kerp_send_mail``) with the fake transport."""
+    delivery = Delivery(db, transport, make_settings(web_origin=WEB))
+    return deliver(delivery, mail, final_attempt=True)
+
+
+def _send_log(db: Database, mail: QueuedMail) -> MailSend:
+    with db.unit_of_work(ROOT) as s:
+        row = s.get(MailSend, mail.send_id)
+        assert row is not None
+        s.expunge(row)
+        return row
+
+
+def test_approval_e_mails_the_requester_after_the_commit(api: Api, outbox: Outbox) -> None:
+    request_id = api.filed(EXT, api.hid, api.ticket("HID", EXT))
+    assert outbox.decisions() == []  # filing mails nobody
+    assert api.approve(PAM, request_id, "PER-04").status_code == 200
+    [mail] = outbox.decisions()
+    assert (mail.template_key, mail.to, mail.locale) == ("access_requests.approved", EXT, None)
+    assert mail.context == {"project_code": "HID", "project_name": "Hidden synthetic site"}
+    assert (mail.tenant_id, mail.project_id) == (T1, None)
+    row = _send_log(api.db, mail)
+    assert (row.template_key, row.status, row.recipient_masked) == (
+        "access_requests.approved",
+        "queued",
+        "e***@example.test",
+    )
+    transport = FakeTransport()
+    assert _deliver(api.db, mail, transport) == "sent"
+    [message] = transport.sent
+    assert message.to == EXT
+    assert "HID" in message.rendered.subject
+    for part in ("HID", "Hidden synthetic site", "approved", f"{WEB}/\n"):
+        assert part in message.rendered.text
+    # Code and name only: no personas, no request or project ids, nobody's name.
+    for leak in ("PER-04", request_id, str(api.hid), PAM, "pam"):
+        assert leak not in message.rendered.text
+        assert leak not in message.rendered.html
+    assert _send_log(api.db, mail).status == "sent"
+
+
+def test_rejection_e_mails_the_reason_on_one_line(api_no_cooldown: Api, outbox: Outbox) -> None:
+    api = api_no_cooldown
+    first = api.filed(EXT, api.hid, api.ticket("HID", EXT))
+    reason = {"reason": "Synthetic: not on\nthis   job"}
+    assert api.act(PAM, first, "reject", reason).status_code == 200
+    second = api.filed(EXT, api.hid)  # request again, no cooldown
+    assert api.act(PAM, second, "reject", {}).status_code == 200
+    with_reason, without = outbox.decisions()
+    assert with_reason.template_key == "access_requests.rejected"
+    assert with_reason.context == {
+        "project_code": "HID",
+        "project_name": "Hidden synthetic site",
+        "reason": "Synthetic: not on this job",
+    }
+    assert without.template_key == "access_requests.rejected_no_reason"
+    assert without.context == {"project_code": "HID", "project_name": "Hidden synthetic site"}
+    transport = FakeTransport()
+    assert [_deliver(api.db, m, transport) for m in (with_reason, without)] == ["sent", "sent"]
+    texts = [m.rendered.text for m in transport.sent]
+    assert "Synthetic: not on this job" in texts[0]
+    assert "Synthetic" not in texts[1]
+    assert all(f"{WEB}/\n" in text and "HID" in text for text in texts)
+    assert [m.to for m in transport.sent] == [EXT, EXT]
+
+
+def test_a_refused_decision_queues_no_e_mail(api: Api, outbox: Outbox) -> None:
+    request_id = api.filed(EXT, api.hid, api.ticket("HID", EXT))
+    assert api.approve(PAM, request_id, "PER-09", "PER-02").status_code == 409  # SoD, rolled back
+    assert api.approve(PETE, request_id).status_code == 404  # not PER-09 of HID: hidden
+    assert outbox.decisions() == []
+    with api.db.unit_of_work(ROOT) as s:
+        keys = [r.template_key for r in s.scalars(select(MailSend))]
+    assert [k for k in keys if k.startswith("access_requests.")] == []
+
+
+def test_a_mail_the_service_refuses_never_undoes_the_decision(
+    api: Api, outbox: Outbox, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def refuse(*_args: Any, **_kwargs: Any) -> uuid.UUID:
+        raise service.InvalidAddressError("not a single e-mail address")
+
+    monkeypatch.setattr(service, "send_mail", refuse)
+    request_id = api.filed(EXT, api.hid, api.ticket("HID", EXT))
+    approved = api.approve(PAM, request_id)
+    assert approved.status_code == 200, approved.text
+    assert api.mine(EXT)[0]["status"] == "approved"
+    assert outbox.decisions() == []
+
+
+def test_a_failed_send_never_undoes_the_decision(api: Api, outbox: Outbox) -> None:
+    request_id = api.filed(EXT, api.hid, api.ticket("HID", EXT))
+    assert api.act(PAM, request_id, "reject", {"reason": "Synthetic"}).status_code == 200
+    [mail] = outbox.decisions()
+    transport = FakeTransport()
+    transport.fail_with(PermanentMailError("ses:MessageRejected"))
+    assert _deliver(api.db, mail, transport) == "failed"
+    assert transport.sent == []
+    row = _send_log(api.db, mail)
+    assert (row.status, row.error_code) == ("failed", "ses:MessageRejected")
+    (entry,) = api.mine(EXT)
+    assert (entry["status"], entry["rejection_reason"]) == ("rejected", "Synthetic")
+
+
+def test_an_inactive_requester_gets_no_e_mail(api: Api, outbox: Outbox) -> None:
+    request_id = api.filed(EXT, api.hid, api.ticket("HID", EXT))
+    with api.db.unit_of_work(ROOT) as s:
+        account = s.get(User, api.users[EXT])
+        assert account is not None
+        account.is_active = False
+    assert api.act(PAM, request_id, "reject", {}).status_code == 200
+    assert outbox.decisions() == []
+
+
+def test_every_decision_template_renders_from_the_catalog() -> None:
+    for template in (
+        service.APPROVED_TEMPLATE,
+        service.REJECTED_TEMPLATE,
+        service.REJECTED_NO_REASON_TEMPLATE,
+    ):
+        assert TEMPLATES.get(template.key) == template
+        assert (template.link_path, template.secret, template.public_link) == ("/", None, True)
+        context: dict[str, str | int] = dict.fromkeys(template.params, "SYN")
+        rendered = render(template, context, locale="en-AU", app_name="KERP", web_origin=WEB)
+        assert "{" not in rendered.text
+        assert f"mail.{template.key}" not in rendered.text

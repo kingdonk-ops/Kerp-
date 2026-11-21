@@ -15,5 +15,17 @@
   "mail.admin.project_invite.subject": "You are invited to project {project_code} on {app_name}",
   "mail.admin.project_invite.intro": "{inviter_name} invited you to the project {project_code} {project_name} on {app_name}. Use the link below to join. If you do not have a password yet, you choose one there. The link works once and expires on {expires_at}.",
   "mail.admin.project_invite.action": "Join the project",
-  "mail.admin.project_invite.outro": "This link is personal: do not forward it. If you did not expect this invitation, you can ignore this e-mail."
+  "mail.admin.project_invite.outro": "This link is personal: do not forward it. If you did not expect this invitation, you can ignore this e-mail.",
+  "mail.access_requests.approved.subject": "Your access request for project {project_code} on {app_name} was approved",
+  "mail.access_requests.approved.intro": "Your request for access to the project {project_code} {project_name} on {app_name} was approved. The project is in your project list the next time you sign in.",
+  "mail.access_requests.approved.action": "Open {app_name}",
+  "mail.access_requests.approved.outro": "If you did not ask for access to this project, tell your administrator.",
+  "mail.access_requests.rejected.subject": "Your access request for project {project_code} on {app_name} was declined",
+  "mail.access_requests.rejected.intro": "Your request for access to the project {project_code} {project_name} on {app_name} was declined. The reason given: {reason}",
+  "mail.access_requests.rejected.action": "Open the lobby",
+  "mail.access_requests.rejected.outro": "You can see the request in the lobby, and request access again from there.",
+  "mail.access_requests.rejected_no_reason.subject": "Your access request for project {project_code} on {app_name} was declined",
+  "mail.access_requests.rejected_no_reason.intro": "Your request for access to the project {project_code} {project_name} on {app_name} was declined.",
+  "mail.access_requests.rejected_no_reason.action": "Open the lobby",
+  "mail.access_requests.rejected_no_reason.outro": "You can see the request in the lobby, and request access again from there."
 }

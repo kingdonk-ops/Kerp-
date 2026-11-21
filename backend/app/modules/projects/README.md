@@ -7,7 +7,7 @@ modules carries the project's `id` as its `project_id`.
 
 | File | What |
 |---|---|
-| `models.py` | `oe_projects_project` (`BaseRecordMixin`, tenant-level row; migration `0008`, membership-based RLS since `0015`, `visible_in_lobby` since `0021`) |
+| `models.py` | `oe_projects_project` (`BaseRecordMixin`, tenant-level row; migration `0008`, membership-based RLS since `0015`, `visible_in_lobby` since `0021`, DB-side `status`/`site_timezone` defaults since `0033`) |
 | `schemas.py` | `ProjectCreate` / `ProjectUpdate` / `ProjectRead`, `LobbyVisibility`, `PolygonGeoJSON`; timezone, ISO 4217, BCP 47 validation from `app.core.locale` (shared with the settings module) |
 | `service.py` | `create_project`, `get_project`, `list_projects`, `live_project_ids` (the jobs scheduler, T-0214), `update_project`, `delete_project`, `site_zone`, `bind_project` (project-scoped routers, T-0217), `set_lobby_visibility`, the narrow lobby read `lobby_projects` / `project_by_code` (T-0040) and `lobby_projects_by_id` (access requests, T-0050) |
 | `router.py` | `GET/POST /api/v1/projects`, `GET/PATCH/DELETE /api/v1/projects/{id}`, `PUT /api/v1/projects/{id}/lobby` |
@@ -16,7 +16,7 @@ modules carries the project's `id` as its `project_id`.
 
 | Column | Rule |
 |---|---|
-| `code`, `name` | `code` unique per tenant (409 on a clash), `[A-Za-z0-9][A-Za-z0-9._-]{0,31}` |
+| `code`, `name` | `code` unique per tenant (409 on a clash; on PostgreSQL recognised by the constraint name `uq_oe_projects_project_tenant_code`, on SQLite by the message), `[A-Za-z0-9][A-Za-z0-9._-]{0,31}` |
 | `status` | `ACTIVE`, `ON_HOLD`, `CLOSED` (TD-185); default: the deployment setting |
 | `site_timezone` | an IANA zone from the `tzdata` package (not the host's zoneinfo: no `localtime`, `posixrules`, `Factory`); default: the deployment setting |
 | `spatial_bounds` | GeoJSON `Polygon`, 2D `[lon, lat]`, closed rings, at most 10,000 positions across all rings, or `null` |
@@ -29,13 +29,17 @@ modules carries the project's `id` as its `project_id`.
 takes them from the deployment settings (`app.modules.settings.service.project_defaults`;
 shipped `ACTIVE`, `Australia/Perth`, `AUD`, `en-AU`, changed by System admins through
 `PATCH /api/v1/settings/deployment`). The service always passes all four values explicitly;
-the column defaults in `models.py` (`DEFAULT_*`, and the DB-side `site_timezone`/`status`
-defaults of T-0063) are fallback literals equal to the shipped defaults (tested). Changing a
+the column defaults in `models.py` (`DEFAULT_*`) and the DB-side defaults of spec §4.1
+(`status DEFAULT 'ACTIVE'`, `site_timezone DEFAULT 'Australia/Perth'`, migration `0033`,
+T-0063) are fallback literals equal to the shipped defaults (tested). `currency_code` and
+`locale` have no DB-side default (TD-185). Changing a
 deployment default never changes existing projects. This module depends on `settings`.
 
 `spatial_bounds` uses `app.core.geo.GeoJSONGeometry`: `geometry(Polygon,4326)` on PostgreSQL
-(written with `ST_GeomFromGeoJSON`, read with `ST_AsGeoJSON`, so spatial SQL works on the
-column), GeoJSON text on SQLite. Python always sees a GeoJSON dict. No GiST index or
+(written with `ST_GeomFromGeoJSON`, read with `ST_AsGeoJSON(…, 15)`, so spatial SQL works on
+the column), GeoJSON text on SQLite. The read asks for 15 decimals (the PostGIS maximum,
+`GEOJSON_MAX_DECIMALS`) instead of the default 9, so a position reads back as it was written
+(T-0063). Python always sees a GeoJSON dict. No GiST index or
 `ST_IsValid` check yet (TD-186).
 
 A project is a **tenant-level row** (`project_id IS NULL`, CHECK constraint). It is written
@@ -53,7 +57,8 @@ the path using the caller's memberships (`app.core.auth.access.CallerGrants`: th
 request's scope was resolved from, so they are read once per request, T-0071):
 
 - list and read: projects the caller is a member of; everything else is 404;
-- edit and delete: the `admin` capability (Project Administrator, PER-09) on that project, else 403;
+- edit and delete: the `admin` capability (Project Administrator, PER-09) on that project, else
+  403; a non-member (also a PER-09 or Project Admin of another project) gets 404;
 - lobby flag (`PUT /{id}/lobby`): PER-09 of that project or a System admin (diff §4.1); a
   non-member who is not a System admin 404, a member without PER-09 403; audited as an
   `update` with `fields: ["visible_in_lobby"]`;
