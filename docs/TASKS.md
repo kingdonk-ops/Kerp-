@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 86/308 tasks done (28%) · **ready now:** 25 · **epics awaiting breakdown:** 49
+**Overall:** 86/308 tasks done (28%) · **ready now:** 24 · **epics awaiting breakdown:** 49
 
 | Phase | Tasks done | Progress |
 |---|---|---|
@@ -153,7 +153,7 @@
 | ⬜ | [T-0107](../tracker/tasks/T-0107.md) | Excel/CSV/IFC tag ingestion wizard: mapping profiles, text-safe identifiers, multi-value split, dry run, dedup, Rev A→0 revision tracking | asset_management | M | T-0103, T-0138 |  |
 | ⬜ | [T-0108](../tracker/tasks/T-0108.md) | Client packs provisioned at project creation: levels + roles, terminology, item types, templates, numbering, register types, mapping profiles, rule sets | asset_management | M | T-0102, T-0034, T-0136, T-0138 |  |
 | ⬜ | [T-0137](../tracker/tasks/T-0137.md) | Client-pack upgrade offers: derived_from links, 'changes available' diff, accept per item, compare view | asset_management | S | T-0108 |  |
-| ▶ | [T-0110](../tracker/tasks/T-0110.md) | One-engine: shared field-type registry (core/fields) + CEL evaluator (dual-runtime) | forms | M | T-0017, T-0018 |  |
+| 🟦 | [T-0110](../tracker/tasks/T-0110.md) | One-engine: shared field-type registry (core/fields) + CEL evaluator (dual-runtime) | forms | M | T-0017, T-0018 |  |
 | ⬜ | [T-0111](../tracker/tasks/T-0111.md) | Unified inspection record oe_inspections_inspection (kind inspection/itp) + lifecycle + anchors by role + template header binding | inspections | M | T-0103, T-0110, T-0134 |  |
 | ⬜ | [T-0140](../tracker/tasks/T-0140.md) | inspections: inspection date vs entry time, backdating reason + report flag, configurable self-approval (default off), soft-delete only | inspections | S | T-0111 |  |
 | ⬜ | [T-0112](../tracker/tasks/T-0112.md) | Equipment calibration register + lifecycle + SAQ OCR cert ingest + QA-review-on-discrepancy + supersede lock + hard gate (as of inspection date) | equipment | M | T-0015, T-0016, T-0111, T-0139 |  |

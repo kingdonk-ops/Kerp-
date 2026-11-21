@@ -72,8 +72,8 @@ callers (`actions`, tab content) must use the same tokens.
 `DynamicForm` renders a form template (EDGE-SCREENS §2.2 schema, `form/types.ts`);
 `evaluateForm` is the pure engine behind it.
 
-- **Data types**: `text`, `number` (JSON number = CEL double), `boolean`, `select`, `date`.
-  Shared field-type registry / dual-runtime parity: T-0110 (TD-177).
+- **Data types**: the shared palette (below); controls exist for `text`, `numeric` / `number`
+  (JSON number = CEL double), `boolean`, `select`, `date` and `calculated`.
 - **CEL** through the `RuleEvaluator` seam, default `src/lib/cel` `evaluate`. Context:
   `{ ...context, fields }` — `fields` holds only visible, non-empty values and cannot be
   overridden by `context`.
@@ -103,5 +103,18 @@ callers (`actions`, tab content) must use the same tokens.
   i18n language. The engine keeps `error_message` unresolved (`FieldError.invalid.message`);
   the renderer localises it. Keys, option values and CEL are never localised; UI chrome stays
   on `t()`. `help` renders under the label and is part of the control's accessible
-  description. Section titles: the template schema has no sections yet (TD-255).
-- Calculated fields and range rules: TD-178.
+  description. Section titles: the schema has `sections` since T-0110; rendering them is TD-255.
+- **Shared palette and server parity (T-0110)**: `data_type` is a key of `src/lib/fields`
+  (`numeric`/`number`, `text`, `boolean`, `select`, `date`, `measurement`, `photo`, `signature`,
+  `instrument_ref`, `calculated`). The engine runs the same semantics as the server
+  (`backend/app/core/fields`, rules in its README) and both are held to
+  `tests/contract/form_fixtures.json` (`form/conformance.test.ts`):
+  - `calculated`: `expression` (CEL) evaluated in template order; shown read-only; submitted
+    with the other values; a value passed in for it is ignored.
+  - `range: {min, max}` (numbers or CEL giving a double): an answer outside it is listed in
+    `evaluation.failed` and shown as a hint; it does **not** block submit (a failed reading is
+    a result). A bound that cannot be evaluated is a `rule_error`.
+  - An answer that does not have the shape of its type is a `type_mismatch` error, checked
+    before the field's `validation`.
+  - `measurement`, `photo`, `signature` and `instrument_ref` have no capture control yet
+    (TD-468).

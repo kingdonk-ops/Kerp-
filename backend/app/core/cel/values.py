@@ -44,7 +44,10 @@ def decode_value(value: JsonValue) -> celtypes.Value:
     if isinstance(value, bool):
         return celtypes.BoolType(value)
     if isinstance(value, int | float):
-        return celtypes.DoubleType(float(value))
+        try:
+            return celtypes.DoubleType(float(value))
+        except OverflowError:  # a JSON integer beyond the double range: Infinity, like JSON.parse
+            return celtypes.DoubleType(math.inf if value > 0 else -math.inf)
     if isinstance(value, str):
         return celtypes.StringType(value)
     if isinstance(value, list):
@@ -76,7 +79,10 @@ def _decode_tag(tag: str, inner: JsonValue) -> celtypes.Value:
     if tag == "$timestamp":
         if not _RFC3339_RE.fullmatch(inner):
             raise ValueError(f"invalid $timestamp (RFC 3339 with offset): {inner!r}")
-        moment = datetime.fromisoformat(inner).astimezone(UTC)
+        try:
+            moment = datetime.fromisoformat(inner).astimezone(UTC)
+        except OverflowError as exc:  # the offset moves it outside years 1-9999
+            raise ValueError(f"invalid $timestamp (out of range): {inner!r}") from exc
         # JS Date has millisecond precision; truncate so both runtimes see the same value.
         moment = moment.replace(microsecond=moment.microsecond // 1000 * 1000)
         return celtypes.TimestampType(moment)
@@ -122,7 +128,8 @@ def _format_timestamp(value: datetime) -> str:
     if value.tzinfo is None:
         raise UnencodableValueError("naive datetime")
     moment = value.astimezone(UTC)
-    return f"{moment:%Y-%m-%dT%H:%M:%S}.{moment.microsecond // 1000:03d}Z"
+    # ``%Y`` is not zero-padded below year 1000 on glibc; the client always writes four digits.
+    return f"{moment.year:04d}-{moment:%m-%dT%H:%M:%S}.{moment.microsecond // 1000:03d}Z"
 
 
 def _format_duration(value: timedelta) -> str:

@@ -49,7 +49,9 @@ export function decodeValue(value: JsonValue): unknown {
   if (keys.length === 1 && tag?.startsWith("$")) {
     return decodeTag(tag, value[tag] as JsonValue);
   }
-  return Object.fromEntries(keys.map((key) => [key, decodeValue(value[key] as JsonValue)]));
+  // A Map, not an object: cel-js cannot read an object that has a `constructor` key, and a
+  // Map never exposes `Object.prototype` members as keys.
+  return new Map(keys.map((key) => [key, decodeValue(value[key] as JsonValue)]));
 }
 
 function decodeTag(tag: string, inner: JsonValue): unknown {
@@ -71,7 +73,15 @@ function decodeTag(tag: string, inner: JsonValue): unknown {
     if (match === null) throw new TypeError(`invalid $timestamp (RFC 3339 with offset): ${inner}`);
     // Date has millisecond precision; truncate the fraction explicitly (the server does too).
     const millis = (match[2] ?? "").slice(0, 4).padEnd(4, "0");
-    return new Date(`${match[1] ?? ""}${millis === "0000" ? ".000" : millis}${match[3] ?? ""}`);
+    const date = new Date(`${match[1] ?? ""}${millis === "0000" ? ".000" : millis}${match[3] ?? ""}`);
+    // Date rolls impossible dates over (30 February, hour 24) and accepts year 0; the server
+    // rejects them, so the wall-clock part must survive a round trip and stay in years 1-9999.
+    const wallClock = new Date(`${match[1] ?? ""}Z`);
+    const year = date.getUTCFullYear();
+    if (Number.isNaN(year) || year < 1 || year > 9999 || wallClock.toISOString().slice(0, 19) !== match[1]) {
+      throw new TypeError(`invalid $timestamp (no such instant): ${inner}`);
+    }
+    return date;
   }
   throw new TypeError(`unsupported tag in a context: ${tag}`);
 }
