@@ -15,7 +15,6 @@ WORKFLOWS = ROOT / ".github" / "workflows"
 FILES = sorted(WORKFLOWS.glob("*.yml"))
 NAMES = [f.name for f in FILES]
 SHA_PIN = re.compile(r"[\w.-]+/[\w.-]+@[0-9a-f]{40} # v\d+(\.\d+)*")
-DIGEST_PIN = re.compile(r"[\w./-]+@sha256:[0-9a-f]{64} # [\w./-]+:[\w.-]+")
 
 
 def _text(name: str) -> str:
@@ -117,7 +116,8 @@ def _service_images() -> dict[str, str]:
     images: dict[str, str] = {}
     for i, line in enumerate(lines):
         if re.match(r"^\s+image: ", line):
-            images[lines[i - 1].strip().rstrip(":")] = line.split("image: ", 1)[1].strip()
+            key = next(k for k in reversed(lines[:i]) if not k.strip().startswith("#"))
+            images[key.strip().rstrip(":")] = line.split("image: ", 1)[1].strip()
     return images
 
 
@@ -141,9 +141,7 @@ def test_ci_has_the_two_service_images() -> None:
 )
 def test_ci_service_images_are_pinned_by_digest(service: str, tag: str) -> None:
     image = _service_images()[service]
-    assert DIGEST_PIN.fullmatch(image), image
-    assert image.startswith(tag.split(":")[0] + "@sha256:")
-    assert image.endswith(f"# {tag}")
+    assert re.fullmatch(rf"{re.escape(tag)}@sha256:[0-9a-f]{{64}} # {re.escape(tag)}", image), image
 
 
 def test_publish_pushes_the_smoke_tested_image_not_a_rebuild() -> None:
