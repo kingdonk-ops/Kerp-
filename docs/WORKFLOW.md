@@ -9,7 +9,7 @@
      │ 0  tracker.py next          → ready tasks (deps done, no open blockers)
      │ 1  spec check               → planner fixes / spec-gap TODO
      │ 2  kerp-implementer         → task branch, TDD, all gates green, own task file + TODOs
-     │    coordinator re-runs gates (verify, don't trust)
+     │    coordinator runs fast gates + affected tests (verify, don't trust); full suites run in CI
      │ 3  PR → dev                 → task in_review
      │ 4  kerp-reviewer (independent) → KERP-REVIEW: APPROVED | CHANGES_REQUESTED patch-id=…
      │      └─ changes → implementer fix round → gates → reviewer   (max 3 rounds, then blocked + TODO)

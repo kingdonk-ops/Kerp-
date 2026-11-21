@@ -3,6 +3,7 @@ import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { playwright } from "@vitest/browser-playwright";
 import { defineConfig } from "vite";
+import { UNIT_TEST_TIMEOUT_MS } from "./src/test/timeouts";
 
 /** Accessibility suites (`*.a11y.test.tsx`) need real layout and CSS: they run in Chrome. */
 const A11Y_TESTS = "src/**/*.a11y.test.{ts,tsx}";
@@ -19,6 +20,8 @@ export default defineConfig({
         test: {
           name: "unit",
           environment: "jsdom",
+          // Room for several Testing Library waits (src/test/timeouts.ts).
+          testTimeout: UNIT_TEST_TIMEOUT_MS,
           setupFiles: ["./src/test/setup.ts"],
           include: ["src/**/*.test.{ts,tsx}"],
           exclude: [A11Y_TESTS],
@@ -29,6 +32,8 @@ export default defineConfig({
         extends: true,
         test: {
           name: "a11y",
+          // Explicit (Vitest's browser default is 15 s): room for several Testing Library waits.
+          testTimeout: UNIT_TEST_TIMEOUT_MS,
           setupFiles: ["./src/test/setup.browser.ts"],
           include: [A11Y_TESTS],
           css: true,

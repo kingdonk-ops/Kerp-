@@ -51,7 +51,7 @@ src/
   pages/      route components (incl. the placeholder lobby route `/lobby`)
   projects/   project scope: `/me/projects` fetch + portfolio personas, ProjectScopeProvider, top-bar ProjectSwitcher
   shells/     RegisterPage, DetailPage (gate banner, tabs, audit), Dynamic Form Renderer (README.md)
-  test/       Vitest setup, fake backend (`fakeApi.ts`), axe harness (`a11y.ts`)
+  test/       Vitest setup, fake backend (`fakeApi.ts`), axe harness (`a11y.ts`), timing budget (`timeouts.ts`: Testing Library waits up to 5 s project-wide, unit tests 20 s — do not add per-test 1 s waits)
   theme/      display themes: ThemeProvider (per-user preference), ThemeToggle
 ```
 
