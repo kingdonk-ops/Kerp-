@@ -42,6 +42,7 @@ from app.modules.uploads.scan import (
 )
 from app.modules.uploads.schemas import UploadCreate
 from app.modules.uploads.storage import (
+    HEALTH_PROBE_TIMEOUT_S,
     MAGIC_SNIFF_BYTES,
     OTHER_CLASS,
     STORAGE_CLASSES,
@@ -57,6 +58,7 @@ if TYPE_CHECKING:
     from app.modules.jobs.registry import JobKind
 
 __all__ = [
+    "HEALTH_PROBE_TIMEOUT_S",
     "MAX_QUARANTINE_LIST",
     "MONITORED_STATUSES",
     "SWEEP_KIND",

@@ -25,6 +25,7 @@ from fastapi.testclient import TestClient
 from app.core.audit.service import chain_entries
 from app.core.auth.access import SYSTEM_ADMIN, Persona
 from app.core.auth.models import DEVICE_ACTIVE, DEVICE_REVOKED, Device
+from app.core.config import Settings
 from app.core.db import Base, Database, utcnow
 from app.core.stats.registry import STATS_REGISTRY, StatsRegistry, register_stats_provider
 from app.core.tenancy.context import TenancyContext
@@ -39,9 +40,18 @@ from app.modules.jobs.models import Job
 from app.modules.jobs.registry import JobContext
 from app.modules.projects import service as projects
 from app.modules.projects.schemas import ProjectCreate
+from app.modules.teams import service as teams
+from app.modules.teams.schemas import TeamCreate
 from app.modules.uploads import service as uploads
 from app.modules.uploads.schemas import UploadCreate
-from app.modules.uploads.storage import LocalStorage, ObjectInfo, set_storage
+from app.modules.uploads.storage import (
+    HEALTH_PROBE_TIMEOUT_S,
+    LocalStorage,
+    ObjectInfo,
+    S3Storage,
+    build_s3_storage,
+    set_storage,
+)
 from tests.audit_support import migrated_database
 from tests.auth_support import ALICE, BOB, PASSWORD, T1, T2, auth_app, grant_persona, make_settings
 from tests.auth_support import seed_user as _seed_user
@@ -242,6 +252,13 @@ def _seed_counts(api: Api) -> None:
     _device(db, T2, stranger, revoked=False)
     _nodes(db, api.scope(other, T2), 4)
     _upload(db, api.scope(other, T2), api.storage)
+    kind = jobs.JOB_REGISTRY.get(admin_jobs.OBJECT_STORE_KIND)
+    with db.unit_of_work(api.scope(other, T2)) as s:
+        jobs.create_job(s, kind)
+    with db.unit_of_work(TenancyContext(tenant_id=T2)) as s:
+        jobs.create_job(s, kind)  # a tenant-level run of T2: neither cache nor "refreshing"
+    with db.unit_of_work(TenancyContext(tenant_id=T2, is_system_admin=True)) as s:
+        teams.create_team(s, TeamCreate(name="Synthetic crew"), actor_id=None)
 
 
 def test_a_system_admin_without_memberships_counts_every_project_of_its_tenant(
@@ -261,6 +278,7 @@ def test_a_system_admin_without_memberships_counts_every_project_of_its_tenant(
     assert modules["jobs"]["jobs_queued"] == 1
     assert modules["teams"] == {"teams": 0}
     assert body["object_store"] == {"as_of": None, "refreshing": False, "storage_classes": []}
+    assert sum(modules["jobs"].values()) == 1
 
 
 def test_stats_are_numbers_only_never_ids_names_or_rows(api: Api) -> None:
@@ -360,7 +378,7 @@ def _imports(path: Path) -> list[str]:
             names += [alias.name for alias in node.names]
         elif isinstance(node, ast.ImportFrom) and node.module and node.level == 0:
             # ``from app.modules.x import service``: the imported name is the submodule.
-            if node.module.count(".") == 2:
+            if node.module == "app.modules" or node.module.count(".") == 2:
                 names += [f"{node.module}.{alias.name}" for alias in node.names]
             else:
                 names.append(node.module)
@@ -574,13 +592,19 @@ def test_a_hung_probe_is_down_after_its_deadline(
     assert health.PROBE_TIMEOUT_S <= 2.0
     monkeypatch.setattr(health, "PROBE_TIMEOUT_S", 0.2)
     release = threading.Event()
-    quick_probes["malware_scanner"] = lambda: release.wait(10) and True
+    # Hangs until released (at most 30 s): only the deadline can end the request early.
+    quick_probes["malware_scanner"] = lambda: release.wait(30) and True
+    alice = api.headers(ALICE)
     try:
-        response = api.client.get(HEALTH, headers=api.headers(ALICE))
-        # Answered while the probe still hangs: the request never waits for it.
+        started = time.perf_counter()
+        response = api.client.get(HEALTH, headers=alice)
+        elapsed = time.perf_counter() - started
         assert not release.is_set()
     finally:
         release.set()
+    # Without the deadline the request would wait the probe's 30 s; with it, ~0.2 s (the bound
+    # leaves room for a slow CI runner, not for the hung probe).
+    assert elapsed < 5.0, elapsed
     probes = {p["name"]: p for p in response.json()["probes"]}
     assert probes["malware_scanner"]["status"] == "down"
     assert probes["malware_scanner"]["latency_ms"] >= 200
@@ -640,3 +664,67 @@ def test_a_cache_older_than_a_day_still_shows_its_as_of(api: Api) -> None:
     store = api.client.get(STATS, headers=api.headers(ALICE)).json()["object_store"]
     assert store["as_of"] is not None
     assert [c["objects"] for c in store["storage_classes"]] == [0, 0, 0, 0]
+
+
+def test_the_import_boundary_check_sees_package_imports(tmp_path: Path) -> None:
+    source = tmp_path / "probe.py"
+    source.write_text("from app.modules import jobs\nfrom app.modules.jobs import models\n")
+    assert _imports(source) == ["app.modules.jobs", "app.modules.jobs.models"]
+
+
+def _s3_settings() -> Settings:
+    return Settings(  # synthetic, never contacted
+        environment="test",
+        s3_endpoint_url="http://minio.internal:9000",
+        s3_access_key_id="synthetic-key",
+        s3_secret_access_key="synthetic-secret",  # type: ignore[arg-type]
+        storage_bucket="kerp-test",
+    )
+
+
+def test_the_object_store_probe_has_its_own_short_timeouts_and_no_retry() -> None:
+    assert HEALTH_PROBE_TIMEOUT_S == health.PROBE_TIMEOUT_S <= 2.0
+    storage = build_s3_storage(_s3_settings())
+    config = storage.probe_client().meta.config
+    assert config.connect_timeout == HEALTH_PROBE_TIMEOUT_S
+    assert config.read_timeout == HEALTH_PROBE_TIMEOUT_S
+    assert config.retries is not None
+    assert config.retries["total_max_attempts"] == 1
+    assert storage.probe_client() is storage.probe_client()  # built once
+    # The shared client keeps botocore's defaults for real transfers.
+    assert storage.client.meta.config.read_timeout != HEALTH_PROBE_TIMEOUT_S
+
+
+def test_the_object_store_probe_uses_the_probe_client() -> None:
+    calls: list[str] = []
+
+    class Client:
+        def __init__(self, name: str) -> None:
+            self.name = name
+
+        def head_bucket(self, Bucket: str) -> None:  # noqa: N803  (boto3's keyword)
+            calls.append(f"{self.name}:{Bucket}")
+
+    storage = S3Storage(
+        "kerp-test",
+        Client("shared"),  # type: ignore[arg-type]
+        Client("presign"),  # type: ignore[arg-type]
+        probe_client_factory=lambda: Client("probe"),  # type: ignore[arg-type,return-value]
+    )
+    assert uploads.ping_storage(storage) is True
+    assert calls == ["probe:kerp-test"]
+
+
+def test_the_database_and_scanner_probes_are_bounded(monkeypatch: pytest.MonkeyPatch) -> None:
+    args = health.probe_connect_args()
+    assert args["connect_timeout"] == 2
+    assert args["options"] == "-c statement_timeout=2000"
+    seen: list[float] = []
+
+    def ping(settings: Settings) -> bool:
+        seen.append(settings.clamd_timeout_seconds)
+        return True
+
+    monkeypatch.setattr(uploads, "ping_scanner", ping)
+    assert health.ping_malware_scanner(Settings(environment="test")) is True
+    assert seen == [health.PROBE_TIMEOUT_S]

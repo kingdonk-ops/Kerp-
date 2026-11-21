@@ -313,11 +313,24 @@ through `uploads.service.object_store_totals` (paginated S3 listing). The newest
 of `PROBE_TIMEOUT_S` = 2 s (planner default). `ok`: healthy within `DEGRADED_AFTER_S` = 1 s;
 `degraded`: healthy but slower, or nothing real to probe (the always-clean stub scanner);
 `down`: failed, raised, timed out or not configured (no Redis URL). A probe's exception text is
-never returned, audited or logged (only its class): it can name a host or DSN.
+never returned, audited or logged (only its class): it can name a host or DSN. Each probe is
+bounded by its own timeout as well, so a hung dependency frees its pool thread within about
+2 s and cannot starve the other probes: PostgreSQL uses a separate pool-less engine (one fresh
+connection, libpq `connect_timeout` and a server `statement_timeout` of 2 s; it never waits
+for a checkout from the API pool), Redis socket connect/read timeouts, the object store a
+dedicated S3 probe client (`connect_timeout` and `read_timeout` 2 s, one attempt, no retry;
+`uploads.storage.HEALTH_PROBE_TIMEOUT_S`), clamd `PING` with its timeout cut to 2 s.
 
 Every call (stats, refresh, refused refresh, health) is audited in `admin-system:<tenant>`
 (`stats_viewed`, `object_store_refresh_queued` / `object_store_refresh_running` with the job
-id, `health_checked` with each probe's status).
+id, `health_checked` with each probe's status). A call refused with 403 (not a
+`system_admin`) or 401 is **not** audited, like the queue monitor: nothing was read or changed.
+
+The single-run guard (`jobs.create_single_run_job`) takes a transaction-scoped advisory lock and
+then looks for a pending run. It relies on PostgreSQL's default **READ COMMITTED** isolation (the
+request sessions' setting): the check after the lock takes a fresh snapshot and sees a run that
+the previous lock holder committed. Under REPEATABLE READ or SERIALIZABLE the snapshot could
+predate that commit and a second run could be queued.
 
 ## Audit
 

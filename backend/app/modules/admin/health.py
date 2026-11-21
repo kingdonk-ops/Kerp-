@@ -23,7 +23,8 @@ from dataclasses import dataclass
 from typing import Final, Literal
 
 import redis
-from sqlalchemy import text
+from sqlalchemy import Engine, create_engine, text
+from sqlalchemy.pool import NullPool
 
 from app.core.config import Settings
 from app.core.db import Database
@@ -35,7 +36,8 @@ ProbeName = Literal["postgresql", "redis", "object_store", "malware_scanner"]
 ProbeStatus = Literal["ok", "degraded", "down"]
 Probe = Callable[[], bool | None]
 
-PROBE_TIMEOUT_S: Final = 2.0
+# The planner default (diff §4.7); the object store's probe client uses the same value.
+PROBE_TIMEOUT_S: Final = uploads.HEALTH_PROBE_TIMEOUT_S
 DEGRADED_AFTER_S: Final = 1.0
 PROBE_ORDER: Final[tuple[ProbeName, ...]] = (
     "postgresql",
@@ -55,10 +57,40 @@ class ProbeResult:
     latency_ms: float | None
 
 
+_probe_engines: dict[str, Engine] = {}
+
+
+def _probe_engine(db: Database) -> Engine:
+    """PostgreSQL: a separate engine without a pool (one fresh connection per probe), with a
+    connect timeout and a statement timeout of ``PROBE_TIMEOUT_S``, so the probe never waits
+    for a checkout from the API's own pool (``pool_timeout``, 30 s) nor for a slow server.
+    Other databases (SQLite in tests): the API's engine."""
+    if db.engine.dialect.name != "postgresql":
+        return db.engine
+    url = db.engine.url.render_as_string(hide_password=False)
+    engine = _probe_engines.get(url)
+    if engine is None:
+        engine = create_engine(
+            db.engine.url,
+            poolclass=NullPool,
+            connect_args=probe_connect_args(),
+        )
+        _probe_engines[url] = engine
+    return engine
+
+
+def probe_connect_args() -> dict[str, object]:
+    """libpq's connect timeout (whole seconds, at least 1) and a server statement timeout."""
+    return {
+        "connect_timeout": max(1, round(PROBE_TIMEOUT_S)),
+        "options": f"-c statement_timeout={int(PROBE_TIMEOUT_S * 1000)}",
+    }
+
+
 def ping_postgresql(db: Database | None) -> bool:
     if db is None:
         return False
-    with db.engine.connect() as connection:
+    with _probe_engine(db).connect() as connection:
         return connection.execute(text("SELECT 1")).scalar() == 1
 
 
@@ -77,7 +109,9 @@ def ping_object_store() -> bool | None:
 
 
 def ping_malware_scanner(settings: Settings) -> bool | None:
-    return uploads.ping_scanner(settings)
+    # clamd's own timeout (KERP_CLAMD_TIMEOUT_SECONDS, 30 s for scans) is cut to the probe's.
+    bounded = settings.model_copy(update={"clamd_timeout_seconds": PROBE_TIMEOUT_S})
+    return uploads.ping_scanner(bounded)
 
 
 def default_probes(db: Database | None, settings: Settings) -> dict[ProbeName, Probe]:

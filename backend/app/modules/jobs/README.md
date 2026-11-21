@@ -100,6 +100,9 @@ advisory lock per tenant and kind; SQLite: the write lock). `pending_job` and
 `last_succeeded_job` read only tenant-level rows of the session's own tenant, filtered
 explicitly (a `system_admin` session sees every project's rows too, ADR 0016). The System
 console's object-store totals use them (`admin.object_store_totals`, its `result` is the cache).
+The guard assumes READ COMMITTED (PostgreSQL's default and the request sessions'): the pending
+check runs after the lock in a fresh statement snapshot, so it sees a run the previous holder
+committed; a REPEATABLE READ transaction could miss it.
 
 ## Worker (rule 1)
 
