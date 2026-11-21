@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 297 · **Closed:** 135
+**Open:** 298 · **Closed:** 135
 
 ## decision (37)
 
@@ -164,7 +164,7 @@
 | [TD-365](../tracker/todo/TD-365.md) | Frontend translations of the password policy codes and the password policy in /auth/config | T-0077 | implementer |
 | [TD-394](../tracker/todo/TD-394.md) | Approve access request: site picker for PER-07 site scope once the asset hierarchy API exists | T-0051 | implementer |
 
-## later (121)
+## later (122)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -186,7 +186,7 @@
 | [TD-115](../tracker/todo/TD-115.md) | P6 supply formats deferred by TD-077: Excel schedule exports via import mapping profiles, and a direct P6 API connector | T-0105 | planner |
 | [TD-123](../tracker/todo/TD-123.md) | Password login has no throttling yet; extend T-0009's Redis lockout to /api/v1/auth/login | T-0008 | implementer |
 | [TD-124](../tracker/todo/TD-124.md) | Fail fast at startup when production auth config (JWT key, KERP_REDIS_URL) is missing | T-0008 | implementer |
-| [TD-126](../tracker/todo/TD-126.md) | CI drift check: fail when frontend/src/api/ (openapi.json, schema.ts) is stale against the backend OpenAPI schema | T-0011 | implementer |
+| [TD-126](../tracker/todo/TD-126.md) | CI drift check: fail when frontend/src/api/ (openapi.json, schema.ts) is stale against the backend OpenAPI schema | T-0011, T-0083 | implementer |
 | [TD-127](../tracker/todo/TD-127.md) | Frontend: project module settings screen (toggle via /api/v1/modules) and hide disabled modules in the navigation | T-0011 | implementer |
 | [TD-128](../tracker/todo/TD-128.md) | Concurrent first toggle of the same module in one project races on uq_project_module_setting_module and returns 500; retry or upsert | T-0011 | implementer |
 | [TD-130](../tracker/todo/TD-130.md) | Module loader: require CurrentPrincipal on every mounted module router by default (opt-out for public routes) | T-0011 | implementer |
@@ -289,6 +289,7 @@
 | [TD-403](../tracker/todo/TD-403.md) | Stats and export providers for modules that land later: NCR, punch, equipment, credentials, materials/MTR, MDR, welding | T-0219, T-0235 | planner |
 | [TD-415](../tracker/todo/TD-415.md) | Inspection follow-ups (oe_inspections_follow_up) move to the generic tasks module when E-04-07 is broken down | T-0257, T-0288, E-04-07 | planner |
 | [TD-440](../tracker/todo/TD-440.md) | In-app IP allowlisting is not built: network restrictions live in the WAF / Entra Conditional Access; revisit only if a client contract requires per-project IP rules | — | planner |
+| [TD-441](../tracker/todo/TD-441.md) | Per-test PostgreSQL databases: widen the empty-source check to leftover types, sequences, views and functions (not only tables) | T-0082 | reviewer |
 
 ## bug (6)
 
