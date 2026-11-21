@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 329 · **Closed:** 146
+**Open:** 328 · **Closed:** 146
 
 ## decision (39)
 
@@ -183,7 +183,7 @@
 | [TD-474](../tracker/todo/TD-474.md) | Unit registry for `measurement` fields: unit catalogue, SI storage and conversion with a shared vector file (ADR 0002 units-v1 port) | T-0110 | implementer |
 | [TD-482](../tracker/todo/TD-482.md) | asset_management: node edit (code / name / attributes, with display_path and display_code rewrite of the subtree), node delete and level def delete are not built in T-0101 | T-0101 | implementer |
 
-## later (132)
+## later (131)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -318,7 +318,6 @@
 | [TD-476](../tracker/todo/TD-476.md) | Form renderer and designer follow-ups on the shared palette: capture controls, section rendering, palette labels, field-ownership map | T-0110, T-0025 | implementer |
 | [TD-483](../tracker/todo/TD-483.md) | asset_management: display_code recompute and the project tree lock are inline; move them to a batch job / narrower lock if trees get large | T-0101 | implementer |
 | [TD-485](../tracker/todo/TD-485.md) | Cross-link inspection requests (RFIs) to TQs (Technical Queries) when the TQ module exists (E-05-04) | T-0115 | planner |
-| [TD-487](../tracker/todo/TD-487.md) | fields/form engine polish from the #156 review: duplicate _VALIDATION_KEYS, dangling registry.test.ts refs, blank calculated boolean/int display, lint range.min <= range.max | T-0110 | reviewer |
 
 ## bug (7)
 
