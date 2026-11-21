@@ -3,11 +3,11 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 93/310 tasks done (30%) · **ready now:** 23 · **epics awaiting breakdown:** 49
+**Overall:** 94/310 tasks done (30%) · **ready now:** 23 · **epics awaiting breakdown:** 49
 
 | Phase | Tasks done | Progress |
 |---|---|---|
-| 0 · Platform foundations | 91/116 | `███████░░░` 78% |
+| 0 · Platform foundations | 92/116 | `███████░░░` 79% |
 | 1 · Asset & Quality backbone | 2/168 (+2 epics) | `░░░░░░░░░░` 1% |
 | 2 · Welding quality | 0/11 | `░░░░░░░░░░` 0% |
 | 3 · Logistics | 0/2 (+7 epics) | `░░░░░░░░░░` 0% |
@@ -90,7 +90,7 @@
 | ✅ | [T-0084](../tracker/tasks/T-0084.md) | projects: module toggle API on the project path (/api/v1/projects/{project_id}/modules) with the admin guard, replacing the project-less core route (TD-122 for modules, TD-129) | projects | S | T-0011, T-0217, T-0014, T-0275 | #164 |
 | ▶ | [T-0085](../tracker/tasks/T-0085.md) | admin: the server refuses self-deactivation on PATCH /admin/users/{id} (409 CANNOT_DEACTIVATE_SELF, audited); Admin -> Users explains it (TD-463) | admin | S | T-0014, T-0331 |  |
 | ✅ | [T-0331](../tracker/tasks/T-0331.md) | Admin → Users screen: System admin creates / deactivates / reactivates accounts; PER-09 invites a user by e-mail to one of its projects (persona(s) + site + SoD confirm), link shown once, open invites listed / re-sent / revoked | frontend | S | T-0026 | #154 |
-| 🟪 | [T-0027](../tracker/tasks/T-0027.md) | Playwright setup + Phase 0 exit journey | e2e | M | T-0023, T-0024, T-0018, T-0012, T-0026, T-0034, T-0036, T-0084 | #166 |
+| ✅ | [T-0027](../tracker/tasks/T-0027.md) | Playwright setup + Phase 0 exit journey | e2e | M | T-0023, T-0024, T-0018, T-0012, T-0026, T-0034, T-0036, T-0084 | #166 |
 | ⚫ | [T-0056](../tracker/tasks/T-0056.md) | Transactional e-mails for access-request decisions (approve / reject) via the outbound e-mail service | admin | S | T-0050, T-0058 |  |
 | ⚫ | [T-0078](../tracker/tasks/T-0078.md) | Screens: create your password at invite acceptance, forgot password and reset password (web and Android) | frontend | S | T-0053, T-0059, T-0077 |  |
 | ✅ | [T-0028](../tracker/tasks/T-0028.md) | CI hardening: detect in ci-gate needs, least-privilege GHCR publish, SHA-pinned actions, base image digest + Renovate, drop empty postgres extra | platform | S | T-0004 | #18 |
