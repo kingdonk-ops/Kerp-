@@ -49,9 +49,11 @@ jobs:
           fi
           flag() { [ "$skip_app" = false ] && [ -f "$1" ] && echo true || echo false; }
           backend_flag() { [ "$backend_needed" = true ] && flag backend/pyproject.toml || echo false; }
-          echo "backend=$(backend_flag)" >> "$GITHUB_OUTPUT"
-          echo "frontend=$(flag frontend/package.json)" >> "$GITHUB_OUTPUT"
-          echo "e2e=$(flag e2e/package.json)" >> "$GITHUB_OUTPUT"
+          {
+            echo "backend=$(backend_flag)"
+            echo "frontend=$(flag frontend/package.json)"
+            echo "e2e=$(flag e2e/package.json)"
+          } >> "$GITHUB_OUTPUT"
 
   tracker:
     runs-on: ubuntu-latest
@@ -67,10 +69,10 @@ jobs:
         run: python scripts/tracker.py validate
       - name: TODO ids do not collide with base
         if: github.event_name == 'pull_request'
-        run: >-
-          python scripts/tracker.py check-ids
-          --base "origin/${{ github.base_ref }}"
-          --head "${{ github.event.pull_request.head.sha }}"
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: python scripts/tracker.py check-ids --base "origin/$BASE_REF" --head "$HEAD_SHA"
       - name: Boards up to date
         run: python scripts/tracker.py render --check
       - name: Pipeline script tests
@@ -135,7 +137,8 @@ jobs:
           --health-cmd "pg_isready -U kerp" --health-interval 5s
           --health-timeout 5s --health-retries 10
       redis:
-        image: redis:7-alpine
+        # Tag kept for readability; the digest decides what is pulled (compose uses the same).
+        image: redis:7-alpine@sha256:7f7d30b7fdd09467bac58198a1f166dd69789d348d4fe859cccb20e0cf287fbe # redis:7-alpine
         ports: ["6379:6379"]
     env:
       KERP_ENVIRONMENT: test
@@ -186,15 +189,24 @@ jobs:
         run: pytest -n auto --durations=25 || [ $? -eq 5 ]
 
   # Backend container image (T-0004): build + smoke test on every run, read-only token.
+  # On a push the smoke-tested image itself is saved and handed to backend-publish (TD-051).
   backend-image:
     needs: detect
     if: needs.detect.outputs.backend == 'true'
     runs-on: ubuntu-latest
+    outputs:
+      image-id: ${{ steps.save.outputs.image-id }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      # OCI labels go into the image here (source links the GHCR package to the repo): the
+      # published image is this one, byte for byte, so publish cannot add them later.
+      - id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ghcr.io/kingdonk-ops/kerp-backend
       - name: Build (load for smoke test)
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
@@ -202,6 +214,7 @@ jobs:
           load: true
           push: false
           tags: kerp-backend:ci
+          labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=backend-image
           cache-to: type=gha,mode=max,scope=backend-image
       - name: Smoke test (non-root, /health, HEALTHCHECK)
@@ -248,9 +261,30 @@ jobs:
       - name: Container logs
         if: always()
         run: docker logs kerp-smoke || true
+      # Only after the smoke test passed (no always()): the image id is the content digest
+      # backend-publish must find again after docker load and in the registry.
+      - name: Save the smoke-tested image
+        id: save
+        if: github.event_name == 'push'
+        run: |
+          set -euo pipefail
+          docker save kerp-backend:ci -o "$RUNNER_TEMP/backend-image.tar"
+          id="$(docker image inspect --format '{{.Id}}' kerp-backend:ci)"
+          echo "tested image: $id"
+          echo "image-id=$id" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: github.event_name == 'push'
+        with:
+          name: backend-image
+          path: ${{ runner.temp }}/backend-image.tar
+          retention-days: 1
+          if-no-files-found: error
+          overwrite: true
 
   # Pushes to dev/main only, after tests and the smoke test passed: publish to GHCR.
-  # The only job allowed to write packages (T-0028).
+  # The only job allowed to write packages (T-0028). It pushes the image backend-image
+  # smoke-tested (saved there, loaded here), never a rebuild, and checks by digest that the
+  # registry serves exactly that image (TD-051).
   backend-publish:
     needs: [detect, backend, backend-pg, backend-image]
     if: github.event_name == 'push' && needs.detect.outputs.backend == 'true'
@@ -258,11 +292,21 @@ jobs:
     permissions:
       contents: read
       packages: write
+    env:
+      IMAGE: ghcr.io/kingdonk-ops/kerp-backend
+      TESTED_ID: ${{ needs.backend-image.outputs.image-id }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          persist-credentials: false
-      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+          name: backend-image
+          path: ${{ runner.temp }}/backend-image
+      - name: Load the smoke-tested image
+        run: |
+          set -euo pipefail
+          docker load -i "$RUNNER_TEMP/backend-image/backend-image.tar"
+          loaded="$(docker image inspect --format '{{.Id}}' kerp-backend:ci)"
+          echo "tested: $TESTED_ID"; echo "loaded: $loaded"
+          [ -n "$TESTED_ID" ] && [ "$loaded" = "$TESTED_ID" ]
       - id: meta
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
@@ -275,14 +319,41 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Push to GHCR
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
-        with:
-          context: backend
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=backend-image
+      - name: Push the tested image to GHCR
+        env:
+          TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          set -euo pipefail
+          : > "$RUNNER_TEMP/digests"
+          while IFS= read -r tag; do
+            [ -n "$tag" ] || continue
+            docker tag kerp-backend:ci "$tag"
+            docker push "$tag" | tee "$RUNNER_TEMP/push.log"
+            grep -o 'digest: sha256:[0-9a-f]\{64\}' "$RUNNER_TEMP/push.log" | cut -d' ' -f2 \
+              >> "$RUNNER_TEMP/digests" || true
+          done <<< "$TAGS"
+          # Fallback: the registry digests docker recorded for the image.
+          docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' kerp-backend:ci \
+            | sed -n "s|^$IMAGE@||p" >> "$RUNNER_TEMP/digests"
+          # Every tag must point at one manifest, and pulling it back must give the tested id.
+          mapfile -t digests < <(sort -u "$RUNNER_TEMP/digests")
+          echo "registry digests: ${digests[*]:-none}"
+          [ "${#digests[@]}" -eq 1 ]
+          ref="$IMAGE@${digests[0]}"
+          docker pull -q "$ref"
+          pushed="$(docker image inspect --format '{{.Id}}' "$ref")"
+          echo "pushed: $ref -> $pushed"
+          [ "$pushed" = "$TESTED_ID" ]
+          {
+            echo "### Published backend image"
+            echo
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Smoke-tested image id | \`$TESTED_ID\` |"
+            echo "| Pushed (registry digest) | \`$ref\` |"
+            echo "| Resolves to | \`$pushed\` (= tested) |"
+            echo "| Tags | $(tr '\n' ' ' <<< "$TAGS") |"
+          } >> "$GITHUB_STEP_SUMMARY"
 
   frontend:
     needs: detect

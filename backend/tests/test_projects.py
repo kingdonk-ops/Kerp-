@@ -5,8 +5,10 @@ Runs on SQLite and, in CI, on PostgreSQL under RLS against the migrated schema, 
 elsewhere, TD-052). All data is synthetic.
 """
 
+import importlib.util
 import uuid
 from collections.abc import Iterator
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -17,19 +19,21 @@ from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 from sqlalchemy import Column, MetaData, Table, event, select, text
+from sqlalchemy import column as sa_column
+from sqlalchemy import table as sa_table
 
 from app.core.audit.service import chain_entries
 from app.core.auth.access import CREATE_PROJECTS, Capability, Grant, Persona, load_grants
 from app.core.auth.models import MEMBERSHIP_TABLE, ProjectMembership
 from app.core.db import Base, Database, contract_violations
-from app.core.geo import GeoJSONGeometry
+from app.core.geo import GEOJSON_MAX_DECIMALS, GeoJSONGeometry
 from app.core.module_loader.loader import discover_modules
 from app.core.tenancy.context import TenancyContext
 from app.core.tenancy.rls import RLS_EXEMPT, bind_connection, rls_tables, session_tenancy
 from app.core.tenancy.scope import OutOfScopeError
 from app.modules.admin import service as admin
 from app.modules.projects import service
-from app.modules.projects.models import TABLE, Project
+from app.modules.projects.models import DEFAULT_STATUS, DEFAULT_TIMEZONE, TABLE, Project
 from app.modules.projects.schemas import (
     MAX_RINGS,
     MAX_TOTAL_POSITIONS,
@@ -257,6 +261,17 @@ def test_geojson_type_round_trips_on_sqlite_without_postgis() -> None:
     assert column_type.process_result_value(None, sqlite.dialect()) is None
 
 
+def test_postgis_reads_geojson_with_explicit_full_precision() -> None:
+    """``ST_AsGeoJSON`` defaults to 9 decimals; the column asks for the PostGIS maximum (15),
+    so a stored position comes back as sent (``app.core.geo.GEOJSON_MAX_DECIMALS``)."""
+    from sqlalchemy.dialects import postgresql
+
+    column = Column("spatial_bounds", GeoJSONGeometry("Polygon"))
+    compiled = str(select(column).compile(dialect=postgresql.dialect()))
+    assert f"ST_AsGeoJSON(spatial_bounds, {GEOJSON_MAX_DECIMALS})" in compiled
+    assert GEOJSON_MAX_DECIMALS == 15
+
+
 # --- service --------------------------------------------------------------------------------
 
 
@@ -273,6 +288,28 @@ def test_timezone_and_spatial_bounds_are_persisted(db: Database) -> None:
         assert (project.currency_code, project.locale, project.status) == ("CAD", "en-AU", "ACTIVE")
         assert (project.tenant_id, project.project_id) == (T1, None)
         assert str(service.site_zone(project)) == "America/Edmonton"
+
+
+PRECISE_BOUNDS: dict[str, Any] = {
+    "type": "Polygon",
+    "coordinates": [
+        [
+            [115.123456789012, -32.987654321098],
+            [116.000000000001, -32.987654321098],
+            [116.000000000001, -31.5],
+            [115.123456789012, -32.987654321098],
+        ]
+    ],
+}
+
+
+def test_spatial_bounds_round_trip_beyond_nine_decimals(db: Database) -> None:
+    """On PostgreSQL the read goes through ``ST_AsGeoJSON`` (default 9 decimals would round
+    116.000000000001 to 116); the explicit precision keeps every position as sent."""
+    with db.unit_of_work(CTX_T1) as s:
+        project_id = service.create_project(s, _create(spatial_bounds=PRECISE_BOUNDS)).id
+    with db.unit_of_work(CTX_T1) as s:
+        assert service.get_project(s, project_id).spatial_bounds == PRECISE_BOUNDS
 
 
 def test_update_changes_only_the_given_fields_and_can_clear_the_bounds(db: Database) -> None:
@@ -332,6 +369,117 @@ def test_a_project_session_cannot_write_the_tenant_level_project_row(db: Databas
     project_ctx = TenancyContext(tenant_id=T1, project_id=uuid.uuid4())
     with pytest.raises(OutOfScopeError), db.unit_of_work(project_ctx) as s:
         service.create_project(s, _create())
+
+
+def test_a_project_bound_session_cannot_update_the_project_row(db: Database) -> None:
+    """The row is tenant-level: even a session bound to this very project cannot change it."""
+    with db.unit_of_work(CTX_T1) as s:
+        project_id = service.create_project(s, _create()).id
+    for bound_to in (project_id, uuid.uuid4()):
+        project_ctx = TenancyContext(tenant_id=T1, project_id=bound_to)
+        with pytest.raises(OutOfScopeError), db.unit_of_work(project_ctx) as s:
+            service.update_project(s, project_id, ProjectUpdate(name="Renamed"))
+    with db.unit_of_work(CTX_T1) as s:
+        project = service.get_project(s, project_id)
+        assert (project.name, project.revision) == ("Synthetic plant", 1)
+
+
+class _Diag:
+    def __init__(self, constraint_name: str | None) -> None:
+        self.constraint_name = constraint_name
+
+
+class _PgError(Exception):
+    """Stands in for a psycopg ``UniqueViolation``: ``diag.constraint_name`` names the index."""
+
+    def __init__(self, message: str, constraint_name: str | None) -> None:
+        super().__init__(message)
+        self.diag = _Diag(constraint_name)
+
+
+@pytest.mark.parametrize(
+    ("dialect", "orig", "duplicate"),
+    [
+        ("postgresql", _PgError("duplicate key", service.CODE_CONSTRAINT), True),
+        # Only the constraint name counts on PostgreSQL, never the message text.
+        ("postgresql", _PgError('violates "uq_x_code"', "uq_oe_projects_other_code"), False),
+        ("postgresql", _PgError("duplicate key", None), False),
+        ("postgresql", Exception(f"{service.CODE_CONSTRAINT} without diag"), False),
+        (
+            "sqlite",
+            Exception(f"UNIQUE constraint failed: {TABLE}.tenant_id, {TABLE}.code"),
+            True,
+        ),
+        ("sqlite", Exception(f"NOT NULL constraint failed: {TABLE}.code_name"), False),
+        ("sqlite", Exception(f"UNIQUE constraint failed: {TABLE}.id"), False),
+    ],
+)
+def test_duplicate_codes_are_told_by_constraint_name_on_postgresql(
+    dialect: str, orig: Exception, duplicate: bool
+) -> None:
+    assert service.is_duplicate_code(dialect, orig) is duplicate
+
+
+def test_the_code_constraint_name_is_the_models() -> None:
+    names = {c.name for c in Project.__table__.constraints}
+    assert service.CODE_CONSTRAINT in names
+
+
+def test_the_database_fills_status_and_site_timezone_when_a_write_leaves_them_out(
+    db: Database,
+) -> None:
+    """Spec §4.1 server-side defaults (migration 0033): the shipped fallback literals, which
+    equal the deployment's shipped defaults (``test_deployment_settings``). A plain table
+    clause carries no ORM defaults, so the insert below leaves both columns to the database."""
+    columns = (
+        "id", "tenant_id", "code", "name", "currency_code", "locale",
+        "created_at", "updated_at", "custom_fields", "source", "revision",
+    )  # fmt: skip
+    project = Project.__table__
+    bare = sa_table(TABLE, *(sa_column(name, project.c[name].type) for name in columns))
+    project_id = uuid.uuid4()
+    now = datetime.now(UTC)
+    values = {
+        "id": project_id,
+        "tenant_id": T1,
+        "code": "RAW",
+        "name": "Raw insert",
+        "currency_code": "AUD",
+        "locale": "en-AU",
+        "created_at": now,
+        "updated_at": now,
+        "custom_fields": {},
+        "source": "system",
+        "revision": 1,
+    }
+    with db.unit_of_work(CTX_T1) as s:
+        s.execute(bare.insert().values(values))
+    with db.unit_of_work(CTX_T1) as s:
+        project_row = service.get_project(s, project_id)
+        assert (project_row.status, project_row.site_timezone) == (
+            DEFAULT_STATUS,
+            DEFAULT_TIMEZONE,
+        )
+    assert project.c.status.server_default is not None
+    assert project.c.site_timezone.server_default is not None
+    assert project.c.currency_code.server_default is None  # tenant settings (TD-185, T-0014)
+    assert project.c.locale.server_default is None
+
+
+def test_migration_0033_freezes_the_models_fallback_literals() -> None:
+    versions = Path(__file__).resolve().parents[1] / "migrations" / "versions"
+    spec = importlib.util.spec_from_file_location("m0033", next(versions.glob("0033_*.py")))
+    assert spec is not None
+    assert spec.loader is not None
+    migration = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(migration)
+    assert migration.DEFAULTS == {"status": DEFAULT_STATUS, "site_timezone": DEFAULT_TIMEZONE}
+    # The SQLite copy is the live table at 0032 plus the defaults: same columns, constraints.
+    frozen = migration._frozen_project(with_defaults=True)
+    live = Project.__table__
+    assert {c.name for c in frozen.columns} == {c.name for c in live.columns}
+    assert {c.name for c in frozen.constraints} == {c.name for c in live.constraints}
+    assert {i.name for i in frozen.indexes} == {i.name for i in live.indexes}
 
 
 def test_changes_are_audited(db: Database) -> None:
@@ -621,6 +769,32 @@ def test_editing_needs_the_admin_capability_and_membership(api: Api) -> None:
         f"{PROJECTS}/{api.home}", json={"currency_code": "XYZ"}, headers=api.headers(ALICE)
     )
     assert invalid.status_code == 422
+
+
+def test_a_non_member_cannot_delete_a_project(api: Api) -> None:
+    response = api.client.delete(f"{PROJECTS}/{api.home}", headers=api.headers(CAROL))
+    assert response.status_code == 404
+    with api.db.unit_of_work(CTX_T1) as s:
+        assert service.get_project(s, api.home).deleted_at is None
+
+
+def test_an_administrator_of_another_project_cannot_touch_this_one(api: Api) -> None:
+    """ALICE is PER-09 of HOME (and a Project Admin), not a member of FOREIGN: 404, not 403."""
+    with api.db.unit_of_work(CTX_T1) as s:
+        foreign = service.create_project(s, _create(code="FOREIGN", name="Foreign")).id
+    headers, url = api.headers(ALICE), f"{PROJECTS}/{foreign}"
+    assert api.client.patch(url, json={"name": "Hijacked"}, headers=headers).status_code == 404
+    assert api.client.delete(url, headers=headers).status_code == 404
+    lobby = api.client.put(f"{url}/lobby", json={"visible_in_lobby": True}, headers=headers)
+    assert lobby.status_code == 404
+    with api.db.unit_of_work(CTX_T1) as s:
+        project = service.get_project(s, foreign)
+        assert (project.name, project.deleted_at, project.visible_in_lobby) == (
+            "Foreign",
+            None,
+            False,
+        )
+        assert project.revision == 1
 
 
 def test_an_administrator_deletes_a_project(api: Api) -> None:

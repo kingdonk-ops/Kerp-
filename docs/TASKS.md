@@ -3,11 +3,11 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 75/298 tasks done (25%) · **ready now:** 26 · **epics awaiting breakdown:** 49
+**Overall:** 77/298 tasks done (26%) · **ready now:** 23 · **epics awaiting breakdown:** 49
 
 | Phase | Tasks done | Progress |
 |---|---|---|
-| 0 · Platform foundations | 75/112 | `██████░░░░` 67% |
+| 0 · Platform foundations | 77/112 | `██████░░░░` 69% |
 | 1 · Asset & Quality backbone | 0/160 (+2 epics) | `░░░░░░░░░░` 0% |
 | 2 · Welding quality | 0/11 | `░░░░░░░░░░` 0% |
 | 3 · Logistics | 0/2 (+7 epics) | `░░░░░░░░░░` 0% |
@@ -88,18 +88,18 @@
 | ⬜ | [T-0053](../tracker/tasks/T-0053.md) | Invite link screens: one-click 'Join project' for signed-in users, invite token carried through sign-in, land in the project (lobby skipped) | frontend | S | T-0052, T-0042, T-0055, T-0026 |  |
 | ▶ | [T-0055](../tracker/tasks/T-0055.md) | Web sign-in with Microsoft (Entra ID SSO): button when enabled, callback landing, translated refusals | frontend | S | T-0054, T-0042 |  |
 | ▶ | [T-0027](../tracker/tasks/T-0027.md) | Playwright setup + Phase 0 exit journey | e2e | S | T-0023, T-0024, T-0018 |  |
-| ▶ | [T-0056](../tracker/tasks/T-0056.md) | Transactional e-mails for access-request decisions (approve / reject) via the outbound e-mail service | admin | S | T-0050, T-0058 |  |
+| ⚫ | [T-0056](../tracker/tasks/T-0056.md) | Transactional e-mails for access-request decisions (approve / reject) via the outbound e-mail service | admin | S | T-0050, T-0058 |  |
 | ⬜ | [T-0078](../tracker/tasks/T-0078.md) | Screens: create your password at invite acceptance, forgot password and reset password (web and Android) | frontend | S | T-0053, T-0059, T-0077 |  |
 | ✅ | [T-0028](../tracker/tasks/T-0028.md) | CI hardening: detect in ci-gate needs, least-privilege GHCR publish, SHA-pinned actions, base image digest + Renovate, drop empty postgres extra | platform | S | T-0004 | #18 |
-| ▶ | [T-0032](../tracker/tasks/T-0032.md) | CI hardening 2: weekly uv lock refresh PR, SHA-pinned promote/review-gate actions, digest-pinned service images, publish the smoke-tested image by digest | platform | S | T-0028 |  |
-| ▶ | [T-0033](../tracker/tasks/T-0033.md) | Migrations: inline frozen RLS/ledger DDL per revision + test that the latest revision matches the live helpers | platform | S | T-0006, T-0007 |  |
+| ⚫ | [T-0032](../tracker/tasks/T-0032.md) | CI hardening 2: weekly uv lock refresh PR, SHA-pinned promote/review-gate actions, digest-pinned service images, publish the smoke-tested image by digest | platform | S | T-0028 |  |
+| ✅ | [T-0033](../tracker/tasks/T-0033.md) | Platform hardening: migrations inline frozen RLS/ledger DDL per revision (+ drift test against the live helpers); CI hardening 2 (weekly uv lock refresh PR, SHA-pinned promote/review-gate actions, digest-pinned service images, publish the smoke-tested image by digest) | platform | M | T-0006, T-0007, T-0028 | #138 |
 | ✅ | [T-0029](../tracker/tasks/T-0029.md) | Pipeline tooling: tracker-aware review-gate patch-id + `tracker.py set --note` date fix | platform | S | — | #62 |
 | ✅ | [T-0030](../tracker/tasks/T-0030.md) | Backend runtime hardening: quiet httpx/httpcore logs, API docs hidden in production, ASCII-safe JSON logs, client disconnect as 499, refuse debug in production | platform | M | T-0021 | #68 |
 | ✅ | [T-0031](../tracker/tasks/T-0031.md) | Frontend hardening: ESLint gate (typescript-eslint, react-hooks) + UI shell fixes (hidden-all-columns guard, encoded storage keys, required_if a11y, tab keyboard/aria, reserved audit tab id) | platform | M | T-0002, T-0025 | #63 |
 | ✅ | [T-0060](../tracker/tasks/T-0060.md) | Request size bounds + jobs hardening: app-wide body limit, spatial_bounds cap, jobs payload cap, list-safe job result, jobs scope tests, real SAQ-worker RLS binding test | platform | M | T-0012, T-0015 | #67 |
 | ⚫ | [T-0061](../tracker/tasks/T-0061.md) | Auth: reject tokens issued in the same second as a password change (sub-second iat vs password_changed_at) | identity | S | T-0008 |  |
 | ⚫ | [T-0062](../tracker/tasks/T-0062.md) | UI shells hardening: hidden-all-columns guard, encoded storage keys, required_if a11y, tab keyboard/aria, reserved audit tab id check | frontend | S | T-0025 |  |
-| ▶ | [T-0063](../tracker/tasks/T-0063.md) | Projects follow-ups: constraint-name duplicate detection, missing authorisation tests, GeoJSON precision, DB-side defaults | projects | S | T-0012 |  |
+| ✅ | [T-0063](../tracker/tasks/T-0063.md) | Projects follow-ups (constraint-name duplicate detection, missing authorisation tests, GeoJSON precision, DB-side defaults) + transactional e-mails for access-request decisions (approve / reject) | projects | M | T-0012, T-0050, T-0058 | #136 |
 | ⚫ | [T-0064](../tracker/tasks/T-0064.md) | Logging and config safety: ASCII-safe JSON logs, client disconnect not logged as 500, refuse debug in production | platform | S | T-0021 |  |
 | ⚫ | [T-0065](../tracker/tasks/T-0065.md) | Worker RLS binding test uses the real asyncio/SAQ worker path instead of threading.Thread | jobs | S | T-0015 |  |
 | ⚫ | [T-0066](../tracker/tasks/T-0066.md) | tracker.py set --note: do not double the date when the note already starts with one; clean existing doubled notes | platform | S | — |  |
@@ -127,7 +127,7 @@
 | ⬜ | [T-0225](../tracker/tasks/T-0225.md) | Frontend: Admin → System → Audit log (filters, verify chain, verify all) and legal-hold toggle on the project admin page | frontend | S | T-0026, T-0222, T-0223 |  |
 | ⬜ | [T-0229](../tracker/tasks/T-0229.md) | Frontend: Admin → Communications — broadcast composer, delivery stats and history, automated template editor | frontend | M | T-0026, T-0226, T-0227, T-0228 |  |
 | ⬜ | [T-0232](../tracker/tasks/T-0232.md) | Frontend: Admin → System → Settings — editable registry by category with bounds, read-only deployment configuration | frontend | S | T-0026, T-0230 |  |
-| ⬜ | [T-0274](../tracker/tasks/T-0274.md) | tenancy: system_admin global project visibility (ADR 0016) — additive migration replacing project_isolation_policy on every project-scoped table through the frozen-DDL helper, ORM scope mirror, RLS contract tests updated | tenancy | M | T-0007, T-0014, T-0033 |  |
+| ▶ | [T-0274](../tracker/tasks/T-0274.md) | tenancy: system_admin global project visibility (ADR 0016) — additive migration replacing project_isolation_policy on every project-scoped table through the frozen-DDL helper, ORM scope mirror, RLS contract tests updated | tenancy | M | T-0007, T-0014, T-0033 |  |
 | ⬜ | [T-0275](../tracker/tasks/T-0275.md) | identity/projects: system_admin capabilities on every project (V, C, E, administer; never A or S), all projects in GET /projects and /me/projects, SoD warning for hold personas on system_admins | identity | S | T-0274, T-0010, T-0014, T-0042 |  |
 | ⬜ | [T-0276](../tracker/tasks/T-0276.md) | Frontend: project picker and All-Projects scope show every project for a system_admin (badge for admin access without membership; no A/S actions) | frontend | S | T-0275, T-0042, T-0024 |  |
 | 🟥 | [T-0277](../tracker/tasks/T-0277.md) | identity: system_admin impersonation token — POST /admin/users/{id}/impersonate and /auth/impersonation/exit, single-session impersonation JWT (no refresh), target RLS with is_system_admin = false (blocked by TD-426) *(blocked by TD-426)* | identity | M | T-0006, T-0008, T-0010, T-0014, T-0039, T-0043, T-0230, T-0274 |  |

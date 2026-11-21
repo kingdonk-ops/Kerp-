@@ -28,20 +28,25 @@ jobs:
       (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
     runs-on: ubuntu-latest
     steps:
+      # This job pushes main and a tag, so the checkout keeps its token (the only one that does).
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+      # Expressions reach the scripts through env only, never interpolated into them.
       - name: Decide
         id: d
         env:
           GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          RUN_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          if [ "${{ github.event_name }}" = "workflow_run" ]; then
-            SHA="${{ github.event.workflow_run.head_sha }}"
+          if [ "$EVENT_NAME" = "workflow_run" ]; then
+            SHA="$RUN_HEAD_SHA"
           else
             SHA="$(git rev-parse origin/dev)"
-            OK=$(gh api "repos/${{ github.repository }}/commits/$SHA/check-runs?check_name=ci-gate" \
+            OK=$(gh api "repos/$REPO/commits/$SHA/check-runs?check_name=ci-gate" \
                  -q '[.check_runs[] | select(.conclusion=="success")] | length')
             [ "$OK" -gt 0 ] || { echo "::error::ci-gate has not passed on dev@$SHA"; exit 1; }
           fi
@@ -51,26 +56,30 @@ jobs:
           fi
           MERGES=$(git log --first-parent --format=%s "origin/main..$SHA" | grep -cE '\(#[0-9]+\)$' || true)
           GO=false
-          [ "${{ github.event_name }}" = "workflow_dispatch" ] && GO=true
+          [ "$EVENT_NAME" = "workflow_dispatch" ] && GO=true
           [ "$MERGES" -ge "$PROMOTE_EVERY" ] && GO=true
           git log --first-parent --format='- %s' "origin/main..$SHA" > notes.md
-          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
-          echo "merges=$MERGES" >> "$GITHUB_OUTPUT"
-          echo "go=$GO" >> "$GITHUB_OUTPUT"
+          {
+            echo "sha=$SHA"
+            echo "merges=$MERGES"
+            echo "go=$GO"
+          } >> "$GITHUB_OUTPUT"
           {
             echo "### Promotion check"
             echo "dev@\`${SHA:0:8}\` — **$MERGES** merged PR(s) since last promotion (threshold $PROMOTE_EVERY) → promote: **$GO**"
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Fast-forward main and tag
         if: steps.d.outputs.go == 'true'
+        env:
+          SHA: ${{ steps.d.outputs.sha }}
+          MERGES: ${{ steps.d.outputs.merges }}
         run: |
           set -euo pipefail
-          SHA="${{ steps.d.outputs.sha }}"
           TAG="release-$(date -u +%Y%m%d-%H%M)-${SHA:0:7}"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git push origin "$SHA:refs/heads/main"
-          printf 'Promoted dev → main (%s PRs)\n\n' "${{ steps.d.outputs.merges }}" | cat - notes.md > tagmsg.md
+          printf 'Promoted dev → main (%s PRs)\n\n' "$MERGES" | cat - notes.md > tagmsg.md
           git tag -a "$TAG" "$SHA" -F tagmsg.md
           git push origin "$TAG"
           { echo "Promoted to **main**, tagged \`$TAG\`"; echo; cat notes.md; } >> "$GITHUB_STEP_SUMMARY"

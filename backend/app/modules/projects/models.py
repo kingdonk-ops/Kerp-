@@ -21,6 +21,8 @@ TABLE: Final = "oe_projects_project"
 STATUSES: Final = ("ACTIVE", "ON_HOLD", "CLOSED")
 # Fallback literals only: ``create_project`` always passes the four values explicitly, taken
 # from the deployment settings (T-0044). They equal the settings' shipped defaults (tested).
+# Status and site timezone are also the DB-side defaults of spec §4.1 (migration 0033,
+# T-0063); currency and locale have none (TD-185).
 DEFAULT_STATUS: Final = "ACTIVE"
 DEFAULT_TIMEZONE: Final = "Australia/Perth"  # master spec §4.1
 DEFAULT_CURRENCY: Final = "AUD"
@@ -49,8 +51,12 @@ class Project(Base, BaseRecordMixin):
 
     code: Mapped[str] = mapped_column(String(32), nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
-    status: Mapped[str] = mapped_column(String(32), nullable=False, default=DEFAULT_STATUS)
-    site_timezone: Mapped[str] = mapped_column(String(64), nullable=False, default=DEFAULT_TIMEZONE)
+    status: Mapped[str] = mapped_column(
+        String(32), nullable=False, default=DEFAULT_STATUS, server_default=DEFAULT_STATUS
+    )  # server default: migration 0033
+    site_timezone: Mapped[str] = mapped_column(
+        String(64), nullable=False, default=DEFAULT_TIMEZONE, server_default=DEFAULT_TIMEZONE
+    )  # server default: migration 0033
     spatial_bounds: Mapped[dict[str, Any] | None] = mapped_column(
         GeoJSONGeometry("Polygon"), nullable=True
     )

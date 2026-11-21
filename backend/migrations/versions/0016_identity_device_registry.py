@@ -28,7 +28,6 @@ import sqlalchemy as sa
 from alembic import op
 
 from app.core.db import GUID, JSONType
-from app.core.tenancy.rls import rls_policy_sql
 
 revision: str = "0016"
 down_revision: str | None = "0015"
@@ -41,6 +40,39 @@ LEDGER_CHECKS = (
     ("hash_version", "hash_version IN (1, 2)"),
     ("v1_no_device", "hash_version >= 2 OR device_id IS NULL"),
 )
+
+# Frozen DDL (TD-060, T-0033): exactly what ``app.core.tenancy.rls.rls_policy_sql``
+# returned for this revision's table(s). Never edit it: a helper change ships as a NEW
+# revision with the new output frozen in it (tests/test_migration_frozen_ddl.py fails until
+# then).
+FROZEN_RLS_DDL: dict[str, tuple[str, ...]] = {
+    TABLE: (
+        "ALTER TABLE oe_identity_device ENABLE ROW LEVEL SECURITY",
+        "ALTER TABLE oe_identity_device FORCE ROW LEVEL SECURITY",
+        "DROP POLICY IF EXISTS project_isolation_policy ON oe_identity_device",
+        (
+            "CREATE POLICY project_isolation_policy ON oe_identity_device FOR ALL USING (tenant_id"
+            " = NULLIF(current_setting('app.current_tenant_id', true), '')::uuid AND project_id IS"
+            " NOT DISTINCT FROM NULLIF(current_setting('app.current_project_id', true), '')::uuid)"
+            " WITH CHECK (tenant_id = NULLIF(current_setting('app.current_tenant_id', true),"
+            " '')::uuid AND project_id IS NOT DISTINCT FROM"
+            " NULLIF(current_setting('app.current_project_id', true), '')::uuid)"
+        ),
+        "DROP POLICY IF EXISTS tenant_level_read_policy ON oe_identity_device",
+        (
+            "CREATE POLICY tenant_level_read_policy ON oe_identity_device FOR SELECT USING"
+            " (tenant_id = NULLIF(current_setting('app.current_tenant_id', true), '')::uuid AND"
+            " project_id IS NULL)"
+        ),
+        "DROP POLICY IF EXISTS allowed_projects_read_policy ON oe_identity_device",
+        (
+            "CREATE POLICY allowed_projects_read_policy ON oe_identity_device FOR SELECT USING"
+            " (tenant_id = NULLIF(current_setting('app.current_tenant_id', true), '')::uuid AND"
+            " project_id = ANY(string_to_array(NULLIF(current_setting('app.allowed_project_ids',"
+            " true), ''), ',')::uuid[]))"
+        ),
+    ),
+}
 
 
 def _ledger_columns() -> list[sa.Column[object]]:
@@ -99,7 +131,7 @@ def _create_device_table() -> None:
     for column in ("tenant_id", "project_id", "user_id"):
         op.create_index(op.f(f"ix_{TABLE}_{column}"), TABLE, [column])
     if op.get_context().dialect.name == "postgresql":
-        for statement in rls_policy_sql(TABLE):
+        for statement in FROZEN_RLS_DDL[TABLE]:
             op.execute(statement)
 
 

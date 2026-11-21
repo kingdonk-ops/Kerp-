@@ -5,7 +5,8 @@ context parameters it needs. Rules every template obeys by construction:
 
 * **Secrets only inside link fragments.** A template with a ``link_path`` builds its one link
   as ``<web origin><link_path>#<secret>``; the secret context value is used nowhere else
-  (never in the subject or the text), and no other context value may hold it.
+  (never in the subject or the text), and no other context value may hold it. A template
+  that links an ordinary page (``public_link=True``) has no secret: ``<web origin><link_path>``.
 * **No remote content.** The HTML has no images, no external styles, no scripts and no
   tracking pixel; its only URL is the link above.
 * Every context value is escaped in the HTML.
@@ -38,17 +39,26 @@ class TemplateError(ValueError):
 @dataclass(frozen=True, slots=True)
 class MailTemplate:
     """``params``: the context keys shown in the text. ``secret``: the context key carried
-    only in the link fragment (``link_path`` required with it)."""
+    only in the link fragment (``link_path`` required with it). ``public_link``: the link is
+    an ordinary page of the app (the lobby, T-0063) and carries no secret and no fragment;
+    a template must say so explicitly, so a link that should carry a secret never goes out
+    without one by mistake."""
 
     key: str
     params: tuple[str, ...] = ()
     link_path: str | None = None
     secret: str | None = None
+    public_link: bool = False
 
     def __post_init__(self) -> None:
         if not KEY_PATTERN.match(self.key):
             raise ValueError(f"mail template key {self.key!r} must look like '<area>.<name>'")
-        if (self.link_path is None) != (self.secret is None):
+        if self.public_link:
+            if self.link_path is None or self.secret is not None:
+                raise ValueError(
+                    f"mail template {self.key!r}: a public link needs a link_path and no secret"
+                )
+        elif (self.link_path is None) != (self.secret is None):
             raise ValueError(f"mail template {self.key!r}: a link needs a secret and vice versa")
         if self.link_path is not None and not re.match(r"^/[a-z0-9/_-]*$", self.link_path):
             raise ValueError(f"mail template {self.key!r}: link_path must be a plain path")
@@ -125,7 +135,7 @@ def register_template(template: MailTemplate) -> MailTemplate:
 
 
 # Core templates. Modules register theirs from their own code (invites: T-0059, password
-# reset: T-0077, access-request decisions: T-0056).
+# reset: T-0077, access-request decisions: T-0063).
 MAGIC_LINK = register_template(
     MailTemplate(
         "auth.magic_link", params=("expires_minutes",), link_path="/magic-link", secret="token"
@@ -169,8 +179,10 @@ def render(
     lang = locale or default_locale
     text_lines = [intro, ""]
     html_lines = [f"<p>{html.escape(intro)}</p>"]
-    if template.link_path is not None and template.secret is not None:
-        url = f"{web_origin.rstrip('/')}{template.link_path}#{quote(str(context[template.secret]))}"
+    if template.link_path is not None:
+        url = f"{web_origin.rstrip('/')}{template.link_path}"
+        if template.secret is not None:
+            url += f"#{quote(str(context[template.secret]))}"
         action, fallback = text_of(f"{own}.action"), text_of("mail.common.link_fallback")
         text_lines += [f"{action}: {url}", ""]
         safe_url = html.escape(url, quote=True)

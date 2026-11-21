@@ -4,8 +4,9 @@ Master spec §1.2/§4.1: spatial data is PostGIS in EPSG:4326 (WGS84). The ORM v
 GeoJSON geometry ``dict`` on every dialect, so services and schemas never see WKB:
 
 * PostgreSQL: the column is ``geometry(<kind>, 4326)``. Writes go through
-  ``ST_SetSRID(ST_GeomFromGeoJSON(...), 4326)`` and reads through ``ST_AsGeoJSON(...)``, so
-  PostGIS enforces the geometry kind and SRID and spatial SQL works on the column.
+  ``ST_SetSRID(ST_GeomFromGeoJSON(...), 4326)`` and reads through ``ST_AsGeoJSON(..., 15)``
+  (full precision, ``GEOJSON_MAX_DECIMALS``), so PostGIS enforces the geometry kind and SRID
+  and spatial SQL works on the column.
 * Anything else (the SQLite fast suite): the same GeoJSON stored as ``TEXT``; no spatial SQL.
 
 Validate the GeoJSON in the API schema before it reaches the column (see the projects module).
@@ -26,6 +27,11 @@ from sqlalchemy.sql.functions import FunctionElement
 from sqlalchemy.types import TypeEngine, UserDefinedType
 
 WGS84: Final = 4326
+# ``ST_AsGeoJSON`` writes at most 9 decimals by default, which would round a stored position
+# on its way back (sub-millimetre, but a different value from the one written). 15 is the
+# PostGIS maximum; PostGIS 3.1+ prints the shortest form that round-trips, so a position
+# reads back as it was written (T-0063, PR #43 review).
+GEOJSON_MAX_DECIMALS: Final = 15
 
 
 class _PostgisGeometry(UserDefinedType[Any]):
@@ -70,7 +76,8 @@ def _pg_from_geojson(element: FunctionElement[Any], compiler: SQLCompiler, **kw:
 
 @compiles(_GeometryToGeoJSON, "postgresql")
 def _pg_to_geojson(element: FunctionElement[Any], compiler: SQLCompiler, **kw: object) -> str:
-    return f"ST_AsGeoJSON({compiler.process(element.clauses, **kw)})"
+    column = compiler.process(element.clauses, **kw)
+    return f"ST_AsGeoJSON({column}, {GEOJSON_MAX_DECIMALS})"
 
 
 class GeoJSONGeometry(TypeDecorator[dict[str, Any]]):

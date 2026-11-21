@@ -69,6 +69,33 @@ def test_detect_failure_without_outputs_fails() -> None:
     assert ci_gate.evaluate(jobs, "push") != []
 
 
+def test_detect_not_green_makes_every_skip_a_problem() -> None:
+    """The "detect not green" override (PR #18 review, P9): without detect's flags no skip
+    is known to be legitimate, so each skipped job is reported on its own, not only detect."""
+    jobs = needs("false")
+    jobs["detect"] = {"result": "failure", "outputs": {}}
+    for job in ci_gate.EXPECTED:
+        if job != "detect":
+            jobs[job]["result"] = "skipped"
+    assert ci_gate.evaluate(jobs, "push") == [
+        "detect: failure (expected success)",
+        "tracker: skipped (expected success)",
+        "backend: skipped (expected success)",
+        "backend-pg: skipped (expected success)",
+        "backend-image: skipped (expected success)",
+        "backend-publish: skipped (expected success)",
+        "frontend: skipped (expected success)",
+        "perf: skipped (expected success)",
+        "e2e: skipped (expected success)",
+    ]
+    # Even a pull_request (where publish skips by design) and "false" flags change nothing.
+    jobs["detect"] = {"result": "cancelled", "outputs": {"backend": "false"}}
+    problems = ci_gate.evaluate(jobs, "pull_request")
+    assert "backend-publish: skipped (expected success)" in problems
+    assert "backend: skipped (expected success)" in problems
+    assert "backend-pg: skipped (expected success)" in problems
+
+
 def test_missing_job_fails() -> None:
     jobs = needs()
     del jobs["frontend"]

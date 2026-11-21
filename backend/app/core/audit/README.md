@@ -14,7 +14,7 @@ table is on `Base.metadata` for Alembic and the contract tests.
 | `models.py` | `AuditEntry` (`audit_ledger`, `BaseRecordMixin`), ORM append-only guard, `AppendOnlyError` |
 | `hashing.py` | canonical JSON, `compute_content_hash`, `verify_entries`, `ChainReport` (pure, no DB) |
 | `service.py` | `append`, `chain_entries`, `verify_chain` |
-| `guard.py` | PostgreSQL REVOKE + trigger DDL (`ledger_guard_sql`) and `ledger_guard_problems` |
+| `guard.py` | PostgreSQL REVOKE + trigger DDL (`ledger_guard_sql`, frozen into migration `0002`) and `ledger_guard_problems` |
 
 ## Using it
 
@@ -139,5 +139,9 @@ fails with `IntegrityError` rather than forking
   to A's key starts B's own chain; neither sees the other's rows), and 6 threads x 5
   concurrent appends to one chain.
 
-Migration `0002` calls the live `rls_policy_sql`/`ledger_guard_sql` helpers, following the
-T-0007 convention; whether revisions should inline frozen DDL instead is **TD-060**.
+Migration `0002` does not call `guard.py` (TD-060, T-0033): it inlines what `ledger_guard_sql` /
+`ledger_guard_drop_sql` returned in `FROZEN_LEDGER_GUARD_DDL` / `FROZEN_LEDGER_GUARD_DROP_DDL`
+(and the RLS DDL in `FROZEN_RLS_DDL`, see `app/core/tenancy/README.md`). Changing the guard
+helpers needs a **new** revision with the new output frozen in those constants; never edit
+`0002`. `tests/test_migration_frozen_ddl.py` fails, naming the table, while the newest revision's
+frozen guard differs from the live helper output.

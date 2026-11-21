@@ -14,9 +14,7 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-from app.core.audit.guard import ledger_guard_drop_sql, ledger_guard_sql
 from app.core.db import GUID, JSONType
-from app.core.tenancy.rls import rls_policy_sql
 
 revision: str = "0002"
 down_revision: str | None = "0001"
@@ -25,6 +23,65 @@ depends_on: str | Sequence[str] | None = None
 
 TABLE = "audit_ledger"
 NIL_UUID = "00000000-0000-0000-0000-000000000000"  # scope_id of tenant-level chains
+
+# Frozen DDL (TD-060, T-0033): exactly what ``rls_policy_sql``, ``ledger_guard_sql`` and
+# ``ledger_guard_drop_sql`` returned for this revision's table. Never edit it: a helper change
+# ships as a NEW revision with the new output frozen in it (tests/test_migration_frozen_ddl.py
+# fails until then).
+FROZEN_RLS_DDL: dict[str, tuple[str, ...]] = {
+    TABLE: (
+        "ALTER TABLE audit_ledger ENABLE ROW LEVEL SECURITY",
+        "ALTER TABLE audit_ledger FORCE ROW LEVEL SECURITY",
+        "DROP POLICY IF EXISTS project_isolation_policy ON audit_ledger",
+        (
+            "CREATE POLICY project_isolation_policy ON audit_ledger FOR ALL USING (tenant_id ="
+            " NULLIF(current_setting('app.current_tenant_id', true), '')::uuid AND project_id IS"
+            " NOT DISTINCT FROM NULLIF(current_setting('app.current_project_id', true), '')::uuid)"
+            " WITH CHECK (tenant_id = NULLIF(current_setting('app.current_tenant_id', true),"
+            " '')::uuid AND project_id IS NOT DISTINCT FROM"
+            " NULLIF(current_setting('app.current_project_id', true), '')::uuid)"
+        ),
+        "DROP POLICY IF EXISTS tenant_level_read_policy ON audit_ledger",
+        (
+            "CREATE POLICY tenant_level_read_policy ON audit_ledger FOR SELECT USING (tenant_id ="
+            " NULLIF(current_setting('app.current_tenant_id', true), '')::uuid AND project_id IS"
+            " NULL)"
+        ),
+        "DROP POLICY IF EXISTS allowed_projects_read_policy ON audit_ledger",
+        (
+            "CREATE POLICY allowed_projects_read_policy ON audit_ledger FOR SELECT USING (tenant_id"
+            " = NULLIF(current_setting('app.current_tenant_id', true), '')::uuid AND project_id ="
+            " ANY(string_to_array(NULLIF(current_setting('app.allowed_project_ids', true), ''),"
+            " ',')::uuid[]))"
+        ),
+    ),
+}
+FROZEN_LEDGER_GUARD_DDL: dict[str, tuple[str, ...]] = {
+    TABLE: (
+        "REVOKE UPDATE, DELETE, TRUNCATE ON audit_ledger FROM PUBLIC",
+        "REVOKE UPDATE, DELETE, TRUNCATE ON audit_ledger FROM CURRENT_USER",
+        (
+            "CREATE OR REPLACE FUNCTION audit_ledger_reject_change() RETURNS trigger LANGUAGE"
+            " plpgsql AS $$ BEGIN RAISE EXCEPTION USING ERRCODE = 'insufficient_privilege', MESSAGE"
+            " = TG_TABLE_NAME || ' is append-only (' || TG_OP || ' refused)'; END $$"
+        ),
+        (
+            "CREATE TRIGGER audit_ledger_append_only BEFORE UPDATE OR DELETE ON audit_ledger FOR"
+            " EACH ROW EXECUTE FUNCTION audit_ledger_reject_change()"
+        ),
+        (
+            "CREATE TRIGGER audit_ledger_no_truncate BEFORE TRUNCATE ON audit_ledger FOR EACH"
+            " STATEMENT EXECUTE FUNCTION audit_ledger_reject_change()"
+        ),
+    ),
+}
+FROZEN_LEDGER_GUARD_DROP_DDL: dict[str, tuple[str, ...]] = {
+    TABLE: (
+        "DROP TRIGGER IF EXISTS audit_ledger_no_truncate ON audit_ledger",
+        "DROP TRIGGER IF EXISTS audit_ledger_append_only ON audit_ledger",
+        "DROP FUNCTION IF EXISTS audit_ledger_reject_change()",
+    ),
+}
 
 
 def upgrade() -> None:
@@ -62,13 +119,13 @@ def upgrade() -> None:
     op.create_index(op.f("ix_audit_ledger_tenant_id"), TABLE, ["tenant_id"])
     op.create_index(op.f("ix_audit_ledger_project_id"), TABLE, ["project_id"])
     if op.get_context().dialect.name == "postgresql":
-        for statement in (*rls_policy_sql(TABLE), *ledger_guard_sql(TABLE)):
+        for statement in (*FROZEN_RLS_DDL[TABLE], *FROZEN_LEDGER_GUARD_DDL[TABLE]):
             op.execute(statement)
 
 
 def downgrade() -> None:
     if op.get_context().dialect.name == "postgresql":
-        for statement in ledger_guard_drop_sql(TABLE):
+        for statement in FROZEN_LEDGER_GUARD_DROP_DDL[TABLE]:
             op.execute(statement)
     op.drop_index(op.f("ix_audit_ledger_project_id"), table_name=TABLE)
     op.drop_index(op.f("ix_audit_ledger_tenant_id"), table_name=TABLE)

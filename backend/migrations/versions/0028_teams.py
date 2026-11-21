@@ -120,6 +120,15 @@ def _policies(table: str, team_column: str) -> list[str]:
     ]
 
 
+# The RLS DDL this revision applies, per table (TD-060, T-0033): frozen here, replayed by
+# tests/test_migration_frozen_ddl.py against the live helpers.
+FROZEN_RLS_DDL: dict[str, tuple[str, ...]] = {
+    TEAM: (_FUNCTION_SQL, *_policies(TEAM, "id")),
+    MEMBER: tuple(_policies(MEMBER, "team_id")),
+    LINK: tuple(_policies(LINK, "team_id")),
+}
+
+
 def _record_columns() -> list[sa.Column[object]]:
     return [
         sa.Column("id", GUID(), nullable=False),
@@ -214,9 +223,8 @@ def upgrade() -> None:
 
     if op.get_context().dialect.name != "postgresql":
         return
-    op.execute(_FUNCTION_SQL)
-    for table, column in ((TEAM, "id"), (MEMBER, "team_id"), (LINK, "team_id")):
-        for statement in _policies(table, column):
+    for table in (TEAM, MEMBER, LINK):  # the lookup function first, with the team table
+        for statement in FROZEN_RLS_DDL[table]:
             op.execute(statement)
 
 
