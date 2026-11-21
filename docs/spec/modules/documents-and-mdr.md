@@ -59,24 +59,41 @@ the audit ledger; no hard purge), TD-403 (providers of later modules), TD-405 (f
 
 ### Access: membership required (TD-396)
 The archive holds every record, file and audit chain of a project, so it follows diff §4.1:
-System admins read no project-scoped record without a membership. **Export and download
-require `system_admin` *and* a live membership of the requesting admin on that project** (any
-persona; PER-09 is the usual one); restore of a deleted project requires the membership the
-admin held when it was deleted (below). A System admin without one first
-grants themselves PER-09 through the existing membership API (`PUT
-/api/v1/admin/projects/{p}/members/{user}`, T-0014), which is written to the audit chain
-`project-members:<project>`; the archive endpoints never grant it implicitly. A deleted project
-has no live memberships (deleting revokes them all, and the membership API answers 404 on a
-deleted project, T-0014), so for **restore of a deleted project** the check is that the
-requesting admin held a membership on it when it was deleted (a membership row revoked by that
-deletion, read through the admin module's `service.py`); a System admin who did not restores it
-as a new project instead. A `system_admin` without the membership gets **404** on these
-endpoints (cross-scope is 404, CLAUDE.md §6); a caller without `system_admin` gets 403. The
-registry list (project code and name, size, tier, status) is tenant-level metadata like the project list a System admin already sees (diff §4.1),
-so it shows every archive; storage-tier changes and deep-archive restores move objects without
-exposing their content and need `system_admin` only. **Restore as new**: the restoring admin
-becomes PER-09 of the new project in the restoring transaction, audited in
-`project-members:<new project>`. Planner default; the user may relax it (TD-396).
+System admins read no project-scoped record without a membership. Every endpoint needs
+`system_admin` (else 403); the ones that expose or copy the content of a **registry** archive
+also need a membership of the requesting admin on the archived project (any persona; PER-09 is
+the usual one), else **404** (cross-scope is 404, CLAUDE.md §6):
+
+| Action | Membership needed |
+|---|---|
+| Export (T-0233) | live membership on the (live) project |
+| Download (T-0237) | live project: live membership; deleted project: membership held when it was deleted |
+| Restore from a registry `archive_id`, mode `deleted` **or** `new` (T-0239, T-0240) | same as download |
+| Restore from an uploaded `.zip` (`file_id`), either mode | none: `system_admin` only, because the caller already holds the bytes (the upload is scanned like any other, T-0016) |
+| Registry list and detail, storage-tier change, deep-archive restore request | none: tenant-level metadata (like the project list a System admin already sees, diff §4.1) and object moves that expose no content |
+
+**Live membership.** A System admin without one grants themselves PER-09 through the existing
+membership API (`PUT /api/v1/admin/projects/{p}/members/{user}`, T-0014), written to the audit
+chain `project-members:<project>`; the archive endpoints never grant a membership implicitly.
+
+**Membership held at deletion.** A deleted project has no live memberships (deleting revokes
+them all, and the membership API answers 404 on a deleted project, T-0014), so nobody can
+self-grant one. The discriminator is the **`revoked_memberships` payload of the project's
+`delete` entry in the `project:<id>` audit chain**, written by `projects.service.delete_project`:
+a sorted list of `"<user id>:<persona>"` for every grant that was live at the deletion
+(`memberships.revoke_project` soft-deletes only live rows; team-derived grants cannot exist at
+that point, they are unlinked first). Memberships removed earlier are soft-deleted too, but they
+are not in that list, so they neither pass the gate nor come back on restore. The admin module
+reads it through a new `admin.service.memberships_at_deletion(session, project_id) → dict[user
+id, set[Grant]]`, built on `app/core/auth/memberships.py` (soft-deleted rows of the project,
+filtered to the pairs of the latest `delete` entry, which the projects module exposes as
+`projects.service.deletion_revoked_memberships(session, project_id)`; the archive module never
+reads the ledger or another module's tables itself). A System admin who was not a member at deletion has no way in through the
+registry; the only path left is an uploaded zip they already hold.
+
+**Restore as new**: the restoring admin becomes PER-09 of the new project in the restoring
+transaction, audited in `project-members:<new project>`. Planner default; the user may relax it
+(TD-396).
 
 ### Package (T-0233, T-0234, T-0235)
 - Built by a **`batch` SAQ job**, heavy libraries imported lazily; streamed to the object store
@@ -130,7 +147,7 @@ becomes PER-09 of the new project in the restoring transaction, audited in
 - Storage tier change by S3 `CopyObject` onto itself with the new storage class; the registry is
   updated only after the copy succeeds. Moving to `DEEP_ARCHIVE` warns about the minimum storage
   duration and the restore time (hours).
-- Download (membership required, non-member → 404): a short-lived presigned GET for
+- Download (membership required per §Access, live or at deletion; else 404): a short-lived presigned GET for
   `STANDARD`, `GLACIER_IR`, or a `restored_temp` copy; `DEEP_ARCHIVE` answers 409 until restored. **Restore from deep archive**
   (`RestoreObject`, tier `Bulk` or `Standard`, chosen days) is polled by an SAQ cron job
   (`HeadObject` restore header); when ready the requesting admin gets an in-app notification
@@ -140,17 +157,20 @@ becomes PER-09 of the new project in the restoring transaction, audited in
   in this epic.
 
 ### Restore (T-0239, T-0240)
-- `POST /api/v1/admin/projects/restore` (`system_admin`; mode `deleted` also needs the
-  membership the admin held when the project was deleted, else 404; see Access above) takes an
-  archive id or a `.zip` uploaded through presigned uploads (T-0016, scanned like any upload). Runs as a `batch` job.
+- `POST /api/v1/admin/projects/restore` (`system_admin`) takes a registry archive id or a
+  `.zip` uploaded through presigned uploads (T-0016, scanned like any upload). From an archive
+  id, both modes need the membership of §Access (live project: live; deleted project: held at
+  deletion), else 404 with nothing written; from an uploaded zip, `system_admin` only. Runs as a
+  `batch` job.
   Before anything is written it checks every SHA-256 of the manifest, the schema versions (an
   archive from a newer schema is refused; older ones go through per-module upgrade steps) and
   verifies every audit chain; any failure writes nothing.
 - **Restore deleted project:** a soft-deleted project's rows still exist. The restore verifies
   that the existing soft-deleted rows match the archive manifest (per-table counts and checksums,
   file SHA-256s) and then **un-deletes them in place** (ids unchanged); it never upserts from the
-  archive. The memberships revoked by the deletion come back with it, so the restoring admin's
-  own membership is live again (audited in `project-members:<project>`). Any difference → 409
+  archive. The memberships revoked by the deletion (exactly the `revoked_memberships` pairs of
+  §Access, never earlier removals) come back with it, so the restoring admin's own membership,
+  if any, is live again (audited in `project-members:<project>`). Any difference → 409
   `ARCHIVE_DIFF` with the differing tables, nothing written (use restore as new instead).
   Refused when the project is live (409).
 - **Restore as new project:** new project id and code; every entity id remapped

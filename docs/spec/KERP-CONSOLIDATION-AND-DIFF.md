@@ -643,7 +643,9 @@ written to the audit ledger. Record reads keep project RLS: System admins read n
 project-scoped record without a membership (§4.1; TD-396), and no console endpoint widens a
 project RLS policy or uses a bypass role; where a non-member needs an overview it gets counts
 from a count-only function. The project archive follows the same rule (export, download and
-restore of a deleted project need a membership; `modules/documents-and-mdr.md` §Access).
+restore from a registry archive in either mode need a membership, live or held at the
+project's deletion; restore from an uploaded zip the caller already holds needs `system_admin`
+only; `modules/documents-and-mdr.md` §Access).
 
 - **Deployment stats** (T-0219): counts and byte totals only, never rows: projects (active,
   soft-deleted), users (active, deactivated), enrolled devices, and per module the counts it
@@ -675,8 +677,11 @@ restore of a deleted project need a membership; `modules/documents-and-mdr.md` �
   admin is a member. For every other project it shows **counts only**, per project and status
   (and reason code), from a count-only `SECURITY DEFINER` function of the T-0219 pattern
   (pinned `search_path`, `EXECUTE` revoked from `PUBLIC`, returns numbers only; ADR). The
-  uploads RLS policy is **not widened** and **no bypass role** is used; to act on rows of such a
-  project the admin first grants themselves a membership (audited, T-0014; TD-396).
+  uploads RLS policy is **not widened** and **no bypass role** is used; the count function
+  accepts only project, status and reason filters (never a file id, hash or filename, so it is no
+  existence oracle). To act on rows of such a project the admin first grants themselves a
+  membership (audited, T-0014; TD-396); the orphan sweep is housekeeping that returns no rows
+  and is exempt.
 - **Audit explorer** (T-0222): read-only over the hash-chain ledger (§4); no endpoint ever
   changes a ledger row. Reads under normal RLS: tenant-level chains (grants, users, devices,
   deployment settings, mail suppression, teams, the system console) in full; project chains
@@ -1046,14 +1051,16 @@ the navigation **and** refused by the API (403 for admin surfaces).
 | **Users** | user directory (status, presence, sessions, logins, grants, filters, search; resend invite, force sign-out, activate/deactivate); user detail with memberships across projects (§4.8) | `system_admin`; PER-09 memberships tab for its own projects | T-0026, T-0246 |
 | **System** | deployment stats + health; queue monitor (retry / abort); upload quarantine (re-check, sweep now); runtime settings (editable registry + read-only deployment configuration); admin grants (T-0026); devices (T-0048); audit log (filters, verify chain); legal hold on the project admin page | `system_admin` | T-0224, T-0225, T-0232 |
 | **Communications** | broadcast composer (audience, count, send); delivery stats (cards) and history; automated e-mail templates (edit, preview, test send, reset) | `system_admin`; PER-09 composer and stats for its own projects | T-0229 |
-| **Project archives** | archive list; export; storage tier toggle; download; start a deep-archive restore; restore wizard (deleted project or new project) | `system_admin`; export, download and restore of a deleted project also need a membership on that project | T-0241 (epic E-01-02) |
+| **Project archives** | archive list; export; storage tier toggle; download; start a deep-archive restore; restore wizard (deleted project or new project) | `system_admin`; export, download and restore from a registry archive (either mode) also need a membership on that project (live, or held when it was deleted); restore from an uploaded zip needs `system_admin` only | T-0241 (epic E-01-02) |
 
 Numbers on these screens are counts and states only (§4.7); a screen never shows a project
 record the caller could not open in the project itself. This holds for the upload quarantine
 (rows only of member projects, counts for the rest), the audit explorer (project chains only of
-member projects) and the project archives (export, download and restore of a deleted project
-need a membership on that project; restore as new makes the restoring admin PER-09 of the new
-project, audited; `modules/documents-and-mdr.md` §Access; TD-396).
+member projects) and the project archives (export, download and restore from a registry
+archive, in either mode, need a membership on that project, live or held when it was deleted;
+only a zip the caller uploads, whose bytes they already hold, restores without one; restore as
+new makes the restoring admin PER-09 of the new project, audited;
+`modules/documents-and-mdr.md` §Access; TD-396).
 
 ---
 
