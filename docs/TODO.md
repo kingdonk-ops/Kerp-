@@ -361,13 +361,13 @@
 | [TD-490](../tracker/todo/TD-490.md) | Admin -> Users invite form: a SoD 409 that returns after the user edited the form re-arms confirm_sod for the edited form (fields stay editable while the send is pending) | T-0331 | reviewer |
 | [TD-507](../tracker/todo/TD-507.md) | Local PostgreSQL test runs of parallel worktrees collide: template databases are named per xdist worker only | T-0230 | implementer |
 | [TD-509](../tracker/todo/TD-509.md) | Flaky: test_auth_magic_link_field_workers lockout test asserts Retry-After == 60 on the wall clock | T-0223 | implementer |
-| [TD-516](../tracker/todo/TD-516.md) | review gate counts dismissed reviews: a dismissed KERP-REVIEW APPROVED still satisfies scripts/review_gate.py | — | planner |
 | [TD-519](../tracker/todo/TD-519.md) | Promotion fails red when CI runs on dev finish out of order (promote.yml checks origin/dev, not the run's head_sha) | — | planner |
 | [TD-523](../tracker/todo/TD-523.md) | Locale check accepts a trailing newline: _LOCALE regex in core/locale.py uses $ with re.match | — | planner |
 | [TD-524](../tracker/todo/TD-524.md) | Password-change revocation can miss tokens when server clocks drift (iat compared with password_changed_at from another clock) | T-0345 | planner |
 | [TD-525](../tracker/todo/TD-525.md) | Some Redis errors surface as 500 instead of 503 (raw redis ConnectionError/TimeoutError outside RevocationUnavailableError) | T-0349 | planner |
 | [TD-527](../tracker/todo/TD-527.md) | Published upload files can be orphaned (object kept with no live owner row, or row pointing at a deleted object) | T-0346 | planner |
 | [TD-528](../tracker/todo/TD-528.md) | Two concurrent adds of the same user to a team return 500 (unique violation) instead of the already-a-member answer | — | planner |
+| [TD-537](../tracker/todo/TD-537.md) | review gate counts dismissed reviews: a dismissed KERP-REVIEW APPROVED still satisfies scripts/review_gate.py | — | planner |
 
 ## risk (34)
 
