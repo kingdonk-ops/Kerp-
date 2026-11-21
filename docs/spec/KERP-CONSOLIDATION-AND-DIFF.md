@@ -977,10 +977,12 @@ come later (Phase 6, T-0303–T-0305, epic E-06-05). Rules:
 - Active cert PDFs + calibration details **auto-compile into the project MDR**.
 
 **Equipment additions (user, 2026-11-21; planner reconciliation):**
-- **Equipment classes** (T-0249, blocked by TD-412): `equipment_class` (`instrument | vehicle |
+- **Equipment classes** (T-0249; TD-412 resolved 2026-11-21: in Phase 1): `equipment_class` (`instrument | vehicle |
   plant`), `requires_calibration` (true for instruments), `asset_number` (fleet number),
   `custodian_user_id`. The calibration gate and the activation cert rule apply only when
-  `requires_calibration` is true. Pulls a slice of E-03-07 into Phase 1 if accepted.
+  `requires_calibration` is true. Pulls this slice of E-03-07 into Phase 1 (product owner,
+  2026-11-21): some vehicles and plant need calibration or monthly compliance inspections, so they
+  are selectable inspection targets (through equipment links) like instruments.
 - **Activation gate** (T-0260): new equipment starts `out_of_service`; moving to `active` calls
   `run_checks(context, "equipment.activate")`, whose locked system-default rule is
   `!equipment.requires_calibration || (has(equipment.active_cert) &&
@@ -996,7 +998,7 @@ come later (Phase 6, T-0303–T-0305, epic E-06-05). Rules:
 - **Standalone inspections on equipment** (pre-starts, fault reports): equipment is an
   informational **link** of a project-level inspection, never an anchor (user, 2026-11-21;
   ADR 0003 amendment 2026-11-21, ADR 0014 superseded, TD-411 resolved; T-0250). Fleet vehicles
-  and plant in the register still wait on TD-412 (T-0249). Expiry lead-time alerts for calibration: T-0183.
+  and plant enter the register in Phase 1 (TD-412 resolved 2026-11-21; T-0249). Expiry lead-time alerts for calibration: T-0183.
 
 ---
 

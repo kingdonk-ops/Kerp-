@@ -3,10 +3,10 @@
 - **Status:** **superseded** (user, 2026-11-21) by the
   [ADR 0003 amendment 2026-11-21](0003-configurable-breakdown-and-terminology.md) (section "Amendment 2026-11-21"):
   equipment is an informational **link** of a project-level inspection, not a third exclusive
-  anchor. TD-411 resolved; TD-412 (fleet in the Phase-1 register) stays open. The text below is
+  anchor. TD-411 resolved; TD-412 resolved 2026-11-21 (fleet vehicles and plant join the Phase-1 register, T-0249). The text below is
   kept as history and is **not** in force.
 - **Date:** 2026-11-21
-- **Affects:** T-0250 (blocked by TD-411), T-0249 (blocked by TD-412), T-0111 (anchor rule; no
+- **Affects:** T-0250 (TD-411, resolved 2026-11-21), T-0249 (TD-412, resolved 2026-11-21), T-0111 (anchor rule; no
   change to its scope), T-0112 (equipment register), CLAUDE.md §6 anchor wording,
   `quality-and-inspection.md` §Standalone inspections
 
