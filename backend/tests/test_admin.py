@@ -848,7 +848,12 @@ def test_the_patch_documents_both_409_answers(api: Api) -> None:
     assert "CANNOT_DEACTIVATE_SELF" in conflict["description"]
     ref = conflict["content"]["application/json"]["schema"]["$ref"]
     model = spec["components"]["schemas"][ref.rsplit("/", 1)[1]]
-    assert model["properties"]["code"]["const"] == "CANNOT_DEACTIVATE_SELF"
+    # Both 409s match the schema: the self-refusal sends the code, the last-admin one does not.
+    assert "detail" in model["required"]
+    assert "code" not in model.get("required", [])
+    variants = model["properties"]["code"]["anyOf"]
+    assert {"const": "CANNOT_DEACTIVATE_SELF", "type": "string"} in variants
+    assert {"type": "null"} in variants
 
 
 # --- check-then-insert races answer like the sequential case (T-0211) ------------------------

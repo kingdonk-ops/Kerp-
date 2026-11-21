@@ -15649,18 +15649,24 @@
             "title": "Detail"
           },
           "code": {
-            "type": "string",
-            "const": "CANNOT_DEACTIVATE_SELF",
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "CANNOT_DEACTIVATE_SELF"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Code"
           }
         },
         "type": "object",
         "required": [
-          "detail",
-          "code"
+          "detail"
         ],
         "title": "UserUpdateRefusal",
-        "description": "A refused ``PATCH /admin/users/{id}`` that carries a ``code`` (T-0085): the caller\ntried to deactivate their own account."
+        "description": "A 409 from ``PATCH /admin/users/{id}``. With ``code: CANNOT_DEACTIVATE_SELF`` the\ncaller tried to deactivate their own account (T-0085); the last-active-System-admin\nrefusal answers ``detail`` only, so ``code`` is optional."
       },
       "ValidationError": {
         "properties": {

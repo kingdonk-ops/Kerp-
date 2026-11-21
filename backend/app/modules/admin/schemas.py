@@ -57,11 +57,12 @@ class UserUpdate(BaseModel):
 
 
 class UserUpdateRefusal(BaseModel):
-    """A refused ``PATCH /admin/users/{id}`` that carries a ``code`` (T-0085): the caller
-    tried to deactivate their own account."""
+    """A 409 from ``PATCH /admin/users/{id}``. With ``code: CANNOT_DEACTIVATE_SELF`` the
+    caller tried to deactivate their own account (T-0085); the last-active-System-admin
+    refusal answers ``detail`` only, so ``code`` is optional."""
 
     detail: str
-    code: Literal["CANNOT_DEACTIVATE_SELF"]
+    code: Literal["CANNOT_DEACTIVATE_SELF"] | None = None
 
 
 class UserRead(BaseModel):

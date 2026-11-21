@@ -5414,17 +5414,15 @@ export interface components {
         };
         /**
          * UserUpdateRefusal
-         * @description A refused ``PATCH /admin/users/{id}`` that carries a ``code`` (T-0085): the caller
-         *     tried to deactivate their own account.
+         * @description A 409 from ``PATCH /admin/users/{id}``. With ``code: CANNOT_DEACTIVATE_SELF`` the
+         *     caller tried to deactivate their own account (T-0085); the last-active-System-admin
+         *     refusal answers ``detail`` only, so ``code`` is optional.
          */
         UserUpdateRefusal: {
             /** Detail */
             detail: string;
-            /**
-             * Code
-             * @constant
-             */
-            code: "CANNOT_DEACTIVATE_SELF";
+            /** Code */
+            code?: "CANNOT_DEACTIVATE_SELF" | null;
         };
         /** ValidationError */
         ValidationError: {

@@ -44,7 +44,7 @@ export async function setAccountActive(
   });
   if (response.ok) return "ok";
   if (response.status === 409) {
-    const code = (error as { code?: unknown } | undefined)?.code;
+    const code = error && "code" in error ? error.code : undefined;
     return code === CANNOT_DEACTIVATE_SELF ? "self" : "last";
   }
   throw new AdminApiError(response.status);
