@@ -91,7 +91,7 @@ Designed the same way inspection templates are, only simpler.
   list through their optional `issue_category` (quality-and-inspection.md §Template settings).
   Each category carries `allows_project_level` (bool, default false; seeded true for `audit` and
   `health_safety` (user, 2026-11-21, TD-451) and for `vehicle`, `equipment`, `pre_start`
-  (planner default)): only issues of such a category may be raised manually without an anchor
+  (user, 2026-11-21)): only issues of such a category may be raised manually without an anchor
   (§3.1).
 - **Default template per category × type.** `oe_issues_default_template` (project,
   `category`, `issue_type`, template key). Raising an issue of category `painting` and type
