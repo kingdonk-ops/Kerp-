@@ -1031,7 +1031,7 @@ cannot be changed or deleted (only deactivated).
   does not release a hold. Hold release and witness signatures stay the single-row H/W sign-off of
   the ITP line (T-0291 attested `itp_hold_release` / `itp_witness`) and client co-sign
   (§Client co-sign).
-- NDT requests to an NDT provider are not RFIs (TD-098); TQ links come later (TD-478).
+- NDT requests to an NDT provider are not RFIs (TD-098); TQ links come later (TD-485).
 
 ### 4. State machine (per slot)
 
@@ -1215,7 +1215,7 @@ notification per request per recipient per event (not one per slot).
   inspection_request.reminder_lead_minutes` (default 120); idempotent through
   `reminder_sent_at`; a slot issued inside the lead time gets no reminder.
 - **E-mail** through core mail (T-0058, diff §4.6), recipient's locale. Planner default, decision
-  **TD-477**: only to project accounts above; content = project code and name, RFI no.,
+  **TD-484**: only to project accounts above; content = project code and name, RFI no.,
   discipline title, the event, and a link to the request page behind sign-in; **no** scheduled
   date/time or location in the body, **no** PDF attachment, **no** `.ics` invite, **no**
   addresses without an account. The templates are overridable per locale through T-0227.
@@ -1346,7 +1346,7 @@ language (fallback `en`; only English ships, TD-172). Empty values print blank: 
   inspection-type labels and reason-code labels are localised configuration strings with `en`
   fallback; PDF labels from the backend catalogue (§10.1); e-mails from the core-mail locales.
   Dates and times are stored UTC and shown in the project time zone.
-- **Not in this module:** NDT requests to NDT providers (TD-098); TQ links (later, TD-478, E-05-04);
+- **Not in this module:** NDT requests to NDT providers (TD-098); TQ links (later, TD-485, E-05-04);
   the iCal feed (TD-419, E-04-15); money, EOT and working-calendar delay hours (E-06-03);
   client responses by magic link without an account (portal, E-07-04).
 
