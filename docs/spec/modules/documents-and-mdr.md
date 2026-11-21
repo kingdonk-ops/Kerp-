@@ -32,14 +32,14 @@ Batch pipeline (**SAQ `batch`** queue, heavy libs lazy):
 
 **Gating invariant:** a compile cannot run while `Σ open issues with mdr_effect = blocks > 0`
 or `Σ unsigned ITP hold points > 0` (amended 2026-11-21; [issues.md](issues.md) §5–§6).
-**MDR gate rule (planner default, TD-445):** `mdr_effect` alone governs the MDR gate: `mdr.compile` blocks while any issue in the dossier scope with `mdr_effect = blocks` is open, and nothing else about an issue (type, `punch_category`, visibility) enters it; this replaces the earlier "open Cat A punch" clause. Punch templates that use Cat A (all system-default punch templates) default to `mdr_effect = blocks`. An open Cat A punch always blocks work completion (`work_anchor.complete`) regardless of `mdr_effect`.
+**MDR gate rule (user, 2026-11-21; TD-445 approved):** `mdr_effect` alone governs the MDR gate: `mdr.compile` blocks while any issue in the dossier scope with `mdr_effect = blocks` is open, and nothing else about an issue (type, `punch_category`, visibility) enters it; this replaces the earlier "open Cat A punch" clause. Punch templates that use Cat A (all system-default punch templates) default to `mdr_effect = blocks`. An open Cat A punch always blocks work completion (`work_anchor.complete`) regardless of `mdr_effect`.
 **Project-level issues in the dossier scope (user, 2026-11-21; issues.md §3.1, §6):** an audit
 or H&S issue may be project-level (no anchor). With `mdr_effect = blocks`, an open project-level
 issue without a location is in the scope of **every** MDR of the project; one with a location is
 in the scope only of the MDRs whose dossier scope covers that location (the location is the scope
-node, inside it or an ancestor of it; planner default). The same rule decides whether it is listed
+node, inside it or an ancestor of it; user, 2026-11-21, TD-451). The same rule decides whether it is listed
 in the NCR / concession register below.
-**Which inspection records a dossier collects (planner default, PR #145 review round 5; TD-451):**
+**Which inspection records a dossier collects (user, 2026-11-21; PR #145 review round 5, TD-451):**
 the dossier collects formal `qa_itp` records of its scope; formal project-level records are
 collected only when their location is inside the dossier scope (the location is the scope node
 or a descendant, through the `asset_management` service; unlike the blocking rule for

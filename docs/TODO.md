@@ -3,9 +3,9 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 301 · **Closed:** 140
+**Open:** 299 · **Closed:** 142
 
-## decision (40)
+## decision (38)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -47,8 +47,6 @@
 | [TD-438](../tracker/todo/TD-438.md) | Machine credentials (ADR 0017): service-account representation and who manages API keys | T-0298, T-0307, T-0308, T-0309 | planner |
 | [TD-439](../tracker/todo/TD-439.md) | Feature flags: who toggles them, project overrides, and what a flag may gate | T-0306 | planner |
 | [TD-442](../tracker/todo/TD-442.md) | Issues: may an internal punch/NCR be assigned to an external account (subcontractor) who must then see it? Planner default: no (422), internal issues are invisible to every is_internal=false caller | T-0314 | planner |
-| [TD-445](../tracker/todo/TD-445.md) | MDR gate: mdr_effect alone governs mdr.compile (the open-Cat-A-punch clause is replaced); Cat A punch templates default to mdr_effect=blocks; Cat A always blocks work completion (planner default) | T-0314, E-05-05 | planner |
-| [TD-451](../tracker/todo/TD-451.md) | Template settings and project-level records: confirm the planner defaults (preset table, health_safety area, informal submit is final, allows_project_level issue categories, at most one equipment link, MDR location overlap rule) | T-0324, T-0325, T-0326, T-0327, T-0328, E-05-05 | planner |
 
 ## spec-gap (56)
 
@@ -485,3 +483,5 @@
 | ✅ | [TD-411](../tracker/todo/TD-411.md) | Equipment (oe_equipment_asset) as an inspection anchor: accept ADR 0014 amending ADR 0003 (a third exclusive anchor for standalone equipment inspections only)? | Product owner (user, 2026-11-21): equipment becomes an informational link, not a third exclusive anchor. qa_itp inspections keep the ADR 0003 anchors; every other area is project-level with an optional location and links (asset node/Item, material, equipment). ADR 0014 superseded by the ADR 0003 amendment 2026-11-21. |
 | ✅ | [TD-443](../tracker/todo/TD-443.md) | Issues on a path with no work-anchor node (audit findings above the work-anchor level, condition surveys): create_issue skips + notifies (planner default) vs allowing issues without a work anchor | Product owner (user, 2026-11-21): issues from project-level inspections (audit, H&S and every non-qa_itp area) are project-level (no work anchor) with optional location/links; they never block work completion; with mdr_effect=blocks a project-level issue blocks every MDR of the project and a location-tagged one only the MDRs whose scope covers the location. Remaining case (a qa_itp inspection on a path without a work anchor): the planner default stays (manual raise 422 until a work anchor is picked; create_issue logged skipped NO_WORK_ANCHOR and notifies). |
 | ✅ | [TD-444](../tracker/todo/TD-444.md) | Pilot-0 scope after the issues re-plan: T-0311-T-0314 replace T-0116/T-0117 in the Phase 1 pilot subset; screens T-0318-T-0320, upgrade/escalate, create_issue and pins outside the gate (planner default) | Product owner (user, 2026-11-21): T-0318 (register, raise, punch detail) and a slimmed T-0319 (NCR detail workflow up to the ncr_close_verify sign-off) join the Pilot-0 gate, with T-0311-T-0314 and the seeded starting templates T-0322 (T-0108 transitively). Flag-override, upgrade and raise-external dialogs split to T-0321 after the pilot; T-0315, T-0317 stay outside the pilot; shared template designer epic E-01-03 after Pilot-0. |
+| ✅ | [TD-445](../tracker/todo/TD-445.md) | MDR gate: mdr_effect alone governs mdr.compile (the open-Cat-A-punch clause is replaced); Cat A punch templates default to mdr_effect=blocks; Cat A always blocks work completion | Product owner (user, 2026-11-21) approved the planner default as-is: mdr_effect alone governs mdr.compile; punch templates that use Cat A (all system-default punch templates) default to mdr_effect=blocks; an open Cat A punch always blocks work_anchor.complete regardless of mdr_effect. |
+| ✅ | [TD-451](../tracker/todo/TD-451.md) | Template settings and project-level records: confirm the planner defaults (preset table, health_safety area, informal submit is final, allows_project_level issue categories, at most one equipment link, MDR location overlap rule) | Product owner (user, 2026-11-21): all items approved except item 7 (discipline replacing issue_category). Decided instead: inspection templates keep the optional issue_category, pointing at the issue category value list, which holds non-discipline categories (vehicle, equipment, pre-start, general, ...) alongside disciplines (painting, blasting, ...), because e.g. issues from a vehicle pre-start have no discipline; raise-time fallback is issue_category x type (none -> general). There is no separate discipline field; the Templates list filters by area and issue category. |

@@ -41,7 +41,7 @@ Designed the same way inspection templates are, only simpler.
   **Templates** menu item that lists every inspection template (quality-and-inspection.md
   §Template settings; diff §6.1). "New issue template" asks one question — **Punch** or **NCR**
   — and the preset copies the type and flag defaults of the project's `general` template of that
-  type (planner default); every setting stays editable before the first publish (T-0320).
+  type (user, 2026-11-21, TD-451); every setting stays editable before the first publish (T-0320).
 - **Authoring.** Templates are authored in the **shared template designer** used by inspection
   and issue templates alike (epic E-01-03, after Pilot-0; one engine, no per-module designer).
   For Pilot-0 the starting templates — `painting`, `blasting`, `civil`, `mechanical`, `welding`
@@ -83,11 +83,16 @@ Designed the same way inspection templates are, only simpler.
   (`key`, localised `label`, `is_active`, `sort_order`; same three layers). Seed (planner
   default): `painting`, `blasting`, `insulation`, `cladding`, `civil`, `mechanical`, `piping`,
   `welding`, `scaffolding`, `electrical`, `audit`, `general`; T-0326 adds `health_safety`
-  (planner default). Keys are never re-keyed or deleted once used, only deactivated. The same
-  list is the **discipline** list of inspection templates (quality-and-inspection.md §Template
-  settings). Each category carries `allows_project_level` (bool, default false; seeded true for
-  `audit` and `health_safety`, planner default): only issues of such a category may be raised
-  manually without an anchor (§3.1).
+  (user, 2026-11-21, TD-451) and `vehicle`, `equipment`, `pre_start` (planner default).
+  Keys are never re-keyed or deleted once used, only deactivated. **Categories are not only
+  disciplines** (user, 2026-11-21): the list holds discipline categories (painting, blasting, …)
+  alongside non-discipline ones (vehicle, equipment, pre-start, audit, general, …), because e.g.
+  an issue raised from a vehicle pre-start has no discipline. Inspection templates point at this
+  list through their optional `issue_category` (quality-and-inspection.md §Template settings).
+  Each category carries `allows_project_level` (bool, default false; seeded true for `audit` and
+  `health_safety` (user, 2026-11-21, TD-451) and for `vehicle`, `equipment`, `pre_start`
+  (planner default)): only issues of such a category may be raised manually without an anchor
+  (§3.1).
 - **Default template per category × type.** `oe_issues_default_template` (project,
   `category`, `issue_type`, template key). Raising an issue of category `painting` and type
   `punch` pre-selects the project's painting punch template; with no mapping the user picks from
@@ -278,10 +283,10 @@ pack release, `weld.accept` or `closeout.final_handover` facts (nothing to block
 `mdr_effect = blocks`, an open project-level issue **without a location** blocks every MDR of the
 project; one **with a location** blocks only the MDRs whose dossier scope covers that location —
 the location node is the scope node, inside it, or an ancestor of it (scopes overlap; lineage
-through the `asset_management` service; planner default, conservative). `mdr_register` lists
+through the `asset_management` service; user, 2026-11-21, TD-451). `mdr_register` lists
 project-level issues on the same rule.
 
-**MDR gate rule (planner default, TD-445):** `mdr_effect` alone governs the MDR gate: `mdr.compile` blocks while any issue in the dossier scope with `mdr_effect = blocks` is open, and nothing else about an issue (type, `punch_category`, visibility) enters it; this replaces the earlier "open Cat A punch" clause. Punch templates that use Cat A (all system-default punch templates) default to `mdr_effect = blocks`. An open Cat A punch always blocks work completion (`work_anchor.complete`) regardless of `mdr_effect`.
+**MDR gate rule (user, 2026-11-21; TD-445 approved):** `mdr_effect` alone governs the MDR gate: `mdr.compile` blocks while any issue in the dossier scope with `mdr_effect = blocks` is open, and nothing else about an issue (type, `punch_category`, visibility) enters it; this replaces the earlier "open Cat A punch" clause. Punch templates that use Cat A (all system-default punch templates) default to `mdr_effect = blocks`. An open Cat A punch always blocks work completion (`work_anchor.complete`) regardless of `mdr_effect`.
 
 Projects may add stricter rules to any of these sets. Upgraded and escalated sources are not
 open; their successors count instead.
@@ -315,10 +320,10 @@ Both create a **new record**; nothing is converted, re-dated or rewritten.
   issue templates** (`linked_issue_templates`, part of the inspection revision hash;
   quality-and-inspection.md §Template settings; T-0327). When an issue is raised from an
   inspection: **exactly one** linked → it is used; **several** → the user picks one of them;
-  **none** → the category × type default of §2 for the template's discipline (no discipline →
-  `general`). For an **audit** template with no links the fallback is the `audit` category
+  **none** → the category × type default of §2 for the template's `issue_category` (none set →
+  `general`) (user, 2026-11-21). For an **audit** template with no links the fallback is the `audit` category
   templates of the type whose `default_origin` matches the audit scope (`internal_audit` /
-  `external_audit`); one → used, several → the user picks (planner default).
+  `external_audit`); one → used, several → the user picks (user, 2026-11-21, TD-451).
 - **Post-submit action `create_issue`** (quality-and-inspection.md §Post-submit automation):
   `action_config` names **one of the template's linked issue templates** (422 otherwise; a
   template without linked issue types cannot use `create_issue`), plus optional
@@ -336,7 +341,7 @@ Both create a **new record**; nothing is converted, re-dated or rewritten.
   painting punch or NCR. If no rule raised an issue, the approve-as-failed dialog requires the
   reviewer to raise one (template chosen by the linked-issue-type rule above);
   `RE_INSPECT` needs at least one linked issue (planner default). Informal records have no
-  approve step, so nothing is forced (planner default).
+  approve step, so nothing is forced (user, 2026-11-21, TD-451).
 - **Audits.** A site audit is an inspection template with the **audit** tick (any area, e.g.
   Health & Safety). Its findings raise issues through `audit` category issue templates:
   internal scope → `origin = internal_audit`, `internal` + `excluded` defaults; external scope →
@@ -344,7 +349,7 @@ Both create a **new record**; nothing is converted, re-dated or rewritten.
   external-scope audit always raises `origin = external_audit`, so even a linked internal
   template yields a `client` issue with `excluded` lifted to `register_only` (§5, forced at
   raise); the Templates settings panel warns when an external-scope audit links an internal
-  template (planner default). The
+  template (user, 2026-11-21, TD-451). The
   internal audit finding templates are seeded for Pilot-0 (T-0322); the external ones with
   T-0327.
 - **Manual raise** (not from an inspection) filters templates by type + category; the

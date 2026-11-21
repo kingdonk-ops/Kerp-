@@ -1024,7 +1024,7 @@ Module screens register their nav items in these groups. Individual items may mo
 |---|---|
 | **Overview** | dashboards, my work |
 | **Backbone** | projects, asset hierarchy, items, teams |
-| **Execution** | inspections / QMS, ITPs, **Templates** (every inspection template in one filterable list: area, discipline, formal, audit, status, kind; presets; user, 2026-11-21), **Issues** (punch/NCR register and, for the QA authority / PER-09 / PER-13, the issue templates — issue types per category; user, 2026-11-21), field time, progress, look-ahead |
+| **Execution** | inspections / QMS, ITPs, **Templates** (every inspection template in one filterable list: area, issue category, formal, audit, status, kind; presets; user, 2026-11-21), **Issues** (punch/NCR register and, for the QA authority / PER-09 / PER-13, the issue templates — issue types per category; user, 2026-11-21), field time, progress, look-ahead |
 | **Logistics** | materials, equipment, storeman |
 | **Documents** | documents, transmittals, CDRL, drawings |
 | **Defense & Claims** | TQs, variations, NOD / EOT, claims |

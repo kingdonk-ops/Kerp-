@@ -396,10 +396,11 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
 
 - **2026-11-21 — template menus, template settings, project-level inspections and links
   (product-owner decisions, binding; planner pass on PR #145):** two menu items, one shared
-  designer: **Templates** (every inspection template, filterable by area, discipline, formal,
+  designer: **Templates** (every inspection template, filterable by area, issue category, formal,
   audit, status, kind) and **Issues** (register + issue templates), diff §6.1. Presets for "New
   template"; settings on the revision: area (= `category`, plain labels, `health_safety` added),
-  discipline (replaces `issue_category`), formal tick (informal = record-only, submit final,
+  issue category (`issue_category`; the planner's `discipline` replacement was reverted by the
+  product owner, see TD-451), formal tick (informal = record-only, submit final,
   outside MDR/progress/KPIs; ITP-chain always formal), audit tick with internal/external scope,
   linked issue types (one used, several picked, none → category × type default); changing area,
   formal or audit needs QA authority or PER-09 and makes a new revision. **ADR 0003 amendment
@@ -420,6 +421,15 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
   T-0179, T-0180, T-0249, T-0252, T-0257, T-0259, T-0311, T-0318, T-0322, E-03-03. **Pilot-0 gate
   unchanged** (none of the new or re-shaped tasks is in T-0146's closure). Raised: TD-451
   (planner defaults of this pass, not blocking).
+
+- **2026-11-21 — product-owner approvals (binding):** TD-445 approved as-is (`mdr_effect` alone
+  governs `mdr.compile`; Cat A punch templates default to `blocks`; Cat A always blocks work
+  completion). TD-451 approved except "`discipline` replaces `issue_category`": inspection
+  templates keep the optional `issue_category`, pointing at an issue category list that also
+  holds non-discipline categories (vehicle, equipment, pre-start, general; a vehicle pre-start
+  has no discipline); the Templates list filters by area and issue category; no `discipline`
+  field. Updated: `quality-and-inspection.md`, `issues.md` §2/§8, T-0316, T-0324, T-0326,
+  T-0327, T-0328, E-01-03, T-0311 (note). Pilot-0 gate unchanged.
 
 ## Key engineering decisions (baked into the spec — see consolidation diff)
 
@@ -444,5 +454,5 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
 | Enterprise governance (2026-11-21) | Formal sign-offs attested (re-auth + intent + device/IP in the ledger); narrow delegation that never confers authority; SCIM deprovisioning; machine credentials bind the tenant from the deployment (ADR 0017), never `A`/`S`; metering counts only, soft limits never block; feature flags gate availability only; IP allowlisting in WAF / Conditional Access |
 
 ## Open decisions (see `TODO.md`)
-TD-433 (signing attestation details), TD-434 (delegation open points), TD-435 (external inspection party persona, blocks T-0296/T-0297), TD-436 (metering attribution), TD-437 (SCIM), TD-438 (machine credentials, ADR 0017), TD-439 (feature flags), TD-410 (public capture links, ADR 0013 proposed), TD-451 (template settings and project-level records: planner defaults), TD-412 (fleet in the Phase-1 equipment register), TD-418 (escalation and approval authority), TD-419 (calendar iCal feed), TD-422 (PER-13 shelf-life approval), TD-423 (self-approval of internal-QA substitutions), TD-426 (system admin impersonation, ADR 0015 proposed, blocks T-0277–T-0280), TD-427 (access logging of system_admin reads without membership, ADR 0016), TD-430 (ADR 0004 Amendment H rule kind `itp_assignment`, planner default in force until revised), TD-431 (QA reviewer self-verification of own uploads), TD-096 (coating/Grating ITR, with the client; interim confirmed 2026-11-15), TD-293 (shared tablets in the pilot, ask the pilot team before go-live), TD-004 (hosting target), TD-072 (ADR 0004 rule-set defaults per project), TD-073 (handover first-shift trigger),
+TD-433 (signing attestation details), TD-434 (delegation open points), TD-435 (external inspection party persona, blocks T-0296/T-0297), TD-436 (metering attribution), TD-437 (SCIM), TD-438 (machine credentials, ADR 0017), TD-439 (feature flags), TD-410 (public capture links, ADR 0013 proposed), TD-412 (fleet in the Phase-1 equipment register), TD-418 (escalation and approval authority), TD-419 (calendar iCal feed), TD-422 (PER-13 shelf-life approval), TD-423 (self-approval of internal-QA substitutions), TD-426 (system admin impersonation, ADR 0015 proposed, blocks T-0277–T-0280), TD-427 (access logging of system_admin reads without membership, ADR 0016), TD-430 (ADR 0004 Amendment H rule kind `itp_assignment`, planner default in force until revised), TD-431 (QA reviewer self-verification of own uploads), TD-096 (coating/Grating ITR, with the client; interim confirmed 2026-11-15), TD-293 (shared tablets in the pilot, ask the pilot team before go-live), TD-004 (hosting target), TD-072 (ADR 0004 rule-set defaults per project), TD-073 (handover first-shift trigger),
 TD-039 (dropped AIP-proposal extras). TD-013 (review-gate ignores tracker) is resolved by T-0029. TD-002/005/007/008/009/012 are resolved by this merge; TD-001 by ADR 0001 (`docs/decisions/`). TD-002 is carried into code by ADR 0002 (`docs/decisions/0002-port-one-engine.md`). TD-034 (remaining Inspection-ERP core packages) is resolved by ADR 0007. TD-003 (SSO vs local JWT) is resolved; the SSO spec is diff §4.5 (TD-043 resolved 2026-11-14). Resolved 2026-11-14 by the product owner: TD-257 (offline grace binds; window is an upper bound), TD-136 (magic links PER-14 only, T-0057) and TD-262 (externals create their own password, reset by e-mail); TD-084 (outbound e-mail) resolved by diff §4.6. Resolved 2026-11-15 by the product owner: TD-224 (per-mailbox magic-link cap), TD-213 (object key layout), TD-271 (T-0079), TD-261 (PER-15 password/SSO) and TD-223 (PR principals; residual risk TD-276). Resolved 2026-11-15 (second batch): TD-283 (one account per device id, per-account client store; follow-up TD-293), TD-281 (rule-set upgrade permissions, ADR 0004 Amendment G) and TD-285 (native-origin allow-list); TD-286 and TD-291 (device risks) accepted for development and covered by T-0080 before pilot go-live.
