@@ -3,16 +3,16 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 72/229 tasks done (31%) · **ready now:** 25 · **epics awaiting breakdown:** 48
+**Overall:** 72/235 tasks done (31%) · **ready now:** 25 · **epics awaiting breakdown:** 48
 
 | Phase | Tasks done | Progress |
 |---|---|---|
 | 0 · Platform foundations | 72/103 | `███████░░░` 70% |
-| 1 · Asset & Quality backbone | 0/114 (+1 epics) | `░░░░░░░░░░` 0% |
+| 1 · Asset & Quality backbone | 0/119 (+1 epics) | `░░░░░░░░░░` 0% |
 | 2 · Welding quality | 0/10 | `░░░░░░░░░░` 0% |
 | 3 · Logistics | 0/2 (+7 epics) | `░░░░░░░░░░` 0% |
 | 4 · Execution | 0/0 (+15 epics) | `░░░░░░░░░░` 0% |
-| 5 · Documents, collaboration & AI | 0/0 (+10 epics) | `░░░░░░░░░░` 0% |
+| 5 · Documents, collaboration & AI | 0/1 (+10 epics) | `░░░░░░░░░░` 0% |
 | 6 · Defense, claims & controls | 0/0 (+8 epics) | `░░░░░░░░░░` 0% |
 | 6b · Work packaging (AWP) | 0/0 (+3 epics) | `░░░░░░░░░░` 0% |
 | 7 · Client portal | 0/0 (+4 epics) | `░░░░░░░░░░` 0% |
@@ -243,8 +243,13 @@
 | ⬜ | [T-0266](../tracker/tasks/T-0266.md) | compliance: schedule readiness conflicts oe_schedule_readiness_conflict — engine over scheduled inspections, daily + reactive evaluation, conflict alerts, auto-resolve on renewal/verification, conflicts API | compliance | M | T-0183, T-0152, T-0181 |  |
 | ⬜ | [T-0267](../tracker/tasks/T-0267.md) | compliance: P6 activity readiness targets — resources of anchor-linked P6 activities, re-evaluation on P6 import commit | compliance | S | T-0266, T-0104 |  |
 | ⬜ | [T-0161](../tracker/tasks/T-0161.md) | e2e: Pilot-0 journey — download, inspect offline with annotated photo, sign and sync, return, resubmit, approve, PDF; scan-to-locate | e2e | S | T-0149, T-0153, T-0155, T-0157, T-0159, T-0160, T-0143, T-0027, T-0164, T-0165, T-0170, T-0171, T-0172, T-0175, T-0176 |  |
+| ⬜ | [T-0185](../tracker/tasks/T-0185.md) | materials/qms: product substitution register oe_material_substitution — internal_qa route (QE approval signed through T-0119), non-QA drafts to the verification queue, scope by project/subtree/work anchor/Item | materials | M | T-0016, T-0018, T-0019, T-0119, T-0181, T-0108, T-0006 |  |
 | ⬜ | [T-0146](../tracker/tasks/T-0146.md) | [Pilot-0] readiness gate: NFR budgets become hard CI gates; pilot scope checklist green | platform | S | T-0045, T-0145, T-0046, T-0142, T-0143, T-0144, T-0111, T-0119, T-0126, T-0127, T-0037, T-0038, T-0039, T-0040, T-0041, T-0042, T-0049, T-0050, T-0051, T-0052, T-0053, T-0054, T-0055, T-0057, T-0058, T-0059, T-0077, T-0078, T-0043, T-0044, T-0047, T-0147, T-0148, T-0149, T-0150, T-0151, T-0152, T-0153, T-0154, T-0155, T-0156, T-0157, T-0158, T-0159, T-0160, T-0161, T-0130, T-0162, T-0163, T-0164, T-0165, T-0167, T-0168, T-0169, T-0170, T-0171, T-0172, T-0107, T-0173, T-0174, T-0175, T-0176, T-0177 |  |
+| ⬜ | [T-0269](../tracker/tasks/T-0269.md) | materials: baseline approved product list per specified product code (oe_material_approved_product), seeded from client packs | materials | S | T-0185, T-0108 |  |
 | ⬜ | [T-0131](../tracker/tasks/T-0131.md) | [M1] Phase 1 backbone-freeze contract gate: freeze core tables, level-def shape + role names, rule-store shape, override record, field ownership, seam sigs; CEL parity | platform | M | T-0005, T-0016, T-0018, T-0101, T-0103, T-0110, T-0111, T-0112, T-0124, T-0132, T-0035, T-0139 |  |
+| ⬜ | [T-0270](../tracker/tasks/T-0270.md) | eligibility/forms: is_product_approved CEL helper (pure, dual-runtime parity fixtures) over context.product_approvals resolved by the eligibility service | materials | S | T-0185, T-0269, T-0139, T-0110, T-0017 |  |
+| ⬜ | [T-0271](../tracker/tasks/T-0271.md) | materials/inspections: substitutions in the offline reference bundle, substitution_id bound on the answer, read-only substitution note on the inspection and its PDF | materials | M | T-0270, T-0147, T-0158, T-0111 |  |
+| ⬜ | [T-0272](../tracker/tasks/T-0272.md) | Frontend: product selector shows approved substitutes badged "Approved Substitute (ref)" with the equivalency document viewable offline; selecting binds substitution_id | materials | S | T-0271, T-0165 |  |
 
 ## Phase 2 — Welding quality
 
@@ -303,12 +308,13 @@
 | 🧩 | [E-05-02](../tracker/tasks/E-05-02.md) | markups + plan_room: PDF/drawing viewer + vector markup overlays | markups | L | E-05-01 |  |
 | 🧩 | [E-05-03](../tracker/tasks/E-05-03.md) | transmittals + correspondence | transmittals | L | E-05-01 |  |
 | 🧩 | [E-05-04](../tracker/tasks/E-05-04.md) | rfi / submittals / meetings / interface_management | rfi | L | E-05-01 |  |
-| 🧩 | [E-05-05](../tracker/tasks/E-05-05.md) | MDR collation engine: SAQ streaming PDF merge, bookmarks, TOC, pagination, SHA-256, transmittal | mdr | L | E-05-01, T-0111, T-0184, T-0265 |  |
+| 🧩 | [E-05-05](../tracker/tasks/E-05-05.md) | MDR collation engine: SAQ streaming PDF merge, bookmarks, TOC, pagination, SHA-256, transmittal | mdr | L | E-05-01, T-0111, T-0184, T-0265, T-0185, T-0271 |  |
 | 🧩 | [E-05-06](../tracker/tasks/E-05-06.md) | search / retrieval: docket OCR → full-text + vector index (SAQ) | search | L | E-05-01 |  |
 | 🧩 | [E-05-07](../tracker/tasks/E-05-07.md) | integrations: outbound event bus + webhooks (HMAC) + ERP sync bridge (SAP/Xero/P6) | integrations | L | T-0015 |  |
 | 🧩 | [E-05-08](../tracker/tasks/E-05-08.md) | erp_chat / ai_agents: operational assistant (proposals only, human-confirmed) | erp_chat | L | E-05-06 |  |
 | 🧩 | [E-05-09](../tracker/tasks/E-05-09.md) | RSW document ingestion: bulk/ZIP upload, combined-PDF splitting, template recognition, OCR extraction with source traceability | documents | L | T-0104, T-0105 |  |
 | 🧩 | [E-05-10](../tracker/tasks/E-05-10.md) | RSW-P6 matching & reconciliation engine: candidates, versioned weighted scoring, CEL hard/soft rules, verification queue, findings | asset_management | L | T-0104, T-0105, E-05-09 |  |
+| ⬜ | [T-0273](../tracker/tasks/T-0273.md) | materials/tq: client_tq substitution route — link to a TQ, approve automatically when the TQ is approved or with recorded client approval evidence | materials | S | E-05-04, T-0185 |  |
 
 ## Phase 6 — Defense, claims & controls
 

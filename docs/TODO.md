@@ -3,9 +3,9 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 281 · **Closed:** 134
+**Open:** 284 · **Closed:** 134
 
-## decision (26)
+## decision (27)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -34,9 +34,10 @@
 | [TD-414](../tracker/todo/TD-414.md) | QA verification gates on existing records: which equipment, credentials and heat/MTR records count as verified when T-0260/T-0261/T-0265 land, and do imports start unverified? | T-0260, T-0261, T-0265 | planner |
 | [TD-418](../tracker/todo/TD-418.md) | SLA escalation 'grants co-review authority' to PER-02 / PER-13: widen who may approve QA verifications, or escalation notifies and reassigns only? | T-0182 | planner |
 | [TD-419](../tracker/todo/TD-419.md) | Calendar iCal feed GET /api/v1/calendar/ical/{token}.ics: a second token-authenticated no-JWT endpoint — decide with ADR 0013 (same tenant-from-JWT conflict) | E-04-15 | planner |
-| [TD-422](../tracker/todo/TD-422.md) | Shelf-life extension approver when the requester is PER-06: PER-13 Quality Director approves (user) — PER-13 has 'audit oversight', not QA approval (A), in the persona matrix | T-0184 | planner |
+| [TD-422](../tracker/todo/TD-422.md) | Shelf-life extension approver when the requester is PER-06: PER-13 Quality Director approves (user) — PER-13 has 'audit oversight', not QA approval (A), in the persona matrix | T-0184, T-0185 | planner |
+| [TD-423](../tracker/todo/TD-423.md) | Internal-QA product substitution: may the Quality Engineer who raises it also approve it (user: 'raises and approves directly'), or does it need a second QE (no self-approval, as T-0184 and T-0140)? | T-0185 | planner |
 
-## spec-gap (54)
+## spec-gap (56)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -94,6 +95,8 @@
 | [TD-417](../tracker/todo/TD-417.md) | New record sources 'automation' and 'public_link' extend RECORD_SOURCES (BaseRecordMixin + audit ledger): core vocabulary change needs an ADR | T-0180, T-0253 | planner |
 | [TD-420](../tracker/todo/TD-420.md) | SLA reminders for override requests and tagout follow-ups without altering the M1-frozen oe_validation_override shape | T-0264 | planner |
 | [TD-421](../tracker/todo/TD-421.md) | Material batch/lot entity with use-by dates is unspecified: who owns it (materials E-03-03 or site_inventory E-03-04), and original_use_by_date immutable + effective_use_by_date changed only by an approved shelf-life extension | E-03-03 | planner |
+| [TD-424](../tracker/todo/TD-424.md) | No baseline approved product list exists: define a project register of approved products per specified product code (planner default T-0269) | T-0269 | planner |
+| [TD-425](../tracker/todo/TD-425.md) | CEL helper eligibility.is_product_approved cannot do I/O and must run offline: pure function over a resolved approvals map | T-0270 | planner |
 
 ## missed (7)
 
