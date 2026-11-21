@@ -3,12 +3,12 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 86/308 tasks done (28%) · **ready now:** 24 · **epics awaiting breakdown:** 49
+**Overall:** 87/308 tasks done (28%) · **ready now:** 26 · **epics awaiting breakdown:** 49
 
 | Phase | Tasks done | Progress |
 |---|---|---|
 | 0 · Platform foundations | 85/114 | `███████░░░` 75% |
-| 1 · Asset & Quality backbone | 1/168 (+2 epics) | `░░░░░░░░░░` 1% |
+| 1 · Asset & Quality backbone | 2/168 (+2 epics) | `░░░░░░░░░░` 1% |
 | 2 · Welding quality | 0/11 | `░░░░░░░░░░` 0% |
 | 3 · Logistics | 0/2 (+7 epics) | `░░░░░░░░░░` 0% |
 | 4 · Execution | 0/0 (+15 epics) | `░░░░░░░░░░` 0% |
@@ -144,7 +144,7 @@
 | ▶ | [T-0134](../tracker/tasks/T-0134.md) | Asset restructure with lineage: split / merge / retire, invariant re-checks, roll-up through superseded_by / derived_from | asset_management | M | T-0101 |  |
 | ▶ | [T-0135](../tracker/tasks/T-0135.md) | Collections: job packs, shutdown windows, test packs, work plans linked to nodes many-to-many | asset_management | S | T-0101 |  |
 | ▶ | [T-0136](../tracker/tasks/T-0136.md) | Terminology layer: per-locale, plural-aware terminology packs (project → client pack → default) + frontend t() resolver | asset_management | M | T-0101, T-0024 |  |
-| ⬜ | [T-0102](../tracker/tasks/T-0102.md) | Dynamic field registry: oe_asset_field_def (JSONSchema registry) + custom_fields JSONB (EAV deleted), GIN jsonb_path_ops + functional B-tree | asset_management | M | T-0101, T-0110 |  |
+| ▶ | [T-0102](../tracker/tasks/T-0102.md) | Dynamic field registry: oe_asset_field_def (JSONSchema registry) + custom_fields JSONB (EAV deleted), GIN jsonb_path_ops + functional B-tree | asset_management | M | T-0101, T-0110 |  |
 | ⬜ | [T-0103](../tracker/tasks/T-0103.md) | Items oe_asset_item: typed inspectable items + work_anchor_id + reserved CML stub fields (no calc engine) | asset_management | M | T-0102 |  |
 | ▶ | [T-0104](../tracker/tasks/T-0104.md) | P6 .xer import: SAQ parser → staging → hierarchy mapping via p6_grammar / p6_eligibility rules, unique (project_id, external_activity_id) | asset_management | M | T-0101, T-0015, T-0034 |  |
 | ⬜ | [T-0105](../tracker/tasks/T-0105.md) | P6 Primavera XML variant + Unmatched-Row Linking Screen (backend) | asset_management | S | T-0104 |  |
@@ -153,7 +153,7 @@
 | ⬜ | [T-0107](../tracker/tasks/T-0107.md) | Excel/CSV/IFC tag ingestion wizard: mapping profiles, text-safe identifiers, multi-value split, dry run, dedup, Rev A→0 revision tracking | asset_management | M | T-0103, T-0138 |  |
 | ⬜ | [T-0108](../tracker/tasks/T-0108.md) | Client packs provisioned at project creation: levels + roles, terminology, item types, templates, numbering, register types, mapping profiles, rule sets | asset_management | M | T-0102, T-0034, T-0136, T-0138 |  |
 | ⬜ | [T-0137](../tracker/tasks/T-0137.md) | Client-pack upgrade offers: derived_from links, 'changes available' diff, accept per item, compare view | asset_management | S | T-0108 |  |
-| 🟪 | [T-0110](../tracker/tasks/T-0110.md) | One-engine: shared field-type registry (core/fields) + CEL evaluator (dual-runtime) | forms | M | T-0017, T-0018 | #156 |
+| ✅ | [T-0110](../tracker/tasks/T-0110.md) | One-engine: shared field-type registry (core/fields) + CEL evaluator (dual-runtime) | forms | M | T-0017, T-0018 | #156 |
 | ⬜ | [T-0111](../tracker/tasks/T-0111.md) | Unified inspection record oe_inspections_inspection (kind inspection/itp) + lifecycle + anchors by role + template header binding | inspections | M | T-0103, T-0110, T-0134 |  |
 | ⬜ | [T-0140](../tracker/tasks/T-0140.md) | inspections: inspection date vs entry time, backdating reason + report flag, configurable self-approval (default off), soft-delete only | inspections | S | T-0111 |  |
 | ⬜ | [T-0112](../tracker/tasks/T-0112.md) | Equipment calibration register + lifecycle + SAQ OCR cert ingest + QA-review-on-discrepancy + supersede lock + hard gate (as of inspection date) | equipment | M | T-0015, T-0016, T-0111, T-0139 |  |
@@ -201,7 +201,7 @@
 | ⬜ | [T-0153](../tracker/tasks/T-0153.md) | Frontend: review screen — reviewer queue, answers with comments and conflict flags, approve/return; inspector's returned list and resubmit; PDF download | frontend | M | T-0150, T-0151, T-0158, T-0025, T-0127, T-0174 |  |
 | ⬜ | [T-0154](../tracker/tasks/T-0154.md) | asset_management: Item scan identifiers (barcode / QR / NFC UID) + lookup endpoint | asset_management | S | T-0103 |  |
 | ⬜ | [T-0155](../tracker/tasks/T-0155.md) | Frontend: scan-to-locate — camera barcode/QR and Android NFC, offline lookup over downloaded Items, online fallback, manual tag search | frontend | M | T-0154, T-0141, T-0149 |  |
-| ⬜ | [T-0156](../tracker/tasks/T-0156.md) | forms: photo answer value — capture time, location and versioned annotation JSON, validated server-side, read-only after submit | forms | S | T-0110, T-0016 |  |
+| ▶ | [T-0156](../tracker/tasks/T-0156.md) | forms: photo answer value — capture time, location and versioned annotation JSON, validated server-side, read-only after submit | forms | S | T-0110, T-0016 |  |
 | ⬜ | [T-0157](../tracker/tasks/T-0157.md) | Frontend: photo capture with location and time + annotation editor (arrow, ellipse, rectangle, freehand, text), offline | frontend | M | T-0156, T-0127, T-0046, T-0247 |  |
 | ⬜ | [T-0158](../tracker/tasks/T-0158.md) | inspections: inspection PDF report (SAQ batch job, PyMuPDF lazy) with annotations burned in, signatures and review history | inspections | M | T-0150, T-0156, T-0312, T-0314, T-0016, T-0136, T-0167, T-0247 |  |
 | ⬜ | [T-0159](../tracker/tasks/T-0159.md) | inspections: batch inspection PDF export (ZIP + index.csv, max 500) + export action on the review queue | inspections | S | T-0158, T-0153 |  |
