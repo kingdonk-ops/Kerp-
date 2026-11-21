@@ -320,9 +320,9 @@
 | [TD-476](../tracker/todo/TD-476.md) | Form renderer and designer follow-ups on the shared palette: capture controls, section rendering, palette labels, field-ownership map | T-0110, T-0025 | implementer |
 | [TD-483](../tracker/todo/TD-483.md) | asset_management: display_code recompute and the project tree lock are inline; move them to a batch job / narrower lock if trees get large | T-0101 | implementer |
 | [TD-485](../tracker/todo/TD-485.md) | Cross-link inspection requests (RFIs) to TQs (Technical Queries) when the TQ module exists (E-05-04) | T-0115 | planner |
-| [TD-488](../tracker/todo/TD-488.md) | fields/form engine polish from the #156 review | T-0110 | reviewer |
 | [TD-489](../tracker/todo/TD-489.md) | Invite and password screens polish from the #152 review (race-fix test, wrong-user README wording, resend link cache, sessionStorage note) | T-0053 | reviewer |
 | [TD-491](../tracker/todo/TD-491.md) | Admin -> Users polish from the #154 review: test that no invite token is in the mutation cache; require a name on Create account | T-0331 | reviewer |
+| [TD-493](../tracker/todo/TD-493.md) | fields/form engine polish from the #156 review | T-0110 | reviewer |
 
 ## bug (8)
 
