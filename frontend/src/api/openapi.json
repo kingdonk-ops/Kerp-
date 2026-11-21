@@ -5853,6 +5853,16 @@
               }
             }
           },
+          "409": {
+            "description": "`code: CANNOT_DEACTIVATE_SELF`: the caller tried to deactivate their own account (refused and audited, T-0085); or, with a plain `detail` and no `code`, the last active System admin cannot be deactivated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserUpdateRefusal"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -15631,6 +15641,26 @@
         "type": "object",
         "title": "UserUpdate",
         "description": "``PATCH /admin/users/{id}``: rename, deactivate (``is_active: false``) or reactivate."
+      },
+      "UserUpdateRefusal": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "code": {
+            "type": "string",
+            "const": "CANNOT_DEACTIVATE_SELF",
+            "title": "Code"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail",
+          "code"
+        ],
+        "title": "UserUpdateRefusal",
+        "description": "A refused ``PATCH /admin/users/{id}`` that carries a ``code`` (T-0085): the caller\ntried to deactivate their own account."
       },
       "ValidationError": {
         "properties": {

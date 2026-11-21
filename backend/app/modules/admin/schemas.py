@@ -56,6 +56,14 @@ class UserUpdate(BaseModel):
         return self
 
 
+class UserUpdateRefusal(BaseModel):
+    """A refused ``PATCH /admin/users/{id}`` that carries a ``code`` (T-0085): the caller
+    tried to deactivate their own account."""
+
+    detail: str
+    code: Literal["CANNOT_DEACTIVATE_SELF"]
+
+
 class UserRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

@@ -29,7 +29,13 @@ bound with `is_system_admin=True`. `revoke` refuses the last `system_admin` held
 T-0211, TD-274): a deactivated user's grant runs nothing. Both lock the live `system_admin`
 rows first (same query, same order), so two System admins removing or deactivating each other
 at once cannot both succeed; the active flag is read fresh (`auth.service.active_user_ids`),
-never from a `User` already loaded in the session. A user create racing a duplicate hits the
+never from a `User` already loaded in the session. `update_user` also refuses any other
+self-deactivation (`actor_id == user_id`), even while other System admins exist
+(`SelfDeactivationError`, 409 `{"code": "CANNOT_DEACTIVATE_SELF", "detail": ...}`; T-0085,
+TD-463); the last-admin check runs first, so the last admin still gets the T-0211 answer. The
+refusal is audited (`admin-user:<id>`, `{"action": "update_refused", "reason":
+"self_deactivation"}`) by `_append_refusal`, in its own unit of work on the side-write pool,
+before anything is written: the entry survives the request's rollback. A user create racing a duplicate hits the
 unique constraint: 409, and the unit of work rolls back. A grant racing a duplicate raises
 `GrantRaceError`; the router rolls back its write-free unit of work and answers 200 already
 held. No SAVEPOINT is used (on SQLite one opened before any write commits early).
@@ -63,7 +69,7 @@ never from a claim, parameter or header.
 |---|---|---|
 | `GET /users` | `system_admin` | every account, with the read-only `is_internal` flag |
 | `POST /users` | `system_admin` | create an account without credentials (`email`, `display_name`); 409 if the e-mail exists |
-| `PATCH /users/{id}` | `system_admin` | `display_name`, `is_active` (deactivate / reactivate; a deactivated user's tokens stop at once); 409 for the last active `system_admin` |
+| `PATCH /users/{id}` | `system_admin` | `display_name`, `is_active` (deactivate / reactivate; a deactivated user's tokens stop at once); 409 for the last active `system_admin`; 409 `CANNOT_DEACTIVATE_SELF` when the caller deactivates themselves (audited, T-0085) |
 | `POST /users/lookup` | PER-09 of any project, `system_admin` | exact e-mail → `{id, email, display_name}` of an active account, else 404 |
 | `GET /projects/{p}/members` | PER-09 of `p`, `system_admin` | members of `p` with their personas and sites, each grant with `source` (`direct` \| `team`), `source_id` (the team link) and `team_name` (the team of a team-derived grant, from the teams service, T-0013) |
 | `PUT /projects/{p}/members/{user}` | PER-09 of `p`, `system_admin` | set the user's complete **individual** persona set on `p`; team-derived grants are untouched, and a persona also held through a team gets its own individual row (it outlives the team) |

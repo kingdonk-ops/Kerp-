@@ -52,9 +52,9 @@ function Accounts() {
     onSuccess: (res, { account, active }) => {
       setDeactivating(null);
       const done = active ? "admin.users.reactivated" : "admin.users.deactivated";
-      setNotice(
-        res === "last" ? t("admin.users.lastSystemAdmin") : t(done, { name: account.display_name }),
-      );
+      if (res === "last") setNotice(t("admin.users.lastSystemAdmin"));
+      else if (res === "self") setNotice(t("admin.users.cannotDeactivateSelf"));
+      else setNotice(t(done, { name: account.display_name }));
     },
     onSettled: refresh,
   });
