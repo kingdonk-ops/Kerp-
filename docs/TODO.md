@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 340 · **Closed:** 147
+**Open:** 341 · **Closed:** 147
 
 ## decision (39)
 
@@ -343,7 +343,7 @@
 | [TD-471](../tracker/todo/TD-471.md) | CEL parity: divergences between celpy and cel-js found by the T-0110 edge probe (pinned as known_gap fixtures) | T-0110, T-0017 | implementer |
 | [TD-490](../tracker/todo/TD-490.md) | Admin -> Users invite form: a SoD 409 that returns after the user edited the form re-arms confirm_sod for the edited form (fields stay editable while the send is pending) | T-0331 | reviewer |
 
-## risk (32)
+## risk (33)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -379,6 +379,7 @@
 | [TD-377](../tracker/todo/TD-377.md) | Invite setup-preview and accept-with-password (not signed in) have no per-client or per-link throttle; every refusal writes an audit entry | T-0059 | implementer |
 | [TD-455](../tracker/todo/TD-455.md) | Queue monitor: retry/abort commit the job write before the audit entry (two transactions); an audit-commit failure leaves the action unaudited | T-0218 | implementer |
 | [TD-462](../tracker/todo/TD-462.md) | Internal contexts that bind is_system_admin=True for a narrow read (jobs scheduler deployment_scopes, teams reconcile, onboarding, the invite token lookup) now also see every project-scoped record of the tenant under ADR 0016 | T-0274 | implementer |
+| [TD-497](../tracker/todo/TD-497.md) | Quarantine re-check: a second verify job can still overlap one whose worker thread is mid-check after a queue-monitor abort (failed/ABORTED while the to_thread verify_upload runs on) or a queue-monitor retry of the replaced failed job; the later job finds the shared quarantine object gone and rejects a clean file as missing_object, the other leaves an orphan content object (fail-safe, nothing published unscanned) | T-0221 | implementer |
 
 ## Closed
 
