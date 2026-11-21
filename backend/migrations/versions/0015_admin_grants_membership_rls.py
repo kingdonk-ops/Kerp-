@@ -117,6 +117,16 @@ def _admin_grant_sql() -> list[str]:
     ]
 
 
+# The RLS DDL this revision applies, per table (TD-060, T-0033): frozen here, replayed by
+# tests/test_migration_frozen_ddl.py against the live helpers.
+FROZEN_RLS_DDL: dict[str, tuple[str, ...]] = {
+    TABLE: tuple(_admin_grant_sql()),
+    **{
+        table: tuple(_membership_sql(table, column, owner))
+        for table, column, owner in MEMBERSHIP_TABLES
+    },
+}
+
 # Only the session user's own live grants of the bound tenant. SECURITY DEFINER with a fixed
 # search_path; it takes no argument, so it can never be asked about another user.
 _FUNCTION_SQL = f"""
@@ -170,13 +180,13 @@ def upgrade() -> None:
     )
     if op.get_context().dialect.name != "postgresql":
         return
-    for statement in _admin_grant_sql():
+    for statement in FROZEN_RLS_DDL[TABLE]:
         op.execute(statement)
     op.execute(_FUNCTION_SQL)
     for statement in _FUNCTION_PRIVILEGES:
         op.execute(statement)
-    for table, column, owner in MEMBERSHIP_TABLES:
-        for statement in _membership_sql(table, column, owner):
+    for table, _column, _owner in MEMBERSHIP_TABLES:
+        for statement in FROZEN_RLS_DDL[table]:
             op.execute(statement)
 
 

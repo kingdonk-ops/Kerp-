@@ -55,6 +55,16 @@ _POLICIES = (
     f" USING ({_EXACT} AND {_VISIBLE}) WITH CHECK ({_EXACT} AND {_VISIBLE})",
 )
 
+# The RLS DDL this revision applies, per table (TD-060, T-0033): frozen here, replayed by
+# tests/test_migration_frozen_ddl.py against the live helpers.
+FROZEN_RLS_DDL: dict[str, tuple[str, ...]] = {
+    TABLE: (
+        f"ALTER TABLE {TABLE} ENABLE ROW LEVEL SECURITY",
+        f"ALTER TABLE {TABLE} FORCE ROW LEVEL SECURITY",
+        *_POLICIES,
+    ),
+}
+
 
 def _check(sql: str, name: str) -> sa.CheckConstraint:
     return sa.CheckConstraint(sql, name=op.f(f"ck_{TABLE}_{name}"))
@@ -114,9 +124,7 @@ def upgrade() -> None:
     op.create_index(TOKEN_INDEX, TABLE, ["token_hash"], unique=True)
     if op.get_context().dialect.name != "postgresql":
         return
-    op.execute(f"ALTER TABLE {TABLE} ENABLE ROW LEVEL SECURITY")
-    op.execute(f"ALTER TABLE {TABLE} FORCE ROW LEVEL SECURITY")
-    for statement in _POLICIES:
+    for statement in FROZEN_RLS_DDL[TABLE]:
         op.execute(statement)
 
 

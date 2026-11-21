@@ -3,9 +3,9 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 299 · **Closed:** 135
+**Open:** 301 · **Closed:** 135
 
-## decision (37)
+## decision (38)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -26,6 +26,7 @@
 | [TD-401](../tracker/todo/TD-401.md) | Project restore: audit chains when restoring as a new project (hash covers tenant/project ids), and hard deletion of projects (not in the spec) | T-0239, T-0240 | planner |
 | [TD-404](../tracker/todo/TD-404.md) | Pilot-0: is the ClamAV scanner (T-0218) required live in the pilot deployment, or is the stub with KERP_UPLOAD_SCANNER_ALLOW_STUB accepted for the pilot? | T-0218, T-0146 | planner |
 | [TD-407](../tracker/todo/TD-407.md) | Admin 'Resend invite' for an invited user: re-send the user's pending project invites (T-0052) or a password-setup e-mail, never a magic link for non-Field-Workers; via core mail, not notifications | T-0244 | planner |
+| [TD-409](../tracker/todo/TD-409.md) | Lock-refresh workflow needs 'Allow GitHub Actions to create and approve pull requests' (scripts/setup_github.sh sets can_approve_pull_request_reviews=false): enable it (it also lets Actions approve PRs; review-gate only counts KERP_ALLOWED_REVIEWERS markers) or use a fine-grained PAT/app instead; until then the weekly run pushes deps/uv-lock-refresh but gh pr create fails | T-0033 | implementer |
 | [TD-410](../tracker/todo/TD-410.md) | Public unauthenticated inspection capture links (pasted T-0179 part 2/3): accept ADR 0013 (no-JWT endpoint, tenant from deployment config, project bound from the link token) or keep capture authenticated (PER-14 magic link)? | T-0252, T-0253, T-0254, T-0255 | planner |
 | [TD-411](../tracker/todo/TD-411.md) | Equipment (oe_equipment_asset) as an inspection anchor: accept ADR 0014 amending ADR 0003 (a third exclusive anchor for standalone equipment inspections only)? | T-0250, T-0111, T-0288 | planner |
 | [TD-412](../tracker/todo/TD-412.md) | Fleet vehicles and plant in the Phase-1 equipment register: pull this part of E-03-07 into Phase 1 (equipment_class, requires_calibration, custodian) or wait for Phase 3? | T-0249, T-0112, E-03-07 | planner |
@@ -122,7 +123,7 @@
 | [TD-337](../tracker/todo/TD-337.md) | Web/Android route /magic-link#<token> that redeems the e-mailed sign-in link (POST /auth/magic-link/redeem); the e-mail now links there | T-0058 | implementer |
 | [TD-388](../tracker/todo/TD-388.md) | saved_views: wire the my_teams filter op | T-0074 | reviewer |
 
-## deferred (37)
+## deferred (38)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -163,6 +164,7 @@
 | [TD-360](../tracker/todo/TD-360.md) | First-run: one-time password link for the first System admin once T-0077 ships | T-0023 | implementer |
 | [TD-365](../tracker/todo/TD-365.md) | Frontend translations of the password policy codes and the password policy in /auth/config | T-0077 | implementer |
 | [TD-394](../tracker/todo/TD-394.md) | Approve access request: site picker for PER-07 site scope once the asset hierarchy API exists | T-0051 | implementer |
+| [TD-432](../tracker/todo/TD-432.md) | Digest-pin the postgis/postgis:16-3.4 CI service image (ci.yml): the implementer sandbox could not reach the Docker Hub registry API to resolve its digest (redis is pinned); resolve with docker buildx imagetools inspect and drop the strict xfail in scripts/tests/test_workflows.py | T-0033 | implementer |
 
 ## later (123)
 

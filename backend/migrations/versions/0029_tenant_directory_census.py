@@ -46,6 +46,10 @@ _POLICY_SQL = (
     f"CREATE POLICY {POLICY} ON {TABLE} FOR SELECT USING ({_CENSUS})",
 )
 
+# The RLS DDL this revision applies, per table (TD-060, T-0033): frozen here, replayed by
+# tests/test_migration_frozen_ddl.py against the live helpers.
+FROZEN_RLS_DDL: dict[str, tuple[str, ...]] = {TABLE: _POLICY_SQL}
+
 # Only a count, never row data, across every tenant. The census setting is raised for this
 # read only and the caller's value restored.
 _FUNCTION_SQL = f"""
@@ -73,7 +77,7 @@ _FUNCTION_PRIVILEGES = (
 def upgrade() -> None:
     if op.get_context().dialect.name != "postgresql":
         return
-    for statement in _POLICY_SQL:
+    for statement in FROZEN_RLS_DDL[TABLE]:
         op.execute(statement)
     op.execute(_FUNCTION_SQL)
     for statement in _FUNCTION_PRIVILEGES:

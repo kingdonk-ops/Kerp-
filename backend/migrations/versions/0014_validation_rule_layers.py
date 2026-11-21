@@ -15,7 +15,6 @@ import sqlalchemy as sa
 from alembic import op
 
 from app.core.db import GUID, JSONType
-from app.core.tenancy.rls import rls_policy_sql
 
 revision: str = "0014"
 down_revision: str | None = "0013"
@@ -25,6 +24,40 @@ depends_on: str | Sequence[str] | None = None
 RULE_SET = "oe_validation_rule_set"
 RULE = "oe_validation_rule"
 UNLOCK = "oe_validation_unlock_request"
+
+# Frozen DDL (TD-060, T-0033): exactly what ``app.core.tenancy.rls.rls_policy_sql``
+# returned for this revision's table(s). Never edit it: a helper change ships as a NEW
+# revision with the new output frozen in it (tests/test_migration_frozen_ddl.py fails until
+# then).
+FROZEN_RLS_DDL: dict[str, tuple[str, ...]] = {
+    UNLOCK: (
+        "ALTER TABLE oe_validation_unlock_request ENABLE ROW LEVEL SECURITY",
+        "ALTER TABLE oe_validation_unlock_request FORCE ROW LEVEL SECURITY",
+        "DROP POLICY IF EXISTS project_isolation_policy ON oe_validation_unlock_request",
+        (
+            "CREATE POLICY project_isolation_policy ON oe_validation_unlock_request FOR ALL USING"
+            " (tenant_id = NULLIF(current_setting('app.current_tenant_id', true), '')::uuid AND"
+            " project_id IS NOT DISTINCT FROM NULLIF(current_setting('app.current_project_id',"
+            " true), '')::uuid) WITH CHECK (tenant_id ="
+            " NULLIF(current_setting('app.current_tenant_id', true), '')::uuid AND project_id IS"
+            " NOT DISTINCT FROM NULLIF(current_setting('app.current_project_id', true), '')::uuid)"
+        ),
+        "DROP POLICY IF EXISTS tenant_level_read_policy ON oe_validation_unlock_request",
+        (
+            "CREATE POLICY tenant_level_read_policy ON oe_validation_unlock_request FOR SELECT"
+            " USING (tenant_id = NULLIF(current_setting('app.current_tenant_id', true), '')::uuid"
+            " AND project_id IS NULL)"
+        ),
+        "DROP POLICY IF EXISTS allowed_projects_read_policy ON oe_validation_unlock_request",
+        (
+            "CREATE POLICY allowed_projects_read_policy ON oe_validation_unlock_request FOR SELECT"
+            " USING (tenant_id = NULLIF(current_setting('app.current_tenant_id', true), '')::uuid"
+            " AND project_id ="
+            " ANY(string_to_array(NULLIF(current_setting('app.allowed_project_ids', true), ''),"
+            " ',')::uuid[]))"
+        ),
+    ),
+}
 
 
 def _mixin_columns() -> list[sa.Column[object]]:
@@ -85,7 +118,7 @@ def upgrade() -> None:
     for column in ("rule_set_id", "rule_id", "tenant_id", "project_id"):
         op.create_index(op.f(f"ix_{UNLOCK}_{column}"), UNLOCK, [column])
     if op.get_context().dialect.name == "postgresql":
-        for statement in rls_policy_sql(UNLOCK):
+        for statement in FROZEN_RLS_DDL[UNLOCK]:
             op.execute(statement)
 
 

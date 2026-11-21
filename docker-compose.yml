@@ -29,7 +29,7 @@ services:
       retries: 30
 
   redis:
-    image: redis:7-alpine
+    image: redis:7-alpine@sha256:7f7d30b7fdd09467bac58198a1f166dd69789d348d4fe859cccb20e0cf287fbe
     ports:
       - "127.0.0.1:${KERP_REDIS_PORT:-6379}:6379"
     healthcheck:

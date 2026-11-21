@@ -123,6 +123,10 @@ def _policies(*, sources: bool) -> list[str]:
     return statements
 
 
+# The RLS DDL this revision applies, per table (TD-060, T-0033): frozen here, replayed by
+# tests/test_migration_frozen_ddl.py against the live helpers.
+FROZEN_RLS_DDL: dict[str, tuple[str, ...]] = {TABLE: tuple(_policies(sources=True))}
+
 # Only a count, never row data, across every tenant: the startup check runs before any tenant
 # is bound. The census setting is raised for this read only and the caller's value restored.
 _FUNCTION_SQL = f"""
@@ -246,7 +250,7 @@ def upgrade() -> None:
     )
     if not postgres:
         return
-    for statement in _policies(sources=True):
+    for statement in FROZEN_RLS_DDL[TABLE]:
         op.execute(statement)
     op.execute(_FUNCTION_SQL)
     for statement in _FUNCTION_PRIVILEGES:
