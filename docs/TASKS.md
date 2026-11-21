@@ -3,11 +3,11 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 96/311 tasks done (31%) · **ready now:** 23 · **epics awaiting breakdown:** 49
+**Overall:** 97/311 tasks done (31%) · **ready now:** 24 · **epics awaiting breakdown:** 49
 
 | Phase | Tasks done | Progress |
 |---|---|---|
-| 0 · Platform foundations | 94/117 | `████████░░` 80% |
+| 0 · Platform foundations | 95/117 | `████████░░` 81% |
 | 1 · Asset & Quality backbone | 2/168 (+2 epics) | `░░░░░░░░░░` 1% |
 | 2 · Welding quality | 0/11 | `░░░░░░░░░░` 0% |
 | 3 · Logistics | 0/2 (+7 epics) | `░░░░░░░░░░` 0% |
@@ -121,7 +121,7 @@
 | ✅ | [T-0083](../tracker/tasks/T-0083.md) | CI speed 3: frontend-only PRs skip the backend jobs (per-component change detection in ci.yml detect) | platform | S | T-0082 | #142 |
 | ✅ | [T-0221](../tracker/tasks/T-0221.md) | uploads: quarantine monitor API — rejected/verifying/expired upload rows and counts of every project, re-check stuck files, sweep now | uploads | S | T-0218, T-0215, T-0039, T-0274 | #159 |
 | ✅ | [T-0222](../tracker/tasks/T-0222.md) | admin: read-only audit explorer over the hash-chain ledger (filters, verify one chain, verify all as a batch job) | admin | M | T-0006, T-0043, T-0039, T-0015, T-0274 | #161 |
-| ▶ | [T-0223](../tracker/tasks/T-0223.md) | projects: per-project legal hold (flag + reason, System admin only, audited) blocking soft delete with 409 LEGAL_HOLD_ACTIVE (ADR) | projects | S | T-0012, T-0039 |  |
+| ✅ | [T-0223](../tracker/tasks/T-0223.md) | projects: per-project legal hold (flag + reason, System admin only, audited) blocking soft delete with 409 LEGAL_HOLD_ACTIVE (ADR) | projects | S | T-0012, T-0039 | #168 |
 | 🟦 | [T-0086](../tracker/tasks/T-0086.md) | CI speed 4: split backend-pg into parallel shards (deterministic file split, combined coverage floor) | platform | S | T-0083 |  |
 | ▶ | [T-0226](../tracker/tasks/T-0226.md) | core mail: delivery ledger — delivered status from SES delivery events, recipient_user_id/project_id/broadcast_id, stats and searchable history (ADR) | platform | M | T-0058 |  |
 | ▶ | [T-0227](../tracker/tasks/T-0227.md) | core mail: automated template overrides — per template + locale subject/text blocks with revisions, preview, test send to self, reset to shipped default | platform | M | T-0058, T-0039 |  |
@@ -129,7 +129,7 @@
 | ⬜ | [T-0228](../tracker/tasks/T-0228.md) | notifications: broadcast e-mail — server-side audience resolution (System admin tenant-wide, PER-09 own projects), batch dispatch, broadcast opt-out, per-broadcast stats | notifications | M | T-0019, T-0058, T-0226, T-0014, T-0049 |  |
 | ▶ | [T-0231](../tracker/tasks/T-0231.md) | settings: client bootstrap config API GET /api/v1/settings/client (client-visible entries only) | settings | S | T-0230 |  |
 | ▶ | [T-0224](../tracker/tasks/T-0224.md) | Frontend: Admin → System console — deployment stats + health, queue monitor, upload quarantine | frontend | M | T-0026, T-0219, T-0218, T-0221 |  |
-| ⬜ | [T-0225](../tracker/tasks/T-0225.md) | Frontend: Admin → System → Audit log (filters, verify chain, verify all) and legal-hold toggle on the project admin page | frontend | S | T-0026, T-0222, T-0223 |  |
+| ▶ | [T-0225](../tracker/tasks/T-0225.md) | Frontend: Admin → System → Audit log (filters, verify chain, verify all) and legal-hold toggle on the project admin page | frontend | S | T-0026, T-0222, T-0223 |  |
 | ⬜ | [T-0229](../tracker/tasks/T-0229.md) | Frontend: Admin → Communications — broadcast composer, delivery stats and history, automated template editor | frontend | M | T-0026, T-0226, T-0227, T-0228 |  |
 | ▶ | [T-0232](../tracker/tasks/T-0232.md) | Frontend: Admin → System → Settings — editable registry by category with bounds, read-only deployment configuration | frontend | S | T-0026, T-0230 |  |
 | ✅ | [T-0274](../tracker/tasks/T-0274.md) | tenancy: system_admin global project visibility (ADR 0016) — additive migration replacing project_isolation_policy on every project-scoped table through the frozen-DDL helper, ORM scope mirror, RLS contract tests updated | tenancy | M | T-0007, T-0014, T-0033 | #151 |
@@ -234,7 +234,7 @@
 | ⬜ | [T-0166](../tracker/tasks/T-0166.md) | sync: P6 re-import during a field checkout — tests 10 and 12 and checked-out records on the change-impact report (split from T-0133) | sync | S | T-0133, T-0104 |  |
 | 🧩 | [E-01-01](../tracker/tasks/E-01-01.md) | register views: column catalogue (level/item-type fields, ancestors, rollups, cross-module providers), filter AST, shared saved views, grouped totals, bulk actions | saved_views | L | T-0020, T-0025, T-0102 |  |
 | ✅ | [E-01-02](../tracker/tasks/E-01-02.md) | project export and retention archive: self-contained zip (offline HTML viewer, categorised files, restorable row dump), S3 storage tiering, deep-archive restore, restore as deleted or new project | archive | L | T-0015, T-0016, T-0026, T-0101, T-0103, T-0111, T-0158 | #137 |
-| ⬜ | [T-0233](../tracker/tasks/T-0233.md) | archive: module + project archive registry (oe_archive_project_archive), export request API, status lifecycle, completion notifications | archive | S | T-0015, T-0016, T-0019, T-0058, T-0039, T-0223, T-0274 |  |
+| ▶ | [T-0233](../tracker/tasks/T-0233.md) | archive: module + project archive registry (oe_archive_project_archive), export request API, status lifecycle, completion notifications | archive | S | T-0015, T-0016, T-0019, T-0058, T-0039, T-0223, T-0274 |  |
 | ⬜ | [T-0234](../tracker/tasks/T-0234.md) | archive: package builder — export-provider contract, manifest + SHA-256 inventory, project_data.json/.js, db_restore_manifest.jsonl.gz, streamed zip; providers for projects, memberships, uploads, audit | archive | M | T-0233, T-0006, T-0016 |  |
 | ⬜ | [T-0235](../tracker/tasks/T-0235.md) | archive: export providers for asset hierarchy, Items and inspections + anchored file tree (reports, original and annotated photos, attachments) | asset_management | M | T-0234, T-0101, T-0103, T-0111, T-0150, T-0156, T-0158 |  |
 | ⬜ | [T-0236](../tracker/tasks/T-0236.md) | archive: offline HTML viewer (index.html + viewer-assets) — hierarchy, Items, inspections, audit hashes, relative file links, zero network | frontend | M | T-0235, T-0024 |  |

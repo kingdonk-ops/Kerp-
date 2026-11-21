@@ -8,12 +8,14 @@ it or holding a membership in it, and to ``system_admin`` sessions.
 
 from __future__ import annotations
 
+import uuid
+from datetime import datetime
 from typing import Any, Final
 
-from sqlalchemy import Boolean, CheckConstraint, String, UniqueConstraint, false
+from sqlalchemy import Boolean, CheckConstraint, DateTime, String, UniqueConstraint, false
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.core.db import Base, BaseRecordMixin
+from app.core.db import GUID, Base, BaseRecordMixin
 from app.core.geo import GeoJSONGeometry
 from app.core.tenancy.rls import RlsPolicy, rls_table_info
 
@@ -27,6 +29,12 @@ DEFAULT_STATUS: Final = "ACTIVE"
 DEFAULT_TIMEZONE: Final = "Australia/Perth"  # master spec §4.1
 DEFAULT_CURRENCY: Final = "AUD"
 DEFAULT_LOCALE: Final = "en-AU"
+MAX_LEGAL_HOLD_REASON: Final = 500
+# While on, a hold has its reason and the time it was set (migration 0038, T-0223). The
+# actor may be ``None`` (provisioning), like ``created_by``.
+LEGAL_HOLD_CHECK: Final = (
+    "NOT legal_hold OR (legal_hold_reason IS NOT NULL AND legal_hold_set_at IS NOT NULL)"
+)
 
 
 class Project(Base, BaseRecordMixin):
@@ -39,6 +47,10 @@ class Project(Base, BaseRecordMixin):
       money mirror and of numbers and dates. KERP never authors money.
     * ``visible_in_lobby``: listed in the lobby for internal users (T-0040, diff §4.1); set
       by the project's PER-09 holders or a System admin only. Default off.
+    * ``legal_hold`` (T-0223, diff §4.7): set and cleared by a System admin only, with a
+      reason; while on, the project cannot be soft-deleted and its archives cannot be deleted
+      (``service.is_on_legal_hold``). ``legal_hold_reason`` / ``_set_by`` / ``_set_at``
+      describe the active hold and are cleared with it; the history is in the audit ledger.
     """
 
     __tablename__ = TABLE
@@ -46,6 +58,7 @@ class Project(Base, BaseRecordMixin):
         UniqueConstraint("tenant_id", "code", name="uq_oe_projects_project_tenant_code"),
         CheckConstraint("project_id IS NULL", name="tenant_level"),
         CheckConstraint("status IN (" + ", ".join(f"'{s}'" for s in STATUSES) + ")", name="status"),
+        CheckConstraint(LEGAL_HOLD_CHECK, name="legal_hold_reason"),  # migration 0038
         rls_table_info(RlsPolicy("membership", project_column="id")),  # T-0014, migration 0015
     )
 
@@ -65,3 +78,13 @@ class Project(Base, BaseRecordMixin):
     visible_in_lobby: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default=false()
     )  # T-0040, migration 0021
+    legal_hold: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )  # T-0223, migration 0038
+    legal_hold_reason: Mapped[str | None] = mapped_column(
+        String(MAX_LEGAL_HOLD_REASON), nullable=True
+    )
+    legal_hold_set_by: Mapped[uuid.UUID | None] = mapped_column(GUID(), nullable=True)
+    legal_hold_set_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
