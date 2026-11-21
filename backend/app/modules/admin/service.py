@@ -5,7 +5,7 @@ Every function needs a tenant-level session (no bound project). Users are read a
 only through ``app.core.auth.service`` (``create_user`` derives ``is_internal``) and
 memberships only through ``app.core.auth.memberships``; this module owns ``oe_admin_grant``.
 
-Audit chains (tenant-level scope): ``admin-user:<user>`` (create, update),
+Audit chains (tenant-level scope): ``admin-user:<user>`` (create, update, update_refused),
 ``admin-user-lookup:<caller>`` (every e-mail lookup), ``project-members:<project>`` (assign,
 remove; ``sod_warning`` flagged), ``admin-grant:<user>`` (grant, revoke).
 
@@ -23,7 +23,7 @@ from typing import Any, Final
 
 from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.audit import service as audit
 from app.core.auth import memberships
@@ -39,7 +39,8 @@ from app.core.auth.access import (
     system_admin_holders,
 )
 from app.core.auth.models import SOURCE_DIRECT, User, normalize_email
-from app.core.tenancy.rls import session_tenancy
+from app.core.db import SIDE_WRITE_DB_KEY
+from app.core.tenancy.rls import bind_tenancy, session_tenancy
 from app.core.tenancy.scope import OutOfScopeError
 from app.modules.admin.models import AdminGrant
 from app.modules.admin.schemas import UserCreate, UserUpdate
@@ -65,6 +66,16 @@ class GrantRaceError(RuntimeError):
 
 class LastSystemAdminError(ValueError):
     """Revoking this ``system_admin`` grant would leave the deployment without one (409)."""
+
+
+CANNOT_DEACTIVATE_SELF: Final = "CANNOT_DEACTIVATE_SELF"
+
+
+class SelfDeactivationError(ValueError):
+    """The caller asked to deactivate their own account (409 ``CANNOT_DEACTIVATE_SELF``,
+    TD-463). The refusal is already audited when this is raised."""
+
+    code: Final = CANNOT_DEACTIVATE_SELF
 
 
 class NotAMemberError(LookupError):
@@ -97,6 +108,30 @@ def _tenant_id(session: Session) -> uuid.UUID:
 
 def _append(session: Session, chain: str, payload: dict[str, Any], actor: uuid.UUID | None) -> None:
     audit.append(session, chain, payload, actor_id=actor, source="api")
+
+
+def _append_refusal(
+    session: Session, chain: str, payload: dict[str, Any], actor: uuid.UUID | None
+) -> None:
+    """Audit a refusal in its own unit of work, bound like ``session``, so the entry survives
+    the refused request's rollback.
+
+    It runs on the ``Database``'s side-write pool (``Database.session`` stashes it under
+    ``SIDE_WRITE_DB_KEY``), never the request pool, as the verification findings log does:
+    a second connection from the request pool could deadlock it under load. A bare session
+    (scripts, tests) gets a plain factory on its own engine. On SQLite, call this before the
+    caller writes anything (its write lock would block the side write).
+    """
+    database = session.info.get(SIDE_WRITE_DB_KEY)
+    maker: sessionmaker[Session] = (
+        database.side_write_sessionmaker
+        if database is not None
+        else sessionmaker(bind=session.get_bind().engine, autoflush=False, expire_on_commit=False)
+    )
+    with maker() as side:
+        bind_tenancy(side, session_tenancy(session))
+        _append(side, chain, payload, actor)
+        side.commit()
 
 
 def _grant_payload(grants: Iterable[Grant]) -> list[dict[str, str | None]]:
@@ -310,6 +345,10 @@ def update_user(
 
     Deactivating the last active System admin (the caller included) raises
     ``LastSystemAdminError``: the deployment would have nobody left to run it (TD-274).
+    Any other self-deactivation (``user_id == actor_id``) raises ``SelfDeactivationError``,
+    also while other System admins exist (TD-463); that refusal is audited
+    (``update_refused``, ``self_deactivation``) in its own unit of work, so the entry outlives
+    the caller's rollback. Both are checked before anything is written.
     """
     user = users.get_user(session, user_id)
     if user.is_active and data.is_active is False:
@@ -317,6 +356,10 @@ def update_user(
         holds = any(r.user_id == user_id for r in admins)
         if holds and not _other_active_admins(session, admins, user_id):
             raise LastSystemAdminError("the last active System admin cannot be deactivated")
+        if user_id == actor_id:
+            refusal = {"action": "update_refused", "reason": "self_deactivation"}
+            _append_refusal(session, f"admin-user:{user_id}", refusal, actor_id)
+            raise SelfDeactivationError("you cannot deactivate your own account")
     changed = sorted(n for n in data.model_fields_set if getattr(user, n) != getattr(data, n))
     for name in changed:
         setattr(user, name, getattr(data, name))

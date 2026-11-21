@@ -782,6 +782,75 @@ def test_deactivating_a_user_without_system_admin_is_not_checked(api: Api) -> No
     assert _deactivate(api, CAROL).status_code == 200
 
 
+# --- nobody deactivates their own account (T-0085, TD-463) ----------------------------------
+
+
+def test_a_system_admin_cannot_deactivate_themselves_while_another_admin_exists(
+    api: Api,
+) -> None:
+    _make_admin(api.db, api.users[BOB])
+    refused = _deactivate(api, ALICE)
+    assert refused.status_code == 409, refused.text
+    assert refused.json()["code"] == "CANNOT_DEACTIVATE_SELF"
+    assert refused.json()["detail"]
+    with api.db.unit_of_work(ROOT) as s:  # nothing written
+        assert service.users.get_user(s, api.users[ALICE]).is_active is True
+    # The refusal is audited in its own unit of work: the request's rollback keeps it.
+    assert api.chain(f"admin-user:{api.users[ALICE]}") == [
+        {"action": "update_refused", "reason": "self_deactivation"}
+    ]
+
+
+def test_the_last_admin_refusal_wins_and_stays_unaudited(api: Api) -> None:
+    refused = _deactivate(api, ALICE)
+    assert refused.status_code == 409
+    assert "code" not in refused.json()  # the T-0211 answer, unchanged
+    assert api.chain(f"admin-user:{api.users[ALICE]}") == []
+
+
+def test_self_deactivation_is_refused_in_the_service(api: Api) -> None:
+    alice, bob = api.users[ALICE], api.users[BOB]
+    _make_admin(api.db, bob)
+    mine = TenancyContext(tenant_id=T1, user_id=alice, is_system_admin=True)
+    with api.db.unit_of_work(mine) as s:
+        with pytest.raises(service.SelfDeactivationError) as caught:
+            service.update_user(s, alice, UserUpdate(is_active=False), actor_id=alice)
+        assert caught.value.code == "CANNOT_DEACTIVATE_SELF"
+        s.rollback()
+    assert api.chain(f"admin-user:{alice}") == [
+        {"action": "update_refused", "reason": "self_deactivation"}
+    ]
+
+
+def test_renaming_oneself_and_reactivating_others_are_unchanged(api: Api) -> None:
+    _make_admin(api.db, api.users[BOB])
+    root = api.headers(ALICE)
+    own = f"{ADMIN}/users/{api.users[ALICE]}"
+    renamed = api.client.patch(own, json={"display_name": "Alice A."}, headers=root)
+    assert renamed.status_code == 200, renamed.text
+    assert renamed.json()["display_name"] == "Alice A."
+    same = api.client.patch(own, json={"is_active": True}, headers=root)
+    assert same.status_code == 200  # already active: no change, no refusal
+    assert api.chain(f"admin-user:{api.users[ALICE]}") == [
+        {"action": "update", "fields": ["display_name"]}
+    ]
+    assert _deactivate(api, CAROL).status_code == 200
+    carol = f"{ADMIN}/users/{api.users[CAROL]}"
+    back = api.client.patch(carol, json={"is_active": True}, headers=root)
+    assert back.status_code == 200
+    assert back.json()["is_active"] is True
+
+
+def test_the_patch_documents_both_409_answers(api: Api) -> None:
+    spec = api.client.get("/openapi.json").json()
+    patch = spec["paths"][f"{ADMIN}/users/{{user_id}}"]["patch"]
+    conflict = patch["responses"]["409"]
+    assert "CANNOT_DEACTIVATE_SELF" in conflict["description"]
+    ref = conflict["content"]["application/json"]["schema"]["$ref"]
+    model = spec["components"]["schemas"][ref.rsplit("/", 1)[1]]
+    assert model["properties"]["code"]["const"] == "CANNOT_DEACTIVATE_SELF"
+
+
 # --- check-then-insert races answer like the sequential case (T-0211) ------------------------
 
 

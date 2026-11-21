@@ -459,6 +459,8 @@ export const en = {
       deactivated: "{{name}} was deactivated.",
       reactivated: "{{name}} was reactivated.",
       lastSystemAdmin: "The last active System admin cannot be deactivated.",
+      cannotDeactivateSelf:
+        "You cannot deactivate your own account. Another System admin can do it.",
       inviteTitle: "Invite to a project",
       inviteNote:
         "The person receives an e-mail with a link. An account is created if none exists; they become a member only when they accept.",
