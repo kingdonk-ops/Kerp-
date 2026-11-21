@@ -1,7 +1,7 @@
 # app/core/mail — outbound e-mail (T-0058, diff §4.6)
 
 One core service for every transactional e-mail: core auth (magic links; password reset,
-T-0077) and modules (invites, T-0059; access-request decisions, T-0056). AWS SES in
+T-0077) and modules (invites, T-0059; access-request decisions, T-0063). AWS SES in
 production, always asynchronous, i18n templates, a send log, and bounce/complaint suppression.
 
 | File | What |
@@ -23,7 +23,8 @@ from app.core.mail.service import send_mail
 send_mail(session, "auth.magic_link", user.email, {"token": token, "expires_minutes": 15})
 # Core templates: auth.magic_link, auth.password_reset (link /reset-password#<token>),
 # auth.password_changed (the notice after a reset; no parameters) - T-0077.
-# Module templates: admin.project_invite (link /invite#<invite_token>.<setup_token>) - T-0059.
+# Module templates: admin.project_invite (link /invite#<invite_token>.<setup_token>) - T-0059;
+# access_requests.approved | rejected | rejected_no_reason (public link /) - T-0063.
 ```
 
 - Call it inside the caller's unit of work. It checks the template and the address, adds a
@@ -53,7 +54,10 @@ template in `en-AU` and fails on a missing key).
 
 - **Secrets only inside link fragments**: a template with a link builds it as
   `<KERP_WEB_ORIGIN><link_path>#<secret>`; the secret is used nowhere else and may not equal
-  any other context value.
+  any other context value. A link to an ordinary page of the app carries no secret and must
+  be declared so: `MailTemplate(..., link_path="/", public_link=True)` gives
+  `<KERP_WEB_ORIGIN>/` (the access-request decision e-mails, T-0063). A `link_path` without a
+  secret and without `public_link` is refused.
 - Plain text plus simple HTML: no images, no remote styles or fonts, no scripts, no tracking
   pixel; every value is HTML-escaped. No project data beyond code and name.
 - Locale: the recipient's, else `KERP_MAIL_DEFAULT_LOCALE` (`en-AU`); a missing catalog or

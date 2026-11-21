@@ -239,6 +239,12 @@ breaking them down earlier would bake in guesses Phases 0–2 will invalidate.
   PR per bundle; the absorbed task is `dropped` (body kept) and its acceptance criteria live on in
   the survivor. T-0051 absorbs T-0048 (devices screen; both Admin-group screens on merged
   backends; size M). T-0146 now depends on T-0051 for the devices screen.
+
+- **2026-11-20 — Phase 0 bundling (user request), bundle 3:** T-0063 absorbs T-0056 (projects
+  follow-ups + access-request decision e-mails; both small backend follow-ups on merged modules).
+  T-0056 is `dropped` (body kept); its acceptance criteria live on in T-0063. The decision e-mails
+  stay outside the Pilot-0 gate.
+
 - **2026-11-21 — admin operations, communications, runtime settings, project archive and the
   user directory (user-supplied spec + addendum; planner pass):** spec added as diff §4.7
   (system console, legal hold, communications, runtime settings registry), §4.8 (account state,

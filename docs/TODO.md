@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 298 · **Closed:** 135
+**Open:** 299 · **Closed:** 135
 
 ## decision (37)
 
@@ -164,7 +164,7 @@
 | [TD-365](../tracker/todo/TD-365.md) | Frontend translations of the password policy codes and the password policy in /auth/config | T-0077 | implementer |
 | [TD-394](../tracker/todo/TD-394.md) | Approve access request: site picker for PER-07 site scope once the asset hierarchy API exists | T-0051 | implementer |
 
-## later (122)
+## later (123)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -286,6 +286,7 @@
 | [TD-391](../tracker/todo/TD-391.md) | audit ledger: rename _SQLITE_WRITE_LOCK and document the race-test barrier timeout | T-0077 | reviewer |
 | [TD-392](../tracker/todo/TD-392.md) | Device registry: scoped admin device list endpoint (System admin: all users; PER-09: its projects' members) to replace the client's per-user fan-out | T-0051 | implementer |
 | [TD-393](../tracker/todo/TD-393.md) | Expose is_system_admin on GET /auth/me so the client need not probe GET /admin/grants for Admin nav visibility | T-0051 | implementer |
+| [TD-395](../tracker/todo/TD-395.md) | Access-request decision e-mails link the app root (/): deep-link the lobby panel or the approved project once the web client has those routes | T-0063 | implementer |
 | [TD-403](../tracker/todo/TD-403.md) | Stats and export providers for modules that land later: NCR, punch, equipment, credentials, materials/MTR, MDR, welding | T-0219, T-0235 | planner |
 | [TD-415](../tracker/todo/TD-415.md) | Inspection follow-ups (oe_inspections_follow_up) move to the generic tasks module when E-04-07 is broken down | T-0257, T-0288, E-04-07 | planner |
 | [TD-440](../tracker/todo/TD-440.md) | In-app IP allowlisting is not built: network restrictions live in the WAF / Entra Conditional Access; revisit only if a client contract requires per-project IP rules | — | planner |

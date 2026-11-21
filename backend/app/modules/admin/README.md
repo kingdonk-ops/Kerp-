@@ -82,7 +82,8 @@ rate limit (`LOOKUP_POLICY`: 20 back to back, then 1 min doubling to 15 min, per
 with `Retry-After`); every lookup, hit or miss, is audited with the e-mail as a SHA-256
 digest. Invites by e-mail: *Project invites* below. Access requests (a user asks, a PER-09 approves or rejects) are the
 `access_requests` module (T-0050); approving one calls `assign_member` with the request's
-personas added to the requester's direct grants, so the SoD rule below applies there too.
+personas added to the requester's direct grants, so the SoD rule below applies there too. The
+requester is e-mailed the decision by that module (T-0063), not by this one.
 
 **Memberships.** Personas are `PER-01`…`PER-16` (`access.Persona`, TD-256); PER-07 needs a
 `site_node_id`, other personas must not have one (422). PER-09 may be assigned by a PER-09
