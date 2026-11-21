@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 341 · **Closed:** 147
+**Open:** 340 · **Closed:** 148
 
 ## decision (39)
 
@@ -135,7 +135,7 @@
 | [TD-463](../tracker/todo/TD-463.md) | Server: refuse self-deactivation on PATCH /admin/users/{id} (Admin → Users only hides the button) | T-0331, T-0085 | implementer |
 | [TD-487](../tracker/todo/TD-487.md) | Frontend: Admin -> System grants page needs the SoD confirm step for system_admin on a hold-authority holder (POST /admin/grants 409 sod_confirmation_required, confirm_sod), plus the same warning for hold personas on system_admins in member/invite/team UIs | T-0275 | implementer |
 
-## deferred (49)
+## deferred (48)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -144,7 +144,6 @@
 | [TD-047](../tracker/todo/TD-047.md) | Automate refresh of backend/requirements*.lock (uv pip compile output): Dependabot pip does not find *.lock files or re-run uv; options: scheduled uv --upgrade workflow opening a PR, or Renovate pip-compile manager | T-0028, T-0032 | implementer |
 | [TD-074](../tracker/todo/TD-074.md) | Handover: offline drafting on tablets via the Dexie outbox | E-04-11 | planner |
 | [TD-122](../tracker/todo/TD-122.md) | Bind the request's project scope from the authorised project (tenancy context is tenant-level after T-0008) | T-0008, T-0084 | implementer |
-| [TD-129](../tracker/todo/TD-129.md) | Guard the module toggle API (PUT /api/v1/modules/{name}) with the admin capability tier once RBAC lands (T-0010/T-0014) | T-0011, T-0084 | implementer |
 | [TD-140](../tracker/todo/TD-140.md) | Compile-on-save checks CEL rules only at top-level variables; field-level type checking against kind context schemas | T-0018 | implementer |
 | [TD-146](../tracker/todo/TD-146.md) | Send the selected project scope with API requests and key cached queries by scope | T-0024 | implementer |
 | [TD-147](../tracker/todo/TD-147.md) | Field-worker sign-in screens: magic-link request/redeem and 6-digit PIN unlock in the SPA | T-0024 | implementer |
@@ -212,7 +211,7 @@
 | [TD-123](../tracker/todo/TD-123.md) | Password login has no throttling yet; extend T-0009's Redis lockout to /api/v1/auth/login | T-0008 | implementer |
 | [TD-124](../tracker/todo/TD-124.md) | Fail fast at startup when production auth config (JWT key, KERP_REDIS_URL) is missing | T-0008 | implementer |
 | [TD-126](../tracker/todo/TD-126.md) | CI drift check: fail when frontend/src/api/ (openapi.json, schema.ts) is stale against the backend OpenAPI schema | T-0011, T-0083 | implementer |
-| [TD-127](../tracker/todo/TD-127.md) | Frontend: project module settings screen (toggle via /api/v1/modules) and hide disabled modules in the navigation | T-0011 | implementer |
+| [TD-127](../tracker/todo/TD-127.md) | Frontend: project module settings screen (toggle via /api/v1/projects/{project_id}/modules) and hide disabled modules in the navigation | T-0011 | implementer |
 | [TD-128](../tracker/todo/TD-128.md) | Concurrent first toggle of the same module in one project races on uq_project_module_setting_module and returns 500; retry or upsert | T-0011 | implementer |
 | [TD-130](../tracker/todo/TD-130.md) | Module loader: require CurrentPrincipal on every mounted module router by default (opt-out for public routes) | T-0011 | implementer |
 | [TD-133](../tracker/todo/TD-133.md) | Dev stack: separate dev database from kerp_test, and create the kerp-vault MinIO bucket + backend storage settings | T-0003 | implementer |
@@ -451,6 +450,7 @@
 | ✅ | [TD-119](../tracker/todo/TD-119.md) | CLAUDE.md section 6 anchor bullet still says 'work anchors to an RSW': apply the ADR 0003 amended wording (human edit; agents may not change CLAUDE.md) | CLAUDE.md section 6 anchor bullet updated to the ADR 0003 wording with 'at most one per root-to-leaf path' (TD-113) (user, 2026-11-10) |
 | ✅ | [TD-120](../tracker/todo/TD-120.md) | Login tenant resolution: how a user picks the tenant at sign-in (multi-tenant accounts, MOD-01 cross-tenant collaboration) | 3a: tenant_id + RLS kept but hidden (one tenant per deployment); System admins appoint Project Admins (create_projects grant) who create projects and get PER-09 on them; PER-09 assigns users to its projects; admin roles never confer hold release or sign-off; one URL, top-bar project picker (one project -> in, several -> last used), lobby of visible-in-lobby projects with access requests decided by the project's admins, other projects by invite or project code. Spec diff §4.1, edge §5/§6, master §1.1/MOD-01; tasks T-0014, T-0023, T-0026, T-0037, T-0039..T-0042 (user, 2026-11-13) |
 | ✅ | [TD-121](../tracker/todo/TD-121.md) | Refresh-token lifetime, absolute session lifetime and SPA refresh-token transport are unspecified | 4c: access 15 min, refresh 12 h from sign-in (rotation never extends it, KERP_REFRESH_TOKEN_HOURS=12), daily re-login; offline local PIN unlock does not depend on a valid refresh token, so the 7-14 day offline window still works. Spec diff §4.2; task T-0037. SPA cookie transport decided in TD-203 (user, 2026-11-13) |
+| ✅ | [TD-129](../tracker/todo/TD-129.md) | Guard the module toggle API (PUT /api/v1/modules/{name}) with the admin capability tier once RBAC lands (T-0010/T-0014) | T-0084: toggle API moved to /api/v1/projects/{project_id}/modules; PUT requires the project admin capability, GET view. |
 | ✅ | [TD-135](../tracker/todo/TD-135.md) | Field-worker PIN semantics: confirm server-checked PIN per session that gates every refresh, and the lockout/magic-link numbers | 8a: hybrid PIN per enrolled device: local unlock against a keystore key (offline, no token needed); server asks for the PIN only on renewal after idle (KERP_PIN_IDLE_MINUTES, default 30); lockout numbers and server-side per-device counter kept. Spec diff §4.2; rework in T-0038 (server) and T-0143 (client) (user, 2026-11-13) |
 | ✅ | [TD-136](../tracker/todo/TD-136.md) | Restrict magic-link sign-in to the Field Worker persona (PER-14) once T-0010 personas exist | Product owner, 2026-11-14: KERP sign-in magic links are limited to Field Workers (PER-14 on at least one project, or a pending invite naming PER-14); anyone else gets the same neutral 202 and no link. Spec diff §4.2 (Magic links for Field Workers only); task T-0057, invite carry-through in T-0052; PER-15 / phase-7 portal question in TD-261 |
 | ✅ | [TD-139](../tracker/todo/TD-139.md) | Confirm per-kind rule context schemas and action vocabularies (validation compiler) | 9a: rule context schemas, p6_grammar groups and action vocabularies confirmed as built and recorded in ADR 0004 Addendum F; frozen by T-0131 (user, 2026-11-13) |
