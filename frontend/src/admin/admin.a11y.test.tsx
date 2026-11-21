@@ -1,4 +1,4 @@
-// Admin screens (T-0051, T-0026) with their dialogs open: WCAG 2.1
+// Admin screens (T-0051, T-0026, T-0232) with their dialogs open: WCAG 2.1
 // AA, contrast and 48 px glove targets in both themes on the field breakpoints (diff §6.3).
 import { fireEvent, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
@@ -7,6 +7,7 @@ import { i18n } from "../i18n";
 import { auditA11y, FIELD_VIEWPORTS, formatFindings, setViewport } from "../test/a11y";
 import { FAKE_USER, json } from "../test/fakeApi";
 import { applyTheme, THEMES } from "../theme/theme";
+import { DEPLOYMENT_CONFIG, REGISTRY } from "./settingsFixtures";
 import { ADMIN_PROJECT, project, renderAdmin } from "./testing";
 
 // The T-0026 cases wait on mocked round-trips through the whole shell (slow under load).
@@ -69,6 +70,29 @@ describe.each(THEMES)("admin screens in the %s theme", (theme) => {
         { theme, systemAdmin: true },
       );
       await screen.findByText(FAKE_USER.email, {}, WAIT);
+
+      const findings = await auditA11y(document.body, theme);
+      expect(findings, formatFindings(findings)).toEqual([]);
+    }, SLOW);
+
+    it("runtime settings with an inline error and the deployment configuration", async () => {
+      await setViewport(viewport);
+      renderAdmin(
+        "/admin/system/settings",
+        {
+          "GET /api/v1/settings/registry": () => json(REGISTRY),
+          "GET /api/v1/settings/deployment-config": () => json(DEPLOYMENT_CONFIG),
+        },
+        { theme, systemAdmin: true, projects: [] },
+      );
+      await screen.findByRole("region", { name: i18n.t("admin.settings.deployment.title") }, WAIT);
+      const days = await screen.findByLabelText(
+        i18n.t("admin.settings.entries.offline_window_days"),
+        { selector: "input" },
+        WAIT,
+      );
+      fireEvent.change(days, { target: { value: "15" } });
+      await screen.findByText(i18n.t("admin.settings.errors.max", { max: "14" }), {}, WAIT);
 
       const findings = await auditA11y(document.body, theme);
       expect(findings, formatFindings(findings)).toEqual([]);

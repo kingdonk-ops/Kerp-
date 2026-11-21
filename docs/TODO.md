@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 368 · **Closed:** 152
+**Open:** 369 · **Closed:** 153
 
 ## decision (40)
 
@@ -194,7 +194,7 @@
 | [TD-510](../tracker/todo/TD-510.md) | Deployment-config view lacks the mail reply-to of diff §4.7: Settings has no reply-to field yet | T-0230 | implementer |
 | [TD-533](../tracker/todo/TD-533.md) | CEL client runtime has no evaluation step budget (cel-js exposes no step hook; server is the hard gate) | T-0341 | implementer |
 
-## later (148)
+## later (149)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -346,6 +346,7 @@
 | [TD-529](../tracker/todo/TD-529.md) | Two list endpoints have no paging (unbounded list responses) | T-0348 | planner |
 | [TD-530](../tracker/todo/TD-530.md) | Database pool size and overflow cannot be configured (create_engine accepts pool_size/max_overflow but settings do not expose them) | T-0348 | planner |
 | [TD-531](../tracker/todo/TD-531.md) | Job rows (jobs table) are never deleted: add a retention purge for finished jobs | T-0346 | planner |
+| [TD-532](../tracker/todo/TD-532.md) | Registry entries declared by later tasks add their label to admin.settings.entries (and a new category to admin.settings.categories) in the Settings screen | T-0232 | implementer |
 
 ## bug (17)
 
@@ -563,4 +564,5 @@
 | ✅ | [TD-463](../tracker/todo/TD-463.md) | Server: refuse self-deactivation on PATCH /admin/users/{id} (Admin → Users only hides the button) | T-0085: the server refuses self-deactivation (409 CANNOT_DEACTIVATE_SELF, audited); the UI shows the message. |
 | ✅ | [TD-492](../tracker/todo/TD-492.md) | Phase 0 exit 'module toggled': no shipped module is toggleable yet (every manifest has toggleable=False), so the e2e journey cannot switch one off and on | User, 2026-11-21: planner default (a) accepted. T-0027 tests the refusals now (platform module 409, unknown module 404, state unchanged); the switch-off/switch-on step is test.skip with TD-492 in the reason until the first toggleable module merges, whose task removes the skip. |
 | ✅ | [TD-502](../tracker/todo/TD-502.md) | ADR for the legal-hold columns on oe_projects_project (core-table change, T-0223) | ADR 0018 (docs/decisions/0018-project-legal-hold.md), accepted 2026-11-21: legal-hold columns on oe_projects_project (additive, no RLS change); reason/set_by/set_at describe the active hold only, history in admin-system:<tenant>; ProjectRead exposes only the flag; delete 409 LEGAL_HOLD_ACTIVE; is_on_legal_hold contract for the archive (T-0233) |
+| ✅ | [TD-516](../tracker/todo/TD-516.md) | Client bootstrap caching: 'ETag / no-store per the auth rules' has no auth rule to follow; default Cache-Control no-store + strong ETag over the values + If-None-Match -> 304 (T-0231); confirm, and that T-0248 clients revalidate with If-None-Match | User, 2026-11-21: default accepted. GET /api/v1/settings/client answers Cache-Control: no-store with a strong ETag over the values; If-None-Match -> 304. T-0248 clients store the values themselves and revalidate with If-None-Match. |
 | ✅ | [TD-521](../tracker/todo/TD-521.md) | Login redirect drops the query string and hash: RequireAuth stores only location.pathname as state.from | Fixed in T-0344: RequireAuth stores pathname + search + hash; LoginPage returnPath() keeps the /login loop guard (also for /login?… and /login#…) and accepts only in-app paths; tests in frontend/src/auth/sessionIsolation.test.tsx. |

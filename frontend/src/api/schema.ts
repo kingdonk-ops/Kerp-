@@ -598,6 +598,23 @@ export interface paths {
         patch: operations["update_registry_entry_api_v1_settings_registry__key__patch"];
         trace?: never;
     };
+    "/api/v1/settings/client": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Client Settings */
+        get: operations["read_client_settings_api_v1_settings_client_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/settings/deployment-config": {
         parameters: {
             query?: never;
@@ -2610,6 +2627,19 @@ export interface components {
             message: string;
             /** Finding Id */
             finding_id?: string | null;
+        };
+        /**
+         * ClientSettingsRead
+         * @description ``GET /client``: the client bootstrap, the client-visible entries only (T-0231).
+         */
+        ClientSettingsRead: {
+            /**
+             * Values
+             * @description Effective value of every client-visible registry entry, by key (for example offline_window_days, offline_grace_hours, max_checkout_clock_skew_s, max_upload_size_mb). Never an entry that is not client-visible, the deployment configuration or a secret. A client ignores keys it does not know.
+             */
+            values: {
+                [key: string]: boolean | number | string | number[];
+            };
         };
         /**
          * CronJobRead
@@ -6760,6 +6790,44 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["SettingEntryRead"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_client_settings_api_v1_settings_client_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "if-none-match"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClientSettingsRead"];
+                };
+            };
+            /** @description Not modified: the If-None-Match tag is still current */
+            304: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

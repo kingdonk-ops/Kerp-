@@ -129,6 +129,17 @@ class SettingValueUpdate(BaseModel):
     value: SettingJson
 
 
+class ClientSettingsRead(BaseModel):
+    """``GET /client``: the client bootstrap, the client-visible entries only (T-0231)."""
+
+    values: dict[str, SettingJson] = Field(
+        description="Effective value of every client-visible registry entry, by key (for "
+        "example offline_window_days, offline_grace_hours, max_checkout_clock_skew_s, "
+        "max_upload_size_mb). Never an entry that is not client-visible, the deployment "
+        "configuration or a secret. A client ignores keys it does not know."
+    )
+
+
 class LockoutScheduleRead(BaseModel):
     free_attempts: int = Field(description="Wrong PINs before the first delay")
     base_delay_seconds: int

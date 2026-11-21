@@ -1,4 +1,4 @@
-# settings — runtime settings registry and deployment settings (T-0044, T-0230)
+# settings — runtime settings registry and deployment settings (T-0044, T-0230, T-0231)
 
 Thresholds a System admin can change without a redeploy (diff §4.7), declared in code and
 stored one value per tenant and key. The deployment settings of diff §4.4 (T-0044) are seven
@@ -13,7 +13,7 @@ returned by the API.
 | `models.py` | `oe_settings_value` (`BaseRecordMixin`, tenant-level, standard RLS; migration `0037`); the legacy `oe_settings_deployment` (migration `0017`, read-only), `SHIPPED_DEFAULTS`, bounds |
 | `cache.py` | `RedisSettingsCache` (Redis + pub/sub invalidation), `NullCache`, `install` / `open_cache` |
 | `deployment_config.py` | the read-only deployment configuration and its secret guard |
-| `schemas.py` | `DeploymentSettingsRead` / `Update`, `SettingEntryRead`, `SettingValueUpdate`, `DeploymentConfigRead` |
+| `schemas.py` | `DeploymentSettingsRead` / `Update`, `SettingEntryRead`, `SettingValueUpdate`, `DeploymentConfigRead`, `ClientSettingsRead` |
 | `service.py` | `get_value`, `get_values`, `client_values`, `set_values`, `registry_entries`; deployment settings: `get_settings`, `project_defaults`, `update_settings`, `stored_record`, `ensure_record` (first-run, T-0023) |
 | `router.py` | `/api/v1/settings/...` (below) |
 
@@ -48,7 +48,7 @@ and reads it with `settings.service.get_value(session, MAX_THINGS.key)`.
 | `choices` | the values of an `enum` |
 | `max_length` | longest `string` or most items of an `int_list` (default 255) |
 | `check` | extra check of a `string` (IANA zone, ISO 4217, BCP 47) |
-| `client_visible` | returned by the client bootstrap (`client_values`; the endpoint is T-0231) |
+| `client_visible` | returned by the client bootstrap (`GET /client`, `client_values`) |
 | `cap` | `DeploymentCap(env, limit)`: a value of the deployment configuration the entry can never exceed |
 
 `add_rule(SettingRule(keys, check))` adds a rule across keys, checked on the values a change
@@ -130,12 +130,16 @@ nothing, which is why it is its own module and not part of `admin` (which depend
 
 ## API (`/api/v1/settings`)
 
+The Admin → System → Settings screen (`frontend/src/admin/SystemSettingsPage.tsx`, T-0232)
+edits the registry and shows the deployment configuration read-only.
+
 | Endpoint | Who | What |
 |---|---|---|
 | `GET /deployment` | any signed-in user (no membership needed) | the seven deployment settings (T-0044 contract) |
 | `PATCH /deployment` | `system_admin` (else 403) | change the given fields; 422 for invalid values, nulls, unknown fields (`tenant_id`, `region`) or an empty body |
 | `GET /registry` | `system_admin` | every entry: `key`, `category`, `type`, `description`, `value`, `default`, `is_default`, `minimum`, `maximum`, `choices`, `max_length`, `client_visible`, `cap`, `cap_source`; by category then key |
 | `PATCH /registry/{key}` | `system_admin` | body `{"value": …}`; 422 out of bounds, wrong type, over the cap or against a rule; 404 for an undeclared key |
+| `GET /client` | any signed-in user (no membership needed) | the client bootstrap: the `client_visible` entries only, `no-store` + `ETag` (below) |
 | `GET /deployment-config` | `system_admin` | read-only deployment configuration: refresh-token hours, PIN idle minutes, PIN lockout schedule, region, storage region, mail transport and sender, malware scanner, the upload limits that cap the registry, AI provider (`none`) |
 
 The `system_admin` flag is the one the request session was bound with at authentication
@@ -149,6 +153,24 @@ TD-296).
 `SecretStr`, any field hidden from `repr()`, any `*_url` or `*_file`, any secret-like name
 (tested against every field of `Settings`). The mail reply-to of diff §4.7 is not shown yet:
 the deployment has no such configuration (TD-510).
+
+### Client bootstrap (`GET /client`, T-0231)
+
+Any signed-in user (no System admin flag, no membership; unauthenticated is 401) gets
+`{"values": {key: value}}`: the effective value (stored value, else the default, never above
+the deployment cap) of every `client_visible` entry of the caller's tenant, and nothing else:
+no other entry, no deployment configuration, no secret. Today that is `offline_window_days`,
+`offline_grace_hours`, `max_checkout_clock_skew_s` and `max_upload_size_mb`; the media
+size/duration caps and the annotation cap join when the task that reads them declares them
+(`client_visible=True`), with no change here. The response is a map, not fixed fields, so a
+new client-visible entry never changes the schema; a client ignores keys it does not know.
+Web and Android read it at sign-in and at every sync (T-0248).
+
+The response carries `Cache-Control: no-store` (tenant data behind a bearer token is never
+kept by a browser or a shared cache) and a strong `ETag` (SHA-256 over the canonical JSON of
+the values). A client that kept the values in its own storage sends `If-None-Match`; a
+matching tag (or `*`; weak tags compare weakly) is `304` with no body and the same headers.
+A change to an entry that is not client-visible leaves the tag alone.
 
 ## Audit
 

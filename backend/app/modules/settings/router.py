@@ -10,13 +10,20 @@
   or over the deployment cap is 422 (never clamped), an undeclared key 404.
 * ``GET /deployment-config``: ``system_admin`` only; the read-only deployment configuration
   (environment), never a secret.
+* ``GET /client`` (T-0231, diff §4.7 client bootstrap): any signed-in user; the effective
+  values of the ``client_visible`` entries only. ``Cache-Control: no-store`` and a strong
+  ``ETag`` over the values; a matching ``If-None-Match`` is 304 with no body.
 
 No endpoint takes or returns a tenant id.
 """
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Request, status
+import hashlib
+import json
+from typing import Annotated
+
+from fastapi import APIRouter, Header, HTTPException, Request, Response, status
 
 from app.core.auth.access import CallerIsSystemAdmin
 from app.core.auth.deps import CurrentPrincipal
@@ -24,6 +31,7 @@ from app.core.config import Settings
 from app.core.db import DbSession
 from app.modules.settings import deployment_config, service
 from app.modules.settings.schemas import (
+    ClientSettingsRead,
     DeploymentConfigRead,
     DeploymentSettingsRead,
     DeploymentSettingsUpdate,
@@ -98,6 +106,45 @@ def update_registry_entry(
     except service.ConcurrentUpdateError as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
     return SettingEntryRead.model_validate(service.registry_entry(session, key, config=config))
+
+
+NO_STORE = "no-store"
+
+
+def _etag(body: ClientSettingsRead) -> str:
+    """A strong validator over the values (canonical JSON, so key order never matters)."""
+    canonical = json.dumps(body.model_dump(mode="json"), sort_keys=True, separators=(",", ":"))
+    return '"' + hashlib.sha256(canonical.encode()).hexdigest()[:32] + '"'
+
+
+def _matches(if_none_match: str | None, etag: str) -> bool:
+    """``If-None-Match`` (RFC 9110 §13.1.2): ``*`` or any listed tag, compared weakly."""
+    if not if_none_match:
+        return False
+    tags = {tag.strip().removeprefix("W/") for tag in if_none_match.split(",")}
+    return "*" in tags or etag in tags
+
+
+@router.get(
+    "/client",
+    response_model=ClientSettingsRead,
+    responses={304: {"description": "Not modified: the If-None-Match tag is still current"}},
+)
+def read_client_settings(
+    request: Request,
+    response: Response,
+    _principal: CurrentPrincipal,
+    session: DbSession,
+    if_none_match: Annotated[str | None, Header()] = None,
+) -> ClientSettingsRead | Response:
+    config: Settings = request.app.state.settings
+    body = ClientSettingsRead(values=service.client_values(session, config=config))
+    etag = _etag(body)
+    headers = {"ETag": etag, "Cache-Control": NO_STORE}
+    if _matches(if_none_match, etag):
+        return Response(status_code=status.HTTP_304_NOT_MODIFIED, headers=headers)
+    response.headers.update(headers)
+    return body
 
 
 @router.get("/deployment-config", response_model=DeploymentConfigRead)

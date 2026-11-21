@@ -5,6 +5,7 @@ the migrated schema. All data is synthetic.
 """
 
 import json
+import re
 import socket
 import time
 import uuid
@@ -43,7 +44,7 @@ from app.modules.settings.registry import (
     SettingsRegistry,
     UnknownSettingError,
 )
-from app.modules.settings.schemas import DeploymentSettingsUpdate
+from app.modules.settings.schemas import DeploymentConfigRead, DeploymentSettingsUpdate
 from app.modules.uploads import service as uploads
 from tests.audit_support import ALEMBIC_INI, migrated_database
 from tests.auth_support import ALICE, BOB, PASSWORD, T1, T2, auth_app, make_settings, seed_user
@@ -52,6 +53,7 @@ from tests.db_support import database_url, seed_tenants
 URL = "/api/v1/settings/registry"
 DEPLOYMENT_URL = "/api/v1/settings/deployment"
 CONFIG_URL = "/api/v1/settings/deployment-config"
+CLIENT_URL = "/api/v1/settings/client"
 CTX_T1 = TenancyContext(tenant_id=T1, is_system_admin=True)
 CTX_T2 = TenancyContext(tenant_id=T2, is_system_admin=True)
 MIB = 1024 * 1024
@@ -908,3 +910,99 @@ def test_no_secret_field_of_settings_can_appear_in_the_deployment_configuration(
         monkeypatch.setattr(deployment_config, "FIELDS", (*deployment_config.FIELDS, name))
         with pytest.raises(RuntimeError, match="secret"):
             deployment_config.read(CONFIG)
+
+
+# --- client bootstrap (T-0231, diff §4.7) -----------------------------------------------------
+
+CLIENT_VISIBLE = {
+    "offline_window_days": 7,
+    "offline_grace_hours": 24,
+    "max_checkout_clock_skew_s": 5,
+    "max_upload_size_mb": 100,
+}
+
+
+def test_the_client_bootstrap_is_for_any_signed_in_user_and_only_client_visible(api: Api) -> None:
+    assert api.client.get(CLIENT_URL).status_code == 401
+    assert api.client.get(CLIENT_URL, headers={"Authorization": "Bearer nope"}).status_code == 401
+    for email in (ALICE, BOB):  # BOB: no System admin flag, no membership
+        response = api.client.get(CLIENT_URL, headers=api.headers(email))
+        assert response.status_code == 200, response.text
+        assert response.json() == {"values": CLIENT_VISIBLE}
+    assert set(CLIENT_VISIBLE) == {d.key for d in REGISTRY if d.client_visible}
+    # Never an entry that is not client-visible, the deployment configuration or a secret.
+    text = response.text
+    hidden = {d.key for d in REGISTRY if not d.client_visible}
+    assert hidden
+    assert not any(key in text for key in hidden)
+    assert not any(f'"{name}"' in text for name in DeploymentConfigRead.model_fields)
+    assert not any(f'"{name}"' in text for name in Settings.model_fields)
+    assert SENTINEL not in text
+    for method in ("patch", "put", "post", "delete"):
+        status_code = getattr(api.client, method)(CLIENT_URL, headers=api.headers(BOB)).status_code
+        assert status_code == 405
+
+
+def test_the_client_bootstrap_returns_the_effective_tenant_values(api: Api) -> None:
+    with api.db.unit_of_work(CTX_T1) as s:
+        service.set_values(s, {"offline_window_days": 3, "default_locale": "en-NZ"}, actor_id=None)
+    with api.db.unit_of_work(CTX_T2) as s:  # another tenant's change is never seen
+        service.set_values(s, {"max_checkout_clock_skew_s": 60}, actor_id=None)
+    response = api.client.get(CLIENT_URL, headers=api.headers(BOB))
+    assert response.json() == {"values": {**CLIENT_VISIBLE, "offline_window_days": 3}}
+
+
+def test_the_client_bootstrap_never_exceeds_the_deployment_cap(
+    tmp_path: Path, db: Database
+) -> None:
+    with db.unit_of_work(CTX_T1) as s:
+        service.set_values(s, {"max_upload_size_mb": 100}, actor_id=None)
+    settings = make_settings(database_url=database_url(tmp_path), upload_max_bytes=40 * MIB)
+    app, _runtime = auth_app(settings)
+    with TestClient(app) as client:
+        api = Api(client, db)
+        response = client.get(CLIENT_URL, headers=api.headers(BOB))
+    assert response.json()["values"]["max_upload_size_mb"] == 40
+
+
+def test_the_client_bootstrap_is_no_store_with_an_etag(api: Api) -> None:
+    headers = api.headers(BOB)
+    first = api.client.get(CLIENT_URL, headers=headers)
+    etag = first.headers["ETag"]
+    assert first.headers["Cache-Control"] == "no-store"
+    assert re.fullmatch(r'"[0-9a-f]{32}"', etag), etag
+    assert api.client.get(CLIENT_URL, headers=headers).headers["ETag"] == etag  # stable
+
+    for match in (etag, f"W/{etag}", f'"other", {etag}', "*"):
+        cached = api.client.get(CLIENT_URL, headers={**headers, "If-None-Match": match})
+        assert cached.status_code == 304, match
+        assert cached.content == b""
+        assert (cached.headers["ETag"], cached.headers["Cache-Control"]) == (etag, "no-store")
+    stale = api.client.get(CLIENT_URL, headers={**headers, "If-None-Match": '"other"'})
+    assert stale.status_code == 200
+    # Unauthenticated stays 401 whatever the validator.
+    assert api.client.get(CLIENT_URL, headers={"If-None-Match": etag}).status_code == 401
+
+    with api.db.unit_of_work(CTX_T1) as s:
+        service.set_values(s, {"offline_grace_hours": 48}, actor_id=None)
+    changed = api.client.get(CLIENT_URL, headers={**headers, "If-None-Match": etag})
+    assert changed.status_code == 200
+    assert changed.json()["values"]["offline_grace_hours"] == 48
+    assert changed.headers["ETag"] != etag
+    # A change to an entry that is not client-visible leaves the ETag alone.
+    new_etag = changed.headers["ETag"]
+    with api.db.unit_of_work(CTX_T1) as s:
+        service.set_values(s, {"default_locale": "en-NZ"}, actor_id=None)
+    same = api.client.get(CLIENT_URL, headers={**headers, "If-None-Match": new_etag})
+    assert same.status_code == 304
+
+
+def test_the_openapi_schema_describes_the_client_bootstrap(api: Api) -> None:
+    spec = api.client.app.openapi()  # type: ignore[attr-defined]
+    operation = spec["paths"][CLIENT_URL]["get"]
+    assert set(operation["responses"]) >= {"200", "304"}
+    ref = operation["responses"]["200"]["content"]["application/json"]["schema"]["$ref"]
+    schema = spec["components"]["schemas"][ref.rsplit("/", 1)[-1]]
+    assert schema["required"] == ["values"]
+    assert schema["properties"]["values"]["type"] == "object"
+    assert schema["properties"]["values"]["additionalProperties"]

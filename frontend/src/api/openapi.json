@@ -1495,6 +1495,63 @@
         }
       }
     },
+    "/api/v1/settings/client": {
+      "get": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Read Client Settings",
+        "operationId": "read_client_settings_api_v1_settings_client_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "if-none-match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-None-Match"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientSettingsRead"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified: the If-None-Match tag is still current"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/settings/deployment-config": {
       "get": {
         "tags": [
@@ -8933,6 +8990,43 @@
         "title": "CheckFinding",
         "description": "A rule of the set that did not pass. ``message`` is the user-readable reason."
       },
+      "ClientSettingsRead": {
+        "properties": {
+          "values": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "string"
+                },
+                {
+                  "items": {
+                    "type": "integer"
+                  },
+                  "type": "array"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Values",
+            "description": "Effective value of every client-visible registry entry, by key (for example offline_window_days, offline_grace_hours, max_checkout_clock_skew_s, max_upload_size_mb). Never an entry that is not client-visible, the deployment configuration or a secret. A client ignores keys it does not know."
+          }
+        },
+        "type": "object",
+        "required": [
+          "values"
+        ],
+        "title": "ClientSettingsRead",
+        "description": "``GET /client``: the client bootstrap, the client-visible entries only (T-0231)."
+      },
       "CronJobRead": {
         "properties": {
           "name": {
@@ -12299,8 +12393,7 @@
                 "minimum": 0.0
               },
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,14}|(?=[\\d.]{1,19}0*$)\\d{0,14}\\.\\d{0,4}0*$)"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -12328,8 +12421,7 @@
                 "minimum": 0.0
               },
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,14}|(?=[\\d.]{1,19}0*$)\\d{0,14}\\.\\d{0,4}0*$)"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -12526,8 +12618,7 @@
           "budget_qty": {
             "anyOf": [
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -12549,8 +12640,7 @@
           "budget_hours": {
             "anyOf": [
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -12561,8 +12651,7 @@
           "earned_qty": {
             "anyOf": [
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "type": "string"
               },
               {
                 "type": "null"

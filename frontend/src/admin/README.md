@@ -1,9 +1,9 @@
-# `src/admin` — Admin screens: access requests, devices (T-0051), admin grants, projects, members (T-0026), users (T-0331)
+# `src/admin` — Admin screens: access requests, devices (T-0051), admin grants, projects, members (T-0026), users (T-0331), runtime settings (T-0232)
 
 Admin-group screens of diff §6.1 on the finished backends of T-0050 (access requests),
 T-0043 (device registry), T-0039 (admin grants), T-0012 / T-0044 (projects), T-0014 (members,
-accounts) and T-0052 (invites). Everything goes through the generated client (`api.ts`,
-`invites.ts`, `users.ts`); every string through `t()` (`admin.*`, `devices.*`, `personas.*`).
+accounts), T-0052 (invites) and T-0230 (settings registry). Everything goes through the generated
+client (`api.ts`, `invites.ts`, `users.ts`, `settings.ts`); every string through `t()` (`admin.*`, `devices.*`, `personas.*`).
 
 ## Who sees what
 
@@ -18,8 +18,12 @@ accounts) and T-0052 (invites). Everything goes through the generated client (`a
 
 - Backbone → **Projects** (`/backbone/projects`) is shown to every signed-in user: the client
   cannot tell who holds `create_projects` (TD-449), so "New project" is offered to all and a `403`
-  is explained. Admin → System → **Admin grants** (`/admin/system/grants`) is a tab of the System
-  screens (`SystemTabs`, `ui.tsx`) shown to System admins only; the API answers everyone else 403.
+  is explained. Admin → System → **Settings** (`/admin/system/settings`) and **Admin grants**
+  (`/admin/system/grants`) are tabs of the System screens (`SystemTabs`, `ui.tsx`) shown to System
+  admins only; the API answers everyone else 403. The tabs are one list (`SYSTEM_TABS`, with
+  `systemAdminOnly`): a new System screen (T-0224, T-0225, …) adds its row there and its route in
+  `src/app/routes.tsx`. The Admin nav item `admin.system` still opens Devices, the one System
+  screen a PER-09 may use.
 - Tenants never appear: no screen takes, shows or sends a tenant.
 
 ## Admin grants (`SystemGrantsPage`, diff §4.1, T-0039)
@@ -30,6 +34,31 @@ accounts) and T-0052 (invites). Everything goes through the generated client (`a
 - These are the only rights the screen offers. A note states that admin grants never give hold
   release, inspection sign-off or signing: those come only from qualified personas on a project
   (PER-02, PER-06, PER-07, PER-11; PER-15 co-signs), assigned under Members.
+
+## Runtime settings (`SystemSettingsPage`, `/admin/system/settings`, diff §4.7, §6.5, T-0232)
+
+- System admins only: for anyone else the screen says so and calls nothing (a `403` from the
+  server says the same).
+- **Runtime settings**: `GET /settings/registry`, grouped by category (headings
+  `admin.settings.categories.*`; a category without a label shows its key). Each entry gets an
+  input for its type: `int` / `float` a number field with `min` / `max`, `bool` a checkbox,
+  `enum` a select of its choices, `string` a text field, `int_list` comma-separated whole
+  numbers. Under it: the bounds, the deployment cap with its environment variable (the effective
+  maximum is the lower of the two), the default (or "Default value" while none is stored) and
+  whether field devices receive it.
+- Labels come from `admin.settings.entries.<key>`. An entry declared by a later task without a
+  label shows its key and the server's description until the task adds its label (TD-532).
+- **Bounds are checked client-side** (`checkSettingValue`, `settings.ts`: type, minimum, maximum
+  lowered by the cap, length, items) and an invalid value cannot be saved. Each entry saves on
+  its own (`PATCH /settings/registry/{key}` with the value in its JSON type); the server's
+  `422` (checks the client cannot make: IANA zone, ISO 4217, BCP 47, `offline_grace_hours` ≤
+  24 × `offline_window_days`) is shown inline at the entry, never clamped. A save replaces the
+  entry in the cached list.
+- **Deployment configuration** (TD-046, TD-398): `GET /settings/deployment-config`, a read-only
+  list with no inputs: refresh-token lifetime, PIN idle lock, PIN lockout schedule, region,
+  object storage region, mail transport and sender, malware scanner, upload limits (the caps of
+  the registry) and the AI provider (`none`). Nothing here is ever a secret (the API's
+  allow-list); it changes only with a redeploy.
 
 ## Projects (`ProjectsPage`, diff §4.1, T-0040, T-0044)
 
