@@ -239,7 +239,10 @@ The image defaults to `KERP_ENVIRONMENT=production` (HSTS on, API docs off); it 
 standard library only. CI's `backend-image` job builds and smoke-tests the image on every run
 with a read-only token. On pushes to `dev`/`main`, the separate `backend-publish` job is the only
 job with `packages: write`. It runs after the tests and the smoke test pass, and pushes
-`ghcr.io/kingdonk-ops/kerp-backend:<short-sha>` and `:<branch>`.
+`ghcr.io/kingdonk-ops/kerp-backend:<short-sha>` and `:<branch>`: the **smoke-tested image
+itself** (`backend-image` saves it as a run artifact, publish loads it), not a rebuild, and it
+checks that the pushed registry digest resolves to the tested image id; both are printed in
+the job summary (TD-051).
 
 ### Lock files
 
@@ -251,6 +254,11 @@ job with `packages: write`. It runs after the tests and the smoke test pass, and
 Both target the image platform (CPython 3.12, `x86_64-manylinux_2_28`). Regenerate after
 changing dependencies in `pyproject.toml` (or `requirements-build.in`) with
 [uv](https://docs.astral.sh/uv/); add `--upgrade` to move to newer releases:
+
+`python scripts/refresh_locks.py [--upgrade]` (repository root) runs exactly these commands
+for `pyproject.toml` and every `requirements*.in`. The weekly `.github/workflows/lock-refresh.yml`
+runs it with `--upgrade` and opens (or updates) one PR to `dev`, branch `deps/uv-lock-refresh`,
+when a lock changed (TD-047).
 
 ```bash
 cd backend
