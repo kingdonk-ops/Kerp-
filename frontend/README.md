@@ -53,7 +53,7 @@ src/
   lobby/      lobby screens: lobby list, project-code entry, Active requests panel (README.md)
   perf/       NFR performance budgets: budgets.json (single config), measurements, CI reporter
   pages/      route components (incl. the lobby route `/lobby`, built from `src/lobby/`)
-  projects/   project scope: `/me/projects` fetch + portfolio personas, ProjectScopeProvider, top-bar ProjectSwitcher
+  projects/   project scope: `/me/projects` fetch + portfolio personas, ProjectScopeProvider, top-bar ProjectSwitcher, capability gate (A/S)
   shells/     RegisterPage, DetailPage (gate banner, tabs, audit), Dynamic Form Renderer (README.md)
   test/       Vitest setup, fake backend (`fakeApi.ts`), axe harness (`a11y.ts`), timing budget (`timeouts.ts`: Testing Library waits up to 5 s project-wide, unit tests 20 s — do not add per-test 1 s waits)
   theme/      display themes: ThemeProvider (per-user preference), ThemeToggle
@@ -106,7 +106,20 @@ src/
   client (`localStorage` key `kerp.scope.<user id>`) and removed once it is no longer allowed
   (project gone from `/me/projects`, or All-Projects without a portfolio persona). Landing on
   `/` after sign-in: one project → it opens; several → the remembered one, else the first by
-  name; none → the **lobby** (`/lobby`). Deep links are kept. The picker always shows
+  name; none → the **lobby** (`/lobby`). Deep links are kept.
+  **System admin (ADR 0016, T-0276).** For a `system_admin`, `/me/projects` returns every live
+  project of the tenant with `access: member | system_admin`. A project reached only through
+  the grant is listed as "code — name (Admin access)" (the badge is option text, so type-ahead
+  finds it) and, when picked, a text badge "Admin access" next to the picker describes it
+  (`aria-describedby`, tooltip with the reason). All-Projects is offered to a `system_admin`
+  too and covers every project. Landing: a `system_admin` with no membership opens the
+  remembered project, else stays on the home page with "Choose a project…" in the picker (never
+  the lobby); with memberships, the fallback is the first project it is a member of.
+  **A/S actions** go through `RequireCapability` (`src/projects/capabilities.tsx`), which
+  derives the caller's capabilities per project from its personas (mirror of
+  `app.core.auth.access.PERSONAS`; the API does not send them yet, TD-500): `system_admin`
+  access gives `V`/`C`/`E`/`admin`, never `A` or `S`. In the All-Projects scope every row
+  passes its own project. The picker always shows
   **"Browse / join another project"**, a link to the lobby. The lobby screens (T-0041:
   lobby list, project-code entry, Active requests) are described in `src/lobby/README.md`. Sending the scope with requests is TD-146; the
   scope is a UI selection — the server binds the allowed projects from memberships (TD-053).

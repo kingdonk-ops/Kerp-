@@ -12,11 +12,12 @@ import {
 import { useServices } from "../app/services";
 import type { KeyValueStorage } from "../auth/tokenStore";
 import { useAuth } from "../auth/AuthProvider";
-import { fetchMyProjects, hasPortfolioPersona, type ProjectSummary } from "./directory";
+import { fetchMyProjects, offersPortfolio, type ProjectSummary } from "./directory";
 
 /**
  * The working scope picked in the top-bar picker: one project, the All-Projects portfolio
- * scope (portfolio personas only, diff §6.1), or none while the user has no project. This is
+ * scope (portfolio personas and `system_admin`, diff §6.1, ADR 0016), or none while the user
+ * has no project or (a `system_admin` without membership) has not picked one yet. This is
  * a UI selection only — the server binds the allowed project list from the user's
  * memberships, never from the client (TD-053).
  */
@@ -29,9 +30,11 @@ interface ProjectScopeValue {
   scope: ProjectScope;
   /** The selected project, or `null` for the portfolio scope and while there is none. */
   project: ProjectSummary | null;
-  /** The user's projects from `GET /api/v1/me/projects`, by name. */
+  /** The user's projects from `GET /api/v1/me/projects`, by name (every project for a
+   * `system_admin`, ADR 0016). */
   projects: ProjectSummary[];
-  /** The user holds a portfolio persona, so All-Projects is offered. */
+  /** The user holds a portfolio persona or reaches projects as `system_admin`, so
+   * All-Projects is offered. */
   portfolio: boolean;
   isLoading: boolean;
   isError: boolean;
@@ -75,15 +78,17 @@ function decode(raw: string | null): ProjectScope | null {
 
 /**
  * Landing scope of diff §4.1: the remembered scope while the user still has it (All-Projects
- * only with a portfolio persona), else the first project by name, else none.
+ * only with a portfolio persona or `system_admin` access), else the first project by name the
+ * user is a member of, else none. A `system_admin` without any membership therefore lands on
+ * the picker with no project chosen, not in the lobby (ADR 0016, T-0276).
  */
 export function resolveScope(
   stored: ProjectScope | null,
   projects: readonly ProjectSummary[],
 ): ProjectScope {
-  if (stored?.kind === "all" && hasPortfolioPersona(projects)) return ALL;
+  if (stored?.kind === "all" && offersPortfolio(projects)) return ALL;
   if (stored?.kind === "project" && projects.some((p) => p.id === stored.projectId)) return stored;
-  const first = projects[0];
+  const first = projects.find((p) => p.access === "member");
   return first ? { kind: "project", projectId: first.id } : NONE;
 }
 
@@ -140,7 +145,7 @@ export function ProjectScopeProvider({ children }: { children: ReactNode }) {
       scope,
       project,
       projects,
-      portfolio: hasPortfolioPersona(projects),
+      portfolio: offersPortfolio(projects),
       isLoading: list.isPending,
       isError: list.isError,
       setScope,

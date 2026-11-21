@@ -8,6 +8,7 @@ import { i18n } from "../i18n";
 import { auditA11y, FIELD_VIEWPORTS, formatFindings, setViewport } from "../test/a11y";
 import { FAKE_USER, json, makeServices, tokens } from "../test/fakeApi";
 import { THEMES, applyTheme, themeStorageKey, DEVICE_THEME_KEY, type ThemeId } from "../theme/theme";
+import { scopeStorageKey } from "../projects/ProjectScopeProvider";
 import { AppRoot } from "./AppRoot";
 import { createQueryClient } from "./queryClient";
 import type { AppServices } from "./services";
@@ -15,6 +16,11 @@ import type { AppServices } from "./services";
 // A portfolio persona, so the All-Projects option is audited too (synthetic).
 const PROJECTS = [
   { id: "p-alpha", code: "SYN-001", name: "Synthetic Refinery Unit", personas: ["PER-01"] },
+];
+
+// A system_admin reaching a project without membership (ADR 0016, T-0276; synthetic).
+const ADMIN_PROJECTS = [
+  { id: "p-jetty", code: "SYN-004", name: "Synthetic Jetty Upgrade", personas: [], access: "system_admin" },
 ];
 
 // Entra ID SSO offered (T-0055): the sign-in page shows "Sign in with Microsoft" first.
@@ -29,6 +35,7 @@ function renderApp(
   signedIn: boolean,
   projects: unknown[] = PROJECTS,
   config: unknown = { password: { available: true } },
+  storedScope: string | null = null,
 ) {
   const base = makeServices({
     "GET /api/v1/me/projects": () => json(projects),
@@ -38,6 +45,7 @@ function renderApp(
   const preferences = memoryStorage();
   // The theme comes from the stored preference, exercising the real switch-on path.
   preferences.setItem(signedIn ? themeStorageKey(FAKE_USER.id) : DEVICE_THEME_KEY, theme);
+  if (storedScope !== null) preferences.setItem(scopeStorageKey(FAKE_USER.id), storedScope);
   const services: AppServices = {
     api: base.api,
     tokens: base.tokens,
@@ -60,6 +68,15 @@ describe.each(THEMES)("app shell in the %s theme", (theme) => {
       await screen.findByText(i18n.t("auth.signedInAs", { name: FAKE_USER.display_name }));
       await screen.findByRole("option", { name: "SYN-001 — Synthetic Refinery Unit" });
       expect(document.documentElement.dataset.theme ?? "standard").toBe(theme);
+
+      const findings = await auditA11y(document.body, theme);
+      expect(findings, formatFindings(findings)).toEqual([]);
+    });
+
+    it("the shell with an 'Admin access' project meets WCAG 2.1 AA and 48 px targets", async () => {
+      await setViewport(viewport);
+      renderApp("/", theme, true, ADMIN_PROJECTS, undefined, "project:p-jetty");
+      await screen.findByTestId("scope-admin-badge");
 
       const findings = await auditA11y(document.body, theme);
       expect(findings, formatFindings(findings)).toEqual([]);
