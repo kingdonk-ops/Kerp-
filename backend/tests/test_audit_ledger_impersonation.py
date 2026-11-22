@@ -45,8 +45,8 @@ ADMIN = uuid.UUID("00000000-0000-4000-8000-00000000fa11")
 DEVICE = uuid.UUID("00000000-0000-4000-8000-0000000de71c")
 KEY = "inspection:00000000-0000-4000-8000-000000000279"
 AT = datetime(2026, 11, 22, 8, 30, 0, 123456, tzinfo=UTC)
-BEFORE = "0042"  # the revision before the hash v3 migration
-AFTER = "0043"  # the hash v3 migration (pinned: a later head must not change these tests)
+BEFORE = "0043"  # the revision before the hash v3 migration
+AFTER = "0044"  # the hash v3 migration (pinned: a later head must not change these tests)
 
 needs_tamper_role = pytest.mark.skipif(
     ON_POSTGRES and not OWNER_URL,

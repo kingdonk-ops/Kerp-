@@ -131,7 +131,7 @@ databases only.
 While a `system_admin` impersonates a user (T-0277, decision TD-426 option (a)), ordinary
 mutations are written under the target's name: `created_by` (and the module's own
 `created_by` / `updated_by`) is the target. The ledger entry is the only record of the admin.
-Migration `0043` added (additive, core table, ADR 0015):
+Migration `0044` added (additive, core table, ADR 0015):
 
 | Column | Meaning |
 |---|---|
@@ -153,7 +153,7 @@ write no impersonator. An entry written under an impersonation token with an exp
 The audit explorer (T-0222) returns `impersonated_by_user_id` on every item and filters on it
 (`EntryFilter.impersonated_by_user_id`).
 
-The `0043` downgrade (development databases only) restores `hash_version IN (1, 2)` and drops
+The `0044` downgrade (development databases only) restores `hash_version IN (1, 2)` and drops
 the column; it **fails while any v3 entry exists**, so a downgrade can never strip the admin
 from an entry silently. Production rolls the code back, not the schema.
 
@@ -166,7 +166,7 @@ from an entry silently. Production rolls the code back, not the schema.
 | `BEFORE UPDATE OR DELETE` row trigger + `BEFORE TRUNCATE` statement trigger | migration `0002` (`guard.py`) | everyone except a superuser with `session_replication_role = replica`, or the owner after disabling the trigger |
 | CHECKs `deleted_at IS NULL`, `revision = 1`, `custom_fields = '{}'`, `scope_id` matches `project_id` | migration `0002` (`models.py`) | soft-deleted, revised or re-scoped rows, even from a superuser with triggers off (both dialects) |
 | CHECKs `hash_version IN (1, 2)`, `hash_version >= 2 OR device_id IS NULL` | migration `0016` (`models.py`) | unknown hash versions, a v1 row claiming a device |
-| CHECKs `hash_version IN (1, 2, 3)`, `hash_version >= 3 OR impersonated_by_user_id IS NULL` | migration `0043` (`models.py`) | a v1/v2 row claiming an impersonator |
+| CHECKs `hash_version IN (1, 2, 3)`, `hash_version >= 3 OR impersonated_by_user_id IS NULL` | migration `0044` (`models.py`) | a v1/v2 row claiming an impersonator |
 
 **Why both REVOKE and triggers.** In CI the runtime role `kerp_app` also runs the migrations,
 so it owns the table (TD-056). An owner's privileges can be revoked, and the REVOKE does apply
@@ -202,8 +202,8 @@ fails with `IntegrityError` rather than forking
   `device_id`, the version CHECKs, and v1 rows written at `0015` still verifying after `0016`.
 - `tests/test_audit_ledger_impersonation.py`: SQLite and PostgreSQL. The v3 known-answer hash,
   v1/v2 unchanged, mixed v1/v2/v3 chains, the impersonator from the request context only (no
-  `append` argument), tampering with it, the CHECKs, v1/v2 rows written at `0042` verifying
-  after `0043`, and the downgrade refusing while a v3 entry exists. The end-to-end option (a)
+  `append` argument), tampering with it, the CHECKs, v1/v2 rows written at `0043` verifying
+  after `0044`, and the downgrade refusing while a v3 entry exists. The end-to-end option (a)
   case (a node created over the API while impersonating) is in `tests/test_impersonation.py`.
 - `tests/test_audit_ledger_pg.py`: PostgreSQL only, as `kerp_app` (skipped elsewhere, TD-052).
   It covers REVOKE (`UPDATE`/`DELETE`/`TRUNCATE` denied, `INSERT`/`SELECT` kept), the triggers

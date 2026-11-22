@@ -97,7 +97,7 @@ three sub-questions of TD-426 were not answered separately; the planner defaults
   ledger entry (hash v3) is the only place that names the admin. Investigations of "who really
   did this" go through the audit explorer filter on `impersonated_by_user_id`.
 - The target learns of every impersonation by e-mail after it ends.
-- The ledger change (T-0279) is migration `0043`; `audit.append` reads the admin from the
+- The ledger change (T-0279) is migration `0044`; `audit.append` reads the admin from the
   request context only (set by the authenticated principal), and outside impersonation entries
   stay v2. Like ADR 0010, its downgrade is for development databases only: it drops
   `impersonated_by_user_id` and restores `hash_version IN (1, 2)`, and fails while any v3 entry

@@ -21,8 +21,8 @@ Downgrade (development databases only, ADR 0015 / ADR 0010): drops the column an
 ``hash_version IN (1, 2)``. It fails while any v3 entry exists: a downgrade can never strip
 the admin from an impersonated entry silently. Production rolls back the code, not the schema.
 
-Revision ID: 0043
-Revises: 0042
+Revision ID: 0044
+Revises: 0043
 Create Date: 2026-11-22
 """
 
@@ -33,8 +33,8 @@ from alembic import op
 
 from app.core.db import GUID, JSONType
 
-revision: str = "0043"
-down_revision: str | None = "0042"
+revision: str = "0044"
+down_revision: str | None = "0043"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
@@ -52,7 +52,7 @@ def _name(check: str) -> str:
 
 
 def _frozen_ledger(*, with_impersonator: bool) -> sa.Table:
-    """``audit_ledger`` as of ``0042`` (``with_impersonator=False``) or this revision, for the
+    """``audit_ledger`` as of ``0043`` (``with_impersonator=False``) or this revision, for the
     SQLite batch copy: ``0002`` + ``0016`` (device, hash version) + ``0026`` (tenant FK)."""
     if with_impersonator:
         extra: list[sa.SchemaItem] = [
