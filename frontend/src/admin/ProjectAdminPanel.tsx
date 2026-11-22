@@ -15,8 +15,8 @@ const MAX_REASON = 500;
 
 /**
  * The project admin page's project section (diff §4.7, §6.5; T-0223): the legal-hold state,
- * its toggle with a mandatory reason for System admins only, and Delete project, refused with
- * `LEGAL_HOLD_ACTIVE` while the project is on hold.
+ * its toggle with a mandatory reason for System admins only, and Delete project (PER-09 or a
+ * System admin), refused with `LEGAL_HOLD_ACTIVE` while the project is on hold.
  */
 export function ProjectAdminPanel({ project, label }: { project: Project; label: string }) {
   const { t } = useTranslation();
@@ -28,6 +28,8 @@ export function ProjectAdminPanel({ project, label }: { project: Project; label:
   const [open, setOpen] = useState<"hold" | "delete" | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const on = project.legal_hold;
+  // Delete needs the project's `admin` capability: PER-09 or a System admin (hidden otherwise).
+  const administers = access.systemAdmin || access.adminProjectIds.includes(project.id);
   const hold = useMutation({
     mutationFn: (reason: string) => setLegalHold(api, project.id, !on, reason),
     onSuccess: (res) => { setNotice(t(res.legal_hold ? "admin.projectAdmin.holdSet" : "admin.projectAdmin.holdCleared")); },
@@ -100,9 +102,11 @@ export function ProjectAdminPanel({ project, label }: { project: Project; label:
             {t(on ? "admin.projectAdmin.clearHold" : "admin.projectAdmin.setHold")}
           </button>
         )}
-        <button type="button" className={BUTTON} onClick={() => { ask("delete"); }}>
-          {t("admin.projectAdmin.delete")}
-        </button>
+        {administers && (
+          <button type="button" className={BUTTON} onClick={() => { ask("delete"); }}>
+            {t("admin.projectAdmin.delete")}
+          </button>
+        )}
       </div>
     </section>
   );

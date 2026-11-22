@@ -546,7 +546,6 @@ export const en = {
       apply: "Apply filters",
       clear: "Clear filters",
       invalid: "Check the marked filters: ids are UUIDs, a flag is a payload key such as sod_warning.",
-      invalidField: "Not valid",
       entriesTitle: "Entries",
       empty: "No entries match.",
       chain: "Chain",

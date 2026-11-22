@@ -199,8 +199,27 @@ describe("audit log", () => {
         { timeout: 8000 },
       ),
     ).toBeInTheDocument();
-    const pollsAtEnd = calls.filter((c) => c.path === `/api/v1/jobs/${JOB}`).length;
-    expect(pollsAtEnd).toBe(2);
+    // Wait past the poll interval: a finished job is not polled again.
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    expect(calls.filter((c) => c.path === `/api/v1/jobs/${JOB}`)).toHaveLength(2);
+  });
+
+  it("stops polling when the job cannot be read", async () => {
+    const calls = renderAdmin(
+      PATH,
+      handlers({
+        "POST /api/v1/admin/system/audit/verify-all": () =>
+          json({ id: JOB, kind: "admin.audit_verify_all", status: "queued" }, 202),
+        [`GET /api/v1/jobs/${JOB}`]: () => json({ detail: "Not found" }, 404),
+      }),
+      SYS,
+    );
+    await loaded();
+    const all = region(i18n.t("admin.audit.verifyAllTitle"));
+    fireEvent.click(all.getByRole("button", { name: i18n.t("admin.audit.verifyAll") }));
+    expect(await all.findByText(i18n.t("admin.actionError"), {}, WAIT)).toBeInTheDocument();
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    expect(calls.filter((c) => c.path === `/api/v1/jobs/${JOB}`)).toHaveLength(1);
   });
 
   it("is refused to anyone but a System admin, without calling the API", async () => {

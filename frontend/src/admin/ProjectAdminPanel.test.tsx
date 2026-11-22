@@ -89,10 +89,26 @@ describe("project admin: delete", () => {
   const del = `DELETE /api/v1/projects/${P}`;
   const deleteNow = async () => {
     await loaded();
-    fireEvent.click(panel().getByRole("button", { name: i18n.t("admin.projectAdmin.delete") }));
+    fireEvent.click(await panel().findByRole("button", { name: i18n.t("admin.projectAdmin.delete") }, WAIT));
     expect(screen.getByRole("dialog", { name: i18n.t("admin.projectAdmin.deleteTitle", { project: LABEL }) })).toBeInTheDocument();
     fireEvent.click(dialog().getByRole("button", { name: i18n.t("admin.projectAdmin.delete") }));
   };
+
+  it("is not offered to a member without PER-09 who is no System admin", async () => {
+    renderAdmin(PATH, handlers(false, { [`GET /api/v1/admin/projects/${P}/members`]: () => json({ detail: "Forbidden" }, 403) }), {
+      projects: [{ ...ADMIN_PROJECT, personas: ["PER-04"] }],
+    });
+    await loaded();
+    // Wait until the access probe has settled (the hold state renders from the same project list).
+    await waitFor(() => { expect(panel().getByText(i18n.t("admin.projectAdmin.holdOff"))).toBeInTheDocument(); }, WAIT);
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    expect(panel().queryByRole("button", { name: i18n.t("admin.projectAdmin.delete") })).not.toBeInTheDocument();
+  });
+
+  it("is offered to a System admin who is no member", async () => {
+    renderAdmin(PATH, handlers(false), { projects: [], systemAdmin: true });
+    expect(await screen.findByRole("button", { name: i18n.t("admin.projectAdmin.delete") }, WAIT)).toBeInTheDocument();
+  });
 
   it("shows the translated LEGAL_HOLD_ACTIVE message when the project is on hold", async () => {
     renderAdmin(

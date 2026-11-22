@@ -124,7 +124,7 @@ TD-537); actions confirm in a `Dialog` first. Fixtures: `systemFixtures.ts`.
   legal-hold state (`legal_hold` of `GET /projects`; the reason is only in the ledger). System
   admins get **Put on legal hold** / **Lift legal hold**: a dialog with a mandatory reason
   (trimmed, ≤ 500 characters) sends `PUT /admin/system/projects/{p}/legal-hold` `{on, reason}`
-  and the project list is re-read. **Delete project** asks first and sends `DELETE /projects/{p}`;
+  and the project list is re-read. **Delete project** (PER-09 of the project or a System admin only) asks first and sends `DELETE /projects/{p}`;
   `409 LEGAL_HOLD_ACTIVE` shows `admin.projectAdmin.conflicts.LEGAL_HOLD_ACTIVE` (never the
   server text), `409 team_links_present`, `403` and `404` are explained; on success the screen
   returns to Backbone → Projects.

@@ -244,7 +244,11 @@ function VerifyAll() {
     queryKey: [...KEY, "job", jobId],
     enabled: jobId !== undefined,
     queryFn: () => fetchJob(api, jobId ?? ""),
-    refetchInterval: (q) => (q.state.data === undefined || running(q.state.data) ? JOB_POLL_MS : false),
+    // Poll while queued or running; stop on a finished job or a failed poll (403/404/5xx).
+    refetchInterval: (q) =>
+      q.state.status !== "error" && (q.state.data === undefined || running(q.state.data))
+        ? JOB_POLL_MS
+        : false,
   });
   const data = jobId === undefined ? undefined : job.data;
   return (
