@@ -18,8 +18,10 @@ from pathlib import Path
 import pytest
 from alembic import command
 from alembic.config import Config
+from alembic.runtime.migration import MigrationContext
 from sqlalchemy import DateTime, bindparam, text
-from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from sqlalchemy import inspect as sa_inspect
+from sqlalchemy.exc import IntegrityError
 
 from app.core.audit.hashing import (
     GENESIS_HASH,
@@ -44,6 +46,7 @@ DEVICE = uuid.UUID("00000000-0000-4000-8000-0000000de71c")
 KEY = "inspection:00000000-0000-4000-8000-000000000279"
 AT = datetime(2026, 11, 22, 8, 30, 0, 123456, tzinfo=UTC)
 BEFORE = "0042"  # the revision before the hash v3 migration
+AFTER = "0043"  # the hash v3 migration (pinned: a later head must not change these tests)
 
 needs_tamper_role = pytest.mark.skipif(
     ON_POSTGRES and not OWNER_URL,
@@ -324,7 +327,7 @@ def test_entries_written_before_the_migration_still_verify_after_it(tmp_path: Pa
     try:
         seed_tenants(db, T1)
         _insert(db, _old_chain())
-        command.upgrade(cfg, "head")
+        command.upgrade(cfg, AFTER)
         with db.unit_of_work(CTX_T1) as s:
             stored = chain_entries(s, KEY)
             assert [(e.hash_version, e.impersonated_by_user_id) for e in stored] == [
@@ -343,9 +346,19 @@ def test_entries_written_before_the_migration_still_verify_after_it(tmp_path: Pa
             assert report.ok, report.problems
             assert report.length == 3
         # Development only (ADR 0015): a downgrade would strip the admin from v3 entries, so
-        # the restored ``hash_version IN (1, 2)`` CHECK refuses it while any exists.
-        with pytest.raises((SQLAlchemyError, ValueError)):
+        # the restored ``hash_version IN (1, 2)`` CHECK refuses it while any exists ...
+        with pytest.raises(IntegrityError, match="hash_version"):
             command.downgrade(cfg, BEFORE)
+        # ... and leaves the schema, the v3 entry and its admin as they were.
+        assert _revision(db) == AFTER
+        with db.unit_of_work(CTX_T1) as s:
+            stored = chain_entries(s, KEY)
+            assert [(e.hash_version, e.impersonated_by_user_id) for e in stored] == [
+                (1, None),
+                (2, None),
+                (3, ADMIN),
+            ]
+            assert verify_chain(s, KEY).ok
     finally:
         db.dispose()
         _drop(cfg, url)
@@ -359,16 +372,22 @@ def test_the_downgrade_keeps_v1_and_v2_entries(tmp_path: Path) -> None:
     try:
         seed_tenants(db, T1)
         _insert(db, _old_chain())
-        command.upgrade(cfg, "head")
+        command.upgrade(cfg, AFTER)
         command.downgrade(cfg, BEFORE)
-        with db.engine.connect() as conn:
-            rows = conn.execute(
-                text("SELECT seq, hash_version FROM audit_ledger ORDER BY seq")
-            ).all()
+        assert _revision(db) == BEFORE
+        with db.unit_of_work(CTX_T1) as s:  # bound: RLS shows the runtime role nothing else
+            rows = s.execute(text("SELECT seq, hash_version FROM audit_ledger ORDER BY seq")).all()
+            columns = {c["name"] for c in sa_inspect(s.connection()).get_columns("audit_ledger")}
         assert [tuple(r) for r in rows] == [(1, 1), (2, 2)]
+        assert "impersonated_by_user_id" not in columns
     finally:
         db.dispose()
         _drop(cfg, url)
+
+
+def _revision(db: Database) -> str | None:
+    with db.engine.connect() as conn:
+        return MigrationContext.configure(conn).get_current_revision()
 
 
 def _drop(cfg: Config, url: str) -> None:

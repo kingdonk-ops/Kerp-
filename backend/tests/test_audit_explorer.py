@@ -514,16 +514,17 @@ def test_the_job_verifies_every_readable_chain_and_stores_the_report(
         "broken_chains": 0,
         "first_broken": None,
     }
-    assert (
-        api.console()[-1]
-        == {"event": "audit_verify_all_finished", "job_id": job_id} | (polled["result"])
+    assert api.console()[-1] == {"event": "audit_verify_all_finished", "job_id": job_id} | (
+        polled["result"]
     )
     with api.db.unit_of_work(ROOT) as s:
         assert audit.chain_entries(s, CONSOLE)[-1].created_by == api.users[ALICE]
 
 
 @needs_tamper_role
-def test_the_job_reports_the_first_broken_chain_and_seq(api: Api, dispatched: list[JobRef]) -> None:
+def test_the_job_reports_the_first_broken_chain_and_seq(
+    api: Api, dispatched: list[JobRef]
+) -> None:
     _three(api, "t0222:all", None)
     _three(api, "t0222:all", api.home)
     _three(api, "t0222:zz", api.home)
