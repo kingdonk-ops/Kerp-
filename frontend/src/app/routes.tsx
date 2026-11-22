@@ -1,6 +1,9 @@
 import type { RouteObject } from "react-router";
 
 import { AccessRequestsPage } from "../admin/AccessRequestsPage";
+import { CommsBroadcastsPage } from "../admin/CommsBroadcastsPage";
+import { CommsDeliveryPage } from "../admin/CommsDeliveryPage";
+import { CommsTemplatesPage } from "../admin/CommsTemplatesPage";
 import { AdminDevicesPage, MyDevicesPage } from "../admin/DevicesPage";
 import { MembersPage } from "../admin/MembersPage";
 import { ProjectsPage } from "../admin/ProjectsPage";
@@ -23,6 +26,7 @@ import { LoginPage } from "../pages/LoginPage";
 import { NavGroupPage } from "../pages/NavGroupPage";
 import { NotFoundPage } from "../pages/NotFoundPage";
 import { SsoReturnPage } from "../pages/SsoReturnPage";
+import { UNSUBSCRIBE_PATH, UnsubscribePage } from "../pages/UnsubscribePage";
 import { Layout, MY_DEVICES_PATH } from "./Layout";
 import { LOBBY_PATH, NAV_GROUPS } from "./nav";
 
@@ -33,6 +37,8 @@ export const routes: RouteObject[] = [
   { path: INVITE_PATH, element: <InvitePage /> },
   { path: FORGOT_PASSWORD_PATH, element: <PasswordEmailPage /> },
   { path: RESET_PASSWORD_PATH, element: <ResetPasswordPage /> },
+  // Broadcast opt-out link of the e-mails (T-0229, TD-601): no sign-in.
+  { path: UNSUBSCRIBE_PATH, element: <UnsubscribePage /> },
   {
     element: <RequireAuth />,
     children: [
@@ -55,6 +61,9 @@ export const routes: RouteObject[] = [
           { path: "admin/system/grants", element: <SystemGrantsPage /> },
           { path: "admin/system/settings", element: <SystemSettingsPage /> },
           { path: "admin/system/audit", element: <SystemAuditPage /> },
+          { path: "admin/communications/broadcasts", element: <CommsBroadcastsPage /> },
+          { path: "admin/communications/delivery", element: <CommsDeliveryPage /> },
+          { path: "admin/communications/templates", element: <CommsTemplatesPage /> },
           { path: "admin/projects/:projectId/members", element: <MembersPage /> },
           { path: "backbone/projects", element: <ProjectsPage /> },
           { path: MY_DEVICES_PATH.slice(1), element: <MyDevicesPage /> },

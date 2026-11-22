@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useId, useState } from "react";
+import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 
 import { useServices } from "../app/services";
@@ -296,7 +297,7 @@ function EntryRow({ entry }: { entry: SettingEntry }) {
   );
 }
 
-type T = ReturnType<typeof useTranslation>["t"];
+type T = TFunction;
 
 function formatValue(entry: SettingEntry, value: SettingEntry["value"], t: T): string {
   if (entry.type === "bool") return value === true ? t("admin.settings.on") : t("admin.settings.off");

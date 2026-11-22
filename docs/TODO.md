@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 425 · **Closed:** 170
+**Open:** 426 · **Closed:** 171
 
 ## decision (40)
 
@@ -166,7 +166,7 @@
 | [TD-543](../tracker/todo/TD-543.md) | System console i18n: label for quarantine reason verify_failed; plural _one forms for count strings | T-0224 | reviewer |
 | [TD-544](../tracker/todo/TD-544.md) | Upload quarantine file cards: show SHA-256, uploader and created time (returned by the API, listed in §4.7) | T-0224 | reviewer |
 | [TD-599](../tracker/todo/TD-599.md) | Mode iv screen: upload a scan of a paper-signed page to a record version and pick the client's PER-15 account (inspector or PER-06, anchor in their subtree); no frontend task covers it (T-0164 covers modes i-iii only) | T-0174, T-0176, T-0164 | coordinator |
-| [TD-601](../tracker/todo/TD-601.md) | SPA page /unsubscribe#<token> for the broadcast opt-out link (T-0228 e-mails link to it) | T-0229 | implementer |
+| [TD-609](../tracker/todo/TD-609.md) | Mail health for the template editor: no endpoint says whether SES verified the sender or whether SES bounce/complaint notifications reach KERP (SNS topic set and subscribed); add status-only mail probes | T-0229 | implementer |
 
 ## deferred (50)
 
@@ -223,7 +223,7 @@
 | [TD-510](../tracker/todo/TD-510.md) | Deployment-config view lacks the mail reply-to of diff §4.7: Settings has no reply-to field yet | T-0230 | implementer |
 | [TD-533](../tracker/todo/TD-533.md) | CEL client runtime has no evaluation step budget (cel-js exposes no step hook; server is the hard gate) | T-0341 | implementer |
 
-## later (172)
+## later (173)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -399,6 +399,7 @@
 | [TD-605](../tracker/todo/TD-605.md) | Broadcast list: filter by readable projects and page in SQL | T-0228 | implementer |
 | [TD-606](../tracker/todo/TD-606.md) | Pin pydantic (or normalise the export) so the generated OpenAPI Decimal pattern does not drift | T-0228 | implementer |
 | [TD-607](../tracker/todo/TD-607.md) | Test PG databases are named by xdist worker only (pg_databases.py): parallel sessions on one cluster drop each other's databases — add a per-run prefix | T-0279 | coordinator |
+| [TD-608](../tracker/todo/TD-608.md) | e2e: a per-run broadcaster in the seed, so local re-runs of the Communications journey never meet the 5-broadcasts-per-24h limit of the shared System admin | T-0229 | implementer |
 
 ## bug (18)
 
@@ -639,3 +640,4 @@
 | ✅ | [TD-577](../tracker/todo/TD-577.md) | Impersonation notice: pass recipient_user_id to send_mail once T-0226 (mail delivery ledger) is merged | Done in T-0277 (PR #184) after T-0226 merged: the notice passes recipient_user_id=target.id. |
 | ✅ | [TD-581](../tracker/todo/TD-581.md) | Migration 0040 collides with T-0226's 0040 (parallel branches): the second to merge must renumber and re-chain | Resolved in T-0277 (PR #184): renumbered to 0041_impersonation_session (Revises 0040_mail_delivery_ledger) after #183 merged. |
 | ✅ | [TD-592](../tracker/todo/TD-592.md) | May a scanned paper signature ever count as the client (PER-15) co-sign? (paper-signed pages are plain evidence until decided) | User, 2026-11-22: yes. A scanned paper signature may count as the client (PER-15) co-sign on the terms of mode iii: the uploader names the client's PER-15 account; it is provisional (verification_mode = provisional_scan) and blocks approval (CLIENT_SIGNATURE_PROVISIONAL) until that client confirms in their own account; a rejection returns the inspection. Spec: quality-and-inspection.md §Client co-sign mode iv and §Signing attestation 'Paper-signed pages'. |
+| ✅ | [TD-601](../tracker/todo/TD-601.md) | SPA page /unsubscribe#<token> for the broadcast opt-out link (T-0228 e-mails link to it) | Resolved in T-0229: public SPA route /unsubscribe (frontend/src/pages/UnsubscribePage.tsx) reads the token from the fragment once, clears it from the URL, posts {token} in the body to /api/v1/notifications/broadcasts/unsubscribe only on the Unsubscribe button (never on load) and shows one neutral confirmation; component, a11y and e2e tests. |

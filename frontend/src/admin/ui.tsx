@@ -103,15 +103,41 @@ export function Pager({
   );
 }
 
+/**
+ * The Communications screens, in tab order (diff §6.5, T-0229). Broadcasts are open to PER-09
+ * holders too (their own projects); the delivery ledger and the templates are System admin only.
+ */
+export const COMMS_TABS = [
+  { to: "/admin/communications/broadcasts", label: "admin.comms.broadcastsTab", systemAdminOnly: false },
+  { to: "/admin/communications/delivery", label: "admin.comms.deliveryTab", systemAdminOnly: true },
+  { to: "/admin/communications/templates", label: "admin.comms.templatesTab", systemAdminOnly: true },
+] as const;
+
 /** Links between the System screens; System-admin-only ones for System admins (T-0026). */
 export function SystemTabs({ systemAdmin }: { systemAdmin: boolean }) {
+  return <TabLinks tabs={SYSTEM_TABS} label="admin.system.tabs" systemAdmin={systemAdmin} />;
+}
+
+/** Links between the Communications screens; System-admin-only ones for System admins. */
+export function CommsTabs({ systemAdmin }: { systemAdmin: boolean }) {
+  return <TabLinks tabs={COMMS_TABS} label="admin.comms.tabs" systemAdmin={systemAdmin} />;
+}
+
+function TabLinks({
+  tabs: all,
+  label,
+  systemAdmin,
+}: {
+  tabs: readonly (typeof SYSTEM_TABS)[number][] | readonly (typeof COMMS_TABS)[number][];
+  label: "admin.system.tabs" | "admin.comms.tabs";
+  systemAdmin: boolean;
+}) {
   const { t } = useTranslation();
-  const tabs = SYSTEM_TABS.filter((tab) => systemAdmin || !tab.systemAdminOnly).map((tab) => ({
-    to: tab.to,
-    label: t(tab.label),
-  }));
+  const tabs = all
+    .filter((tab) => systemAdmin || !tab.systemAdminOnly)
+    .map((tab) => ({ to: tab.to, label: t(tab.label) }));
   return (
-    <nav aria-label={t("admin.system.tabs")} className="flex flex-wrap gap-touch-gap">
+    <nav aria-label={t(label)} className="flex flex-wrap gap-touch-gap">
       {tabs.map((tab) => (
         <NavLink
           key={tab.to}

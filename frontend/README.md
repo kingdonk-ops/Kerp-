@@ -39,7 +39,7 @@ npm run gen:api    # regenerate src/api/ from the backend OpenAPI schema (backen
 
 ```
 src/
-  admin/      Admin screens: access-request inbox, devices (admin + My devices), revoke (README.md)
+  admin/      Admin screens: access-request inbox, devices (admin + My devices), revoke, System console, Communications (README.md)
   api/        generated API types (openapi.json, schema.ts) — never hand-edit (see src/api/README.md)
   app/        providers (AppRoot/AppProviders), services, router, shell layout, nav groups, query client
   auth/       token store, AuthProvider (login/logout/me), RequireAuth route guard, Entra ID SSO button + codes
@@ -52,7 +52,7 @@ src/
   lib/fields/ the one field-type palette and answer shapes (mirrors backend app/core/fields)
   lobby/      lobby screens: lobby list, project-code entry, Active requests panel (README.md)
   perf/       NFR performance budgets: budgets.json (single config), measurements, CI reporter
-  pages/      route components (incl. the lobby route `/lobby`, built from `src/lobby/`)
+  pages/      route components (incl. the lobby route `/lobby`, built from `src/lobby/`, and the public broadcast opt-out `/unsubscribe#<token>`)
   projects/   project scope: `/me/projects` fetch + portfolio personas, ProjectScopeProvider, top-bar ProjectSwitcher, capability gate (A/S)
   shells/     RegisterPage, DetailPage (gate banner, tabs, audit), Dynamic Form Renderer (README.md)
   test/       Vitest setup, fake backend (`fakeApi.ts`), axe harness (`a11y.ts`), timing budget (`timeouts.ts`: Testing Library waits up to 5 s project-wide, unit tests 20 s — do not add per-test 1 s waits)
@@ -91,7 +91,9 @@ src/
 - **Invites and passwords (T-0053, diff §4.1, §4.2).** `/invite#<token>` (join, sign-in
   carry-through, "Create your password"), "Forgot password?" → `/forgot-password` and
   `/reset-password#<token>` live outside the auth guard; tokens come only from the URL fragment,
-  which is removed at once: `src/invite/README.md`.
+  which is removed at once: `src/invite/README.md`. The broadcast opt-out `/unsubscribe#<token>`
+  (T-0229, TD-601) works the same way and posts nothing until the user presses Unsubscribe
+  (`src/admin/README.md` §Communications).
   The callback redirects to **`/login/sso-return`** (`src/pages/SsoReturnPage.tsx`):
   `?status=signed_in` → the tab adopts the session the server set as the `httpOnly` refresh
   cookie (`TokenStore.adoptCookieSession`: only the "signed in" marker is stored; the access
@@ -108,8 +110,8 @@ src/
   ITPs, field time, progress, look-ahead); an item shows under its group only once its
   screen exists — the module task that ships the screen gives the item its `path`. An item
   with `requires: "projectAdmin"` shows only to PER-09 holders and System admins. Built so
-  far: Admin → Users (T-0331), Admin → System (Devices) and Admin → Access requests (T-0051,
-  `src/admin/README.md`).
+  far: Admin → Users (T-0331), Admin → System (Devices), Admin → Access requests (T-0051) and
+  Admin → Communications (T-0229; `src/admin/README.md`).
   The top bar links Profile → **My devices** (`/profile/devices`).
 - **Project picker and landing (T-0042, diff §4.1, §6.1).** The top-bar picker lists the
   caller's projects from `GET /api/v1/me/projects` (memberships, T-0014) as "code — name",
