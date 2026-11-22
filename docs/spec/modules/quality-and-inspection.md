@@ -407,6 +407,29 @@ before it ships carry no attestation and stay valid ("no attestation recorded" o
   block per formal sign-off: signer and persona, "on behalf of <name>" when signed by a delegate,
   intent text and version, method, signed time (occurred time and confidence offline), device
   id and IP, through one shared renderer in `signing` (T-0291).
+- **Snapshot of what was signed** (product intake 2026-11-21, planner default; user to
+  confirm). The attestation also records, at the moment of signing and never backfilled later:
+  `signer_snapshot` (display name, organisation, persona and site scope used) and
+  `credential_snapshot` (each credential or qualification the consumer checked for this
+  sign-off: credential id, type, level, number, valid-until and verification state at that
+  instant; empty when the kind needs none). For sign-offs against a template or contract text,
+  the consumer passes the template revision id and its content hash. A later change of name,
+  credential expiry or template revision never alters the stored snapshot. Records signed before
+  this lands show "not recorded", never a value derived after the fact.
+- **Keys and fingerprints** (product intake 2026-11-21, planner default; user to confirm). Every
+  record sealed with a key names the fingerprint (SHA-256 of the public key or certificate) of
+  that key: client device co-sign assertions (T-0173), PAdES signatures of dossiers and Delay
+  Notices (documents-and-mdr.md). Rotated or retired keys and certificates are kept (public part
+  only, with their validity window and retirement time) so older records stay verifiable; a key
+  is never deleted while a record names it. The hash-chained ledger itself is not key-signed and
+  is unaffected.
+- **Retention vs erasure** (product intake 2026-11-21, planner default; user to confirm). A
+  signature image (provisional wet signature, T-0174; drawn signatures) is a file with its own
+  retention schedule (TD-175); when it is erased, the ledger entry, attestation and image hash
+  remain, so the fact of signing survives and the PDF prints "signature image removed under
+  retention policy, <date>". A privacy erasure request does not erase a signature on a formal or
+  co-signed record: it is retained as evidence (legal-obligation basis), and the refusal is
+  recorded in the erasure log.
 
 ## Delegation of authority (narrow; user, 2026-11-21, enterprise roadmap; planner defaults TD-434)
 
@@ -680,7 +703,8 @@ the `equipment.activate` tagout provider; equipment is a link, TD-411 resolved),
   (planner rule): no automatic transition to `active`.
 - **`notify_users`:** personas (resolved to project members at send time), the equipment
   custodian, explicit users; in-app high priority (T-0019), push, and an e-mail with project
-  code/name and a deep link only (diff §4.6). No SMS (TD-413). Manual API notifications stay
+  code/name and a deep link only (diff §4.6). No SMS (TD-413). No Teams/WhatsApp messaging
+  bridge (user decision 2026-11-21). Manual API notifications stay
   PER-09-only (diff §4.1); automations notify through the service.
 - **`create_action_task`:** `oe_inspections_follow_up` (paste: `oe_inspection_follow_up`) with
   `kind` (`tagout_confirmation | repair_request | supervisor_review`), assignee persona/user,
@@ -1254,6 +1278,19 @@ notification per request per recipient per event (not one per slot).
   slot in `requested` or `confirmed` once `now ≥ scheduled_start −
   inspection_request.reminder_lead_minutes` (default 120); idempotent through
   `reminder_sent_at`; a slot issued inside the lead time gets no reminder.
+  A reminder that cannot go out before `scheduled_start` (worker backlog, outage) is recorded
+  as failed (`too_late`) and never sent late (product intake 2026-11-21, planner default; user
+  to confirm; general rule in TD-549).
+- **Delivery failure per party** (product intake 2026-11-21, planner default; user to confirm).
+  The delivery result of every call-out notification is kept per recipient and channel (in-app
+  always delivered; push and e-mail from their channel results, e-mail bounces from the core-mail
+  send log, diff §4.6/§4.7). When no channel reached any call-out recipient of an external party
+  (for example the e-mail bounced or was suppressed and the recipient has no device), the party
+  row shows `notice_delivery = failed` with the reason, the requester and PER-06 get a `high`
+  in-app notification, and the slot detail shows it. A failed delivery is never attendance: the
+  party stays `pending` until someone records `attended`, `absent` or a waiver, and the delay
+  rules (§7) default the cause of a later `no_show` for that party to `contractor` (notice not
+  delivered), changeable by PER-02/PER-06 with a reason as usual. The shared delivery log is TD-549.
 - **E-mail** through core mail (T-0058, diff §4.6), recipient's locale. Planner default, decision
   **TD-484**: only to project accounts above; content = project code and name, RFI no.,
   discipline title, the event, and a link to the request page behind sign-in; **no** scheduled
@@ -1318,6 +1355,12 @@ language (fallback `en`; only English ships, TD-172). Empty values print blank: 
   label; times in UTC with the project's IANA time zone. `mine=true` limits to slots where the
   caller is requester, named witness or (PER-15) call-out recipient. Several slots on one day and
   overlapping slots are allowed and listed.
+- **Why a slot is open** (product intake 2026-11-21, planner default; user to confirm). The
+  detail screen (T-0338) and the calendar event popover (T-0339) show, beside the slot state,
+  one line per external party: party, its point (H / W), attendance (`pending | attended |
+  absent | waived`) and notice delivery (`delivered | failed`), so the reason a slot is still
+  open is visible without opening the history. PER-15 sees the same lines (no
+  `internal_commercial` fields, §13).
 - **Who sees what:** internal members with `V` (PER-07 only inside their site nodes); PER-15 only
   slots of issued requests whose every anchor is in their granted subtree; a named witness the
   slots naming them. The same rule applies to the register and detail (§12).

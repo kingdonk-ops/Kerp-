@@ -86,6 +86,60 @@ equivalency document into the dossier, listed on the material traceability index
 the MDR engine reads no materials table. Verified certificates only (`material_cert.verify`,
 T-0265).
 
+### Dossier builder, revisions and verification (product intake 2026-11-21; E-05-05)
+Planner defaults (user to confirm) unless marked as a user decision.
+
+- **Builder screen** (product intake 2026-11-21, planner default; user to confirm). One screen,
+  three panes: (1) the dossier scope tree with the section outline (bookmark levels) of the
+  selected scope; (2) a live readiness list: every finding the `mdr.compile` rule set would
+  return now, each with a "Fix" link that opens the blocking record (issue, inspection, ITP
+  line, MTR) in its own module screen; (3) a preview of the cover sheet and table of contents
+  with the compile controls (Draft compile, Issue). The readiness list is the same
+  `run_checks(context, "mdr.compile")` evaluation the issue action runs, in dry-run mode; the
+  screen adds no gate of its own.
+- **Gates are written over KERP facts** (product intake 2026-11-21, planner default; user to
+  confirm): rules in `mdr.compile` read KERP states and service facts (inspection lifecycle
+  states such as `LOCKED_FOR_TURNOVER`, `mdr_effect`, ITP hold-point sign-off state, MTR
+  verification, client acceptance of the previous revision), never a generic document status
+  field. Gating stays configuration (ADR 0004): projects tune it through their rule-set copy and
+  per-record overrides, never through hard-wired status checks.
+- **Draft compile vs Issue** (product intake 2026-11-21, planner default; user to confirm).
+  *Draft compile* runs whatever the readiness list says, stamps every page "DRAFT – not for
+  issue", is not signed, gets no revision letter and is kept only as the latest draft per scope.
+  *Issue* runs `mdr.compile`, allocates the revision and signs the result (PAdES-B-LTA + RFC
+  3161, above).
+- **Revisions** (product intake 2026-11-21, planner default; user to confirm). The first issued
+  revision for client review is Rev A (then B, C … for further review rounds); after the client
+  accepts a review revision, the final issue is Rev 0 (then 1, 2 … for later re-issues). Client
+  acceptance is a fact the `mdr.compile` rule set reads: a locked default rule requires the
+  client's acceptance of the latest review revision **only when issuing Rev 0 or later**; a
+  review revision (Rev A, B …) never waits for client acceptance. How the client records
+  acceptance (portal co-sign, E-07-02, or an internal record of the client's transmittal reply)
+  is open in TD-559; several client signers follow TD-546.
+- **Stamp, then sign, then hash** (product intake 2026-11-21, planner default; user to
+  confirm). Order of the final steps: merge → stamp (cover sheet, page stamps, optional QR) →
+  PAdES signature → SHA-256 over the **final signed bytes**, stored with the revision and shown
+  on the dossier detail screen. Nothing printed inside the file (cover, QR, footer) ever claims
+  the hash of that same file. Each later long-term-validation augmentation (B-LTA adds validation
+  data and archive timestamps as new incremental revisions) is stored as a new file version with
+  its own SHA-256; every recorded version stays matchable. Authenticated users can check a copy
+  they hold on the dossier detail screen: the browser computes the SHA-256 of the dropped file
+  locally (the file is not uploaded) and the screen says whether it matches a stored version of
+  that dossier revision.
+- **No public verification page** (user decision 2026-11-21). KERP offers no public or
+  unauthenticated "verify this dossier" page or endpoint. Verification is the PAdES-B-LTA
+  signature, checkable in any standard PDF reader, plus the stored hash check for signed-in
+  users above. A QR code on the cover, if used, carries only a reference (dossier number and
+  revision) and never a URL to a public endpoint. The tamper-evident record of the compile stays
+  the hash-chained `audit_ledger`; there is no second cryptographic chain.
+- **Appendix deduplication** (product intake 2026-11-21, planner default; user to confirm).
+  Each calibration certificate and each MTR or batch certificate is attached **once** per
+  dossier, in its appendix (Calibration Certificates, Material Test Reports). Every page or
+  reading that relies on it (an ITR reading taken with an instrument, an asset built from a heat)
+  carries a cross-reference to that appendix entry (appendix item number and page), and the
+  appendix index lists, per certificate, every place that refers to it. Identity of a
+  certificate is its stored file's SHA-256 (the same file uploaded twice is one entry).
+
 ## Related registers (epics)
 `transmittals` (purpose-coded, recipients + ack), `correspondence`, `tq` (Technical Query — Request for Information)/`submittals`,
 `meetings` (feeds portal v3 visit scheduling), `file_search` (tsvector OCR of dockets for the
