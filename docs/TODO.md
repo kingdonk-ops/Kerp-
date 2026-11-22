@@ -3,9 +3,9 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 389 · **Closed:** 162
+**Open:** 393 · **Closed:** 164
 
-## decision (42)
+## decision (41)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -49,10 +49,9 @@
 | [TD-486](../tracker/todo/TD-486.md) | RFI witness check: may an unmet hold-point (H) witness requirement be overridden per record (ADR 0004 Amendment A), or is it non-overridable? | T-0333 | planner |
 | [TD-514](../tracker/todo/TD-514.md) | How is a passed or LOCKED_FOR_TURNOVER inspection corrected? Define void-and-reissue (revision suffix, supersedes link, ledger, MDR shows latest) | — | planner |
 | [TD-538](../tracker/todo/TD-538.md) | Confirm the per-client limits on magic-link requests (20 per hour, the password-reset numbers) and Entra SSO starts (60 per hour) for crews and offices behind one shared address | T-0345 | implementer |
-| [TD-545](../tracker/todo/TD-545.md) | AI provider, region and credentials (data use allowed by the user 2026-11-21): confirm one provider per deployment, Australian region, company-owned key in the secret store, fail closed | E-05-08, T-0187, T-0189 | planner |
-| [TD-561](../tracker/todo/TD-561.md) | Grant ceiling questions: second approver when PER-09 assigns a hold-authority persona it does not hold? May external accounts hold PER-14 (Field Worker)? | T-0014, T-0026, T-0296 | planner |
+| [TD-564](../tracker/todo/TD-564.md) | On-site label printing (QR / asset tags, quarantine labels): PDF label sheet, vendor print service on Android, or Web Bluetooth? Needs the printer model and device platform | T-0155, E-03-03, E-03-07, T-0141 | planner |
 
-## spec-gap (83)
+## spec-gap (85)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -139,6 +138,8 @@
 | [TD-554](../tracker/todo/TD-554.md) | Per-person share links for MDR and report access: expiry stamped at creation, policy change affects new links only, counted bulk re-expiry, immediate revoke, distinct expired vs revoked messages | E-07-01, E-07-04 | planner |
 | [TD-555](../tracker/todo/TD-555.md) | Three-way upgrade of default ITP templates and rule sets into customised projects: counts, overlapping pairs, keep ours / take theirs, auto-update untouched, mark dropped | T-0137, T-0281, T-0036 | planner |
 | [TD-559](../tracker/todo/TD-559.md) | MDR breakdown open points: how client acceptance of a review revision is recorded, revision scheme, Rev 0 without review, B-LTA augmentation schedule | E-05-05 | planner |
+| [TD-563](../tracker/todo/TD-563.md) | Earned value counts only verified completion: which ITP lines verify which progress steps, partial credit, reversal on re-inspection; planned vs verified-complete view | E-06-04, E-04-03, E-04-06, E-04-12 | planner |
+| [TD-567](../tracker/todo/TD-567.md) | Schedule facts in rule sets: total float and on-critical-path per anchor from the last committed P6 import (project critical definition), CEL variable names and units | T-0125, T-0104, E-04-02 | planner |
 
 ## missed (12)
 
@@ -212,7 +213,7 @@
 | [TD-510](../tracker/todo/TD-510.md) | Deployment-config view lacks the mail reply-to of diff §4.7: Settings has no reply-to field yet | T-0230 | implementer |
 | [TD-533](../tracker/todo/TD-533.md) | CEL client runtime has no evaluation step budget (cel-js exposes no step hook; server is the hard gate) | T-0341 | implementer |
 
-## later (151)
+## later (154)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -365,6 +366,9 @@
 | [TD-556](../tracker/todo/TD-556.md) | Undo a committed P6 or asset import while nothing refers to the imported nodes yet | T-0129, T-0104, T-0138 | planner |
 | [TD-557](../tracker/todo/TD-557.md) | Client-mandated PDF forms: AcroForm fill or coordinate mapping, fixed slots with overflow note, form revision by inspection date, rendered in the worker | T-0158, T-0110 | planner |
 | [TD-558](../tracker/todo/TD-558.md) | Navigation placement check: TQs, submittals, RFIs, NCRs, material lots and calibration certificates against diff §6.1 | T-0024 | planner |
+| [TD-562](../tracker/todo/TD-562.md) | Project admin page shows only the legal-hold flag: no read endpoint for the active hold's reason, set-by and set-at (LegalHoldRead only from the PUT) | T-0225 | implementer |
+| [TD-565](../tracker/todo/TD-565.md) | Risk register with a probability x impact matrix per project (configurable scales, heat map, links to anchors, issues and P6 activities) | E-06-06 | planner |
+| [TD-566](../tracker/todo/TD-566.md) | Inline read-only Gantt preview of an XER held in document control, from the server-side parse; display only, never an import path | E-04-01, E-04-12 | planner |
 | [TD-568](../tracker/todo/TD-568.md) | Adopt core tenant_level_context in the remaining tenant-level session guards | T-0349 | implementer |
 | [TD-569](../tracker/todo/TD-569.md) | Use core sha256_hex for the remaining inline SHA-256 hex digests (lockout subject, mail address, admin e-mail) | T-0349 | implementer |
 
@@ -595,3 +599,5 @@
 | ✅ | [TD-516](../tracker/todo/TD-516.md) | Client bootstrap caching: 'ETag / no-store per the auth rules' has no auth rule to follow; default Cache-Control no-store + strong ETag over the values + If-None-Match -> 304 (T-0231); confirm, and that T-0248 clients revalidate with If-None-Match | User, 2026-11-21: default accepted. GET /api/v1/settings/client answers Cache-Control: no-store with a strong ETag over the values; If-None-Match -> 304. T-0248 clients store the values themselves and revalidate with If-None-Match. |
 | ✅ | [TD-521](../tracker/todo/TD-521.md) | Login redirect drops the query string and hash: RequireAuth stores only location.pathname as state.from | Fixed in T-0344: RequireAuth stores pathname + search + hash; LoginPage returnPath() keeps the /login loop guard (also for /login?… and /login#…) and accepts only in-app paths; tests in frontend/src/auth/sessionIsolation.test.tsx. |
 | ✅ | [TD-525](../tracker/todo/TD-525.md) | Some Redis errors surface as 500 instead of 503 (raw redis ConnectionError/TimeoutError outside RevocationUnavailableError) | T-0349: redis.ConnectionError and redis.TimeoutError that reach the app are 503 {detail: 'Service temporarily unavailable'} via one app-wide handler (redis_unavailable_handler), logged as a warning without the driver message; other Redis errors (bugs) stay 500. Request paths already wrap Redis (revocation store -> RevocationUnavailableError, settings cache swallows RedisError, queue monitor catches); the handler is the safety net for any that escape. Errors in post-response/background work (job dispatch, mail payloads) never reach a request and are unaffected. Tests: tests/test_service_unavailable.py. |
+| ✅ | [TD-545](../tracker/todo/TD-545.md) | AI provider, region and credentials (data use allowed by the user 2026-11-21): confirm one provider per deployment, Australian region, company-owned key in the secret store, fail closed | User decision 2026-11-22: planner defaults accepted — one AI provider per deployment, Australian region, company-owned (tenant) key in the deployment secret store, fail closed when anything is missing (diff §4.11) |
+| ✅ | [TD-561](../tracker/todo/TD-561.md) | Grant ceiling questions: second approver when PER-09 assigns a hold-authority persona it does not hold? May external accounts hold PER-14 (Field Worker)? | User decision 2026-11-22: planner defaults accepted — no second approver when PER-09 assigns a hold-authority persona it does not hold; external subcontractor crews may hold PER-14 Field Worker (diff §4.1, §4.9) |

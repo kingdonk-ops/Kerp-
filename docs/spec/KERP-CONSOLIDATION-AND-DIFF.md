@@ -164,7 +164,9 @@ Wins over any earlier text on tenant selection, tenant administrators and projec
 - **PER-09 is the per-project admin persona.** A Project Admin "controls" exactly the projects
   where they hold PER-09; one person can hold PER-09 on several projects, and a project can have
   several PER-09 holders. PER-09 on a project may: edit its settings, toggle *visible in lobby*,
-  assign and remove users on that project (any persona, including PER-09, with site scope),
+  assign and remove users on that project (any persona, including PER-09, with site scope; no
+  second approver is needed when PER-09 assigns a hold-authority persona it does not hold itself,
+  user decision 2026-11-22, TD-561),
   invite a user by e-mail (creates the account if none exists), and decide its access requests.
   It may not grant tenant-level grants. Memberships on soft-deleted projects are ignored
   everywhere (`load_grants`, allowed project list, admin checks).
@@ -896,7 +898,10 @@ the user approved. E-signature and delegation are in `modules/quality-and-inspec
   no cross-tenant guest model: a deployment has one tenant (§4.1), and clients, subcontractors,
   third-party inspectors and labs are ordinary accounts with `is_internal = false`, invited by
   e-mail with a password (§4.1, §4.2, never SSO) and given individual memberships. PER-15 covers
-  client witness and co-sign. Gaps the roadmap closes:
+  client witness and co-sign. External subcontractor crews may hold **PER-14 Field Worker** (user
+  decision 2026-11-22, TD-561). The planner default of TD-552 limits an external account to
+  PER-14, PER-15, PER-16 and the external inspection party persona (TD-435); other staff personas
+  would be refused in code (422 `EXTERNAL_ACCOUNT_PERSONA`). Gaps the roadmap closes:
   - **Internal-commercial boundary (T-0295; restrictive planner default):** routes and response
     fields classed `internal_commercial` (rates, cost, CBS burn, estimates, internal commercial
     registers) answer 404 or are omitted for every `is_internal = false` caller, whatever persona
@@ -968,19 +973,43 @@ come later (Phase 6, T-0303–T-0305, epic E-06-05). Rules:
 - **E-mail carries a link and the project code/name only** (§4.6); numbers stay in the app and
   in the statement CSV download.
 
-### 4.11 AI assistance: data use, assurance record, project assistant (user decision and product intake, 2026-11-21)
+### 4.11 AI assistance: data use, assurance record, project assistant (user decisions 2026-11-21 and 2026-11-22; product intake 2026-11-21 and 2026-11-22)
 
 - **Data use** (user decision 2026-11-21): client and site data of a project may be sent to an
   external AI provider for KERP's AI features (assistant, ITP drafting and watchdog, ingestion
   second pass, text refinement). The CLAUDE.md §6 rule is unchanged: every AI-initiated mutation
   carries `source="ai"` and needs human confirmation before it applies.
-- **Provider, residency, credentials** (product intake 2026-11-21, planner default; user to
-  confirm, TD-545): one provider per deployment (= the tenant, §4.1), chosen from OpenAI,
-  Anthropic Claude or a self-hosted model, hosted in the deployment region (Australian region,
-  TD-078). Credentials are the company's own (tenant-owned key) held in the deployment secret
-  store, never a registry entry (§4.7, TD-398). **Fail closed:** with no provider or no valid
-  credentials every AI feature is unavailable (entry points hidden; endpoints answer 503
-  `AI_UNAVAILABLE`); nothing falls back to another provider or region.
+- **Provider, residency, credentials** (user decision 2026-11-22; TD-545 resolved): one
+  provider per deployment (= the tenant, §4.1), chosen from OpenAI, Anthropic Claude or a
+  self-hosted model, hosted in the deployment region (Australian region, TD-078). Credentials are
+  the company's own (tenant-owned key) held in the deployment secret store, never a registry
+  entry (§4.7, TD-398). **Fail closed:** with no provider or no valid credentials every AI feature
+  is unavailable (entry points hidden; endpoints answer 503 `AI_UNAVAILABLE`); nothing falls back
+  to another provider or region.
+- **Named operations only** (product intake 2026-11-22, planner default; user to confirm). AI is
+  reached only through named server-side operations declared by the owning module (for example
+  `issues.refine_text`, `validation.explain_finding` "why did this rule block",
+  `issues.suggest_root_causes`, `qms.draft_itp`, the project assistant). There is **no** general
+  completion or chat-proxy endpoint. Each operation builds its own context through module
+  services under RLS as the asking user, writes the assurance record below and returns a draft
+  with `source="ai"` that a person confirms.
+- **No silent fallback** (product intake 2026-11-22, planner default; user to confirm). Retries
+  and a circuit breaker run against the one configured provider only. While it is down the
+  operation answers "AI unavailable" (503 `AI_UNAVAILABLE`) and manual work continues unchanged.
+  A local or self-hosted model is used only when the company chose it as its provider (for
+  example an air-gapped site), never as an automatic fallback. The assurance record names the
+  model that actually answered.
+- **Model tiers** (product intake 2026-11-22, planner default; user to confirm). Operations name a
+  logical tier (`fast`, `reasoning`), never a vendor model string; deployment configuration maps
+  each tier to a model of the configured provider. A missing mapping fails closed like a missing
+  key.
+- **Company controls** (product intake 2026-11-22, planner default; user to confirm). A
+  `system_admin` sets: the modules the assistant may read (allow-list; a module not on the list
+  is never queried), retention days for assistant conversations (0 = not kept after the session;
+  the metadata-only assurance record follows TD-175), and a daily AI budget cap (tokens or calls
+  per day, per deployment). When the cap is reached every operation answers 429
+  `AI_BUDGET_REACHED` ("AI budget reached") until the next day and fails closed. Non-secret
+  values are runtime-registry entries (§4.7); keys stay deployment secrets.
 - **AI assurance record** (product intake 2026-11-21, planner default; user to confirm). Every
   AI call writes one metadata row (BaseRecordMixin, project RLS for project calls): feature,
   provider, model id, credentials owner (tenant key, or platform key only if TD-545 changes),
@@ -1005,6 +1034,17 @@ come later (Phase 6, T-0303–T-0305, epic E-06-05). Rules:
   example "what blocks milestone X": P6 links, the asset subtree, open issues with
   `mdr_effect = blocks`, unsigned hold points). The assistant reads and drafts only; any change
   it proposes is a draft with `source="ai"`, confirmed by a person in the normal screen.
+- **Cited answers** (product intake 2026-11-22, planner default; user to confirm). Every factual
+  statement of the project assistant cites its source record (NCR, ITP line, document revision,
+  P6 activity …) as a link; a citation is shown only when the asking user can open that record
+  (checked at render time through the owning service). With no citable source the assistant says
+  it does not know; uncited claims are not shown.
+- **Feedback** (product intake 2026-11-22, planner default; user to confirm). Each answer or
+  draft can be marked useful or wrong, with an optional note; stored against the assurance
+  record (the note is user text, not model output).
+- **Drawer** (product intake 2026-11-22, planner default; user to confirm). The assistant opens
+  as an in-app drawer on the current record ("Ask about this NCR"), with that record as the
+  starting context; it never leaves the screen the user is on.
 
 ---
 

@@ -4,6 +4,7 @@ import { AccessRequestsPage } from "../admin/AccessRequestsPage";
 import { AdminDevicesPage, MyDevicesPage } from "../admin/DevicesPage";
 import { MembersPage } from "../admin/MembersPage";
 import { ProjectsPage } from "../admin/ProjectsPage";
+import { SystemAuditPage } from "../admin/SystemAuditPage";
 import { SystemDeploymentPage } from "../admin/SystemDeploymentPage";
 import { SystemGrantsPage } from "../admin/SystemGrantsPage";
 import { SystemQueuesPage } from "../admin/SystemQueuesPage";
@@ -53,6 +54,7 @@ export const routes: RouteObject[] = [
           { path: "admin/system/devices", element: <AdminDevicesPage /> },
           { path: "admin/system/grants", element: <SystemGrantsPage /> },
           { path: "admin/system/settings", element: <SystemSettingsPage /> },
+          { path: "admin/system/audit", element: <SystemAuditPage /> },
           { path: "admin/projects/:projectId/members", element: <MembersPage /> },
           { path: "backbone/projects", element: <ProjectsPage /> },
           { path: MY_DEVICES_PATH.slice(1), element: <MyDevicesPage /> },
