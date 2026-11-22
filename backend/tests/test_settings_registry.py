@@ -239,6 +239,7 @@ DECLARED = {
     "tablet_proxy_quality": ("uploads_media", "int", 72, 40, 95),
     "report_image_max_px": ("uploads_media", "int", 1024, 480, 2048),
     "report_image_quality": ("uploads_media", "int", 68, 40, 95),
+    "impersonation_max_minutes": ("identity", "int", 30, 5, 60),  # T-0277, ADR 0015
 }
 
 
@@ -247,6 +248,7 @@ def test_the_declared_entries_are_the_spec_values() -> None:
     assert import_setting_defs(discover_modules()) == [
         "app.modules.settings.setting_defs",
         "app.modules.uploads.setting_defs",
+        "app.modules.admin.setting_defs",  # after its dependencies (T-0277)
     ]
     declared = {d.key: (d.category, d.type, d.default, d.minimum, d.maximum) for d in REGISTRY}
     assert declared == DECLARED

@@ -259,6 +259,12 @@ def build_workers(
                 cron=scheduler.MAIL_EXPIRY_CRON,
                 timeout=scheduler.CRON_TIMEOUT_S,
             ),
+            # Ends expired or revoked impersonations nobody used again (T-0277).
+            CronJob(
+                scheduler.tracked(scheduler.impersonation_sweep),
+                cron=scheduler.IMPERSONATION_CRON,
+                timeout=scheduler.CRON_TIMEOUT_S,
+            ),
         ],
     }
     functions: dict[str, list[tuple[str, Any]]] = {

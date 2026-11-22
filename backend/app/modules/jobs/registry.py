@@ -29,6 +29,8 @@ CRON_SCHEDULES: Final[dict[str, str]] = {
     "sweep_cron": "*/5 * * * *",  # stuck-job sweep (T-0214)
     "hourly_project_jobs": "17 * * * *",  # hourly per-project jobs, off the full hour (T-0215)
     "expire_mail_cron": "41 * * * *",  # fail mail stuck queued past its payload (T-0346)
+    # Ends expired or revoked System admin impersonations nobody used again (T-0277).
+    "impersonation_sweep": "*/5 * * * *",
 }
 
 

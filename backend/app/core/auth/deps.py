@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from typing import Annotated
+from typing import Annotated, Final
 
 from fastapi import Depends, HTTPException, Request, status
 
@@ -37,14 +37,41 @@ def unauthorized(*, invalid_token: bool = False) -> HTTPException:
     )
 
 
+# ``request.state`` attribute holding the ``ImpersonationScope`` of an impersonation request,
+# set by ``access.resolve_request_scope`` once the admin was re-checked and the target's
+# grants loaded (T-0277). Without it an impersonation token authenticates nothing.
+IMPERSONATION_STATE: Final = "kerp_impersonation"
+
+
+@dataclass(frozen=True, slots=True)
+class ImpersonationScope:
+    """What ``resolve_request_scope`` established for an impersonation request (T-0277)."""
+
+    tenant_id: uuid.UUID
+    target_user_id: uuid.UUID
+    session_id: uuid.UUID
+    impersonator_user_id: uuid.UUID
+    # The target holds a PER-15 (Client Representative) membership on some project: the
+    # session is read-only (ADR 0015 §9; enforced by the guardrail, T-0278).
+    read_only: bool
+
+
 @dataclass(frozen=True, slots=True)
 class Principal:
-    """The authenticated caller of a request."""
+    """The authenticated caller of a request.
+
+    While a ``system_admin`` impersonates (T-0277, ADR 0015), ``user`` and ``user_id`` are the
+    *target* (records are attributed to the target) and ``impersonator_user_id`` is the admin.
+    """
 
     user: User
     claims: TokenClaims
-    # The enrolled field device the request comes through (T-0043), else ``None``.
+    # The enrolled field device the request comes through (T-0043), else ``None``. Always
+    # ``None`` while impersonating: an impersonation is never bound to a device.
     device_id: uuid.UUID | None = None
+    # Computed per request from the target's memberships (ADR 0015 §9): ``True`` when the
+    # target holds PER-15 on any project. Always ``False`` outside impersonation.
+    impersonation_read_only: bool = False
 
     @property
     def user_id(self) -> uuid.UUID:
@@ -53,6 +80,15 @@ class Principal:
     @property
     def tenant_id(self) -> uuid.UUID:
         return self.claims.tenant_id
+
+    @property
+    def impersonator_user_id(self) -> uuid.UUID | None:
+        """The ``system_admin`` acting as ``user`` (impersonation token), else ``None``."""
+        return self.claims.impersonator_id
+
+    @property
+    def is_impersonation(self) -> bool:
+        return self.claims.is_impersonation
 
 
 def require_claims(bearer: Annotated[BearerResult, Depends(get_bearer)]) -> TokenClaims:
@@ -80,7 +116,13 @@ def get_current_user(
     runs its first query (T-0210): once that session has queried, it holds a pooled connection
     until the request ends, and a second unit of work then waiting on the same pool deadlocks
     the pool under load (every request holds one connection and waits for another).
+
+    An impersonation token (T-0277) authenticates only when ``resolve_request_scope`` has
+    re-checked its admin and loaded the target's grants for this request
+    (``IMPERSONATION_STATE``); else ``401``. It never resolves or touches a device.
     """
+    if claims.is_impersonation:
+        return _impersonation_principal(request, claims, session)
     device_id: uuid.UUID | None = None
     database: Database | None = getattr(request.app.state, "db", None)
     if database is not None:  # None: a test app whose session dependency is overridden
@@ -101,6 +143,24 @@ def get_current_user(
     except AuthenticationError as exc:
         raise unauthorized(invalid_token=True) from exc
     return Principal(user=user, claims=claims, device_id=device_id)
+
+
+def _impersonation_principal(
+    request: Request, claims: TokenClaims, session: DbSession
+) -> Principal:
+    scope = getattr(request.state, IMPERSONATION_STATE, None)
+    if not isinstance(scope, ImpersonationScope) or (
+        scope.tenant_id,
+        scope.target_user_id,
+        scope.session_id,
+        scope.impersonator_user_id,
+    ) != (claims.tenant_id, claims.user_id, claims.session_id, claims.impersonator_id):
+        raise unauthorized(invalid_token=True)
+    try:
+        user = load_active_user(session, claims)
+    except AuthenticationError as exc:
+        raise unauthorized(invalid_token=True) from exc
+    return Principal(user=user, claims=claims, impersonation_read_only=scope.read_only)
 
 
 async def get_principal(

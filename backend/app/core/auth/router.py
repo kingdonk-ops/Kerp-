@@ -35,7 +35,10 @@ from fastapi import (
     Response,
     status,
 )
+from fastapi.responses import JSONResponse
+from sqlalchemy.orm import Session
 
+from app.core.auth import impersonation
 from app.core.auth.deps import CurrentPrincipal, get_auth_service, unauthorized
 from app.core.auth.device_signal import DEVICE_HEADER, request_device_id
 from app.core.auth.lockout import LockedOutError
@@ -43,6 +46,7 @@ from app.core.auth.post_auth import invite_reference
 from app.core.auth.providers import PasswordCredentials
 from app.core.auth.runtime import AuthRuntime, get_auth_runtime
 from app.core.auth.schemas import (
+    ImpersonationRefusal,
     JsonWebKeySet,
     LoginRequest,
     MagicLinkRedeemRequest,
@@ -382,10 +386,56 @@ def refresh(
 
 
 @router.post(f"{PREFIX}/logout", status_code=status.HTTP_204_NO_CONTENT)
-def logout(principal: CurrentPrincipal, service: AuthServiceDep, response: Response) -> None:
-    """Revoke this access token and every token of its login session; clear the cookie."""
+def logout(
+    principal: CurrentPrincipal,
+    service: AuthServiceDep,
+    runtime: RuntimeDep,
+    session: DbSession,
+    response: Response,
+) -> None:
+    """Revoke this access token and every token of its login session; clear the cookie.
+
+    With an impersonation token it ends the impersonation only, like
+    `/impersonation/exit`: the refresh cookie is the admin's own session and stays."""
+    if principal.is_impersonation:
+        _exit_impersonation(principal, session, runtime)
+        return
     service.logout(principal.claims)
     _clear_refresh_cookie(response)
+
+
+def _exit_impersonation(
+    principal: CurrentPrincipal, session: Session, runtime: AuthRuntime
+) -> None:
+    claims = principal.claims
+    impersonation.end(
+        session, claims.session_id, impersonation.EXIT, actor_id=claims.impersonator_id
+    )
+    runtime.store.revoke_token(claims.jti, claims.remaining())
+    runtime.store.revoke_session(claims.session_id, claims.remaining())
+
+
+@router.post(
+    f"{PREFIX}/impersonation/exit",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses={
+        status.HTTP_403_FORBIDDEN: {
+            "model": ImpersonationRefusal,
+            "description": "`code: NOT_IMPERSONATING`: the bearer is not an impersonation token",
+        }
+    },
+)
+def exit_impersonation(
+    principal: CurrentPrincipal, runtime: RuntimeDep, session: DbSession
+) -> Response:
+    """End the caller's impersonation (T-0277, ADR 0015 §3): its token and session are revoked
+    at once and the target is told by e-mail. The admin's own access token and refresh cookie
+    were never touched, so the SPA resumes the admin's session. Expiry needs no call."""
+    if not principal.is_impersonation:
+        refusal = ImpersonationRefusal(detail="Not impersonating", code="NOT_IMPERSONATING")
+        return JSONResponse(refusal.model_dump(), status_code=status.HTTP_403_FORBIDDEN)
+    _exit_impersonation(principal, session, runtime)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get(f"{PREFIX}/me", response_model=MeResponse)

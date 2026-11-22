@@ -124,6 +124,12 @@ def check_startup_config(settings: Settings) -> None:
     startup_warning(settings)
 
 
+def revocation_store_from_settings(settings: Settings) -> RevocationStore:
+    """A revocation store of its own for a process without an auth runtime (the worker's
+    impersonation sweep, T-0277). The caller closes it."""
+    return _store_from_settings(settings)
+
+
 def _store_from_settings(settings: Settings) -> RevocationStore:
     if settings.redis_url:
         return RedisRevocationStore.from_url(settings.redis_url)

@@ -35,6 +35,7 @@ from app.modules.jobs.registry import CRON_SCHEDULES, UnknownJobKindError
 from app.modules.projects import service as projects
 
 if TYPE_CHECKING:
+    from app.core.config import Settings
     from app.core.db import Database
     from app.modules.jobs.registry import JobRegistry
 
@@ -49,6 +50,8 @@ HOURLY_CRON: Final = CRON_SCHEDULES["hourly_project_jobs"]
 MAIL_EXPIRY_CRON: Final = CRON_SCHEDULES["expire_mail_cron"]
 MAIL_EXPIRE_AFTER: Final = timedelta(seconds=PAYLOAD_TTL_S) + timedelta(hours=1)
 MAIL_EXPIRED: Final = "payload_expired"
+# Ends impersonations nobody used again after their expiry or revocation (T-0277).
+IMPERSONATION_CRON: Final = CRON_SCHEDULES["impersonation_sweep"]
 
 logger = logging.getLogger("kerp.jobs")
 
@@ -134,6 +137,32 @@ async def hourly_project_jobs(ctx: Mapping[str, Any]) -> None:
                 "hourly project jobs failed for a project",
                 extra={"project_id": str(scope.project_id)},
             )
+
+
+def _sweep_impersonations(db: Database, settings: Settings, tenant_id: uuid.UUID) -> dict[str, int]:
+    # Imported here: core auth's revocation store and impersonation service (Redis client).
+    from app.core.auth.impersonation import sweep
+    from app.core.auth.runtime import revocation_store_from_settings
+
+    store = revocation_store_from_settings(settings)
+    try:
+        return sweep(db, store, tenant_id)
+    finally:
+        store.close()
+
+
+async def impersonation_sweep(ctx: Mapping[str, Any]) -> None:
+    """SAQ cron (T-0277, ADR 0015): end the deployment tenant's impersonations that expired or
+    were revoked without being used again, so each still gets its ``impersonation.ended``
+    ledger entry and its target's notice e-mail."""
+    settings: Settings = ctx["settings"]
+    tenant_id = settings.default_tenant_id
+    if tenant_id is None:
+        logger.warning("impersonation sweep skipped: KERP_DEFAULT_TENANT_ID is not set")
+        return
+    ended = await asyncio.to_thread(_sweep_impersonations, ctx["db"], settings, tenant_id)
+    if any(ended.values()):
+        logger.info("impersonation sweep ended sessions: %s", ended)
 
 
 def _known_kinds(registry: JobRegistry) -> tuple[str, ...]:

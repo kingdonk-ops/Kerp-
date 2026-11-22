@@ -111,6 +111,8 @@ class RevocationStore(Protocol):
 
     def is_revoked(self, jti: str, session_id: uuid.UUID) -> bool: ...
 
+    def is_session_revoked(self, session_id: uuid.UUID) -> bool: ...
+
     def register_refresh(self, jti: str, session_id: uuid.UUID, ttl: timedelta) -> None: ...
 
     def consume_refresh(
@@ -253,6 +255,11 @@ class RedisRevocationStore:
     def is_revoked(self, jti: str, session_id: uuid.UUID) -> bool:
         count = self._call(lambda: self._client.exists(_jti_key(jti), _sid_key(session_id)))
         return bool(count)
+
+    def is_session_revoked(self, session_id: uuid.UUID) -> bool:
+        """Whether the whole login session is revoked (e.g. an impersonation's admin session,
+        T-0277)."""
+        return bool(self._call(lambda: self._client.exists(_sid_key(session_id))))
 
     def register_refresh(self, jti: str, session_id: uuid.UUID, ttl: timedelta) -> None:
         self._call(
@@ -482,6 +489,10 @@ class InMemoryRevocationStore:
     def is_revoked(self, jti: str, session_id: uuid.UUID) -> bool:
         with self._lock:
             return self._live(_jti_key(jti)) or self._live(_sid_key(session_id))
+
+    def is_session_revoked(self, session_id: uuid.UUID) -> bool:
+        with self._lock:
+            return self._live(_sid_key(session_id))
 
     def register_refresh(self, jti: str, session_id: uuid.UUID, ttl: timedelta) -> None:
         self._set(_refresh_key(jti), ttl)

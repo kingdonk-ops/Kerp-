@@ -31,8 +31,9 @@ from fastapi import Depends, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
-from app.core.auth.deps import CurrentPrincipal
+from app.core.auth.deps import IMPERSONATION_STATE, CurrentPrincipal, ImpersonationScope
 from app.core.auth.models import ProjectMembership
+from app.core.auth.tokens import TokenClaims
 from app.core.db import SIDE_WRITE_DB_KEY, DbSession
 from app.core.tenancy.context import TenancyContext
 from app.core.tenancy.rls import bind_tenancy, session_tenancy
@@ -412,8 +413,17 @@ GRANTS_STATE: Final = "kerp_grants"
 ADMIN_GRANTS_STATE: Final = "kerp_admin_grants"
 
 
+class ImpersonationRefusedError(Exception):
+    """The impersonating admin no longer holds ``system_admin`` or is deactivated (T-0277):
+    the impersonation token authenticates nothing (``401``) and its session has ended."""
+
+
 def resolve_request_scope(
-    database: Database, base: TenancyContext, *, state: object | None = None
+    database: Database,
+    base: TenancyContext,
+    *,
+    state: object | None = None,
+    impersonation: TokenClaims | None = None,
 ) -> TenancyContext:
     """Bind the request's allowed projects from the membership store (never the request).
 
@@ -422,12 +432,20 @@ def resolve_request_scope(
     binds ``system_admin`` as ``is_system_admin`` (T-0014, edge spec §6 amendments): never
     from token claims, request parameters or headers. With ``state`` (the request's
     ``request.state``) the loaded grants are kept there for ``get_caller_grants``.
+
+    With ``impersonation`` (the verified impersonation token whose ``sub`` is ``base.user_id``,
+    T-0277, ADR 0015 §4) the scope is the **target's**: its memberships, ``is_system_admin``
+    false and no tenant-level admin grant usable. The same unit of work first re-checks that
+    the admin (``imp``) still holds ``system_admin`` and is active; if not, the session ends
+    (``revoked``) and ``ImpersonationRefusedError`` is raised.
     """
     if base.user_id is None:
         return base
     # Bound to the caller (``app.current_user_id``): the membership and admin-grant policies
     # let a session read its own rows, so neither lookup depends on what it decides (TD-152).
     own = TenancyContext(tenant_id=base.tenant_id, user_id=base.user_id)
+    if impersonation is not None:
+        return _impersonation_scope(database, base, own, impersonation, state)
     with database.unit_of_work(own) as session:
         grants = load_grants(session, base.tenant_id, base.user_id)
         admin_grants = caller_admin_grants(session, base.tenant_id, base.user_id)
@@ -436,6 +454,50 @@ def resolve_request_scope(
         setattr(state, ADMIN_GRANTS_STATE, (base.tenant_id, base.user_id, admin_grants))
     is_admin = SYSTEM_ADMIN in admin_grants
     return resolve_scope(grants, replace(base, is_system_admin=is_admin), base.project_id)
+
+
+def _impersonation_scope(
+    database: Database,
+    base: TenancyContext,
+    own: TenancyContext,
+    claims: TokenClaims,
+    state: object | None,
+) -> TenancyContext:
+    """The target's scope for an impersonation request (``resolve_request_scope``)."""
+    # Imported here: it needs the DB layer and the mail service.
+    from app.core.auth.impersonation import REVOKED, admin_may_impersonate, end_refused
+
+    admin_id = claims.impersonator_id
+    if admin_id is None or claims.user_id != base.user_id or claims.tenant_id != base.tenant_id:
+        raise ImpersonationRefusedError("not this caller's impersonation token")
+    allowed = False
+    grants: list[Grant] = []
+    # One unit of work: bound to the admin to read the admin's own grant and state (the
+    # admin-grant policy shows a session its own rows), then rebound to the target to read
+    # the target's memberships. Column reads only, so the rebind is allowed.
+    with database.unit_of_work(TenancyContext(tenant_id=base.tenant_id, user_id=admin_id)) as s:
+        # ``iat``: a password change of the admin after it ends the impersonation too.
+        allowed = admin_may_impersonate(s, base.tenant_id, admin_id, since=claims.issued_at)
+        if allowed:
+            bind_tenancy(s, own)
+            grants = load_grants(s, base.tenant_id, claims.user_id)
+    if not allowed:
+        end_refused(database, claims, REVOKED)
+        raise ImpersonationRefusedError("the impersonating admin may no longer impersonate")
+    read_only = any(g.persona is Persona.CLIENT_REPRESENTATIVE for g in grants)
+    if state is not None:
+        setattr(state, GRANTS_STATE, (base.tenant_id, base.user_id, tuple(grants)))
+        # The target's tenant-level grants (``create_projects``) are not usable (ADR 0015 §4).
+        setattr(state, ADMIN_GRANTS_STATE, (base.tenant_id, base.user_id, frozenset()))
+        scope = ImpersonationScope(
+            tenant_id=base.tenant_id,
+            target_user_id=claims.user_id,
+            session_id=claims.session_id,
+            impersonator_user_id=admin_id,
+            read_only=read_only,
+        )
+        setattr(state, IMPERSONATION_STATE, scope)
+    return resolve_scope(grants, replace(base, is_system_admin=False), base.project_id)
 
 
 def user_has_projects_beyond(
@@ -496,7 +558,10 @@ def get_caller_admin_grants(
 ) -> frozenset[str]:
     """The caller's own tenant-level admin grants (``create_projects`` gates project creation,
     T-0039): the ones loaded when the request's scope was resolved, else looked up. Never
-    from the request. They confer no ``A`` or ``S`` (``caller_admin_grants``)."""
+    from the request. They confer no ``A`` or ``S`` (``caller_admin_grants``). While
+    impersonating there are none: the target's grants are not usable (ADR 0015 §4, §8)."""
+    if principal.is_impersonation:
+        return frozenset()
     cached = getattr(request.state, ADMIN_GRANTS_STATE, None)
     if cached is not None and cached[:2] == (principal.tenant_id, principal.user_id):
         return frozenset(cached[2])

@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 411 · **Closed:** 168
+**Open:** 414 · **Closed:** 170
 
 ## decision (39)
 
@@ -221,7 +221,7 @@
 | [TD-510](../tracker/todo/TD-510.md) | Deployment-config view lacks the mail reply-to of diff §4.7: Settings has no reply-to field yet | T-0230 | implementer |
 | [TD-533](../tracker/todo/TD-533.md) | CEL client runtime has no evaluation step budget (cel-js exposes no step hook; server is the hard gate) | T-0341 | implementer |
 
-## later (161)
+## later (164)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -380,6 +380,9 @@
 | [TD-568](../tracker/todo/TD-568.md) | Adopt core tenant_level_context in the remaining tenant-level session guards | T-0349 | implementer |
 | [TD-569](../tracker/todo/TD-569.md) | Use core sha256_hex for the remaining inline SHA-256 hex digests (lockout subject, mail address, admin e-mail) | T-0349 | implementer |
 | [TD-576](../tracker/todo/TD-576.md) | Invite e-mails carry no recipient_user_id in the delivery ledger when the invitee already has an account | T-0226 | implementer |
+| [TD-578](../tracker/todo/TD-578.md) | Login telemetry, presence and the session index must skip impersonation principals (ADR 0015 §7) | T-0243 | implementer |
+| [TD-579](../tracker/todo/TD-579.md) | Impersonation UI: keep the token in memory only, never store the last-used project or offline data, and decide what Logout does while impersonating | T-0280 | implementer |
+| [TD-580](../tracker/todo/TD-580.md) | Sync download and other device-bound field endpoints must refuse impersonation tokens | T-0147 | implementer |
 | [TD-582](../tracker/todo/TD-582.md) | Startup safety: also refuse a runtime role with no grants on app tables (0039 skipped), not only one with too much access (PR #181 review) | T-0342 | reviewer |
 | [TD-583](../tracker/todo/TD-583.md) | first-run.md: replace 'downgrade to 0038 and upgrade again' with a re-runnable grant command once migrations past 0039 exist (PR #181 review) | T-0343 | reviewer |
 | [TD-585](../tracker/todo/TD-585.md) | CEL runtime sets sys.setrecursionlimit inside evaluate on the request path; set it once at startup (PR #181 review) | T-0341 | reviewer |
@@ -622,4 +625,6 @@
 | ✅ | [TD-545](../tracker/todo/TD-545.md) | AI provider, region and credentials (data use allowed by the user 2026-11-21): confirm one provider per deployment, Australian region, company-owned key in the secret store, fail closed | User decision 2026-11-22: planner defaults accepted — one AI provider per deployment, Australian region, company-owned (tenant) key in the deployment secret store, fail closed when anything is missing (diff §4.11) |
 | ✅ | [TD-549](../tracker/todo/TD-549.md) | Notification rules (trigger, recipients by role, delay, channel, template, conditions), per-notification delivery log with skipped reasons and an Outbox card, issued vs amended triggers, never-late reminders | User decision 2026-11-22: call-outs ignore e-mail opt-out. Contractual call-out / inspection-request notices are transactional; an opt-out never suppresses them and is not a skipped reason for them; opt-out applies to optional notifications only. Missing address or bounce still recorded per party. The rest of this spec-gap (rule model, delivery log, Outbox card, issued vs amended, never late) continues in TD-587 |
 | ✅ | [TD-561](../tracker/todo/TD-561.md) | Grant ceiling questions: second approver when PER-09 assigns a hold-authority persona it does not hold? May external accounts hold PER-14 (Field Worker)? | User decision 2026-11-22: planner defaults accepted — no second approver when PER-09 assigns a hold-authority persona it does not hold; external subcontractor crews may hold PER-14 Field Worker (diff §4.1, §4.9) |
+| ✅ | [TD-577](../tracker/todo/TD-577.md) | Impersonation notice: pass recipient_user_id to send_mail once T-0226 (mail delivery ledger) is merged | Done in T-0277 (PR #184) after T-0226 merged: the notice passes recipient_user_id=target.id. |
+| ✅ | [TD-581](../tracker/todo/TD-581.md) | Migration 0040 collides with T-0226's 0040 (parallel branches): the second to merge must renumber and re-chain | Resolved in T-0277 (PR #184): renumbered to 0041_impersonation_session (Revises 0040_mail_delivery_ledger) after #183 merged. |
 | ✅ | [TD-592](../tracker/todo/TD-592.md) | May a scanned paper signature ever count as the client (PER-15) co-sign? (paper-signed pages are plain evidence until decided) | User, 2026-11-22: yes. A scanned paper signature may count as the client (PER-15) co-sign on the terms of mode iii: the uploader names the client's PER-15 account; it is provisional (verification_mode = provisional_scan) and blocks approval (CLIENT_SIGNATURE_PROVISIONAL) until that client confirms in their own account; a rejection returns the inspection. Spec: quality-and-inspection.md §Client co-sign mode iv and §Signing attestation 'Paper-signed pages'. |
