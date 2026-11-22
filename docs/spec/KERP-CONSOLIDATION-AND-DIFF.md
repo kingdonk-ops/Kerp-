@@ -1097,7 +1097,7 @@ come later (Phase 6, T-0303–T-0305, epic E-06-05). Rules:
     card separately (one service call and one `run_checks` per card); a refused card stays
     `waiting` with its reason, the others still apply.
   - **Expiry:** a `waiting` card expires after `ai_change_card_expiry_days` (runtime registry,
-    §4.7; default 14, bounds 1–90) and can no longer be applied; a daily `batch` job marks it
+    §4.7; default 14, confirmed by the user 2026-11-22; bounds 1–90) and can no longer be applied; a daily `batch` job marks it
     `expired`. Expired and rejected cards stay listed with their assurance record.
 
 ---

@@ -3,9 +3,9 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 411 · **Closed:** 167
+**Open:** 411 · **Closed:** 168
 
-## decision (40)
+## decision (39)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -48,7 +48,6 @@
 | [TD-486](../tracker/todo/TD-486.md) | RFI witness check: may an unmet hold-point (H) witness requirement be overridden per record (ADR 0004 Amendment A), or is it non-overridable? | T-0333 | planner |
 | [TD-514](../tracker/todo/TD-514.md) | How is a passed or LOCKED_FOR_TURNOVER inspection corrected? Define void-and-reissue (revision suffix, supersedes link, ledger, MDR shows latest) | — | planner |
 | [TD-564](../tracker/todo/TD-564.md) | On-site label printing (QR / asset tags, quarantine labels): PDF label sheet, vendor print service on Android, or Web Bluetooth? Needs the printer model and device platform | T-0155, E-03-03, E-03-07, T-0141, T-0255 | planner |
-| [TD-592](../tracker/todo/TD-592.md) | May a scanned paper signature ever count as the client (PER-15) co-sign? (paper-signed pages are plain evidence until decided) | T-0291, E-05-05, T-0158 | planner |
 
 ## spec-gap (94)
 
@@ -149,7 +148,7 @@
 | [TD-591](../tracker/todo/TD-591.md) | Competency at sign-off: read-only rule-set fact 'signer holds a valid credential of type X at signing time', snapshotted in the attestation | T-0118, T-0289, T-0291 | planner |
 | [TD-593](../tracker/todo/TD-593.md) | Client-supplied material late for its work pack: warning readiness conflict when expected delivery is after the installing pack's planned start (supplied_by flag on material lines) | E-03-03, E-03-02, E-04-02, E-06b-02, T-0266 | planner |
 
-## missed (12)
+## missed (13)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -165,6 +164,7 @@
 | [TD-542](../tracker/todo/TD-542.md) | Deployment screen: re-read stats while an object-store count is running (poll while refreshing) | T-0224 | reviewer |
 | [TD-543](../tracker/todo/TD-543.md) | System console i18n: label for quarantine reason verify_failed; plural _one forms for count strings | T-0224 | reviewer |
 | [TD-544](../tracker/todo/TD-544.md) | Upload quarantine file cards: show SHA-256, uploader and created time (returned by the API, listed in §4.7) | T-0224 | reviewer |
+| [TD-599](../tracker/todo/TD-599.md) | Mode iv screen: upload a scan of a paper-signed page to a record version and pick the client's PER-15 account (inspector or PER-06, anchor in their subtree); no frontend task covers it (T-0164 covers modes i-iii only) | T-0174, T-0176, T-0164 | coordinator |
 
 ## deferred (50)
 
@@ -622,3 +622,4 @@
 | ✅ | [TD-545](../tracker/todo/TD-545.md) | AI provider, region and credentials (data use allowed by the user 2026-11-21): confirm one provider per deployment, Australian region, company-owned key in the secret store, fail closed | User decision 2026-11-22: planner defaults accepted — one AI provider per deployment, Australian region, company-owned (tenant) key in the deployment secret store, fail closed when anything is missing (diff §4.11) |
 | ✅ | [TD-549](../tracker/todo/TD-549.md) | Notification rules (trigger, recipients by role, delay, channel, template, conditions), per-notification delivery log with skipped reasons and an Outbox card, issued vs amended triggers, never-late reminders | User decision 2026-11-22: call-outs ignore e-mail opt-out. Contractual call-out / inspection-request notices are transactional; an opt-out never suppresses them and is not a skipped reason for them; opt-out applies to optional notifications only. Missing address or bounce still recorded per party. The rest of this spec-gap (rule model, delivery log, Outbox card, issued vs amended, never late) continues in TD-587 |
 | ✅ | [TD-561](../tracker/todo/TD-561.md) | Grant ceiling questions: second approver when PER-09 assigns a hold-authority persona it does not hold? May external accounts hold PER-14 (Field Worker)? | User decision 2026-11-22: planner defaults accepted — no second approver when PER-09 assigns a hold-authority persona it does not hold; external subcontractor crews may hold PER-14 Field Worker (diff §4.1, §4.9) |
+| ✅ | [TD-592](../tracker/todo/TD-592.md) | May a scanned paper signature ever count as the client (PER-15) co-sign? (paper-signed pages are plain evidence until decided) | User, 2026-11-22: yes. A scanned paper signature may count as the client (PER-15) co-sign on the terms of mode iii: the uploader names the client's PER-15 account; it is provisional (verification_mode = provisional_scan) and blocks approval (CLIENT_SIGNATURE_PROVISIONAL) until that client confirms in their own account; a rejection returns the inspection. Spec: quality-and-inspection.md §Client co-sign mode iv and §Signing attestation 'Paper-signed pages'. |
