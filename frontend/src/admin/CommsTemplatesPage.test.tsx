@@ -1,5 +1,5 @@
 // Admin → Communications → E-mail templates (T-0229, diff §4.7 'Editor details'). Synthetic data only.
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { i18n } from "../i18n";
@@ -49,8 +49,11 @@ describe("template list", () => {
 
 describe("mail health", () => {
   it("shows no banner when the deployment can send", async () => {
-    renderAdmin(PATH, handlers(), SYS);
+    const calls = renderAdmin(PATH, handlers(), SYS);
     await screen.findByRole("region", { name: tr("admin.comms.templates.listTitle") }, WAIT);
+    // The configuration arrives on its own: absence means something only once it was read.
+    await waitFor(() => { expect(calls.some((c) => c.path === "/api/v1/settings/deployment-config")).toBe(true); }, WAIT);
+    await act(async () => { await Promise.resolve(); });
     expect(screen.queryByText(tr("admin.comms.templates.health.title"))).not.toBeInTheDocument();
   });
 

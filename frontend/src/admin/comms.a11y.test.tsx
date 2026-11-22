@@ -102,8 +102,10 @@ describe.each(THEMES)("communications screens in the %s theme", (theme) => {
       renderAt("/unsubscribe#syntheticOptOutToken_0123456789-abcdefABCDEF", {
         "POST /api/v1/notifications/broadcasts/unsubscribe": () => json({ status: "ok" }),
       }, { theme });
+      // The page is a lazy route: audit it once it is there, not the empty document before.
+      const confirm = await screen.findByRole("button", { name: i18n.t("unsubscribe.confirm") }, WAIT);
       await audit(theme);
-      fireEvent.click(await screen.findByRole("button", { name: i18n.t("unsubscribe.confirm") }));
+      fireEvent.click(confirm);
       await screen.findByRole("status", {}, WAIT);
       await audit(theme);
     }, SLOW);

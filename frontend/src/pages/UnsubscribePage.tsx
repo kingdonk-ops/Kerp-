@@ -7,8 +7,6 @@ import { unsubscribe } from "../admin/comms";
 import { useServices } from "../app/services";
 import { AuthCard } from "../auth/AuthCard";
 
-export const UNSUBSCRIBE_PATH = "/unsubscribe";
-
 /** An opt-out token: `secrets.token_urlsafe` output only (a real one is 43 characters). */
 const TOKEN = /^[A-Za-z0-9_-]{16,512}$/;
 

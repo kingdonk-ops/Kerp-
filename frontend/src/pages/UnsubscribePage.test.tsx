@@ -1,10 +1,11 @@
 // /unsubscribe#<token>: the broadcast opt-out page (T-0229, TD-601). Synthetic data only.
-import { fireEvent, screen } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { i18n } from "../i18n";
 import { renderAt } from "../invite/testing";
 import { json } from "../test/fakeApi";
+import { UNSUBSCRIBE_PATH } from "./unsubscribePath";
 
 const TOKEN = "syntheticOptOutToken_0123456789-abcdefABCDEF";
 const PATH = "/api/v1/notifications/broadcasts/unsubscribe";
@@ -13,8 +14,10 @@ describe("unsubscribe page", () => {
   it("reads the token from the fragment, removes it, waits for the click and posts it in the body", async () => {
     const { calls, router } = renderAt(`/unsubscribe#${TOKEN}`, { [`POST ${PATH}`]: () => json({ status: "ok" }) });
     await screen.findByRole("heading", { name: i18n.t("unsubscribe.title") });
-    expect(router.state.location.hash).toBe("");
-    expect(router.state.location.pathname).toBe("/unsubscribe");
+    // The lazy route finishes the hash-clearing navigation after the first render: wait for it.
+    await waitFor(() => { expect(router.state.location.hash).toBe(""); });
+    expect(router.state.location.pathname).toBe(UNSUBSCRIBE_PATH);
+    expect(UNSUBSCRIBE_PATH).toBe("/unsubscribe");
     // Nothing on load: link scanners prefetch.
     expect(calls.some((c) => c.path === PATH)).toBe(false);
 

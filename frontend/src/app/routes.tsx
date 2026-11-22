@@ -23,6 +23,7 @@ import { LoginPage } from "../pages/LoginPage";
 import { NavGroupPage } from "../pages/NavGroupPage";
 import { NotFoundPage } from "../pages/NotFoundPage";
 import { SsoReturnPage } from "../pages/SsoReturnPage";
+import { UNSUBSCRIBE_PATH } from "../pages/unsubscribePath";
 import { Layout, MY_DEVICES_PATH } from "./Layout";
 import { LOBBY_PATH, NAV_GROUPS } from "./nav";
 
@@ -35,7 +36,7 @@ export const routes: RouteObject[] = [
   { path: RESET_PASSWORD_PATH, element: <ResetPasswordPage /> },
   // Broadcast opt-out link of the e-mails (T-0229, TD-601): no sign-in; its own chunk.
   {
-    path: "/unsubscribe",
+    path: UNSUBSCRIBE_PATH,
     lazy: async () => ({ Component: (await import("../pages/UnsubscribePage")).UnsubscribePage }),
   },
   {
