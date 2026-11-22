@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 356 · **Closed:** 151
+**Open:** 361 · **Closed:** 151
 
 ## decision (40)
 
@@ -127,7 +127,7 @@
 | [TD-515](../tracker/todo/TD-515.md) | Field registry has no multi-point measurement field: add measurement_set (list of values + unit) with CEL list statistics (mean/min/max/count) | — | planner |
 | [TD-536](../tracker/todo/TD-536.md) | Queue monitor: no API lists queued/running jobs, so the System console aborts by pasted job id; add a list (or job id on stuck quarantine rows) so abort can be picked from the screen | T-0224 | implementer |
 
-## missed (8)
+## missed (12)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -139,6 +139,10 @@
 | [TD-337](../tracker/todo/TD-337.md) | Web/Android route /magic-link#<token> that redeems the e-mailed sign-in link (POST /auth/magic-link/redeem); the e-mail now links there | T-0058 | implementer |
 | [TD-388](../tracker/todo/TD-388.md) | saved_views: wire the my_teams filter op | T-0074 | reviewer |
 | [TD-487](../tracker/todo/TD-487.md) | Frontend: Admin -> System grants page needs the SoD confirm step for system_admin on a hold-authority holder (POST /admin/grants 409 sod_confirmation_required, confirm_sod), plus the same warning for hold personas on system_admins in member/invite/team UIs | T-0275 | implementer |
+| [TD-540](../tracker/todo/TD-540.md) | Upload quarantine: test the 'object deleted' half of the Re-check guard (verifying + object_deleted row) | T-0224 | reviewer |
+| [TD-542](../tracker/todo/TD-542.md) | Deployment screen: re-read stats while an object-store count is running (poll while refreshing) | T-0224 | reviewer |
+| [TD-543](../tracker/todo/TD-543.md) | System console i18n: label for quarantine reason verify_failed; plural _one forms for count strings | T-0224 | reviewer |
+| [TD-544](../tracker/todo/TD-544.md) | Upload quarantine file cards: show SHA-256, uploader and created time (returned by the API, listed in §4.7) | T-0224 | reviewer |
 
 ## deferred (50)
 
@@ -195,7 +199,7 @@
 | [TD-508](../tracker/todo/TD-508.md) | Verify the e2e suite on the make up compose stack, and give it its own database | T-0027 | implementer |
 | [TD-510](../tracker/todo/TD-510.md) | Deployment-config view lacks the mail reply-to of diff §4.7: Settings has no reply-to field yet | T-0230 | implementer |
 
-## later (143)
+## later (144)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -342,6 +346,7 @@
 | [TD-513](../tracker/todo/TD-513.md) | CI: the SQLite backend job (~6.5 min) becomes the critical path once backend-pg is sharded | T-0086 | implementer |
 | [TD-532](../tracker/todo/TD-532.md) | Registry entries declared by later tasks add their label to admin.settings.entries (and a new category to admin.settings.categories) in the Settings screen | T-0232 | implementer |
 | [TD-537](../tracker/todo/TD-537.md) | RegisterPage shell lacks per-row actions and server-side paging, so the System console registers (failed jobs, upload quarantine) use admin card lists; adopt the shell once it supports both (diff §6.5) | T-0224 | implementer |
+| [TD-541](../tracker/todo/TD-541.md) | Upload quarantine: 'Sweep now' for any project (picker), not only projects that already have quarantine rows | T-0224 | reviewer |
 
 ## bug (10)
 
