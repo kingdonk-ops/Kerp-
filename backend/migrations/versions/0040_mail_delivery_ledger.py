@@ -19,8 +19,8 @@ batch mode copies the table; it gets the frozen definition below (no reflection,
 ``--sql`` works and later model changes stay out). The downgrade turns ``delivered`` rows back
 into ``sent`` (what they were before the notification) before the old check returns.
 
-Revision ID: 0039
-Revises: 0038
+Revision ID: 0040
+Revises: 0039
 Create Date: 2026-11-22
 """
 
@@ -31,8 +31,8 @@ from alembic import op
 
 from app.core.db import GUID, JSONType
 
-revision: str = "0039"
-down_revision: str | None = "0038"
+revision: str = "0040"
+down_revision: str | None = "0039"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
@@ -63,7 +63,7 @@ def _ledger_columns() -> list[sa.Column[object]]:
 
 
 def _frozen_send_log(*, with_ledger: bool) -> sa.Table:
-    """``mail_send_log`` as of revision 0038 (SQLite), or as of this one."""
+    """``mail_send_log`` as of revision 0039 (SQLite), or as of this one."""
     ledger: list[sa.SchemaItem] = []
     statuses = OLD_STATUSES
     if with_ledger:

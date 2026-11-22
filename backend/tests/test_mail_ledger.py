@@ -149,7 +149,7 @@ def test_delivered_is_a_status_and_the_database_refuses_unknown_ones(db: Databas
 
 def _migration() -> ModuleType:
     versions = Path(__file__).resolve().parents[1] / "migrations" / "versions"
-    spec = importlib.util.spec_from_file_location("m0039", next(versions.glob("0039_*.py")))
+    spec = importlib.util.spec_from_file_location("m0040", next(versions.glob("0040_*.py")))
     assert spec is not None
     assert spec.loader is not None
     migration = importlib.util.module_from_spec(spec)
@@ -157,7 +157,7 @@ def _migration() -> ModuleType:
     return migration
 
 
-def test_migration_0039_freezes_the_table_it_copies() -> None:
+def test_migration_0040_freezes_the_table_it_copies() -> None:
     migration = _migration()
     live = MailSend.__table__
     frozen = migration._frozen_send_log(with_ledger=True)
@@ -194,7 +194,7 @@ def test_the_migration_keeps_rows_and_its_downgrade_turns_delivered_back_into_se
     delivered = _send(db, message_id="ses-1", status="delivered", recipient_user_id=USER)
     bounced = _send(db, message_id="ses-2", status="bounced")
     db.dispose()
-    command.downgrade(cfg, "0038")
+    command.downgrade(cfg, "0039")
     old = Database(url)
     try:
         with old.unit_of_work(TENANT) as session:

@@ -25,7 +25,7 @@ here.
 
 ## Decision
 
-1. **Extend, do not duplicate.** Migration `0039` changes `mail_send_log` additively:
+1. **Extend, do not duplicate.** Migration `0040` changes `mail_send_log` additively:
    - `recipient_user_id` UUID NULL and `broadcast_id` UUID NULL, plain ids without a foreign
      key (like `created_by`; the broadcast table of T-0228 does not exist yet and a user row may
      be deactivated), each indexed;

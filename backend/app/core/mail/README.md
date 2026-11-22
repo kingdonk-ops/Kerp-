@@ -13,7 +13,7 @@ production, always asynchronous, i18n templates, a send log that is also the del
 | `i18n.py`, `locales/*.json` | `t(key, locale, **params)` over flat JSON catalogs; `en-AU` is the base |
 | `transport.py` | `MailTransport` protocol: `SesTransport`, `FakeTransport`, `LogTransport`; `check_mail_config`, `transport_from_settings` |
 | `sns.py` | SNS message verification for the SES delivery/bounce/complaint endpoint |
-| `models.py` | `mail_send_log`, `mail_suppression` (`BaseRecordMixin`, standard RLS; migration `0024`; the ledger columns: `0039`) |
+| `models.py` | `mail_send_log`, `mail_suppression` (`BaseRecordMixin`, standard RLS; migration `0024`; the ledger columns: `0040`) |
 | `router.py`, `schemas.py` | `/api/v1/mail`: admin reads (history, stats), suppression removal, the public SNS endpoint |
 
 ## Sending
@@ -164,6 +164,6 @@ SES, the sender, the topic, the web origin and the deployment tenant are set
 `tests/test_mail.py` (boundary, contract, templates, enqueue-after-commit, delivery with the
 fake transport, SES error mapping, start-up config, the jobs hook) and
 `tests/test_mail_sns.py` (SNS verification with a generated certificate, suppression,
-admin API) and `tests/test_mail_ledger.py` (T-0226: migration `0039`, signed `Delivery`
+admin API) and `tests/test_mail_ledger.py` (T-0226: migration `0040`, signed `Delivery`
 notifications, forward-only status changes, project sends, stats and history filters). All run
 on SQLite and PostgreSQL.
