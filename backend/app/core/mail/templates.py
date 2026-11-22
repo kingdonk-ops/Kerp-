@@ -13,6 +13,13 @@ context parameters it needs. Rules every template obeys by construction:
 
 Core and modules register their templates with ``register_template``; the registry is
 process-wide (``TEMPLATES``).
+
+**Overrides** (T-0227, diff §4.7 Automated templates, TD-400): a System admin may reword the
+subject and the text blocks (intro, outro, action label) of a template per locale, as plain text
+with only the placeholders the template declares (``placeholders()``). ``override_problems``
+is the gate: no HTML, no URL, no link secret, no unknown or computed placeholder. The renderer
+still escapes every value and builds the one link itself, so an override can neither move nor
+reveal a secret. Without an override the i18n catalogue's shipped text is used.
 """
 
 from __future__ import annotations
@@ -21,15 +28,22 @@ import html
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Final
+from typing import Final, Literal, get_args
 from urllib.parse import quote
 
-from app.core.mail.i18n import FALLBACK_LOCALE, t
+from app.core.mail.i18n import FALLBACK_LOCALE, placeholder_fields, shipped, t
 
 KEY_PATTERN: Final = re.compile(r"^[a-z][a-z0-9_]{1,39}\.[a-z][a-z0-9_]{1,59}$")
 MAX_CONTEXT_VALUE: Final = 500
 ContextValue = str | int
 _SECRET_CHARS: Final = re.compile(r"^[A-Za-z0-9._~-]{16,512}$")
+
+
+# The audience groups the template editor lists templates by (diff §4.7 Editor details).
+Audience = Literal["internal_staff", "client", "external_party", "deployment_wide"]
+AUDIENCES: Final[tuple[str, ...]] = get_args(Audience)
+# Placeholders every template may use besides its own parameters.
+COMMON_PLACEHOLDERS: Final = ("app_name",)
 
 
 class TemplateError(ValueError):
@@ -42,13 +56,17 @@ class MailTemplate:
     only in the link fragment (``link_path`` required with it). ``public_link``: the link is
     an ordinary page of the app (the lobby, T-0063) and carries no secret and no fragment;
     a template must say so explicitly, so a link that should carry a secret never goes out
-    without one by mistake."""
+    without one by mistake. ``audience``: the group the template editor lists it under.
+    ``required``: an override may reword it but never leave its subject or a text block empty
+    (sign-in, invite, password reset, RFI call-outs; diff §4.7 Editor details)."""
 
     key: str
     params: tuple[str, ...] = ()
     link_path: str | None = None
     secret: str | None = None
     public_link: bool = False
+    audience: Audience = "deployment_wide"
+    required: bool = False
 
     def __post_init__(self) -> None:
         if not KEY_PATTERN.match(self.key):
@@ -64,6 +82,22 @@ class MailTemplate:
             raise ValueError(f"mail template {self.key!r}: link_path must be a plain path")
         if self.secret is not None and self.secret in self.params:
             raise ValueError(f"mail template {self.key!r}: the secret is never a text parameter")
+        if self.audience not in AUDIENCES:
+            raise ValueError(f"mail template {self.key!r}: unknown audience {self.audience!r}")
+
+    @property
+    def has_action(self) -> bool:
+        return self.link_path is not None
+
+    def blocks(self) -> tuple[str, ...]:
+        """The texts an override may reword: ``subject``, ``intro``, ``outro`` and, with a
+        link, ``action_label``."""
+        return ("subject", "intro", "outro") + (("action_label",) if self.has_action else ())
+
+    def placeholders(self) -> tuple[str, ...]:
+        """The ``{name}`` placeholders its texts may use: its parameters and ``app_name``.
+        Never the secret."""
+        return tuple(dict.fromkeys((*self.params, *COMMON_PLACEHOLDERS)))
 
     def i18n_keys(self) -> tuple[str, ...]:
         parts: tuple[str, ...] = ("subject", "intro", "outro")
@@ -101,6 +135,125 @@ class MailTemplate:
 
 
 @dataclass(frozen=True, slots=True)
+class TemplateText:
+    """The rewordable texts of a template in one locale, unformatted (``{name}`` placeholders).
+    ``action_label`` is ``None`` for a template without a link."""
+
+    subject: str
+    intro: str
+    outro: str
+    action_label: str | None = None
+
+
+def shipped_text(template: MailTemplate, locale: str | None, default: str) -> TemplateText:
+    """The shipped default of ``template`` in ``locale`` (the i18n catalogue, with its
+    fallback chain), unformatted."""
+    own = f"mail.{template.key}"
+    return TemplateText(
+        subject=shipped(f"{own}.subject", locale, default=default),
+        intro=shipped(f"{own}.intro", locale, default=default),
+        outro=shipped(f"{own}.outro", locale, default=default),
+        action_label=shipped(f"{own}.action", locale, default=default)
+        if template.has_action
+        else None,
+    )
+
+
+# --- override checks (T-0227, TD-400) --------------------------------------------------------
+
+MAX_BLOCK: Final = {"subject": 200, "intro": 2000, "outro": 2000, "action_label": 80}
+# Something that looks like markup: a tag, a comment, a doctype or a processing instruction.
+_HTML: Final = re.compile(r"<[/!?]?[A-Za-z]|<!|<\?")
+# A link of any kind: the renderer adds the one link a template has, nothing else may.
+_URL: Final = re.compile(
+    r"(?i)(?:\b[a-z][a-z0-9+.-]*://|\bwww\.|\b(?:mailto|javascript|vbscript):)"
+)
+_CONTROL: Final = re.compile(r"[\x00-\x09\x0b-\x1f\x7f\u2028\u2029]")
+_LINE_BREAK: Final = re.compile(r"[\r\n]")
+
+
+def override_problems(template: MailTemplate, text: TemplateText) -> dict[str, str]:
+    """Why ``text`` may not override ``template`` (field -> reason; empty = acceptable).
+
+    Plain text only: no HTML, no URL (the renderer places the action link), no control
+    characters, no line break in the subject or the action label. Placeholders: only the
+    template's own (``placeholders()``), as a bare ``{name}``; never the link secret, never an
+    attribute, index, conversion or format spec. The subject and (with a link) the action
+    label are never empty; the intro and outro of a ``required`` template neither.
+    """
+    problems: dict[str, str] = {}
+    declared = set(template.placeholders())
+    values = {
+        "subject": text.subject,
+        "intro": text.intro,
+        "outro": text.outro,
+        "action_label": text.action_label,
+    }
+    if not template.has_action and text.action_label is not None:
+        problems["action_label"] = "this template has no action link"
+    for block in template.blocks():
+        value = values[block]
+        if value is None or not value.strip():
+            if block in ("subject", "action_label") or template.required:
+                problems[block] = "must not be empty"
+            continue
+        if len(value) > MAX_BLOCK[block]:
+            problems[block] = f"at most {MAX_BLOCK[block]} characters"
+        elif _CONTROL.search(value) or (
+            block in ("subject", "action_label") and _LINE_BREAK.search(value)
+        ):
+            problems[block] = "plain text only: no control characters or line breaks here"
+        elif _HTML.search(value):
+            problems[block] = "plain text only: HTML is not allowed"
+        elif _URL.search(value):
+            problems[block] = "no links: the action link is added when the e-mail is sent"
+        else:
+            reason = _placeholder_problem(template, value, declared)
+            if reason is not None:
+                problems[block] = reason
+    return problems
+
+
+def _placeholder_problem(template: MailTemplate, value: str, declared: set[str]) -> str | None:
+    try:
+        fields = placeholder_fields(value)
+    except ValueError:
+        return "unbalanced braces: write placeholders as {name}"
+    for name, conversion, spec in fields:
+        if template.secret is not None and name.split(".")[0].split("[")[0] == template.secret:
+            return "the link secret is never shown in the text"
+        if name not in declared or conversion is not None or spec:
+            allowed = ", ".join(f"{{{p}}}" for p in sorted(declared))
+            return f"unknown placeholder {{{name}}}; allowed: {allowed}"
+    return None
+
+
+# Synthetic values for previews and test sends (never real data).
+SAMPLE_VALUES: Final[dict[str, ContextValue]] = {
+    "expires_minutes": 15,
+    "expires_at": "1 January 2030 09:00",
+    "project_code": "SAMPLE-001",
+    "project_name": "Sample project",
+    "inviter_name": "Sam Sample",
+    "user_name": "Sam Sample",
+    "reason": "This is a sample reason.",
+}
+SAMPLE_SECRET: Final = "sample-link-not-valid-0000"
+
+
+def sample_context(template: MailTemplate) -> dict[str, ContextValue]:
+    """A context for ``template`` made of synthetic sample values; the secret (if any) is a
+    placeholder token that opens nothing."""
+    context: dict[str, ContextValue] = {
+        name: SAMPLE_VALUES.get(name, f"Sample {name.replace('_', ' ')}")
+        for name in template.params
+    }
+    if template.secret is not None:
+        context[template.secret] = SAMPLE_SECRET
+    return context
+
+
+@dataclass(frozen=True, slots=True)
 class RenderedMail:
     subject: str
     text: str
@@ -123,6 +276,9 @@ class TemplateRegistry:
         except KeyError:
             raise TemplateError(f"unknown mail template {key!r}") from None
 
+    def find(self, key: str) -> MailTemplate | None:
+        return self._templates.get(key)
+
     def all(self) -> tuple[MailTemplate, ...]:
         return tuple(self._templates[k] for k in sorted(self._templates))
 
@@ -138,7 +294,11 @@ def register_template(template: MailTemplate) -> MailTemplate:
 # reset: T-0077, access-request decisions: T-0063).
 MAGIC_LINK = register_template(
     MailTemplate(
-        "auth.magic_link", params=("expires_minutes",), link_path="/magic-link", secret="token"
+        "auth.magic_link",
+        params=("expires_minutes",),
+        link_path="/magic-link",
+        secret="token",
+        required=True,
     )
 )
 
@@ -151,9 +311,14 @@ PASSWORD_RESET = register_template(
         params=("expires_minutes",),
         link_path="/reset-password",
         secret="token",
+        required=True,
     )
 )
 PASSWORD_CHANGED = register_template(MailTemplate("auth.password_changed"))
+
+
+def _paragraph(text: str) -> str:
+    return "<br>\n".join(html.escape(line) for line in text.split("\n"))
 
 
 def render(
@@ -164,37 +329,53 @@ def render(
     default_locale: str = FALLBACK_LOCALE,
     app_name: str,
     web_origin: str,
+    override: TemplateText | None = None,
 ) -> RenderedMail:
-    """Subject, text and HTML of ``template`` in ``locale`` (else the default locale)."""
+    """Subject, text and HTML of ``template`` in ``locale`` (else the default locale).
+
+    ``override``: a System admin's wording (T-0227) instead of the shipped catalogue text. It
+    must pass ``override_problems`` (``ValueError`` otherwise); its placeholders are filled
+    like the catalogue's, every value is still escaped and the link is still built here. An
+    empty intro or outro (allowed for a template that is not ``required``) is left out."""
     values: dict[str, object] = {name: context[name] for name in template.params}
     values["app_name"] = app_name
+    own = f"mail.{template.key}"
 
     def text_of(key: str) -> str:
         return t(key, locale, default=default_locale, **values)
 
-    own = f"mail.{template.key}"
-    subject = text_of(f"{own}.subject")
-    intro, outro = text_of(f"{own}.intro"), text_of(f"{own}.outro")
+    if override is not None:
+        problems = override_problems(template, override)
+        if problems:
+            raise ValueError(f"mail template {template.key!r}: unusable override {problems}")
+        subject = override.subject.strip().format_map(values)
+        intro = override.intro.strip().format_map(values)
+        outro = override.outro.strip().format_map(values)
+        action = (override.action_label or "").strip().format_map(values)
+    else:
+        subject = text_of(f"{own}.subject")
+        intro, outro = text_of(f"{own}.intro"), text_of(f"{own}.outro")
+        action = text_of(f"{own}.action") if template.has_action else ""
     footer = text_of("mail.common.footer")
     lang = locale or default_locale
-    text_lines = [intro, ""]
-    html_lines = [f"<p>{html.escape(intro)}</p>"]
+    text_lines: list[str] = [intro, ""] if intro else []
+    html_lines: list[str] = [f"<p>{_paragraph(intro)}</p>"] if intro else []
     if template.link_path is not None:
         url = f"{web_origin.rstrip('/')}{template.link_path}"
         if template.secret is not None:
             url += f"#{quote(str(context[template.secret]))}"
-        action, fallback = text_of(f"{own}.action"), text_of("mail.common.link_fallback")
+        fallback = text_of("mail.common.link_fallback")
         text_lines += [f"{action}: {url}", ""]
         safe_url = html.escape(url, quote=True)
         html_lines += [
             f'<p><a href="{safe_url}" style="font-weight:bold">{html.escape(action)}</a></p>',
             f"<p>{html.escape(fallback)}<br>{html.escape(url)}</p>",
         ]
-    text_lines += [outro, "", "--", footer, ""]
-    html_lines += [
-        f"<p>{html.escape(outro)}</p>",
-        f'<hr><p style="font-size:12px;color:#555555">{html.escape(footer)}</p>',
-    ]
+    if outro:
+        text_lines += [outro, ""]
+        html_lines.append(f"<p>{_paragraph(outro)}</p>")
+    text_lines += ["--", footer, ""]
+    html_lines.append(f'<hr><p style="font-size:12px;color:#555555">{html.escape(footer)}</p>')
     body = "\n".join(html_lines)
     document = (
         f'<!DOCTYPE html>\n<html lang="{html.escape(lang)}"><head><meta charset="utf-8">'

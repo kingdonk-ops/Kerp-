@@ -46,9 +46,39 @@ def locale_chain(locale: str | None, default: str = FALLBACK_LOCALE) -> tuple[st
     return tuple(chain)
 
 
+def catalog_locales() -> tuple[str, ...]:
+    """The locales that ship a catalog (``en-AU`` first)."""
+    folder = files(__package__ or "app.core.mail") / "locales"
+    tags = sorted(
+        entry.name.removesuffix(".json")
+        for entry in folder.iterdir()
+        if entry.name.endswith(".json") and entry.is_file()
+    )
+    return tuple(sorted(tags, key=lambda tag: tag != FALLBACK_LOCALE))
+
+
 def placeholders(text: str) -> frozenset[str]:
     """The ``{name}`` placeholders of ``text``."""
     return frozenset(name for _, name, _, _ in _FORMATTER.parse(text) if name)
+
+
+def placeholder_fields(text: str) -> list[tuple[str, str | None, str]]:
+    """Every replacement field of ``text`` as ``(field name, conversion, format spec)``; an
+    empty field name (``{}``) comes back as ``""``. ``ValueError`` for unbalanced braces."""
+    return [
+        (name, conversion, spec or "")
+        for _, name, spec, conversion in _FORMATTER.parse(text)
+        if name is not None
+    ]
+
+
+def shipped(key: str, locale: str | None, *, default: str = FALLBACK_LOCALE) -> str:
+    """The unformatted text of ``key`` in the first catalog of the chain that has it."""
+    for tag in locale_chain(locale, default):
+        text = catalog(tag).get(key)
+        if text is not None:
+            return text
+    raise MissingTranslationError(f"no text for {key!r} in {locale_chain(locale, default)}")
 
 
 def t(key: str, locale: str | None, *, default: str = FALLBACK_LOCALE, **params: object) -> str:

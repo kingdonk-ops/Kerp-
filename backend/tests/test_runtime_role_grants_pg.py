@@ -132,7 +132,9 @@ def test_the_runtime_role_owns_nothing_and_has_what_it_needs(split: Split) -> No
             )
         ).scalar_one()
         assert owned == 0
-        for table in ("oe_projects_project", "auth_user", "tenants", "oe_jobs_job"):
+        # mail_template_override (0042, T-0227): created after 0039, granted by its defaults.
+        tables = ("oe_projects_project", "auth_user", "tenants", "oe_jobs_job")
+        for table in (*tables, "mail_template_override"):
             for privilege in ("SELECT", "INSERT", "UPDATE", "DELETE"):
                 assert _privilege(conn, split.role, table, privilege), (table, privilege)
             assert not _privilege(conn, split.role, table, "TRUNCATE"), table

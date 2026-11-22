@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 SendStatus = Literal["queued", "sent", "delivered", "bounced", "complained", "failed", "suppressed"]
 
@@ -73,3 +73,77 @@ class MailSuppressionRead(BaseModel):
     reason: Literal["bounce", "complaint"]
     detail: str | None
     created_at: datetime
+
+
+# --- automated template overrides (T-0227) ----------------------------------------------------
+
+Audience = Literal["internal_staff", "client", "external_party", "deployment_wide"]
+
+
+class MailTemplateTextRead(BaseModel):
+    """A template's rewordable texts in one locale, unformatted (``{name}`` placeholders).
+    ``action_label`` is ``null`` for a template without a link."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    subject: str
+    intro: str
+    outro: str
+    action_label: str | None
+
+
+class MailTemplateTextWrite(BaseModel):
+    """Plain text only, with the template's declared placeholders (``{user_name}``); no HTML,
+    no URL, never the link secret. ``action_label`` only for a template with a link. Checked
+    by the server (422 with one entry per refused field)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    subject: str = Field(max_length=200)
+    intro: str = Field(max_length=2000)
+    outro: str = Field(max_length=2000)
+    action_label: str | None = Field(default=None, max_length=80)
+
+
+class MailTemplateOverrideRead(MailTemplateTextRead):
+    """One revision of an override. ``version`` numbers the revisions; ``is_current``: the
+    one sends use now (none current: the shipped text)."""
+
+    id: uuid.UUID
+    template_key: str
+    locale: str
+    version: int
+    is_current: bool
+    created_at: datetime
+    created_by: uuid.UUID | None
+
+
+class MailTemplateLocaleRead(BaseModel):
+    locale: str
+    shipped: MailTemplateTextRead
+    override: MailTemplateOverrideRead | None
+
+
+class MailTemplateRead(BaseModel):
+    """A registered template: its audience group, whether it is required (no empty subject
+    or text block), whether it has an action link, the placeholders its texts may use, and
+    per locale the shipped text and the current override."""
+
+    key: str
+    audience: Audience
+    required: bool
+    has_action: bool
+    placeholders: list[str]
+    locales: list[MailTemplateLocaleRead]
+
+
+class MailPreviewRead(BaseModel):
+    """The rendered e-mail with synthetic sample values. ``html`` is a complete document."""
+
+    subject: str
+    text: str
+    html: str
+
+
+class MailTestSendRead(BaseModel):
+    send_id: uuid.UUID

@@ -1557,6 +1557,374 @@
         }
       }
     },
+    "/api/v1/mail/templates": {
+      "get": {
+        "tags": [
+          "mail"
+        ],
+        "summary": "List Templates",
+        "description": "Every registered template: audience group, required flag, declared placeholders, and\nper locale the shipped text and the tenant's current override.",
+        "operationId": "list_templates_api_v1_mail_templates_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MailTemplateRead"
+                  },
+                  "type": "array",
+                  "title": "Response List Templates Api V1 Mail Templates Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/mail/templates/{template_key}/{locale}/revisions": {
+      "get": {
+        "tags": [
+          "mail"
+        ],
+        "summary": "List Template Revisions",
+        "description": "Every saved revision of the template in this locale, newest first.",
+        "operationId": "list_template_revisions_api_v1_mail_templates__template_key___locale__revisions_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "template_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 100,
+              "pattern": "^[a-z][a-z0-9_]{1,39}\\.[a-z][a-z0-9_]{1,59}$",
+              "title": "Template Key"
+            }
+          },
+          {
+            "name": "locale",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 35,
+              "pattern": "^[a-z]{2,3}(-[A-Z]{2})?$",
+              "title": "Locale"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MailTemplateOverrideRead"
+                  },
+                  "title": "Response List Template Revisions Api V1 Mail Templates  Template Key   Locale  Revisions Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/mail/templates/{template_key}/{locale}": {
+      "put": {
+        "tags": [
+          "mail"
+        ],
+        "summary": "Save Template Override",
+        "description": "Save a new revision and make it current; the next send uses it. Audited.",
+        "operationId": "save_template_override_api_v1_mail_templates__template_key___locale__put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "template_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 100,
+              "pattern": "^[a-z][a-z0-9_]{1,39}\\.[a-z][a-z0-9_]{1,59}$",
+              "title": "Template Key"
+            }
+          },
+          {
+            "name": "locale",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 35,
+              "pattern": "^[a-z]{2,3}(-[A-Z]{2})?$",
+              "title": "Locale"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MailTemplateTextWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MailTemplateOverrideRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "mail"
+        ],
+        "summary": "Reset Template Override",
+        "description": "Back to the shipped default (revisions kept; audited). Idempotent.",
+        "operationId": "reset_template_override_api_v1_mail_templates__template_key___locale__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "template_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 100,
+              "pattern": "^[a-z][a-z0-9_]{1,39}\\.[a-z][a-z0-9_]{1,59}$",
+              "title": "Template Key"
+            }
+          },
+          {
+            "name": "locale",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 35,
+              "pattern": "^[a-z]{2,3}(-[A-Z]{2})?$",
+              "title": "Locale"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/mail/templates/{template_key}/{locale}/preview": {
+      "post": {
+        "tags": [
+          "mail"
+        ],
+        "summary": "Preview Template",
+        "description": "Render with synthetic sample values: the draft in the body (checked like a save,\nnothing stored), else what a send would use now.",
+        "operationId": "preview_template_api_v1_mail_templates__template_key___locale__preview_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "template_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 100,
+              "pattern": "^[a-z][a-z0-9_]{1,39}\\.[a-z][a-z0-9_]{1,59}$",
+              "title": "Template Key"
+            }
+          },
+          {
+            "name": "locale",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 35,
+              "pattern": "^[a-z]{2,3}(-[A-Z]{2})?$",
+              "title": "Locale"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/MailTemplateTextWrite"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MailPreviewRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/mail/templates/{template_key}/{locale}/test-send": {
+      "post": {
+        "tags": [
+          "mail"
+        ],
+        "summary": "Send Template Test",
+        "description": "Queue the template with sample values to the caller's own address only (the request\nnames no recipient). Rate-limited (429 with ``Retry-After``); audited.",
+        "operationId": "send_template_test_api_v1_mail_templates__template_key___locale__test_send_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "template_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 100,
+              "pattern": "^[a-z][a-z0-9_]{1,39}\\.[a-z][a-z0-9_]{1,59}$",
+              "title": "Template Key"
+            }
+          },
+          {
+            "name": "locale",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 35,
+              "pattern": "^[a-z]{2,3}(-[A-Z]{2})?$",
+              "title": "Locale"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MailTestSendRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/settings/deployment": {
       "get": {
         "tags": [
@@ -12370,6 +12738,30 @@
         "title": "MailCountsRead",
         "description": "Delivery-ledger counts (T-0226). ``sent``: accepted by SES (now sent, delivered,\nbounced or complained); ``delivered``: SES reported the delivery (now delivered or\ncomplained); the others: sends in that status. ``delivery_rate`` = delivered / sent\n(0..1, 4 decimals), ``null`` when nothing was sent."
       },
+      "MailPreviewRead": {
+        "properties": {
+          "subject": {
+            "type": "string",
+            "title": "Subject"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "html": {
+            "type": "string",
+            "title": "Html"
+          }
+        },
+        "type": "object",
+        "required": [
+          "subject",
+          "text",
+          "html"
+        ],
+        "title": "MailPreviewRead",
+        "description": "The rendered e-mail with synthetic sample values. ``html`` is a complete document."
+      },
       "MailSendRead": {
         "properties": {
           "id": {
@@ -12687,6 +13079,256 @@
           "template_key"
         ],
         "title": "MailTemplateCountsRead"
+      },
+      "MailTemplateLocaleRead": {
+        "properties": {
+          "locale": {
+            "type": "string",
+            "title": "Locale"
+          },
+          "shipped": {
+            "$ref": "#/components/schemas/MailTemplateTextRead"
+          },
+          "override": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MailTemplateOverrideRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "locale",
+          "shipped",
+          "override"
+        ],
+        "title": "MailTemplateLocaleRead"
+      },
+      "MailTemplateOverrideRead": {
+        "properties": {
+          "subject": {
+            "type": "string",
+            "title": "Subject"
+          },
+          "intro": {
+            "type": "string",
+            "title": "Intro"
+          },
+          "outro": {
+            "type": "string",
+            "title": "Outro"
+          },
+          "action_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Action Label"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "template_key": {
+            "type": "string",
+            "title": "Template Key"
+          },
+          "locale": {
+            "type": "string",
+            "title": "Locale"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "is_current": {
+            "type": "boolean",
+            "title": "Is Current"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          }
+        },
+        "type": "object",
+        "required": [
+          "subject",
+          "intro",
+          "outro",
+          "action_label",
+          "id",
+          "template_key",
+          "locale",
+          "version",
+          "is_current",
+          "created_at",
+          "created_by"
+        ],
+        "title": "MailTemplateOverrideRead",
+        "description": "One revision of an override. ``version`` numbers the revisions; ``is_current``: the\none sends use now (none current: the shipped text)."
+      },
+      "MailTemplateRead": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "audience": {
+            "type": "string",
+            "enum": [
+              "internal_staff",
+              "client",
+              "external_party",
+              "deployment_wide"
+            ],
+            "title": "Audience"
+          },
+          "required": {
+            "type": "boolean",
+            "title": "Required"
+          },
+          "has_action": {
+            "type": "boolean",
+            "title": "Has Action"
+          },
+          "placeholders": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Placeholders"
+          },
+          "locales": {
+            "items": {
+              "$ref": "#/components/schemas/MailTemplateLocaleRead"
+            },
+            "type": "array",
+            "title": "Locales"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "audience",
+          "required",
+          "has_action",
+          "placeholders",
+          "locales"
+        ],
+        "title": "MailTemplateRead",
+        "description": "A registered template: its audience group, whether it is required (no empty subject\nor text block), whether it has an action link, the placeholders its texts may use, and\nper locale the shipped text and the current override."
+      },
+      "MailTemplateTextRead": {
+        "properties": {
+          "subject": {
+            "type": "string",
+            "title": "Subject"
+          },
+          "intro": {
+            "type": "string",
+            "title": "Intro"
+          },
+          "outro": {
+            "type": "string",
+            "title": "Outro"
+          },
+          "action_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Action Label"
+          }
+        },
+        "type": "object",
+        "required": [
+          "subject",
+          "intro",
+          "outro",
+          "action_label"
+        ],
+        "title": "MailTemplateTextRead",
+        "description": "A template's rewordable texts in one locale, unformatted (``{name}`` placeholders).\n``action_label`` is ``null`` for a template without a link."
+      },
+      "MailTemplateTextWrite": {
+        "properties": {
+          "subject": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Subject"
+          },
+          "intro": {
+            "type": "string",
+            "maxLength": 2000,
+            "title": "Intro"
+          },
+          "outro": {
+            "type": "string",
+            "maxLength": 2000,
+            "title": "Outro"
+          },
+          "action_label": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Action Label"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "subject",
+          "intro",
+          "outro"
+        ],
+        "title": "MailTemplateTextWrite",
+        "description": "Plain text only, with the template's declared placeholders (``{user_name}``); no HTML,\nno URL, never the link secret. ``action_label`` only for a template with a link. Checked\nby the server (422 with one entry per refused field)."
+      },
+      "MailTestSendRead": {
+        "properties": {
+          "send_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Send Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "send_id"
+        ],
+        "title": "MailTestSendRead"
       },
       "MeResponse": {
         "properties": {

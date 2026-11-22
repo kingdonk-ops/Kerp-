@@ -6,8 +6,9 @@
   Only after the caller's transaction commits is it handed to the queue (``queue.py``); a
   rollback drops it. Nothing is ever sent from a request, and a failed send can never roll
   back the caller's business action (it happens later, in the worker, in its own unit of work).
-* ``deliver`` (worker) skips a suppressed address (``suppressed``), renders the template,
-  hands it to the transport, and records ``sent`` with the provider message id, ``failed``
+* ``deliver`` (worker) skips a suppressed address (``suppressed``), renders the template
+  (with the tenant's current override, T-0227, read in the same unit of work), hands it to
+  the transport, and records ``sent`` with the provider message id, ``failed``
   for a permanent error or the last attempt, or raises ``RetryMail`` for a transient error so
   the queue tries again with back-off.
 * ``record_ses_event`` (SNS endpoint) marks the send-log row ``delivered`` on a delivery,
@@ -35,8 +36,9 @@ from app.core.config import Settings
 from app.core.db import Database, utcnow
 from app.core.mail.addresses import address_hash, mask_address, normalize_address
 from app.core.mail.models import MailSend, MailSuppression
+from app.core.mail.overrides import effective_override
 from app.core.mail.queue import QueuedMail, mail_enqueuer
-from app.core.mail.templates import TEMPLATES, TemplateError, render
+from app.core.mail.templates import TEMPLATES, TemplateError, TemplateText, render
 from app.core.mail.transport import (
     MailTransport,
     OutboundMessage,
@@ -185,19 +187,31 @@ def _live_suppression(session: Session, recipient_hash: str) -> MailSuppression 
     ).first()
 
 
-def _begin(db: Database, mail: QueuedMail) -> str | None:
-    """Count the attempt; ``None`` to go ahead, else the row's final status."""
+@dataclass(frozen=True, slots=True)
+class _Begun:
+    """``status``: ``None`` to go ahead, else the row's final status. ``override``: the
+    tenant's current wording of the template for the mail's locale (T-0227), else ``None``."""
+
+    status: str | None
+    override: TemplateText | None = None
+
+
+def _begin(db: Database, mail: QueuedMail, default_locale: str) -> _Begun:
+    """Count the attempt and read the template override the send renders with."""
     with db.unit_of_work(_scope(mail)) as session:
         row = session.get(MailSend, mail.send_id)
         if row is None:
-            return "missing"
+            return _Begun("missing")
         if row.status != "queued":
-            return row.status  # delivered or settled by an earlier run (SAQ at-least-once)
+            return _Begun(row.status)  # delivered or settled by an earlier run (at-least-once)
         if _live_suppression(session, row.recipient_hash) is not None:
             row.status, row.status_at = "suppressed", utcnow()
-            return "suppressed"
+            return _Begun("suppressed")
         row.attempts += 1
-        return None
+        template = TEMPLATES.find(mail.template_key)
+        if template is None:  # unknown: ``render`` below records the failure
+            return _Begun(None)
+        return _Begun(None, effective_override(session, template, mail.locale, default_locale))
 
 
 def _settle(
@@ -229,12 +243,13 @@ def _settle(
 def deliver(delivery: Delivery, mail: QueuedMail, *, final_attempt: bool) -> str:
     """Send one queued mail; return its status. Raises ``RetryMail`` for a transient error
     when another attempt is left (the queue backs off and calls again)."""
-    settled = _begin(delivery.db, mail)
+    settings = delivery.settings
+    begun = _begin(delivery.db, mail, settings.mail_default_locale)
+    settled = begun.status
     if settled is not None:
         if settled == "missing":
             logger.warning("mail send-log row not found", extra={"send_id": str(mail.send_id)})
         return settled
-    settings = delivery.settings
     try:
         rendered = render(
             TEMPLATES.get(mail.template_key),
@@ -243,6 +258,7 @@ def deliver(delivery: Delivery, mail: QueuedMail, *, final_attempt: bool) -> str
             default_locale=settings.mail_default_locale,
             app_name=settings.app_name,
             web_origin=settings.web_origin or _dev_origin(settings),
+            override=begun.override,
         )
         message_id = delivery.transport.send(OutboundMessage(mail.to, rendered, mail.template_key))
     except TransientMailError as exc:

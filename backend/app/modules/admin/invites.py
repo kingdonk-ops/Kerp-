@@ -152,6 +152,7 @@ INVITE_TEMPLATE: Final = register_template(
         params=("project_code", "project_name", "inviter_name", "expires_at"),
         link_path="/invite",
         secret="link_token",
+        required=True,  # an override may reword it, never empty it (T-0227)
     )
 )
 
