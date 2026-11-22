@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 426 · **Closed:** 171
+**Open:** 427 · **Closed:** 171
 
 ## decision (40)
 
@@ -223,7 +223,7 @@
 | [TD-510](../tracker/todo/TD-510.md) | Deployment-config view lacks the mail reply-to of diff §4.7: Settings has no reply-to field yet | T-0230 | implementer |
 | [TD-533](../tracker/todo/TD-533.md) | CEL client runtime has no evaluation step budget (cel-js exposes no step hook; server is the hard gate) | T-0341 | implementer |
 
-## later (173)
+## later (174)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -400,6 +400,7 @@
 | [TD-606](../tracker/todo/TD-606.md) | Pin pydantic (or normalise the export) so the generated OpenAPI Decimal pattern does not drift | T-0228 | implementer |
 | [TD-607](../tracker/todo/TD-607.md) | Test PG databases are named by xdist worker only (pg_databases.py): parallel sessions on one cluster drop each other's databases — add a per-run prefix | T-0279 | coordinator |
 | [TD-608](../tracker/todo/TD-608.md) | e2e: a per-run broadcaster in the seed, so local re-runs of the Communications journey never meet the 5-broadcasts-per-24h limit of the shared System admin | T-0229 | implementer |
+| [TD-610](../tracker/todo/TD-610.md) | Machine-readable 422 codes for mail template overrides and broadcast refusals, so the Communications UI stops matching English reason text | T-0229 | implementer |
 
 ## bug (18)
 

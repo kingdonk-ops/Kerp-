@@ -205,6 +205,7 @@ test.describe("Admin → Communications journey", () => {
     await tab.goto(`/unsubscribe#${token}`);
     await expect(tab.getByRole("heading", { name: t("unsubscribe.title"), level: 1 })).toBeVisible();
     await expect.poll(() => new URL(tab.url()).hash).toBe("");
+    expect(new URL(tab.url()).pathname).toBe("/unsubscribe");
     const posted = tab.waitForResponse(
       (r) => new URL(r.url()).pathname === "/api/v1/notifications/broadcasts/unsubscribe",
     );

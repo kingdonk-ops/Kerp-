@@ -3,6 +3,7 @@ import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { i18n } from "../i18n";
+import type { ProjectSummary } from "../projects/directory";
 import { json } from "../test/fakeApi";
 import { BROADCAST, BROADCAST_ID, COUNTS } from "./commsFixtures";
 import { ADMIN_PROJECT, project, renderAdmin } from "./testing";
@@ -114,12 +115,44 @@ describe("broadcast composer", () => {
     expect(tabs.getAllByRole("link").map((l) => l.textContent)).toEqual([tr("admin.comms.broadcastsTab")]);
   });
 
+  it("never offers or sends a project where the PER-09 is only a member", async () => {
+    const member: ProjectSummary = {
+      id: "00000000-0000-4000-8000-000000000103",
+      code: "SYN-003",
+      name: "Synthetic Jetty",
+      personas: ["PER-01"],
+      access: "member",
+    };
+    const calls = renderAdmin(PATH, handlers(), { projects: [ADMIN_PROJECT, member] });
+    await composer();
+    const own = screen.getByLabelText(tr("admin.comms.broadcasts.project", { code: ADMIN_PROJECT.code, name: ADMIN_PROJECT.name }));
+    expect(screen.getAllByRole("checkbox", { name: /SYN-/ })).toEqual([own]);
+    expect(screen.queryByLabelText(tr("admin.comms.broadcasts.project", { code: member.code, name: member.name }))).not.toBeInTheDocument();
+
+    fireEvent.click(own);
+    write("Synthetic notice", "Body.");
+    fireEvent.click(button("admin.comms.broadcasts.count"));
+    await screen.findByText(tr("admin.comms.broadcasts.recipients", { count: 12 }), {}, WAIT);
+    fireEvent.click(button("admin.comms.broadcasts.send"));
+    fireEvent.click(await screen.findByRole("button", { name: tr("admin.comms.broadcasts.confirm", { count: 12 }) }, WAIT));
+    await screen.findByText(tr("admin.comms.broadcasts.queued", { count: 12 }), {}, WAIT);
+    const bodies = calls
+      .filter((c) => c.method === "POST" && c.path.startsWith("/api/v1/notifications/broadcasts"))
+      .map((c) => c.body as { project_ids: string[] });
+    expect(bodies).toHaveLength(2);
+    for (const body of bodies) expect(body.project_ids).toEqual([ADMIN_PROJECT.id]);
+  });
+
   it.each([
     [{ status: 429, headers: { "Retry-After": "3600" } }, /^You have sent the maximum number of broadcasts for now\. Try again from /],
     [{ status: 403, body: { detail: "x", code: "IMPERSONATION_ACTION_FORBIDDEN" } }, tr("admin.comms.broadcasts.impersonating")],
     [{ status: 403, body: { detail: "Forbidden" } }, tr("admin.comms.broadcasts.notAllowed")],
     [{ status: 404, body: { detail: "Not found" } }, tr("admin.comms.broadcasts.outOfScope")],
     [{ status: 422, body: { detail: "The audience has no recipients" } }, tr("admin.comms.broadcasts.noRecipients")],
+    [
+      { status: 422, body: { detail: [{ loc: ["body", "subject"], msg: "plain text on one line", type: "value_error" }] } },
+      tr("admin.comms.broadcasts.sendRefused"),
+    ],
   ] as const)("explains a refused send (%o)", async (answer, message) => {
     const respond = () =>
       new Response(JSON.stringify("body" in answer ? answer.body : { detail: "x" }), {
@@ -135,6 +168,7 @@ describe("broadcast composer", () => {
     fireEvent.click(await screen.findByRole("button", { name: tr("admin.comms.broadcasts.confirm", { count: 12 }) }, WAIT));
     expect(await screen.findByText(message, {}, WAIT)).toHaveAttribute("role", "alert");
     expect(document.body.textContent).not.toContain("The audience has no recipients");
+    expect(document.body.textContent).not.toContain("plain text on one line");
   });
 });
 

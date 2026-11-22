@@ -14,6 +14,7 @@ describe("unsubscribe page", () => {
     const { calls, router } = renderAt(`/unsubscribe#${TOKEN}`, { [`POST ${PATH}`]: () => json({ status: "ok" }) });
     await screen.findByRole("heading", { name: i18n.t("unsubscribe.title") });
     expect(router.state.location.hash).toBe("");
+    expect(router.state.location.pathname).toBe("/unsubscribe");
     // Nothing on load: link scanners prefetch.
     expect(calls.some((c) => c.path === PATH)).toBe(false);
 

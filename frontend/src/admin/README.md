@@ -115,7 +115,9 @@ Tabs (`COMMS_TABS`, `CommsTabs` in `ui.tsx`): **Broadcasts** for PER-09 holders 
 **Delivery** and **E-mail templates** for System admins only (hidden from everyone else; the API
 answers them 403). `useCommsGate(systemAdminOnly)` enables the queries only for a caller who may
 use the screen; anyone else gets `admin.comms.forbidden` / `forbiddenSystem` and nothing is
-called. Fixtures: `commsFixtures.ts`.
+called. Fixtures: `commsFixtures.ts`. The three screens and `/unsubscribe` are lazy routes
+(`lazy` in `src/app/routes.tsx`): their code is a separate chunk loaded on first visit, which keeps
+the main bundle under Vite's 500 kB warning.
 
 - **Broadcasts** (`CommsBroadcastsPage`, T-0228, TD-399): the composer. A System admin chooses
   *All active users* (`scope: tenant`) or projects of `GET /projects`; a PER-09 gets no tenant
@@ -127,7 +129,8 @@ called. Fixtures: `commsFixtures.ts`.
   (≤ 10 000, line breaks kept). Send asks first ("goes to N people; cannot be recalled"), then
   `POST /notifications/broadcasts` (202). Refusals are explained, never the server text: `403`
   (`IMPERSONATION_ACTION_FORBIDDEN` while logged in as another user, else not allowed), `404`
-  (a project not the caller's), `422` (nobody in the audience), `429` (5 per 24 h, with the time
+  (a project not the caller's), `422` (nobody in the audience; any other `422` says the broadcast
+could not be sent: TD-610 for stable codes), `429` (5 per 24 h, with the time
   from `Retry-After`). Below: **Sent broadcasts** (`GET /notifications/broadcasts`, 50 per page),
   each a card with status, audience (project codes), recipients, queued, skipped, created and
   finished; **Delivery** opens `GET /notifications/broadcasts/{id}` and shows its count cards

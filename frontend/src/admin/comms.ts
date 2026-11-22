@@ -68,10 +68,15 @@ export type SendBroadcastResult =
   | { kind: "ok"; broadcast: Broadcast }
   | { kind: "forbidden"; impersonating: boolean }
   | { kind: "outOfScope" }
+  | { kind: "noRecipients" }
   | { kind: "invalid" }
   | { kind: "rateLimited"; retryAfter: number | null };
 
-/** Queue the broadcast (202). 403 / 404 / 422 / 429 come back as results, not errors. */
+/**
+ * Queue the broadcast (202). 403 / 404 / 422 / 429 come back as results, not errors. A 422
+ * with a string `detail` is the empty audience (T-0228 router); any other 422 (body
+ * validation the client did not catch) is `invalid`. Machine-readable codes: TD-610.
+ */
 export async function sendBroadcast(
   api: ApiClient,
   body: components["schemas"]["BroadcastWrite"],
@@ -84,7 +89,10 @@ export async function sendBroadcast(
     case 404:
       return { kind: "outOfScope" };
     case 422:
-      return { kind: "invalid" };
+      // The empty-audience refusal is a plain-text `detail`; body validation is a list.
+      return typeof (error as { detail?: unknown } | undefined)?.detail === "string"
+        ? { kind: "noRecipients" }
+        : { kind: "invalid" };
     case 429:
       return { kind: "rateLimited", retryAfter: retryAfter(response) };
     default:
@@ -272,11 +280,15 @@ function refusalReason(msg: string): RefusalReason {
   if (msg.includes("HTML")) return "html";
   if (msg.includes("line breaks")) return "lineBreak";
   if (msg.startsWith("no links")) return "url";
-  if (msg.includes("placeholder") || msg.includes("{")) return "placeholder";
+  if (msg.includes("placeholder") || msg.includes("link secret") || msg.includes("{")) return "placeholder";
   return "other";
 }
 
-/** A `422`'s per-field problems (`loc: ["body", "<field>"]`); never the server's text. */
+/**
+ * A `422`'s per-field problems (`loc: ["body", "<field>"]`); never the server's text. The
+ * server's reasons are English text (`override_problems`, backend `core/mail/templates.py`);
+ * `comms.test.ts` lists each one so a change there fails here. Stable codes: TD-610.
+ */
 export function refusedFields(error: unknown): Partial<Record<TemplateField, RefusalReason>> {
   const detail = (error as { detail?: unknown } | undefined)?.detail;
   const out: Partial<Record<TemplateField, RefusalReason>> = {};

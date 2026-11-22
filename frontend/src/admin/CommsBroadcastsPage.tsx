@@ -297,8 +297,10 @@ function SendOutcome({ result, lang }: { result: SendBroadcastResult; lang: stri
       );
     case "outOfScope":
       return <p role="alert">{t("admin.comms.broadcasts.outOfScope")}</p>;
-    case "invalid":
+    case "noRecipients":
       return <p role="alert">{t("admin.comms.broadcasts.noRecipients")}</p>;
+    case "invalid":
+      return <p role="alert">{t("admin.comms.broadcasts.sendRefused")}</p>;
     case "rateLimited": {
       const time = retryTime(result.retryAfter, lang);
       return (

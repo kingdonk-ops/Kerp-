@@ -798,6 +798,7 @@ export const en = {
         confirm: "Send to {{count}} people",
         queued: "Broadcast queued for {{count}} people.",
         noRecipients: "This audience reaches nobody. Change the audience.",
+        sendRefused: "The broadcast could not be sent. Check the subject and message and try again.",
         outOfScope: "One of the chosen projects is not yours to e-mail.",
         notAllowed: "You may not send to this audience.",
         impersonating: "Broadcasts cannot be sent while you are logged in as another user.",
