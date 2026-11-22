@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 396 · **Closed:** 165
+**Open:** 401 · **Closed:** 165
 
 ## decision (40)
 
@@ -216,7 +216,7 @@
 | [TD-510](../tracker/todo/TD-510.md) | Deployment-config view lacks the mail reply-to of diff §4.7: Settings has no reply-to field yet | T-0230 | implementer |
 | [TD-533](../tracker/todo/TD-533.md) | CEL client runtime has no evaluation step budget (cel-js exposes no step hook; server is the hard gate) | T-0341 | implementer |
 
-## later (154)
+## later (158)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -374,6 +374,10 @@
 | [TD-566](../tracker/todo/TD-566.md) | Inline read-only Gantt preview of an XER held in document control, from the server-side parse; display only, never an import path | E-04-01, E-04-12 | planner |
 | [TD-568](../tracker/todo/TD-568.md) | Adopt core tenant_level_context in the remaining tenant-level session guards | T-0349 | implementer |
 | [TD-569](../tracker/todo/TD-569.md) | Use core sha256_hex for the remaining inline SHA-256 hex digests (lockout subject, mail address, admin e-mail) | T-0349 | implementer |
+| [TD-582](../tracker/todo/TD-582.md) | Startup safety: also refuse a runtime role with no grants on app tables (0039 skipped), not only one with too much access (PR #181 review) | T-0342 | reviewer |
+| [TD-583](../tracker/todo/TD-583.md) | first-run.md: replace 'downgrade to 0038 and upgrade again' with a re-runnable grant command once migrations past 0039 exist (PR #181 review) | T-0343 | reviewer |
+| [TD-585](../tracker/todo/TD-585.md) | CEL runtime sets sys.setrecursionlimit inside evaluate on the request path; set it once at startup (PR #181 review) | T-0341 | reviewer |
+| [TD-586](../tracker/todo/TD-586.md) | Expose X-Next-Offset in the native-app CORS expose_headers before a native client pages the drift report (PR #181 review) | T-0348 | reviewer |
 
 ## bug (17)
 
@@ -397,7 +401,7 @@
 | [TD-534](../tracker/todo/TD-534.md) | API shutdown raises when Redis is unreachable: SaqBroker.close() (SAQ RedisQueue.disconnect) connects to close its pub/sub | T-0342 | implementer |
 | [TD-560](../tracker/todo/TD-560.md) | review gate counts dismissed reviews: a dismissed KERP-REVIEW APPROVED still satisfies scripts/review_gate.py | — | planner |
 
-## risk (34)
+## risk (35)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -435,6 +439,7 @@
 | [TD-462](../tracker/todo/TD-462.md) | Internal contexts that bind is_system_admin=True for a narrow read (jobs scheduler deployment_scopes, teams reconcile, onboarding, the invite token lookup) now also see every project-scoped record of the tenant under ADR 0016 | T-0274 | implementer |
 | [TD-497](../tracker/todo/TD-497.md) | Quarantine re-check: a second verify job can still overlap one whose worker thread is mid-check after a queue-monitor abort (failed/ABORTED while the to_thread verify_upload runs on) or a queue-monitor retry of the replaced failed job; the later job finds the shared quarantine object gone and rejects a clean file as missing_object, the other leaves an orphan content object (fail-safe, nothing published unscanned) | T-0221 | implementer |
 | [TD-520](../tracker/todo/TD-520.md) | Review gate accepts a 7-character patch-id prefix (MARKER_RE [0-9a-f]{7,40} plus prefix matching) | — | planner |
+| [TD-584](../tracker/todo/TD-584.md) | Refresh grace: a failed commit after the token is consumed leaves the client unable to refresh; log replays inside the 30 s grace window (PR #181 review) | T-0345 | reviewer |
 
 ## Closed
 
