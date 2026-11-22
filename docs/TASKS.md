@@ -3,11 +3,11 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 112/322 tasks done (35%) · **ready now:** 21 · **epics awaiting breakdown:** 49
+**Overall:** 113/322 tasks done (35%) · **ready now:** 23 · **epics awaiting breakdown:** 49
 
 | Phase | Tasks done | Progress |
 |---|---|---|
-| 0 · Platform foundations | 110/127 | `████████░░` 87% |
+| 0 · Platform foundations | 111/127 | `████████░░` 87% |
 | 1 · Asset & Quality backbone | 2/169 (+2 epics) | `░░░░░░░░░░` 1% |
 | 2 · Welding quality | 0/11 | `░░░░░░░░░░` 0% |
 | 3 · Logistics | 0/2 (+7 epics) | `░░░░░░░░░░` 0% |
@@ -144,9 +144,9 @@
 | ✅ | [T-0274](../tracker/tasks/T-0274.md) | tenancy: system_admin global project visibility (ADR 0016) — additive migration replacing project_isolation_policy on every project-scoped table through the frozen-DDL helper, ORM scope mirror, RLS contract tests updated | tenancy | M | T-0007, T-0014, T-0033 | #151 |
 | ✅ | [T-0275](../tracker/tasks/T-0275.md) | identity/projects: system_admin capabilities on every project (V, C, E, administer; never A or S), all projects in GET /projects and /me/projects, SoD warning for hold personas on system_admins | identity | S | T-0274, T-0010, T-0014, T-0042 | #158 |
 | ✅ | [T-0276](../tracker/tasks/T-0276.md) | Frontend: project picker and All-Projects scope show every project for a system_admin (badge for admin access without membership; no A/S actions) | frontend | S | T-0275, T-0042, T-0024 | #163 |
-| 🟪 | [T-0277](../tracker/tasks/T-0277.md) | identity: system_admin impersonation token — POST /admin/users/{id}/impersonate and /auth/impersonation/exit, single-session impersonation JWT (no refresh), target RLS with is_system_admin = false, end-of-session e-mail to the target | identity | M | T-0006, T-0008, T-0010, T-0014, T-0039, T-0043, T-0058, T-0230, T-0274 | #184 |
-| ⬜ | [T-0278](../tracker/tasks/T-0278.md) | identity: central impersonation guardrail — 403 IMPERSONATION_ACTION_FORBIDDEN for A/S authority, signing, co-sign, inspection submit/approve, hold release, overrides and credential/device/grant mutations; route-classification contract test | identity | M | T-0277, T-0010 |  |
-| ⬜ | [T-0279](../tracker/tasks/T-0279.md) | audit: dual-identity ledger entries during impersonation — impersonated_by_user_id column, ledger hash v3, attribution in the audit explorer (ADR 0015) | audit | S | T-0006, T-0043, T-0277 |  |
+| ✅ | [T-0277](../tracker/tasks/T-0277.md) | identity: system_admin impersonation token — POST /admin/users/{id}/impersonate and /auth/impersonation/exit, single-session impersonation JWT (no refresh), target RLS with is_system_admin = false, end-of-session e-mail to the target | identity | M | T-0006, T-0008, T-0010, T-0014, T-0039, T-0043, T-0058, T-0230, T-0274 | #184 |
+| ▶ | [T-0278](../tracker/tasks/T-0278.md) | identity: central impersonation guardrail — 403 IMPERSONATION_ACTION_FORBIDDEN for A/S authority, signing, co-sign, inspection submit/approve, hold release, overrides and credential/device/grant mutations; route-classification contract test | identity | M | T-0277, T-0010 |  |
+| ▶ | [T-0279](../tracker/tasks/T-0279.md) | audit: dual-identity ledger entries during impersonation — impersonated_by_user_id column, ledger hash v3, attribution in the audit explorer (ADR 0015) | audit | S | T-0006, T-0043, T-0277 |  |
 | ▶ | [T-0351](../tracker/tasks/T-0351.md) | CI: CycloneDX SBOM job (hardening only) + docs/security controls self-assessment and records-retention-by-data-class table | platform | S | T-0086 |  |
 
 ## Phase 1 — Asset & Quality backbone
