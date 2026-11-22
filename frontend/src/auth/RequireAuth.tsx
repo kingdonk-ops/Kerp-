@@ -10,7 +10,9 @@ export function RequireAuth() {
   const location = useLocation();
 
   if (status === "anonymous") {
-    return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+    // The whole location (query and hash too, TD-521): a deep link survives the sign-in.
+    const from = `${location.pathname}${location.search}${location.hash}`;
+    return <Navigate to="/login" replace state={{ from }} />;
   }
   if (status === "error") {
     return (

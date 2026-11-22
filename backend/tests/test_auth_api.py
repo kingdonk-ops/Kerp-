@@ -22,11 +22,7 @@ from app.core.auth.revocation import InMemoryRevocationStore, RevocationUnavaila
 from app.core.auth.runtime import AuthRuntime
 from app.core.auth.service import set_password
 from app.core.db import Database, DbSession
-from app.core.tenancy.context import (
-    TenancyContext,
-    current_tenant_id,
-    current_user_id,
-)
+from app.core.tenancy.context import TenancyContext
 from app.core.tenancy.rls import session_tenancy
 from tests.audit_support import migrated_database
 from tests.auth_support import (
@@ -79,8 +75,6 @@ def app_runtime(tmp_path: Path, db: Database) -> tuple[FastAPI, AuthRuntime]:
             "tenant": str(principal.tenant_id),
             "bound_tenant": str(bound.tenant_id) if bound else None,
             "bound_project": str(bound.project_id) if bound and bound.project_id else None,
-            "ctx_tenant": str(current_tenant_id.get()),
-            "ctx_user": str(current_user_id.get()),
         }
 
     @app.get("/_bound")
@@ -326,8 +320,6 @@ def test_request_session_is_bound_to_the_token_tenant(
         "tenant": str(T1),
         "bound_tenant": str(T1),
         "bound_project": None,
-        "ctx_tenant": str(T1),
-        "ctx_user": str(users["alice"]),
     }
 
 
@@ -446,14 +438,19 @@ def test_refresh_rotates_both_tokens_in_the_same_session(
     assert refresh(client, rotated["refresh_token"]).status_code == 200
 
 
-def test_refresh_token_reuse_revokes_the_whole_session(client: TestClient) -> None:
+def test_spent_refresh_token_is_refused_at_once_without_ending_the_session(
+    client: TestClient,
+) -> None:
+    """Within the 30-second retry grace (T-0345) a spent token is refused, but the session
+    survives: the client may just have lost the answer. A replay after the grace revokes
+    the whole session (``test_auth_sessions``, on an injected clock)."""
     tokens = _login(client)
     rotated = token_body(refresh(client, tokens["refresh_token"]))
-    # The old refresh token is replayed (stolen copy): rejected, and the session is killed.
-    replay = refresh(client, tokens["refresh_token"])
-    assert replay.status_code == 401
-    assert client.get(ME, headers=_bearer(rotated["access_token"])).status_code == 401
-    assert refresh(client, rotated["refresh_token"]).status_code == 401
+    retry = refresh(client, tokens["refresh_token"])
+    assert retry.status_code == 401
+    assert retry.headers["www-authenticate"] == 'Bearer error="invalid_token"'
+    assert client.get(ME, headers=_bearer(rotated["access_token"])).status_code == 200
+    assert refresh(client, rotated["refresh_token"]).status_code == 200
 
 
 def test_access_token_cannot_be_used_to_refresh(client: TestClient) -> None:
@@ -525,7 +522,7 @@ def test_unregistered_refresh_token_is_rejected(
 def test_revocation_store_outage_is_503_not_access(
     tmp_path: Path, db: Database, users: dict[str, uuid.UUID]
 ) -> None:
-    from app.core.auth.revocation import RedisRevocationStore
+    from app.core.auth.revocation import AUTH_UNAVAILABLE, RedisRevocationStore
 
     app, runtime = auth_app(
         make_settings(database_url=database_url(tmp_path)),
@@ -538,10 +535,12 @@ def test_revocation_store_outage_is_503_not_access(
         "refresh", user_id=users["alice"], tenant_id=T1, session_id=uuid.uuid4()
     )
     with TestClient(app) as c:
-        assert c.get(ME, headers=_bearer(token.token)).status_code == 503
+        me = c.get(ME, headers=_bearer(token.token))
         login = c.post(LOGIN, json={"email": ALICE, "password": PASSWORD})
-        assert login.status_code == 503
-        assert refresh(c, minted.token).status_code == 503
+        renewed = refresh(c, minted.token)
+    for response in (me, login, renewed):
+        assert response.status_code == 503
+        assert response.json() == {"detail": AUTH_UNAVAILABLE}  # the app-wide body (T-0349)
 
 
 class RevokeFails(InMemoryRevocationStore):

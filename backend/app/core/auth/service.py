@@ -7,7 +7,17 @@
   replaced by a new pair in the same session, expiring when the session ends: rotation
   never extends a session past sign-in + ``KERP_REFRESH_TOKEN_HOURS`` (diff §4.2).
   Presenting an already-used refresh token is treated as theft: the whole session is
-  revoked (rotation with reuse detection).
+  revoked (rotation with reuse detection). The account's row is locked and checked
+  (active, password unchanged) *before* the token is consumed, so a lock timeout or a
+  database failure there leaves the token usable (T-0345). A retry of a token consumed less
+  than ``REFRESH_RETRY_GRACE`` (30 s) ago (the client lost or never got the response) is a
+  plain ``AuthenticationError`` that leaves the session alive; after the grace, reuse
+  detection revokes the session as before.
+* **Sign-in method and time** (T-0345): every token carries the session's ``auth_time`` and
+  ``amr`` (``pwd`` / ``magic_link`` / ``sso``, plus ``pin`` once renewed by PIN unlock),
+  copied by every rotation. ``is_fresh_sign_in`` answers whether a session was signed in
+  online within ``FRESH_SIGN_IN_WINDOW`` (5 min) and never renewed by PIN: a PIN change that
+  would clear a ``PIN_EXHAUSTED`` stop needs one (TD-301, product owner 2026-11-16).
 * **Logout**: revokes the access token's ``jti`` and its session, so every token of that
   login (including the refresh token) stops working at once.
 * **Field PIN, hybrid** (T-0038, ``field.py``, diff §4.2): the PIN belongs to the enrolled
@@ -34,9 +44,10 @@ from __future__ import annotations
 import json
 import logging
 import uuid
-from collections.abc import Collection
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
+from typing import Final, Literal
 
 from sqlalchemy import bindparam, func, select, text
 from sqlalchemy.orm import Session, object_session
@@ -58,6 +69,7 @@ from app.core.auth.field import (
 from app.core.auth.lockout import (
     LOGIN_ACCOUNT_POLICY,
     LOGIN_POLICY,
+    MAGIC_LINK_CLIENT_POLICY,
     MAGIC_LINK_REQUEST_POLICY,
     PIN_POLICY,
     ProgressiveLockout,
@@ -82,8 +94,24 @@ from app.core.db import Database, utcnow
 from app.core.tenancy.context import TenancyContext
 from app.core.tenancy.rls import bind_tenancy, session_tenancy
 from app.core.tenancy.scope import get_or_404
+from app.core.timestamps import aware_utc
 
 _logger = logging.getLogger("kerp.auth")
+
+# How a session was signed in: the ``amr`` claim (T-0345; RFC 8176 ``pwd`` and ``pin``).
+SignInMethod = Literal["pwd", "magic_link", "sso"]
+AMR_PASSWORD: Final = "pwd"
+AMR_MAGIC_LINK: Final = "magic_link"
+AMR_SSO: Final = "sso"
+# Added to ``amr`` by a PIN unlock: the session was renewed by the PIN, not by a sign-in.
+AMR_PIN: Final = "pin"
+SIGN_IN_METHODS: Final = frozenset({AMR_PASSWORD, AMR_MAGIC_LINK, AMR_SSO})
+# A "fresh online sign-in" (TD-301, product owner 2026-11-16): at most this old.
+FRESH_SIGN_IN_WINDOW: Final = timedelta(minutes=5)
+# A retry of a refresh token consumed at most this long ago is refused without revoking the
+# session (a lost or failed response, T-0345); the consumption is remembered a little longer.
+REFRESH_RETRY_GRACE: Final = timedelta(seconds=30)
+REFRESH_SPENT_MEMORY: Final = REFRESH_RETRY_GRACE + timedelta(seconds=30)
 
 
 class CredentialsExistError(Exception):
@@ -325,16 +353,11 @@ def set_user_password(
     return user
 
 
-def _aware(moment: datetime) -> datetime:
-    # SQLite hands TIMESTAMPTZ back naive; it was stored as UTC.
-    return moment if moment.tzinfo is not None else moment.replace(tzinfo=UTC)
-
-
 def _credential_state(user: User) -> tuple[str | None, datetime | None]:
     """What a password change changes, comparable before and after a re-read: the stamp is
     made aware, since SQLite hands back naive what was written aware in the same session."""
     changed = user.password_changed_at
-    return user.password_hash, _aware(changed) if changed is not None else None
+    return user.password_hash, aware_utc(changed) if changed is not None else None
 
 
 def token_predates_password_change(user: User, claims: TokenClaims) -> bool:
@@ -343,7 +366,7 @@ def token_predates_password_change(user: User, claims: TokenClaims) -> bool:
     it (e.g. the login right after ``set_password``) is accepted, even within one second."""
     if user.password_changed_at is None:
         return False
-    return claims.issued_at < _aware(user.password_changed_at)
+    return claims.issued_at < aware_utc(user.password_changed_at)
 
 
 def magic_link_predates_password_change(user: User, issued_at: object) -> bool:
@@ -358,7 +381,7 @@ def magic_link_predates_password_change(user: User, issued_at: object) -> bool:
         issued = datetime.fromtimestamp(issued_at, tz=UTC)
     else:
         issued = utcnow() - MAGIC_LINK_TTL
-    return issued < _aware(user.password_changed_at)
+    return issued < aware_utc(user.password_changed_at)
 
 
 def load_active_user(session: Session, claims: TokenClaims, *, for_update: bool = False) -> User:
@@ -395,6 +418,14 @@ def pin_failure_subject(tenant_id: uuid.UUID, device_id: uuid.UUID) -> str:
 UNKNOWN_CLIENT = "unknown"
 
 
+def client_subject(tenant_id: uuid.UUID, client: str | None) -> str:
+    """The subject of a per-client lockout: tenant + client address, the derivation of
+    ``PasswordResetService.request`` (TD-138), also used by magic-link requests and SSO
+    starts (T-0345). ``client`` is ``request.client.host`` (behind a proxy, set from
+    ``X-Forwarded-For`` only for trusted peers)."""
+    return f"{tenant_id}|{client or UNKNOWN_CLIENT}"
+
+
 class AuthService:
     def __init__(
         self, runtime: AuthRuntime, provider: AuthProvider[PasswordCredentials] | None = None
@@ -407,6 +438,9 @@ class AuthService:
             store, LOGIN_ACCOUNT_POLICY, "login-account"
         )
         self.magic_link_lockout = ProgressiveLockout(store, MAGIC_LINK_REQUEST_POLICY, "magic")
+        self.magic_link_client_lockout = ProgressiveLockout(
+            store, MAGIC_LINK_CLIENT_POLICY, "magic-client"
+        )
         # Per device. The cap holds until a sign-in on the device clears it: the counter
         # outlives any one session (``lockout.PIN_POLICY``).
         pin_policy = replace(PIN_POLICY, window=self._pin_ttl())
@@ -416,6 +450,22 @@ class AuthService:
         """Forget the device's PIN failures: a sign-in on it (a new session bound to it) or a
         PIN change ends the "10th wrong PIN" stop."""
         self.pin_lockout.succeeded(pin_failure_subject(tenant_id, device_id))
+
+    def pin_at_limit(self, tenant_id: uuid.UUID, device_id: uuid.UUID) -> bool:
+        """The device has had its last allowed wrong PIN (``PIN_EXHAUSTED``): PIN unlock is
+        over there until a sign-in on the device (read-only)."""
+        return self.pin_lockout.at_limit(pin_failure_subject(tenant_id, device_id))
+
+    def is_fresh_sign_in(self, claims: TokenClaims) -> bool:
+        """The token's session was started by an online sign-in (password, magic link or SSO)
+        at most ``FRESH_SIGN_IN_WINDOW`` ago and was never renewed by PIN unlock (TD-301,
+        product owner 2026-11-16). A token without the sign-in claims (issued before T-0345)
+        is never fresh."""
+        if claims.auth_time is None or AMR_PIN in claims.amr:
+            return False
+        if SIGN_IN_METHODS.isdisjoint(claims.amr):
+            return False
+        return self.runtime.tokens.now() - claims.auth_time <= FRESH_SIGN_IN_WINDOW
 
     def login(
         self,
@@ -450,7 +500,12 @@ class AuthService:
         # that the device it names is revoked (and is told to wipe).
         refuse_revoked_device(session, device_id)
         return self.start_session(
-            session, user, device_id=device_id, invite_ref=invite_ref, credential_bound=True
+            session,
+            user,
+            method=AMR_PASSWORD,
+            device_id=device_id,
+            invite_ref=invite_ref,
+            credential_bound=True,
         )
 
     def refresh(
@@ -467,10 +522,11 @@ class AuthService:
         return self._rotate(session, claims, device_id=bound)
 
     def request_magic_link(
-        self, *, email: str, invite_ref: str | None = None
+        self, *, email: str, invite_ref: str | None = None, client: str | None = None
     ) -> MagicLinkJob | None:
-        """The request half of a magic-link request: count it (the per-mailbox lockout,
-        ``LockedOutError`` when locked) and return the job to run after the response.
+        """The request half of a magic-link request: count it (per client address, then per
+        mailbox: ``LockedOutError`` when either is locked, T-0345) and return the job to run
+        after the response. ``client`` is the caller's address, as for password reset.
 
         Nothing here depends on the address: unknown, inactive, ineligible and eligible
         accounts get the same work and the same job (diff §4.2 *no timing oracle*, T-0057).
@@ -481,6 +537,7 @@ class AuthService:
         tenant = self.runtime.settings.default_tenant_id
         if tenant is None:
             return None
+        self.magic_link_client_lockout.begin(client_subject(tenant, client))
         self.magic_link_lockout.begin(_subject(tenant, email))
         return MagicLinkJob(tenant_id=tenant, email=normalize_email(email), invite_ref=invite_ref)
 
@@ -579,7 +636,12 @@ class AuthService:
             raise AuthenticationError("not eligible for a magic link")
         invite_ref = data.get("inv")
         return self.start_session(
-            session, user, device_id=device_id, invite_ref=invite_ref, credential_bound=True
+            session,
+            user,
+            method=AMR_MAGIC_LINK,
+            device_id=device_id,
+            invite_ref=invite_ref,
+            credential_bound=True,
         )
 
     def start_session(
@@ -587,6 +649,7 @@ class AuthService:
         session: Session,
         user: User,
         *,
+        method: SignInMethod,
         device_id: uuid.UUID | None = None,
         invite_ref: str | None = None,
         credential_bound: bool = False,
@@ -595,7 +658,9 @@ class AuthService:
         (password, magic link, Entra ID SSO: T-0054): the internal flag is recomputed, the
         session is bound to ``device_id`` when that is an active device the user enrolled,
         and the same 15-minute access + 12-hour refresh pair is issued. The caller has
-        already refused a revoked device (credentials first, T-0080).
+        already refused a revoked device (credentials first, T-0080). ``method`` is how the
+        identity was proved (``amr``); with the sign-in time it rides on every token of the
+        session (T-0345).
 
         The user's row is locked and read again before the tokens are issued (``lock_user``,
         T-0077), so a concurrent password change either waits and revokes this session or
@@ -615,7 +680,14 @@ class AuthService:
         self._signed_in(user)
         session_id = uuid.uuid4()
         bound = self._bind_sign_in_device(session, user.id, user.tenant_id, session_id, device_id)
-        pair = self._issue_pair(user.id, user.tenant_id, session_id, device_id=bound)
+        pair = self._issue_pair(
+            user.id,
+            user.tenant_id,
+            session_id,
+            device_id=bound,
+            auth_time=self.runtime.tokens.now(),
+            amr=(method,),
+        )
         if invite_ref is None:
             return pair
         return replace(pair, invite=run_post_authentication(session, user, invite_ref))
@@ -657,7 +729,9 @@ class AuthService:
         user.password_hash = password_hash
         user.password_changed_at = utcnow()
         session.flush()
-        return self.start_session(session, user, device_id=device_id, credential_bound=True)
+        return self.start_session(
+            session, user, method=AMR_PASSWORD, device_id=device_id, credential_bound=True
+        )
 
     def unlock(
         self,
@@ -692,7 +766,7 @@ class AuthService:
                 raise PinGateError(PIN_EXHAUSTED)
             raise PinGateError(PIN_INVALID)
         self.pin_lockout.succeeded(subject)
-        return self._rotate(session, claims, device_id=bound)
+        return self._rotate(session, claims, device_id=bound, renewed_by_pin=True)
 
     def _bind_sign_in_device(
         self,
@@ -771,26 +845,58 @@ class AuthService:
                 raise
 
     def _rotate(
-        self, session: Session, claims: TokenClaims, *, device_id: uuid.UUID | None = None
+        self,
+        session: Session,
+        claims: TokenClaims,
+        *,
+        device_id: uuid.UUID | None = None,
+        renewed_by_pin: bool = False,
     ) -> TokenPair:
-        if not self.runtime.store.consume_refresh(claims.jti):
-            # Valid signature but already used (or never registered): assume a stolen
-            # token is being replayed and kill the whole session.
-            self._revoke_session(claims.session_id)
-            raise AuthenticationError("refresh token reused")
+        """Spend the refresh token and issue the session's next pair.
+
+        The account's row is locked and checked first (T-0345): a lock timeout or any
+        database failure there raises before the token is consumed, so the client can retry
+        with the same token. The pair keeps the session's sign-in claims; a PIN unlock
+        (``renewed_by_pin``) adds ``pin`` to ``amr`` for the rest of the session."""
         bind_tenancy(session, TenancyContext(tenant_id=claims.tenant_id, user_id=claims.user_id))
         try:
             load_active_user(session, claims, for_update=True)
         except AuthenticationError:
             self._revoke_session(claims.session_id)
             raise
+        now = self.runtime.tokens.now()
+        spent = self.runtime.store.consume_refresh(
+            claims.jti, spent_at=now.timestamp(), remember=REFRESH_SPENT_MEMORY
+        )
+        if not spent:
+            if self._retried_within_grace(claims.jti, now):
+                # The client is retrying a request whose answer it lost: refuse it, but do
+                # not treat it as theft (T-0345).
+                raise AuthenticationError("refresh token retried within the grace")
+            # Valid signature but already used (or never registered): assume a stolen
+            # token is being replayed and kill the whole session.
+            self._revoke_session(claims.session_id)
+            raise AuthenticationError("refresh token reused")
+        amr = claims.amr
+        if renewed_by_pin and AMR_PIN not in amr:
+            amr = (*amr, AMR_PIN)
         return self._issue_pair(
             claims.user_id,
             claims.tenant_id,
             claims.session_id,
             not_after=claims.expires_at,
             device_id=device_id,
+            auth_time=claims.auth_time,
+            amr=amr,
         )
+
+    def _retried_within_grace(self, jti: str, now: datetime) -> bool:
+        """The token was consumed at most ``REFRESH_RETRY_GRACE`` ago (by this service's
+        clock; a consumption stamped slightly ahead by another process counts as recent)."""
+        spent_at = self.runtime.store.refresh_spent_at(jti)
+        if spent_at is None:
+            return False
+        return now.timestamp() - spent_at <= REFRESH_RETRY_GRACE.total_seconds()
 
     def _pin_ttl(self) -> timedelta:
         return self.runtime.tokens.ttl["refresh"] + PIN_TTL_MARGIN
@@ -810,10 +916,13 @@ class AuthService:
         *,
         not_after: datetime | None = None,
         device_id: uuid.UUID | None = None,
+        auth_time: datetime | None = None,
+        amr: Sequence[str] = (),
     ) -> TokenPair:
         """A new pair. A new session ends at now + refresh TTL; a rotation passes the
         session's end as ``not_after``, so neither token outlives it. ``device_id`` (the
-        session's bound device) becomes both tokens' ``did`` claim."""
+        session's bound device) becomes both tokens' ``did`` claim; ``auth_time`` / ``amr``
+        (the session's sign-in) ride on both tokens too."""
         tokens = self.runtime.tokens
         refresh = tokens.issue(
             "refresh",
@@ -822,6 +931,8 @@ class AuthService:
             session_id=session_id,
             not_after=not_after,
             device_id=device_id,
+            auth_time=auth_time,
+            amr=amr,
         )
         access = tokens.issue(
             "access",
@@ -830,6 +941,8 @@ class AuthService:
             session_id=session_id,
             not_after=refresh.claims.expires_at,
             device_id=device_id,
+            auth_time=auth_time,
+            amr=amr,
         )
         self.runtime.store.register_refresh(
             refresh.claims.jti, session_id, refresh.claims.remaining()

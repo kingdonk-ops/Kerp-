@@ -9,7 +9,7 @@ are epic E-01-01; the `RegisterPage` shell is T-0025.
 |---|---|
 | `models.py` | `oe_saved_view` (`BaseRecordMixin`, project RLS, migration `0011`); `oe_saved_view_team` (the teams of a `team` view, same RLS, migration `0032`, T-0074) |
 | `schemas.py` | `ViewConfig` (columns, §2 filter AST, sort, group-by, conditional format, density), `SavedViewCreate` / `SavedViewUpdate` / `SavedViewRead` |
-| `service.py` | `Viewer`, `view_team_ids`, `create_view`, `get_view`, `list_views`, `default_view`, `update_view`, `delete_view`, `present`, `load_config`, `register_catalogue`, `known_columns` |
+| `service.py` | `Viewer`, `view_team_ids`, `create_view`, `get_view`, `list_views`, `default_view`, `update_view`, `delete_view`, `present`, `present_many`, `load_config`, `register_catalogue`, `known_columns` |
 | `router.py` | `/api/v1/saved-views/projects/{project_id}/views...` |
 
 ## Record
@@ -54,6 +54,10 @@ is the Project Administrator.
   it the owner's personal default.
 - `GET .../views/default?register_key=` returns the caller's default, else the project
   default, else `null`.
+- **Listing cost (T-0348, TD-387):** `list_views` filters the private views of others in SQL
+  and reads the team links of the listed team views in one query; `present_many` builds the
+  register's column catalogue once and asks `teams.service` for the project's linked teams
+  once. A list request costs the same number of queries however many views there are.
 
 ## Teams (T-0074, ADR 0008)
 

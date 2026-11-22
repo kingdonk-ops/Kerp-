@@ -12,6 +12,11 @@ can no longer matter:
   consumes it atomically (``DEL`` returns 1 exactly once) and registers the successor.
   A refresh token presented a second time finds nothing: that is reuse, and the caller
   revokes the whole session (OAuth 2.0 Security BCP refresh-token rotation).
+* ``refresh-spent:<jti>``: when a refresh token was consumed (epoch seconds of the
+  consuming service's clock), written in the same transaction as the consumption
+  (T-0345). It tells a client's retry of a just-consumed token (a lost or failed response)
+  from a replay: within the retry grace the retry is refused without revoking the session.
+  TTL = a little longer than that grace.
 
 Field-worker auth (T-0009) keeps its short-lived state here too:
 
@@ -43,12 +48,17 @@ short-lived values: ``pwreset:token:<sha256(token)>`` (JSON ``{uid, tid}``, take
 single use) and ``pwreset:user:<tid>:<uid>`` (the digest of the account's one live token),
 both with the link lifetime as TTL.
 
-Any store failure raises ``RevocationUnavailableError``; callers fail closed (503), they
-never treat an unreachable store as "not revoked" or "not locked".
+Any store failure raises ``RevocationUnavailableError``; callers fail closed, they never
+treat an unreachable store as "not revoked" or "not locked". Callers let it propagate: one
+app-wide handler (``revocation_unavailable_handler``, registered in ``app.main``) answers
+``503`` with ``{"detail": AUTH_UNAVAILABLE}`` wherever it is raised (T-0349, TD-290). A raw
+Redis connection or timeout error that escapes elsewhere gets the same status with
+``{"detail": REDIS_UNAVAILABLE}`` (``redis_unavailable_handler``, TD-525).
 """
 
 from __future__ import annotations
 
+import logging
 import math
 import threading
 import time
@@ -58,6 +68,8 @@ from datetime import timedelta
 from typing import Final, Protocol, cast
 
 import redis
+from fastapi import Request
+from fastapi.responses import JSONResponse
 
 KEY_PREFIX: Final = "kerp:auth:"
 # Optimistic-transaction retries in ``begin_attempt`` before giving up (fail closed). Each
@@ -66,8 +78,30 @@ KEY_PREFIX: Final = "kerp:auth:"
 MAX_ATTEMPT_RETRIES: Final = 32
 
 
+# The one body of a revocation-store outage, whichever endpoint hit it (T-0349).
+AUTH_UNAVAILABLE: Final = "Authentication temporarily unavailable"
+# The body of any other Redis outage that reaches the app (TD-525). Never the driver's
+# message: it can name the host.
+REDIS_UNAVAILABLE: Final = "Service temporarily unavailable"
+# The Redis errors that mean "unreachable right now"; any other Redis error is a bug (500).
+REDIS_OUTAGE_ERRORS: Final = (redis.ConnectionError, redis.TimeoutError)
+
+logger = logging.getLogger(__name__)
+
+
 class RevocationUnavailableError(RuntimeError):
     """The revocation store cannot be reached. Authentication must fail closed."""
+
+
+async def revocation_unavailable_handler(_request: Request, _exc: Exception) -> JSONResponse:
+    """App-wide: a revocation-store outage is ``503``, never "not revoked" and never 500."""
+    return JSONResponse({"detail": AUTH_UNAVAILABLE}, status_code=503)
+
+
+async def redis_unavailable_handler(_request: Request, exc: Exception) -> JSONResponse:
+    """App-wide: an unreachable Redis is ``503``, not a generic 500 (TD-525)."""
+    logger.warning("redis unavailable: %s", type(exc).__name__)
+    return JSONResponse({"detail": REDIS_UNAVAILABLE}, status_code=503)
 
 
 class RevocationStore(Protocol):
@@ -79,7 +113,11 @@ class RevocationStore(Protocol):
 
     def register_refresh(self, jti: str, session_id: uuid.UUID, ttl: timedelta) -> None: ...
 
-    def consume_refresh(self, jti: str) -> bool: ...
+    def consume_refresh(
+        self, jti: str, *, spent_at: float | None = None, remember: timedelta | None = None
+    ) -> bool: ...
+
+    def refresh_spent_at(self, jti: str) -> float | None: ...
 
     def put_magic_link(self, digest: str, payload: bytes, ttl: timedelta) -> None: ...
 
@@ -96,6 +134,8 @@ class RevocationStore(Protocol):
     ) -> tuple[int, int]: ...
 
     def clear_failures(self, key: str) -> None: ...
+
+    def failure_count(self, key: str) -> int: ...
 
     def bind_device(self, session_id: uuid.UUID, device_id: uuid.UUID, ttl: timedelta) -> None: ...
 
@@ -134,6 +174,19 @@ def _sid_key(session_id: uuid.UUID) -> str:
 
 def _refresh_key(jti: str) -> str:
     return f"{KEY_PREFIX}refresh:{jti}"
+
+
+def _spent_key(jti: str) -> str:
+    return f"{KEY_PREFIX}refresh-spent:{jti}"
+
+
+def _spent_value(value: bytes | None) -> float | None:
+    if value is None:
+        return None
+    try:
+        return float(value.decode())
+    except ValueError:
+        return None
 
 
 def _magic_key(digest: str) -> str:
@@ -206,8 +259,41 @@ class RedisRevocationStore:
             lambda: self._client.set(_refresh_key(jti), str(session_id).encode(), ex=_seconds(ttl))
         )
 
-    def consume_refresh(self, jti: str) -> bool:
-        return bool(self._call(lambda: self._client.delete(_refresh_key(jti))))
+    def consume_refresh(
+        self, jti: str, *, spent_at: float | None = None, remember: timedelta | None = None
+    ) -> bool:
+        """Spend the refresh token: ``True`` exactly once. With ``spent_at``, the moment is
+        kept under ``refresh-spent:<jti>`` for ``remember``, written in the same transaction
+        as the delete (WATCH/MULTI), so no retry can see the token gone but not yet marked."""
+        key = _refresh_key(jti)
+        if spent_at is None:
+            return bool(self._call(lambda: self._client.delete(key)))
+        marker, ttl = _spent_key(jti), _seconds(remember or timedelta(minutes=1))
+
+        def transaction() -> bool:
+            pipe = self._client.pipeline(transaction=True)
+            try:
+                for _ in range(MAX_ATTEMPT_RETRIES):
+                    try:
+                        pipe.watch(key)  # type: ignore[no-untyped-call]  # stub gap
+                        if not pipe.exists(key):
+                            return False
+                        pipe.multi()
+                        pipe.delete(key)
+                        pipe.set(marker, repr(spent_at).encode(), ex=ttl)
+                        pipe.execute()
+                        return True
+                    except redis.WatchError:
+                        continue  # consumed (or re-registered) in between: look again
+                raise redis.RedisError("refresh consumption kept conflicting")  # fail closed
+            finally:
+                pipe.reset()
+
+        return self._call(transaction)
+
+    def refresh_spent_at(self, jti: str) -> float | None:
+        """When the refresh token was consumed, while that is remembered; else ``None``."""
+        return _spent_value(_as_bytes(self._call(lambda: self._client.get(_spent_key(jti)))))
 
     def put_magic_link(self, digest: str, payload: bytes, ttl: timedelta) -> None:
         self._call(lambda: self._client.set(_magic_key(digest), payload, ex=_seconds(ttl)))
@@ -274,6 +360,11 @@ class RedisRevocationStore:
 
     def clear_failures(self, key: str) -> None:
         self._call(lambda: self._client.delete(_failures_key(key), _lock_key(key)))
+
+    def failure_count(self, key: str) -> int:
+        """The live failure count of ``key`` (read-only: counts nothing, arms nothing)."""
+        current = _as_bytes(self._call(lambda: self._client.get(_failures_key(key))))
+        return int(current) if current is not None else 0
 
     def bind_device(self, session_id: uuid.UUID, device_id: uuid.UUID, ttl: timedelta) -> None:
         seconds = _seconds(ttl)
@@ -395,11 +486,20 @@ class InMemoryRevocationStore:
     def register_refresh(self, jti: str, session_id: uuid.UUID, ttl: timedelta) -> None:
         self._set(_refresh_key(jti), ttl)
 
-    def consume_refresh(self, jti: str) -> bool:
+    def consume_refresh(
+        self, jti: str, *, spent_at: float | None = None, remember: timedelta | None = None
+    ) -> bool:
         with self._lock:
             live = self._live(_refresh_key(jti))
             self._entries.pop(_refresh_key(jti), None)
+            if live and spent_at is not None:
+                expires = self._clock() + _seconds(remember or timedelta(minutes=1))
+                self._entries[_spent_key(jti)] = (expires, repr(spent_at).encode())
             return live
+
+    def refresh_spent_at(self, jti: str) -> float | None:
+        with self._lock:
+            return _spent_value(self._get(_spent_key(jti)))
 
     def put_magic_link(self, digest: str, payload: bytes, ttl: timedelta) -> None:
         self._set(_magic_key(digest), ttl, payload)
@@ -440,6 +540,11 @@ class InMemoryRevocationStore:
         with self._lock:
             self._entries.pop(_failures_key(key), None)
             self._entries.pop(_lock_key(key), None)
+
+    def failure_count(self, key: str) -> int:
+        with self._lock:
+            current = self._get(_failures_key(key))
+        return int(current) if current is not None else 0
 
     def bind_device(self, session_id: uuid.UUID, device_id: uuid.UUID, ttl: timedelta) -> None:
         with self._lock:

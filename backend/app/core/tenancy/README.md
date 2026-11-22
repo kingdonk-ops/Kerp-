@@ -187,11 +187,26 @@ rows with `tests/db_support.seed_tenants` (synthetic ids only).
 - **Core connections:** `bind_connection(conn, ctx)` inside the transaction.
 - `bind_tenancy(session, ctx)` stores the context on `session.info`. An `after_begin` hook
   applies it with `set_config(..., true)` (`SET LOCAL`) at the start of every transaction.
-  `install_pool_reset` also clears every setting (`rls.SETTINGS`) when a connection returns to the pool.
+  `install_pool_reset` also clears every setting (`rls.SETTINGS`) when a connection returns to the pool:
+  one `SELECT set_config(name, '', false), …` (`rls.POOL_RESET_SQL`) and one commit (T-0348), so
+  a return costs three round trips (the driver's `BEGIN`, the statement, `COMMIT`), not nine. The
+  policies read the empty value as unset (`NULLIF(..., '')`), as after a `RESET`.
 - **One scope per session.** `bind_tenancy` raises if asked to switch a session that holds
   loaded objects or pending changes to a *different* context, because `session.get` would
   hand out identity-map objects of the old scope without SQL. Commit and `expunge_all()`
   first, or use a new session (`unit_of_work`) per tenant/project batch.
+- **Another scope for one block, same transaction** (`rebind.py`, T-0349): `with
+  project_binding(session, project_id):` binds a tenant-level session to one project and back
+  (the caller's site filter and everything else kept); `SessionRebinding(session, target)` does
+  the same for any target (the invite module's narrow system path subclasses it). The session's
+  objects are flushed, detached and re-attached. Leaving the block always restores the caller's
+  scope: also when the block or its closing flush fails. A restore that fails on a *failed*
+  transaction puts the scope back on the session only (the rollback makes the connection
+  agree); on a good transaction it propagates, so the unit of work rolls back instead of
+  running on with the connection still in the target scope.
+- **Tenant-level work:** `tenant_level_context(session, what)` (`rls.py`) returns the session's
+  context when it is bound tenant-level (no project) and raises `RuntimeError("<what> needs a
+  tenant-level bound session")` otherwise.
 
 ## Reads, writes, 404
 
@@ -246,6 +261,9 @@ offline (`--sql`) output.
 `tests/test_rls_bypass.py` fails if a migrated model table is not covered
 (`rls_coverage_problems`) or the runtime role is SUPERUSER/BYPASSRLS
 (`rls_enforcement_problems`). Data migrations see no rows unless they bind a context (TD-055).
+Production runs both checks (with the ledger guard) at API and worker startup and refuses to
+start on any problem; elsewhere they are warnings, and SQLite skips them with a log line
+(`app/core/startup_safety.py`, T-0342; `docs/deploy/first-run.md`).
 Migration `0006` (T-0010) adds `allowed_projects_read_policy` to every table that already has
 `project_isolation_policy` (a `DO` loop over the catalog). The frozen DDL of `0002`–`0005` is
 the helper output as replayed before T-0033 (it already includes that policy), so a fresh

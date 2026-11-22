@@ -28,7 +28,11 @@ from app.core.auth.access import Persona, load_grants
 from app.core.auth.device_signal import DEVICE_HEADER
 from app.core.auth.keys import AuthConfigError
 from app.core.auth.models import DEVICE_ACTIVE, DEVICE_REVOKED, Device, ProjectMembership, User
-from app.core.auth.revocation import InMemoryRevocationStore, RedisRevocationStore
+from app.core.auth.revocation import (
+    AUTH_UNAVAILABLE,
+    InMemoryRevocationStore,
+    RedisRevocationStore,
+)
 from app.core.auth.router import REFRESH_COOKIE
 from app.core.auth.runtime import AuthRuntime, check_startup_config
 from app.core.auth.sso_router import PREAUTH_COOKIE
@@ -47,6 +51,7 @@ from tests.sso_support import (
     FakeEntra,
     new_rsa_key,
 )
+from tests.test_auth_revocation import BrokenRedis
 
 DEPLOYMENT = "https://kerp.example.test"
 NATIVE_ORIGIN = "https://localhost"  # the Capacitor Android app (androidScheme https)
@@ -373,6 +378,55 @@ def test_an_app_challenge_needs_a_device_id(h: Harness) -> None:
     assert malformed.status_code == 422
 
 
+# --- the per-client start limit (T-0345, TD-323) --------------------------------------------
+
+
+def _state_entries(store: InMemoryRevocationStore) -> int:
+    return sum(1 for key in store._entries if ":sso:entra:state:" in key)
+
+
+def test_starts_are_limited_per_client_before_a_state_entry_is_stored(
+    tmp_path: Path, db: Database
+) -> None:
+    clock = [1000.0]
+    store = InMemoryRevocationStore(clock=lambda: clock[0])
+    harness = _harness(tmp_path, db, store=store)
+    flooder = TestClient(harness.client.app, client=("203.0.113.90", 40000))
+    other = TestClient(harness.client.app, client=("198.51.100.9", 40000))
+    with harness.client:
+        for _ in range(60):  # 60 back to back
+            assert flooder.get(START, follow_redirects=False).status_code == 302
+        assert _state_entries(store) == 60
+        locked = flooder.get(START, follow_redirects=False)
+        assert locked.status_code == 429
+        assert locked.headers["retry-after"] == "30"
+        assert PREAUTH_COOKIE not in locked.cookies
+        assert _state_entries(store) == 60  # refused before anything was stored
+        # The form post that carries an invite is the same start, under the same limit.
+        form = flooder.post(
+            START,
+            content=b"invite_token=synthetic-invite",
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            follow_redirects=False,
+        )
+        assert form.status_code == 429
+        # Another client is not limited.
+        assert other.get(START, follow_redirects=False).status_code == 302
+        # The lock passes, then escalates like every policy.
+        clock[0] += 30
+        assert flooder.get(START, follow_redirects=False).status_code == 302
+        again = flooder.get(START, follow_redirects=False)
+        assert (again.status_code, again.headers["retry-after"]) == (429, "60")
+
+
+def test_the_start_limit_fails_closed_without_the_store(tmp_path: Path, db: Database) -> None:
+    harness = _harness(tmp_path, db, store=RedisRevocationStore(BrokenRedis()))
+    with harness.client:
+        response = harness.client.get(START, follow_redirects=False)
+    assert response.status_code == 503
+    assert response.json() == {"detail": AUTH_UNAVAILABLE}  # the app-wide body (T-0349)
+
+
 # --- the happy path ---------------------------------------------------------------------
 
 
@@ -406,6 +460,15 @@ def test_first_sign_in_links_by_verified_email_and_issues_the_kerp_session(h: Ha
 
     actions = [(e["action"], e.get("user_id")) for e in sso_audit(h)]
     assert actions == [("sso_linked", str(h.staff)), ("sso_signed_in", str(h.staff))]
+
+
+def test_an_sso_session_records_its_sign_in_method_and_time(h: Harness) -> None:
+    """T-0345: an SSO sign-in is a fresh online sign-in like password and magic link."""
+    before = h.runtime.tokens.now()
+    claims = h.runtime.tokens.verify(signed_in(sign_in(h)), "refresh")
+    assert claims.amr == ("sso",)
+    assert claims.auth_time is not None
+    assert before <= claims.auth_time <= h.runtime.tokens.now()
 
 
 def test_later_sign_ins_match_by_oid_only(h: Harness) -> None:

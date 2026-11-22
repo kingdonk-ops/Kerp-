@@ -185,7 +185,8 @@ so revoking and re-creating cannot reset it.
 (`app.admin_project_ids`) and to `app.is_system_admin` sessions; they are also the only ones
 who insert and update, and nobody deletes (`app/core/tenancy/README.md`). **The invitee never
 reads the table.** Preview, accept, the post-authentication hook and the eligibility provider
-run on a narrow system path (`invites._SystemPath`): the session is re-bound with
+run on a narrow system path (`invites._SystemPath`, a `core.tenancy.rebind.SessionRebinding`):
+the session is re-bound with
 `is_system_admin` for exactly the lookup by token hash (eligibility: by the caller's own
 e-mail), the checks (hash, expiry, single use, bound e-mail) and the writes, and bound back.
 

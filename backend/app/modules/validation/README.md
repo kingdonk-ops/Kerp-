@@ -13,7 +13,7 @@ Built fresh; Inspection-ERP's `Finding(key, severity, message)` shape was a refe
 | `defaults.py` | system default seed files `app/modules/<m>/rules/defaults/*.yaml`: `load_defaults()` |
 | `service.py` | rule store (`create_rule_set`, `save_rule`, `set_rule_enabled`, `delete_rule`, `reset_rule`, `reset_rule_set`), layers (`sync_system_layer`, `sync_system_defaults`, `seed_tenant`, `seed_project`, `copy_module_defaults`), unlock (`request_unlock`, `approve_unlock`, `reject_unlock`), `resolve_rule_set`, `run_checks` |
 | `overrides.py` | per-record override of a blocked check (`request_override`, `approve_override`, `reject_override`, `list_overrides`, `get_override`; binding hash and voiding used by `run_checks`) — T-0035 |
-| `upgrades.py` | default-upgrade offers (`pending_updates`, `accept_update`), the tenant drift report (`drift_report`), "Try it" (`try_rule`) — T-0036 |
+| `upgrades.py` | default-upgrade offers (`pending_updates`, `accept_update`), the tenant drift report (`drift_report`, `drift_report_page`), "Try it" (`try_rule`) — T-0036 |
 | `schemas.py` | `RuleSpec` (input), `CheckResult` / `CheckFinding` (output), the Rules API shapes |
 | `router.py` | Rules settings API (ADR 0004 §7), see below |
 
@@ -25,11 +25,11 @@ from app.modules.validation.service import run_checks
 result = run_checks(
     {"record": {...}, "fields": {...}, "actor": {...}, "now": {"$timestamp": "..."}},
     "p6.import.commit",
-    session=session,                 # bound to the caller's tenant/project
+    session=session,  # bound to the caller's tenant/project
     subject=f"p6_import:{import_id}",
 )
 if result.blocked:
-    raise TransitionBlocked(result.reason)   # e.g. "Torque wrench TW-12: calibration expired"
+    raise TransitionBlocked(result.reason)  # e.g. "Torque wrench TW-12: calibration expired"
 ```
 
 - The context is KERP CEL JSON (`app/core/cel/README.md`). `params` is reserved: each rule
@@ -148,18 +148,29 @@ confirmation (spec-gap TD-139).
 `save_rule` compiles before anything is written and raises `RuleCompileError` with the reason:
 
 - the engine must match the kind (`regex` only for `autolink` and `p6_grammar`);
-- CEL goes through `app.core.cel.compile_expression`: the same parser, 4096-byte cap and
-  static checks as evaluation (safe subset, TD-041), and every top-level variable must be in
+- CEL goes through `app.core.cel.compile_expression`: the same parser, 4096-byte cap, cost caps
+  (at most 3 nested loop macros, nesting depth 100; T-0341) and static checks as evaluation
+  (safe subset, TD-041), and every top-level variable must be in
   the kind's context schema. A macro variable counts as bound only inside its own macro
   call (`l.all(x, x.ok) && x` is rejected). Field-level types are not checked (no server CEL type checker);
 - regex compiles with **RE2** (`google-re2`, imported lazily): linear time, so lookaround and
   backreferences are rejected; patterns are capped at 1024 characters;
 - `params` must be valid KERP CEL JSON.
 
+Save and the "Try it" draft (`try_rule`) use this same compile step, so a rule over a cost cap
+can neither be stored nor tried (`422`, `CEL PARSE_ERROR: ...`). A rule stored before the caps
+existed that exceeds one is a `PARSE_ERROR` at evaluation, and a rule that spends the server's
+evaluation step budget an `EVAL_ERROR`: in `run_checks` both are an `error` finding that blocks
+(fail closed), as before.
+
 ### Versions and audit (ADR 0004 §3)
 
 Each rule has a `version` (1 on add, +1 on every edit, enable/disable, delete, reset or
-unlock) and each set a `version` (+1 on every change to one of its rules). Every change is
+unlock) and each set a `version` (+1 on every change to one of its rules). Every change that
+raises a set's version (edit, enable/disable, delete, reset, accepted upgrade, unlock approval,
+system seed upgrade) first locks the set's row (`SELECT … FOR UPDATE`, like `projects._locked`)
+and re-reads it, so concurrent edits are serialised and get consecutive versions (T-0347).
+Every change is
 appended to the set's audit chain `validation.rule_set:<set id>` (T-0006) with the full rule
 snapshot (`params` as canonical JSON text, because the ledger refuses floats). Saving
 identical values writes nothing. Deleting is a soft delete that keeps the `rule_key`; a
@@ -224,7 +235,11 @@ approval records the ADR reference on the rule (`unlock_adr_reference`). Request
 rejection or cancellation and the unlock itself are each a ledger entry. A rule changed after
 the request cannot be unlocked by it. A rule has at most one pending request: a partial unique
 index (`rule_id` where `status = 'pending'`, migration `0020`, T-0216) backs the service's
-check, so a concurrent duplicate is the same `RuleStoreError` (409), never a second row. Unlocking the tenant default does not touch project
+check, so a concurrent duplicate is the same `RuleStoreError` (409), never a second row.
+Approve, reject and cancel close the request with a guarded `UPDATE … WHERE status =
+'pending'` (as override decisions do, T-0347): when a concurrent decision committed first the
+row count is 0 and the later one is a `RuleStoreError` (409) with nothing applied and nothing
+audited, so a request is never both approved (rule unlocked) and rejected. Unlocking the tenant default does not touch project
 copies; a project picks the unlocked default up by resetting the rule. Resetting never
 loosens beyond the default, so it is allowed on locked rules, with one exception on the
 tenant layer: a reset (one rule or the whole set) that would **delete** a live locked rule
@@ -270,6 +285,15 @@ not accepted) and `default_removed` (a copied rule whose default the tenant remo
 covers the projects the session can read (RLS: the caller's portfolio projects,
 `allowed_project_ids`), never others.
 
+`drift_report_page(session, limit=None, offset=0)` returns one page (`DriftPage`: `entries`,
+`next_offset`, `None` on the last page) of whole projects in project id order, so a project is
+never split across pages; `drift_report` is every page at once. A page costs four queries
+however many projects and sets it covers (the page's project ids, its project sets, the tenant
+default sets, and one `IN (...)` query for the rules of both; T-0348, TD-289).
+`GET /drift-report` takes optional `limit` (projects per page, default 100, at most 500) and
+`offset` (default 0) and still answers a plain `DriftEntryRead` list; when more projects follow,
+the `X-Next-Offset` header holds the `offset` of the next page.
+
 ## "Try it" (ADR 0004 §6, T-0036)
 
 `try_rule(session, set_id, rule_key, context, draft=None)` evaluates the stored rule (enabled
@@ -302,7 +326,7 @@ and returns a `TryResult`; it writes **nothing** (no finding, version or ledger 
 | `GET .../rule-sets/{set}/updates` | the upgrade offer (`RuleSetUpdatesRead`), tenant and project sets |
 | `POST .../rule-sets/{set}/updates/{key}/accept` | accept one rule of it |
 | `POST .../rule-sets/{set}/rules/{key}/try` | "Try it" (`TryRuleInput`: `context`, optional draft `rule`) |
-| `GET /drift-report` | the tenant drift report (`DriftEntryRead`) |
+| `GET /drift-report` | the tenant drift report (`DriftEntryRead`), paged by project (`limit`, `offset`, `X-Next-Offset`) |
 
 | Layer | `check` sets | other kinds |
 |---|---|---|

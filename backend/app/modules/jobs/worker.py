@@ -31,7 +31,8 @@ from app.core.module_loader.loader import (
     import_setting_defs,
 )
 from app.core.request_context import request_id_var
-from app.core.tenancy.context import TenancyContext, use_tenancy
+from app.core.startup_safety import check_database_role
+from app.core.tenancy.context import TenancyContext
 from app.modules.jobs import mail, scheduler, service
 from app.modules.jobs.broker import QUEUE_NAMES, RUN_JOB, LoopDispatcher, SaqBroker
 from app.modules.jobs.registry import JOB_REGISTRY, JobContext, JobRegistry
@@ -40,7 +41,8 @@ from app.modules.settings import cache as settings_cache
 logger = logging.getLogger("kerp.jobs")
 STOP_SIGNALS: Final = (signal.SIGINT, signal.SIGTERM)
 SHUTDOWN_GRACE_S: Final = 8  # running jobs may finish before cancellation (compose stops at 10s)
-CANCELLED: Final = "Job timed out or was cancelled"
+CANCELLED: Final = service.TIMED_OUT
+CANCELLED_RETRY: Final = "Job timed out or was cancelled; it is retried"
 
 
 class WorkerContext(Context, total=False):
@@ -79,9 +81,7 @@ async def run_job(
                     "job cancelled while starting",
                     extra={"job_id": job_id, "kind": begun[0], "request_id": request_id},
                 )
-                await asyncio.shield(
-                    asyncio.to_thread(_finish, db, tenancy, row_id, None, CANCELLED)
-                )
+                await _settle_cancelled(ctx, db, tenancy, row_id)
             raise
         if started is None:
             logger.warning("job not in its scope or already finished", extra={"job_id": job_id})
@@ -93,10 +93,9 @@ async def run_job(
 
         try:
             handler = registry.get(kind).handler
-            with use_tenancy(tenancy):
-                result = await handler(
-                    JobContext(row_id, kind, tenancy, payload, request_id, update, db)
-                )
+            result = await handler(
+                JobContext(row_id, kind, tenancy, payload, request_id, update, db)
+            )
         except service.RetryLaterError as exc:
             # The handler asked to run again later (T-0218): SAQ retries with back-off while
             # the kind allows more attempts; the last one fails the row with the message.
@@ -111,18 +110,18 @@ async def run_job(
                 raise
             await asyncio.to_thread(_finish, db, tenancy, row_id, None, message)
             return
-        except (Exception, asyncio.CancelledError) as exc:
+        except asyncio.CancelledError:
+            logger.exception(
+                "job cancelled", extra={"job_id": job_id, "kind": kind, "request_id": request_id}
+            )
+            await _settle_cancelled(ctx, db, tenancy, row_id)
+            raise
+        except Exception as exc:
             logger.exception(
                 "job failed", extra={"job_id": job_id, "kind": kind, "request_id": request_id}
             )
-            error = (
-                CANCELLED
-                if isinstance(exc, asyncio.CancelledError)
-                else service.sanitise_error(exc)
-            )
+            error = service.sanitise_error(exc)
             await asyncio.shield(asyncio.to_thread(_finish, db, tenancy, row_id, None, error))
-            if isinstance(exc, asyncio.CancelledError):
-                raise
             return
         try:
             await asyncio.to_thread(_finish, db, tenancy, row_id, result, None)
@@ -135,6 +134,24 @@ async def run_job(
             await asyncio.to_thread(_finish, db, tenancy, row_id, None, error)
     finally:
         request_id_var.reset(token)
+
+
+async def _settle_cancelled(
+    ctx: WorkerContext, db: Database, tenancy: TenancyContext, row_id: uuid.UUID
+) -> None:
+    """Settle a row whose run was cancelled: SAQ's job timeout or a worker shutdown (deploy).
+
+    SAQ runs a retryable job again (a timeout while attempts are left; a shutdown always), so
+    the row goes back to ``queued`` for that run, as for ``RetryLaterError`` (T-0346, audit
+    item 8); a ``failed`` row would never start again. On the last attempt it fails. Shielded:
+    the write lands even if the cancellation is repeated.
+    """
+    saq_job = ctx.get("job")
+    if saq_job is not None and saq_job.retryable:
+        write = asyncio.to_thread(_requeue, db, tenancy, row_id, CANCELLED_RETRY)
+    else:
+        write = asyncio.to_thread(_finish, db, tenancy, row_id, None, CANCELLED)
+    await asyncio.shield(write)
 
 
 async def _settle(
@@ -220,7 +237,8 @@ def build_workers(
         ctx["mail_queue"] = broker.queues["interactive"]
         ctx["mail_delivery"] = delivery
 
-    # The stuck-job sweep (T-0214) and the hourly per-project jobs (T-0215): batch worker only.
+    # The stuck-job sweep (T-0214), the hourly per-project jobs (T-0215) and the expiry of
+    # mail stuck queued (T-0346): batch worker only.
     cron_jobs: dict[str, list[CronJob[WorkerContext]]] = {
         "interactive": [],
         "batch": [
@@ -233,6 +251,12 @@ def build_workers(
             CronJob(
                 scheduler.tracked(scheduler.hourly_project_jobs),
                 cron=scheduler.HOURLY_CRON,
+                timeout=scheduler.CRON_TIMEOUT_S,
+            ),
+            # Mail stuck ``queued`` past its payload lifetime is failed (T-0346, TD-336).
+            CronJob(
+                scheduler.tracked(scheduler.expire_mail_cron),
+                cron=scheduler.MAIL_EXPIRY_CRON,
                 timeout=scheduler.CRON_TIMEOUT_S,
             ),
         ],
@@ -259,13 +283,20 @@ async def serve(settings: Settings) -> None:
     """Run both workers until SIGTERM/SIGINT (or cancellation), then stop both.
 
     Every module's startup check (``register_startup_check``) runs first, before any
-    connection is made: a check that raises refuses to start the worker (T-0213)."""
+    connection is made: a check that raises refuses to start the worker (T-0213). Then the
+    database role is checked like the API's (``check_database_role``, T-0342), before Redis."""
     registry = load_registry()
     registry.run_startup_checks(settings)
     transport = transport_from_settings(settings)  # production refuses without SES (T-0058)
     if not settings.redis_url:
         raise RuntimeError("KERP_REDIS_URL is not set")
     db = Database.from_settings(settings)
+    try:
+        # T-0342: the same database role rule as the API (refused in production).
+        check_database_role(db, settings)
+    except BaseException:
+        db.dispose()
+        raise
     broker = SaqBroker(settings.redis_url)
     loop = asyncio.get_running_loop()
     service.set_dispatcher(LoopDispatcher(broker, loop))

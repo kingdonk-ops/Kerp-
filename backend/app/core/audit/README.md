@@ -139,8 +139,10 @@ so it owns the table (TD-056). An owner's privileges can be revoked, and the REV
 to it, but an owner can always grant them back. The triggers do not depend on privileges, so
 they still hold when the owner has re-granted itself `UPDATE`
 (`test_triggers_still_block_an_owner_that_grants_itself_update`). When production splits the
-migration owner from the runtime role, the runtime role must get only `SELECT, INSERT`, and
-`ledger_guard_problems(conn)` can be asserted at startup (**TD-059**).
+migration owner from the runtime role, the runtime role must get only `SELECT, INSERT`
+(TD-059). Production asserts `ledger_guard_problems(conn)` at API and worker startup and
+refuses to start on any problem, including a missing `audit_ledger` (`table not found`, an
+unmigrated database; T-0342, `app/core/startup_safety.py`).
 
 `soft_delete` never applies to audit entries. Bulk ORM `update()`/`delete()` skip the ORM guard;
 on PostgreSQL the database layers still refuse them, on SQLite nothing does.

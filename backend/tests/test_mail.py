@@ -616,11 +616,14 @@ def test_ses_client_is_built_lazily_in_the_deployment_region(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     import boto3
+    from botocore.config import Config
 
     calls: list[tuple[str, str]] = []
+    configs: list[Config] = []
 
-    def fake_client(service: str, region_name: str) -> StubSes:
+    def fake_client(service: str, region_name: str, config: Config) -> StubSes:
         calls.append((service, region_name))
+        configs.append(config)
         return StubSes()
 
     monkeypatch.setattr(boto3, "client", fake_client)
@@ -633,6 +636,13 @@ def test_ses_client_is_built_lazily_in_the_deployment_region(
     transport.send(_message())
     transport.send(_message())
     assert calls == [("sesv2", "eu-central-1")]
+    # Bounded (T-0346): one send ends well inside the mail job's timeout, so a slow SES
+    # cannot outlive the job and send the same mail again on the job's retry.
+    [config] = configs
+    assert (config.connect_timeout, config.read_timeout) == (5, 20)
+    assert config.retries == {"total_max_attempts": 2}
+    budget = config.retries["total_max_attempts"] * (config.connect_timeout + config.read_timeout)
+    assert budget < jobs_mail.MAIL_TIMEOUT_S
 
 
 def _production(**overrides: Any) -> Settings:
@@ -811,6 +821,24 @@ def test_an_expired_payload_fails_the_send(db: Database, captured: Captured) -> 
     assert asyncio.run(jobs_mail.send_mail_job(ctx, **kwargs)) == "failed"
     row = _row(db, mail.send_id)
     assert (row.status, row.error_code) == ("failed", "payload_expired")
+
+
+def test_a_missing_payload_never_overwrites_a_send_that_was_settled(
+    db: Database, captured: Captured
+) -> None:
+    """SAQ runs a job at least once: a re-run after the send (payload deleted) keeps ``sent``."""
+    queue = FakeQueue()
+    mail = _mail(db, captured)
+    asyncio.run(jobs_mail.put(queue, mail))
+    kwargs = queue.jobs[0].kwargs or {}
+    transport = FakeTransport()
+    assert asyncio.run(jobs_mail.send_mail_job(_job_ctx(queue, db, transport, 1), **kwargs)) == (
+        "sent"
+    )
+    asyncio.run(jobs_mail.send_mail_job(_job_ctx(queue, db, transport, 2), **kwargs))
+    row = _row(db, mail.send_id)
+    assert (row.status, row.error_code) == ("sent", None)
+    assert len(transport.sent) == 1
 
 
 def test_a_payload_of_another_send_is_refused(db: Database, captured: Captured) -> None:

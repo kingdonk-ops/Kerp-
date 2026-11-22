@@ -23,7 +23,7 @@ from app.core.config import Settings
 from app.core.db import Database, utcnow
 from app.core.stats.registry import register_stats_provider
 from app.core.tenancy.context import TenancyContext
-from app.core.tenancy.rls import session_tenancy
+from app.core.tenancy.rls import session_tenancy, tenant_level_context
 from app.core.tenancy.scope import OutOfScopeError, get_or_404
 from app.modules.jobs.service import CONSOLE_CHAIN, JOB_REGISTRY, create_job, job_status
 from app.modules.projects import service as projects
@@ -221,6 +221,9 @@ def complete_upload(
     file = get_file(session, file_id)
     if file.created_by is not None and file.created_by != actor_id:
         raise NotUploaderError("only the uploader can complete an upload")
+    # Locked (PostgreSQL) before the status check: a client retry of ``/complete`` waits here
+    # and then sees ``verifying``, so one upload never gets two verify jobs (T-0346).
+    session.refresh(file, with_for_update=True)
     if file.status != "pending":
         raise UploadStateError(f"the file is {file.status}")
     info = storage.head(file.staging_key)
@@ -292,8 +295,19 @@ def _check(
     return "infected", "infected", signature
 
 
+def _is_current(file: UploadedFile, job_id: uuid.UUID | None) -> bool:
+    """Whether the verify job ``job_id`` is the file's own (``None``: not called by a job)."""
+    return job_id is None or file.job_id == job_id
+
+
 def verify_upload(
-    db: Database, tenancy: TenancyContext, file_id: uuid.UUID, *, storage: Storage, scanner: Scanner
+    db: Database,
+    tenancy: TenancyContext,
+    file_id: uuid.UUID,
+    *,
+    storage: Storage,
+    scanner: Scanner,
+    job_id: uuid.UUID | None = None,
 ) -> dict[str, Any]:
     """Quarantine, check and publish the uploaded bytes, or reject them.
 
@@ -306,10 +320,15 @@ def verify_upload(
     when the scanner is unavailable (``ScannerUnavailableError``, re-raised) the file stays
     ``verifying`` and its quarantine copy is kept for the job's retry (T-0218); the orphan
     sweep deletes it once the file is no longer ``verifying``.
+
+    ``job_id`` (the verify job, ``uploads.verify``): a job that is not the file's current
+    ``job_id`` does nothing, not even touch storage (T-0346). Two verify jobs of one file must
+    never run at once: both use the same quarantine object, so the later one could reject a
+    clean file as ``missing_object``. ``None``: a direct call, not a job.
     """
     with db.unit_of_work(tenancy) as session:
         file = get_file(session, file_id)
-        if file.status != "verifying":
+        if file.status != "verifying" or not _is_current(file, job_id):
             return {"file_id": str(file_id), "status": file.status}
         staging, quarantine, content = file.staging_key, file.quarantine_key, file.content_key
         expected = (file.size_bytes, file.content_type, file.sha256)
@@ -334,7 +353,7 @@ def verify_upload(
         # Re-read under a row lock (PostgreSQL): the orphan sweep may be rejecting this
         # stuck file right now; whoever locks first decides, the other sees the new status.
         session.refresh(file, with_for_update=True)
-        if file.status == "verifying":
+        if file.status == "verifying" and _is_current(file, job_id):
             file.scan_result = verdict
             file.scan_signature = signature
             if reason is not None:
@@ -432,6 +451,8 @@ def schedule_sweep(session: Session, *, actor_id: uuid.UUID | None = None) -> Jo
 # The statuses the monitor shows: still in the check, refused, or never completed.
 MONITORED_STATUSES: Final = ("verifying", "rejected", "expired")
 MAX_QUARANTINE_LIST: Final = 200
+# Who needs the tenant-level session, named in the error when it is not one (T-0349).
+_MONITOR: Final = "the quarantine monitor"
 
 
 @dataclass(frozen=True, slots=True)
@@ -473,14 +494,6 @@ class QuarantineCount:
     count: int
 
 
-def _console_tenant(session: Session) -> uuid.UUID:
-    """The tenant of the caller's tenant-level request session (checked before any write)."""
-    context = session_tenancy(session)
-    if context is None or context.project_id is not None:
-        raise RuntimeError("the quarantine monitor needs a tenant-level bound session")
-    return context.tenant_id
-
-
 def _monitor_filters(
     statuses: Collection[str] | None, reason: str | None, project_id: uuid.UUID | None
 ) -> list[Any]:
@@ -516,7 +529,7 @@ def quarantine_files(
     ``object_deleted`` is set; there is no purge. A project soft-deleted since keeps its
     rows, without a code. Reason codes are passed through, never enumerated (T-0169).
     """
-    _console_tenant(session)
+    tenant_level_context(session, _MONITOR)  # checked before any read
     filters = _monitor_filters(statuses, reason, project_id)
     total = session.scalar(select(func.count()).select_from(UploadedFile).where(*filters)) or 0
     rows = list(
@@ -565,7 +578,7 @@ def quarantine_counts(
     A ``GROUP BY`` under the same normal RLS as ``quarantine_files``; no ``SECURITY DEFINER``
     function (ADR 0016). Sorted by project code, status and reason.
     """
-    _console_tenant(session)
+    tenant_level_context(session, _MONITOR)  # checked before any read
     rows = session.execute(
         select(
             UploadedFile.project_id,
@@ -600,7 +613,7 @@ def _console_audit(
     # failed commit of the request session leaves the action unaudited (TD-455).
     audit.append(
         session,
-        CONSOLE_CHAIN.format(tenant_id=_console_tenant(session)),
+        CONSOLE_CHAIN.format(tenant_id=tenant_level_context(session, _MONITOR).tenant_id),
         {"event": event, **payload},
         actor_id=actor_id,
         source="api",
@@ -636,7 +649,7 @@ def recheck_upload(
     ``storage`` defaults to the configured object store.
     """
     storage = storage or get_storage()
-    tenant_id = _console_tenant(session)
+    tenant_id = tenant_level_context(session, _MONITOR).tenant_id
     file = get_or_404(session, UploadedFile, file_id)
     if file.tenant_id != tenant_id or file.project_id is None:  # defence in depth
         raise OutOfScopeError("UploadedFile not found")
@@ -677,7 +690,7 @@ def queue_project_sweep(
     every project of its tenant, ADR 0016), else ``OutOfScopeError`` (404). The job is created
     in the project's own scope and runs there, as the hourly sweep does (T-0215).
     """
-    tenant_id = _console_tenant(session)
+    tenant_id = tenant_level_context(session, _MONITOR).tenant_id
     project = projects.get_project(session, project_id)
     if project.tenant_id != tenant_id:  # defence in depth: RLS and the ORM scope hide it
         raise OutOfScopeError("Project not found")

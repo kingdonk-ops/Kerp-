@@ -35,12 +35,7 @@ from sqlalchemy.pool import QueuePool
 
 from app.core.config import Settings
 from app.core.db import GUID, Base, Database, import_all_models
-from app.core.tenancy.context import (
-    TenancyContext,
-    current_project_id,
-    current_tenant_id,
-    use_tenancy,
-)
+from app.core.tenancy.context import TenancyContext
 from app.core.tenancy.rls import (
     PROJECT_SETTING,
     TENANT_SETTING,
@@ -116,11 +111,10 @@ def test_worker_without_context_reads_and_writes_nothing(db: Database) -> None:
 
 # The worker tests below run a job through the real SAQ path: ``build_workers`` (the same
 # workers ``python -m app.modules.jobs.worker`` serves), a Redis queue, SAQ's job processing
-# task and the ``run_job`` wrapper, on one asyncio loop. The workers are started inside an
-# ambient ``use_tenancy(CTX_C)``: asyncio tasks copy the context variables of the task that
-# creates them, so a wrapper that did not bind the job's own scope would hand the handler
-# tenant T2's context. (The thread-based test this replaces proved nothing: a new thread
-# starts with empty context variables whatever the code under test does.)
+# task and the ``run_job`` wrapper, on one asyncio loop. The handler's scope comes only from
+# the job row: its ``JobContext.tenancy`` and the PostgreSQL settings of its session are
+# checked. (The tenant/project context variables an ambient scope could leak through were
+# dead code and are gone, T-0349. The thread-based test this replaces proved nothing.)
 
 
 @pytest.fixture
@@ -148,8 +142,7 @@ def _run_through_saq(
         service.set_dispatcher(dispatcher)
         settings = Settings(environment="test")
         workers = build_workers(settings, db=db, registry=registry, broker=broker)
-        with use_tenancy(CTX_C):  # an ambient context the worker tasks inherit
-            tasks = [asyncio.create_task(w.start()) for w in workers]
+        tasks = [asyncio.create_task(w.start()) for w in workers]
         try:
             with db.unit_of_work(enqueue_in) as s:
                 job_id = service.create_job(s, kind).id
@@ -184,7 +177,6 @@ def test_the_saq_worker_binds_the_jobs_own_scope_under_rls(
     seen: dict[str, object] = {}
 
     async def probe(job: JobContext) -> dict[str, Any]:
-        seen["context"] = (current_tenant_id.get(), current_project_id.get())
         seen["tenancy"] = job.tenancy
         with job.db.unit_of_work(job.tenancy) as s:
             seen["settings"] = _setting_values(s.connection())
@@ -199,7 +191,6 @@ def test_the_saq_worker_binds_the_jobs_own_scope_under_rls(
 
     assert (job.status, job.error, job.result) == ("succeeded", None, {"ok": True})
     assert (job.tenant_id, job.project_id) == (T1, PA)
-    assert seen["context"] == (T1, PA)  # not CTX_C, the context the worker tasks inherited
     assert seen["tenancy"] == CTX_A
     assert seen["settings"] == (str(T1), str(PA))  # the handler's session is bound in PostgreSQL
     assert seen["names"] == VISIBLE_TO_A

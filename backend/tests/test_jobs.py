@@ -26,7 +26,7 @@ from app.core.config import Settings
 from app.core.db import Base, Database, contract_violations, utcnow
 from app.core.module_loader.loader import discover_modules, import_job_handlers
 from app.core.request_context import request_id_var
-from app.core.tenancy.context import TenancyContext, current_tenant_id
+from app.core.tenancy.context import TenancyContext
 from app.core.tenancy.rls import RLS_EXEMPT, rls_tables
 from app.main import create_app
 from app.modules.jobs import registry as registry_module
@@ -63,7 +63,7 @@ class RecordingBroker:
 
 async def echo(job: JobContext) -> dict[str, Any]:
     await job.update(50, "half way")
-    return {"echo": job.payload, "tenant": str(current_tenant_id.get())}
+    return {"echo": job.payload, "tenant": str(job.tenancy.tenant_id)}
 
 
 async def boom(job: JobContext) -> None:
@@ -390,8 +390,33 @@ def test_failing_handler_stores_a_sanitised_error_and_logs_the_traceback(
     assert "hunter2" in str(record.exc_info[1])  # full detail in the log only
 
 
-def test_a_cancelled_or_timed_out_job_is_marked_failed(
-    db: Database, dispatched: list[JobRef]
+class SaqJobStandIn:
+    """The part of SAQ's job ``run_job`` reads: whether SAQ will run it again."""
+
+    def __init__(self, retryable: bool) -> None:
+        self.retryable = retryable
+
+
+@pytest.mark.parametrize(
+    ("saq_job", "expected"),
+    [
+        # SAQ runs it again (timeout with attempts left, or a deploy's shutdown): the row
+        # goes back to ``queued`` so that run can start it (T-0346, audit item 8).
+        (
+            SaqJobStandIn(retryable=True),
+            ("queued", None, "Job timed out or was cancelled; it is retried"),
+        ),
+        # The last attempt (or no SAQ job at all): the row fails.
+        (SaqJobStandIn(retryable=False), ("failed", "Job timed out or was cancelled", None)),
+        (None, ("failed", "Job timed out or was cancelled", None)),
+    ],
+    ids=["retryable", "last-attempt", "no-saq-job"],
+)
+def test_a_cancelled_or_timed_out_job_is_requeued_while_retryable_else_failed(
+    db: Database,
+    dispatched: list[JobRef],
+    saq_job: SaqJobStandIn | None,
+    expected: tuple[str, str | None, str | None],
 ) -> None:
     job_id = create(db, CTX_A, "demo.slow")
 
@@ -405,16 +430,23 @@ def test_a_cancelled_or_timed_out_job_is_marked_failed(
         registry = JobRegistry()
         registry.add(JobKind("demo.slow", "batch", slow_signalling))
         ctx: Any = {"db": db, "registry": registry}
+        if saq_job is not None:
+            ctx["job"] = saq_job
         task = asyncio.create_task(run_job(ctx, **dispatched[0].kwargs()))  # type: ignore[arg-type]
         await asyncio.wait_for(handler_running.wait(), timeout=10)
         assert load(db, CTX_A, job_id).status == "running"
-        task.cancel()  # what SAQ does when the job's timeout expires
+        task.cancel()  # what SAQ does when the job's timeout expires or the worker stops
         with pytest.raises(asyncio.CancelledError):
             await task
 
     asyncio.run(scenario())
     job = load(db, CTX_A, job_id)
-    assert (job.status, job.error) == ("failed", "Job timed out or was cancelled")
+    assert (job.status, job.error, job.message) == expected
+    if job.status == "queued":  # SAQ's retry starts it again
+        with db.unit_of_work(CTX_A) as s:
+            again = service.start_job(s, job_id)
+            assert again is not None
+            assert (again.status, again.attempts) == ("running", 2)
 
 
 @pytest.mark.parametrize("commit_first", [True, False], ids=["after-commit", "before-commit"])
@@ -465,6 +497,33 @@ def test_a_job_cancelled_while_starting_is_marked_failed_not_left_running(
     assert handler_calls == []
     record = next(r for r in caplog.records if r.__dict__.get("job_id") == str(job_id))
     assert record.__dict__["request_id"] == dispatched[0].request_id
+
+
+def test_a_retryable_job_cancelled_while_starting_goes_back_to_queued(
+    db: Database, dispatched: list[JobRef], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    job_id = create(db, CTX_A, "demo.slow")
+    real_start = worker_module._start
+
+    async def scenario() -> None:
+        loop = asyncio.get_running_loop()
+        task: asyncio.Task[None] | None = None
+
+        def start_then_cancel(*args: Any) -> Any:
+            started = real_start(*args)
+            assert task is not None
+            loop.call_soon_threadsafe(task.cancel)
+            return started
+
+        monkeypatch.setattr(worker_module, "_start", start_then_cancel)
+        ctx: Any = {"db": db, "registry": REGISTRY, "job": SaqJobStandIn(retryable=True)}
+        task = asyncio.create_task(run_job(ctx, **dispatched[0].kwargs()))  # type: ignore[arg-type]
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+    asyncio.run(scenario())
+    job = load(db, CTX_A, job_id)
+    assert (job.status, job.error, job.finished_at) == ("queued", None, None)
 
 
 def test_repeated_cancels_while_starting_still_wait_for_the_start_and_fail_the_row(
@@ -608,6 +667,98 @@ def test_sweep_re_enqueues_only_stuck_rows_saq_does_not_know(db: Database) -> No
     }
     assert fresh not in requeued
     assert other not in requeued
+
+
+# --- sweep of lost ``running`` rows (T-0346, audit item 14) -------------------------------------
+
+RETRYING = JobKind("demo.retrying", "batch", echo, timeout_s=60, max_attempts=3)
+SINGLE = JobKind("demo.single", "batch", echo, timeout_s=60)
+LOST_REGISTRY = make_registry()
+LOST_REGISTRY.add(RETRYING)
+LOST_REGISTRY.add(SINGLE)
+
+
+def started(
+    db: Database, ctx: TenancyContext, job_id: uuid.UUID, ago: timedelta, attempts: int = 1
+) -> None:
+    """Make the row ``running`` since ``ago`` (its worker then died without a trace)."""
+    with db.unit_of_work(ctx) as s:
+        s.execute(
+            update(Job)
+            .where(Job.id == job_id, Job.tenant_id == ctx.tenant_id)
+            .values(status="running", attempts=attempts, started_at=utcnow() - ago)
+        )
+
+
+def test_sweep_requeues_a_lost_running_row_with_attempts_left(db: Database) -> None:
+    service.set_dispatcher(None)
+    with db.unit_of_work(CTX_A) as s:
+        lost = service.create_job(s, RETRYING).id
+    # Past its 60 s timeout plus the margin; the first of its three attempts.
+    started(db, CTX_A, lost, timedelta(seconds=60) + service.RUNNING_MARGIN + timedelta(minutes=1))
+    broker = RecordingBroker()
+    requeued = asyncio.run(service.sweep(db, broker, [CTX_A], registry=LOST_REGISTRY))
+    assert requeued == [lost]
+    assert [(r.job_id, r.max_attempts) for r in broker.enqueued] == [(lost, 3)]
+    job = load(db, CTX_A, lost)
+    assert (job.status, job.error, job.attempts) == ("queued", None, 1)
+    assert job.message == service.LOST_RETRY
+    with db.unit_of_work(CTX_A) as s:  # SAQ's run then starts it again
+        assert service.start_job(s, lost) is not None
+
+
+def test_sweep_fails_a_lost_running_row_on_its_last_attempt_and_frees_the_single_run(
+    db: Database,
+) -> None:
+    service.set_dispatcher(None)
+    with db.unit_of_work(CTX_T1) as s:
+        lost, created = service.create_single_run_job(s, SINGLE)
+    assert created
+    started(db, CTX_T1, lost.id, timedelta(hours=1))  # killed by OOM an hour ago
+    with db.unit_of_work(CTX_T1) as s:  # before the sweep: the dead row blocks every new run
+        pending, created = service.create_single_run_job(s, SINGLE)
+        assert (pending.id, created) == (lost.id, False)
+    broker = RecordingBroker()
+    assert asyncio.run(service.sweep(db, broker, [CTX_T1], registry=LOST_REGISTRY)) == []
+    assert broker.enqueued == []
+    job = load(db, CTX_T1, lost.id)
+    assert (job.status, job.error) == ("failed", "Job timed out or was cancelled")
+    assert job.finished_at is not None
+    with db.unit_of_work(CTX_T1) as s:
+        fresh, created = service.create_single_run_job(s, SINGLE)
+    assert created
+    assert fresh.id != lost.id
+
+
+def test_sweep_leaves_running_rows_saq_knows_or_still_within_their_timeout(
+    db: Database,
+) -> None:
+    service.set_dispatcher(None)
+    with db.unit_of_work(CTX_A) as s:
+        known = service.create_job(s, SINGLE).id
+        recent = service.create_job(s, SINGLE).id
+        slow = service.create_job(s, JobKind("demo.ocr", "interactive", echo)).id
+    started(db, CTX_A, known, timedelta(hours=1))  # SAQ still has it: SAQ decides
+    started(db, CTX_A, recent, timedelta(seconds=30))  # inside its 60 s timeout
+    started(db, CTX_A, slow, timedelta(minutes=12))  # 600 s timeout + 5 min margin not over
+    broker = RecordingBroker()
+    broker.known.add(str(known))
+    assert asyncio.run(service.sweep(db, broker, [CTX_A], registry=LOST_REGISTRY)) == []
+    assert broker.enqueued == []
+    assert {load(db, CTX_A, j).status for j in (known, recent, slow)} == {"running"}
+
+
+def test_recover_leaves_a_row_that_moved_on_since_the_sweep_read_it(db: Database) -> None:
+    service.set_dispatcher(None)
+    with db.unit_of_work(CTX_A) as s:
+        job_id = service.create_job(s, RETRYING).id
+    started(db, CTX_A, job_id, timedelta(hours=1), attempts=2)
+    # The sweep read attempt 1; SAQ has started attempt 2 meanwhile.
+    assert service._recover(db, CTX_A, job_id, 1, 3) is None
+    with db.unit_of_work(CTX_A) as s:
+        service.finish_job(s, job_id, result={})
+    assert service._recover(db, CTX_A, job_id, 2, 3) is None
+    assert load(db, CTX_A, job_id).status == "succeeded"
 
 
 # --- HTTP: POST enqueue, GET poll ------------------------------------------------------------
@@ -778,10 +929,11 @@ def test_worker_builds_one_saq_worker_per_queue_with_its_concurrency(db: Databas
         ("t:batch", 1),
     ]
     # Both run job rows; the batch worker also runs the stuck-job sweep cron (T-0214), the
-    # interactive one the outbound e-mail sends (T-0058).
+    # hourly jobs (T-0215) and the queued-mail expiry (T-0346), the interactive one the
+    # outbound e-mail sends (T-0058).
     assert [set(w.functions) for w in workers] == [
         {"kerp_run_job", "kerp_send_mail"},
-        {"kerp_run_job", "sweep_cron", "hourly_project_jobs"},
+        {"kerp_run_job", "sweep_cron", "hourly_project_jobs", "expire_mail_cron"},
     ]
     ctx: WorkerContext = {"worker": workers[0]}
     assert workers[0].startup is not None

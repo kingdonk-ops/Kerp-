@@ -8,21 +8,16 @@ the admin module's ``GrantIn`` (PER-07 names its site, nobody else does).
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Annotated, Literal
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, StringConstraints
 
+from app.core.timestamps import aware_utc
 from app.modules.access_requests.models import MESSAGE_MAX, REASON_MAX
 from app.modules.admin.schemas import GrantRead, MemberAssign
 
-
-def _utc(value: datetime) -> datetime:
-    # SQLite hands TIMESTAMPTZ back naive; every value was stored in UTC.
-    return value.replace(tzinfo=UTC) if value.tzinfo is None else value
-
-
-UtcDatetime = Annotated[datetime, AfterValidator(_utc)]
+UtcDatetime = Annotated[datetime, AfterValidator(aware_utc)]
 Status = Literal["pending", "approved", "rejected", "withdrawn"]
 # A lookup ticket is a compact JWT; anything longer is not one.
 TICKET_MAX = 4096

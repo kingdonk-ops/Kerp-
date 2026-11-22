@@ -11,7 +11,7 @@ from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -228,6 +228,26 @@ def test_run_checks_fails_closed(db: Database, expression: str, outcome: str) ->
         result = run_checks({"fields": {"n": 1.0}}, "demo.submit", session=s)
     assert result.blocked
     assert [f.outcome for f in result.findings] == [outcome]
+
+
+@pytest.mark.parametrize(
+    "expression",
+    [
+        "l.all(a, l.all(b, l.all(c, l.all(d, true))))",  # over the macro-nesting cap
+        "(" * 150 + "true" + ")" * 150,  # over the nesting-depth cap
+    ],
+)
+def test_a_stored_rule_over_a_cost_cap_fails_closed(db: Database, expression: str) -> None:
+    # A rule stored before the T-0341 caps (written here past compile-on-save) is a parse
+    # error at evaluation: run_checks blocks with an "error" finding, as for any CEL error.
+    set_id = make_set(db, CTX_A)
+    add(db, CTX_A, set_id, cel_rule("r", "true"))
+    with db.unit_of_work(CTX_A) as s:
+        s.execute(update(Rule).where(Rule.rule_key == "r").values(expression=expression))
+    with db.unit_of_work(CTX_A) as s:
+        result = run_checks({"fields": {}, "l": [1.0]}, "demo.submit", session=s)
+    assert result.blocked
+    assert [f.outcome for f in result.findings] == ["error"]
 
 
 class TransitionBlockedError(Exception):

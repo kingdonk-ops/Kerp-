@@ -46,6 +46,7 @@ from app.modules.validation.service import (
     _context,
     _guard_reset_keeps_locks,
     _guard_source,
+    _locked_rule_set,
     _message,
     _parent_set,
     _record_change,
@@ -55,12 +56,16 @@ from app.modules.validation.service import (
 )
 
 __all__ = [
+    "DEFAULT_DRIFT_PAGE",
+    "MAX_DRIFT_PAGE",
     "MAX_SAMPLE_CONTEXT_BYTES",
     "MAX_SAMPLE_DEPTH",
     "MAX_SAMPLE_TEXT",
+    "DriftPage",
     "SampleContextError",
     "accept_update",
     "drift_report",
+    "drift_report_page",
     "pending_updates",
     "try_rule",
 ]
@@ -70,6 +75,8 @@ MAX_SAMPLE_TEXT: Final = 20_000  # characters of sample text a regex rule is tri
 MAX_SAMPLE_CONTEXT_BYTES: Final = 64 * 1024  # compact JSON of a CEL sample (as job payloads)
 MAX_SAMPLE_DEPTH: Final = 32  # nested objects/lists in a CEL sample, the context itself = 1
 MAX_MATCHES: Final = 100  # matches returned by "Try it" on an autolink rule
+DEFAULT_DRIFT_PAGE: Final = 100  # projects per page of GET /drift-report without ``limit``
+MAX_DRIFT_PAGE: Final = 500  # the largest ``limit`` GET /drift-report accepts
 
 
 class SampleContextError(ValueError):
@@ -198,7 +205,7 @@ def accept_update(
     context = _context(session)
     _guard_source(source)
     actor = actor_id or context.user_id
-    rule_set = get_or_404(session, RuleSet, rule_set_id)
+    rule_set = _locked_rule_set(session, rule_set_id)
     parent, mine, defaults = _state(session, rule_set)
     update = next((u for u in _diff(rule_set, mine, defaults) if u.rule_key == rule_key), None)
     if update is None:
@@ -229,7 +236,20 @@ def accept_update(
 # --- drift report (ADR 0004 Consequences) ------------------------------------------------------
 
 
+@dataclasses.dataclass(frozen=True)
+class DriftPage:
+    """One page of the drift report: whole projects, ``next_offset`` ``None`` on the last."""
+
+    entries: list[DriftEntryRead]
+    next_offset: int | None
+
+
 def drift_report(session: Session) -> list[DriftEntryRead]:
+    """The whole drift report (every readable project); see ``drift_report_page``."""
+    return drift_report_page(session).entries
+
+
+def drift_report_page(session: Session, *, limit: int | None = None, offset: int = 0) -> DriftPage:
     """Project rules that differ from the tenant defaults, for every project the tenant-level
     session can read (RLS: the caller's portfolio projects, ``allowed_project_ids``; every project
     of the tenant for a ``system_admin`` session, ADR 0016).
@@ -239,10 +259,35 @@ def drift_report(session: Session) -> list[DriftEntryRead]:
     (``fields``). ``deleted``: a default the project deleted. ``missing``: a default the
     project's copy lacks (an update not accepted). ``default_removed``: a copied rule whose
     default the tenant removed. Sorted by project, set key and rule key.
+
+    Paged by project (T-0348): ``limit`` projects (all with ``None``) from ``offset`` in project
+    id order, so a project is never split across pages. A page costs a fixed number of
+    queries, however many projects and sets it covers: the page's project ids, its project
+    sets, the tenant default sets, and one ``IN (...)`` query for the rules of both.
     """
     context = _tenant_context(session)
+    page_query = (
+        select(RuleSet.project_id)
+        .where(RuleSet.tenant_id == context.tenant_id, RuleSet.layer == "project")
+        .distinct()
+        .order_by(RuleSet.project_id)
+        .offset(offset)
+    )
+    if limit is not None:
+        page_query = page_query.limit(limit + 1)  # one more: is there a next page?
+    project_ids = [p for p in session.scalars(page_query) if p is not None]
+    next_offset = None
+    if limit is not None and len(project_ids) > limit:
+        project_ids = project_ids[:limit]
+        next_offset = offset + limit
+    if not project_ids:
+        return DriftPage([], next_offset)
     sets = session.scalars(
-        select(RuleSet).where(RuleSet.tenant_id == context.tenant_id, RuleSet.layer == "project")
+        select(RuleSet).where(
+            RuleSet.tenant_id == context.tenant_id,
+            RuleSet.layer == "project",
+            RuleSet.project_id.in_(project_ids),
+        )
     ).all()
     tenant_sets = {
         s.key: s
@@ -251,18 +296,20 @@ def drift_report(session: Session) -> list[DriftEntryRead]:
                 RuleSet.tenant_id == context.tenant_id,
                 RuleSet.project_id.is_(None),
                 RuleSet.layer == "tenant",
+                RuleSet.key.in_({s.key for s in sets}),
             )
         )
     }
+    by_set = _rules_by_set(session, [s.id for s in sets] + [s.id for s in tenant_sets.values()])
     entries: list[DriftEntryRead] = []
     for rule_set in sets:
         default_set = tenant_sets.get(rule_set.key)
         defaults = (
             {}
             if default_set is None
-            else {r.rule_key: r for r in list_rules(session, default_set) if r.deleted_at is None}
+            else {r.rule_key: r for r in by_set[default_set.id] if r.deleted_at is None}
         )
-        mine = {rule.rule_key: rule for rule in list_rules(session, rule_set)}
+        mine = {rule.rule_key: rule for rule in by_set[rule_set.id]}
         for key, rule in mine.items():
             default = None if rule.origin_rule_key is None else defaults.get(rule.origin_rule_key)
             drift, fields = _drift(rule, default)
@@ -271,7 +318,22 @@ def drift_report(session: Session) -> list[DriftEntryRead]:
         for key, default in defaults.items():
             if key not in mine:
                 entries.append(_entry(rule_set, key, "missing", [], None, default))
-    return sorted(entries, key=lambda e: (str(e.project_id), e.rule_set_key, e.rule_key))
+    entries.sort(key=lambda e: (str(e.project_id), e.rule_set_key, e.rule_key))
+    return DriftPage(entries, next_offset)
+
+
+def _rules_by_set(session: Session, set_ids: list[uuid.UUID]) -> dict[uuid.UUID, list[Rule]]:
+    """Every rule of the sets, deleted ones included, in run order: one query."""
+    found: dict[uuid.UUID, list[Rule]] = {set_id: [] for set_id in set_ids}
+    query = (
+        select(Rule)
+        .where(Rule.rule_set_id.in_(set_ids))
+        .order_by(Rule.sort_order, Rule.rule_key)
+        .execution_options(include_deleted=True)
+    )
+    for rule in session.scalars(query):
+        found[rule.rule_set_id].append(rule)
+    return found
 
 
 def _drift(rule: Rule, default: Rule | None) -> tuple[str | None, list[str]]:

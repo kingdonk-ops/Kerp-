@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import { CEL_ERROR_CODES, evaluate, type CelResult, type JsonValue } from "./index";
+import { MAX_EVAL_STEPS, MAX_EXPRESSION_BYTES, MAX_MACRO_NESTING, MAX_NESTING_DEPTH } from "./limits";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../../..");
 const FIXTURE_FILE = join(REPO_ROOT, "tests/contract/conformance_fixtures.json");
@@ -29,6 +30,7 @@ interface Fixture {
 
 interface FixtureDocument {
   error_codes: string[];
+  limits: Record<string, number>;
   fixtures: Fixture[];
 }
 
@@ -85,6 +87,15 @@ describe("CEL conformance fixtures (client runtime)", () => {
 
   it("uses exactly the shared error code list", () => {
     expect([...CEL_ERROR_CODES]).toEqual(DOCUMENT.error_codes);
+  });
+
+  it("uses exactly the shared limits", () => {
+    expect(DOCUMENT.limits).toEqual({
+      max_expression_bytes: MAX_EXPRESSION_BYTES,
+      max_macro_nesting: MAX_MACRO_NESTING,
+      max_nesting_depth: MAX_NESTING_DEPTH,
+      max_eval_steps: MAX_EVAL_STEPS,
+    });
   });
 
   it("has unique fixture ids", () => {

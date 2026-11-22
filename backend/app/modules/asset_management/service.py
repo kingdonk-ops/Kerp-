@@ -422,9 +422,8 @@ def _path_codes(
 def _refresh_display_codes(
     session: Session, project_id: uuid.UUID, levels: Levels, root: AssetNode
 ) -> None:
-    """Recompute ``display_code`` of ``root`` and its subtree (a move, a template change)."""
-    if all(level.display_code_template is None for level in levels.values()):
-        return
+    """Recompute ``display_code`` of ``root`` and its subtree (a move, a template change). It
+    always runs, so clearing the last template restores each node's own code (T-0347)."""
     parent_path = root.tree_path.rpartition(".")[0] or None
     above = _path_codes(session, project_id, levels, parent_path)
     codes: dict[uuid.UUID, dict[str, str]] = {}
@@ -600,7 +599,9 @@ def move_node(
             AssetNode.project_id == project_id, AssetNode.id.in_(batch)
         )
         session.scalars(_fresh(reload)).all()
-    _refresh_display_codes(session, project_id, levels, node)
+    # Without any template every display code is the node's own code, which a move keeps.
+    if any(level.display_code_template is not None for level in levels.values()):
+        _refresh_display_codes(session, project_id, levels, node)
     _audit(
         session,
         NODE_CHAIN,

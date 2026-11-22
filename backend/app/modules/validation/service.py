@@ -23,17 +23,16 @@ per-record override of a blocked check (Amendment A, T-0035) is in ``overrides.p
 
 from __future__ import annotations
 
-import dataclasses
 import json
 import logging
 import re
 import uuid
 from collections.abc import Callable, Collection, Iterable, Mapping
 from functools import cache
-from typing import TYPE_CHECKING, Any, Final
+from typing import TYPE_CHECKING, Any, Final, cast
 
-from sqlalchemy import ColumnElement, or_, select
-from sqlalchemy.exc import IntegrityError, OperationalError, SQLAlchemyError
+from sqlalchemy import ColumnElement, or_, select, update
+from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.audit import service as audit
@@ -42,7 +41,8 @@ from app.core.db import SIDE_WRITE_DB_KEY, Database, utcnow
 from app.core.module_loader import service as module_settings
 from app.core.module_loader.loader import discover_modules
 from app.core.tenancy.context import TenancyContext
-from app.core.tenancy.rls import SESSION_INFO_KEY, bind_tenancy, session_tenancy
+from app.core.tenancy.rebind import project_binding
+from app.core.tenancy.rls import bind_tenancy, session_tenancy
 from app.core.tenancy.scope import OutOfScopeError, get_or_404
 from app.modules.projects import service as projects
 from app.modules.validation import overrides
@@ -66,6 +66,8 @@ from app.modules.validation.schemas import (
 )
 
 if TYPE_CHECKING:
+    from sqlalchemy.engine import CursorResult
+
     from app.modules.projects.models import Project
 
 __all__ = [
@@ -233,7 +235,7 @@ def save_rule(
     """
     context = _context(session)
     _guard_source(source)
-    rule_set = get_or_404(session, RuleSet, rule_set_id)
+    rule_set = _locked_rule_set(session, rule_set_id)
     compile_rule(rule_set.kind, spec.engine, spec.expression, spec.params, spec.action)
     actor = actor_id or context.user_id
     values = {name: getattr(spec, name) for name in _EDIT_FIELDS}
@@ -280,7 +282,7 @@ def delete_rule(
     """Soft-delete a rule; it keeps its ``rule_key`` (ADR 0004 §3). Not a locked one."""
     context = _context(session)
     _guard_source(source)
-    rule_set = get_or_404(session, RuleSet, rule_set_id)
+    rule_set = _locked_rule_set(session, rule_set_id)
     rule = _live_rule(session, rule_set, rule_key)
     _guard_unlocked(rule_set, rule)
     actor = actor_id or context.user_id
@@ -487,7 +489,7 @@ def set_rule_enabled(
     """Disable or enable a rule (versioned, audited). Not a locked one."""
     context = _context(session)
     _guard_source(source)
-    rule_set = get_or_404(session, RuleSet, rule_set_id)
+    rule_set = _locked_rule_set(session, rule_set_id)
     rule = _live_rule(session, rule_set, rule_key)
     _guard_unlocked(rule_set, rule)
     if rule.enabled == enabled:
@@ -522,7 +524,7 @@ def reset_rule(
     """
     context = _context(session)
     _guard_source(source)
-    rule_set = get_or_404(session, RuleSet, rule_set_id)
+    rule_set = _locked_rule_set(session, rule_set_id)
     parent = _parent_set(session, rule_set)
     rule = _find_rule(session, rule_set, rule_key, include_deleted=True)
     if rule is not None and rule.origin_rule_key is None:
@@ -554,7 +556,7 @@ def reset_rule_set(
     context = _context(session)
     _guard_source(source)
     actor = actor_id or context.user_id
-    rule_set = get_or_404(session, RuleSet, rule_set_id)
+    rule_set = _locked_rule_set(session, rule_set_id)
     parent = _parent_set(session, rule_set)
     mine = {rule.rule_key: rule for rule in list_rules(session, rule_set)}
     defaults = [rule for rule in list_rules(session, parent) if rule.deleted_at is None]
@@ -655,7 +657,7 @@ def seed_project(
     context = _tenant_context(session)
     enabled = _default_enabled_modules()
     actor = actor_id or context.user_id
-    with _ProjectBinding(session, context, project_id):
+    with project_binding(session, project_id):
         return _copy_to_project(
             session, lambda s: s.module is None or s.module in enabled, source_pack, actor
         )
@@ -765,11 +767,11 @@ def approve_unlock(
     request = _pending_unlock(session, request_id)
     if actor is None or actor == request.requested_by:
         raise UnlockPermissionError("a second, different person must approve an unlock")
-    rule_set = get_or_404(session, RuleSet, request.rule_set_id)
+    rule_set = _locked_rule_set(session, request.rule_set_id)
     rule = get_or_404(session, Rule, request.rule_id)
     if rule.version != request.rule_version or not rule.locked:
         raise RuleStoreError("the rule changed since the unlock was requested; request again")
-    _decide(request, "approved", actor)
+    _decide(session, request, "approved", actor)
     rule.locked = False
     rule.unlock_adr_reference = request.adr_reference
     rule.version += 1
@@ -803,7 +805,7 @@ def reject_unlock(
     request = _pending_unlock(session, request_id)
     rule_set = get_or_404(session, RuleSet, request.rule_set_id)
     status = "cancelled" if actor == request.requested_by else "rejected"
-    _decide(request, status, actor)
+    _decide(session, request, status, actor)
     _audit_unlock(session, rule_set, request, f"unlock_{status}", actor)
     return request
 
@@ -1011,40 +1013,6 @@ def _copy_to_project(
     ]
 
 
-class _ProjectBinding:
-    """Re-bind a tenant-level session to one project for a copy, then back (same transaction).
-
-    ``bind_tenancy`` refuses to switch a session holding objects, so they are flushed,
-    detached, and re-attached once the session is back in the tenant scope.
-    """
-
-    def __init__(self, session: Session, context: TenancyContext, project_id: uuid.UUID) -> None:
-        self.session, self.context = session, context
-        self.project = dataclasses.replace(context, project_id=project_id)
-        self.held: list[object] = []
-
-    def __enter__(self) -> None:
-        self.session.flush()
-        self.held = list(self.session.identity_map.values())
-        self.session.expunge_all()
-        bind_tenancy(self.session, self.project)
-
-    def __exit__(self, exc_type: object, *_exc: object) -> None:
-        if exc_type is None:
-            self.session.flush()
-        self.session.expunge_all()
-        if exc_type is None:
-            bind_tenancy(self.session, self.context)
-        else:
-            try:
-                bind_tenancy(self.session, self.context)
-            except SQLAlchemyError:
-                # The transaction is already failed (it will be rolled back): restore the
-                # scope on the session without touching the connection.
-                self.session.info[SESSION_INFO_KEY] = self.context
-        self.session.add_all(self.held)
-
-
 @cache  # module manifests are static for the life of the process, so discover them once
 def _default_enabled_modules() -> frozenset[str]:
     states = module_settings.default_states(discover_modules())
@@ -1082,6 +1050,9 @@ def _sync_seed(session: Session, context: TenancyContext, seed: SeedRuleSet) -> 
         raise RuleStoreError(f"seed {seed.key!r} changes the kind; a set's kind is fixed")
     if rule_set.seed_version is not None and rule_set.seed_version >= seed.version:
         return False
+    session.refresh(rule_set, with_for_update=True)  # the version bump below (T-0347)
+    if rule_set.seed_version is not None and rule_set.seed_version >= seed.version:
+        return False  # a concurrent load got there first
     previous = rule_set.seed_version
     current = {rule.rule_key: rule for rule in list_rules(session, rule_set)}
     changes = [
@@ -1155,6 +1126,27 @@ def _audit_seed(
     )
 
 
+def _locked_rule_set(session: Session, rule_set_id: uuid.UUID) -> RuleSet:
+    """The visible rule set, its row locked for the transaction (``FOR UPDATE`` on
+    PostgreSQL) and re-read, as ``projects._locked`` does: every change that raises the set's
+    ``version`` takes it first, so two concurrent edits are serialised and end as two
+    consecutive versions instead of both writing the same one.
+
+    A set the session may read but not change (a project session and a tenant set) is not
+    returned by the locking read on PostgreSQL (RLS applies the write policy to ``FOR
+    UPDATE``): ``OutOfScopeError`` (404), as the write guard answers on any database."""
+    rule_set = get_or_404(session, RuleSet, rule_set_id)
+    locked = session.scalars(
+        select(RuleSet)
+        .where(RuleSet.id == rule_set.id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    ).first()
+    if locked is None:
+        raise OutOfScopeError("RuleSet not found")
+    return locked
+
+
 def _pending_unlock(session: Session, request_id: uuid.UUID) -> UnlockRequest:
     request = get_or_404(session, UnlockRequest, request_id)
     if request.status != "pending":
@@ -1162,11 +1154,28 @@ def _pending_unlock(session: Session, request_id: uuid.UUID) -> UnlockRequest:
     return request
 
 
-def _decide(request: UnlockRequest, status: str, actor: uuid.UUID) -> None:
-    request.status = status
-    request.decided_by = actor
-    request.decided_at = utcnow()
-    request.updated_by = actor
+def _decide(session: Session, request: UnlockRequest, status: str, actor: uuid.UUID) -> None:
+    """Close the pending request. Guarded in the database (as override decisions are): a
+    concurrent approve, reject or cancel committed since the row was read as ``pending``
+    leaves no pending row to update, so this one is refused (``RuleStoreError``, 409) before
+    anything is applied or audited, and the winner's decision stands."""
+    now = utcnow()
+    result = session.execute(
+        update(UnlockRequest)
+        .where(UnlockRequest.id == request.id, UnlockRequest.status == "pending")
+        .values(
+            status=status,
+            decided_by=actor,
+            decided_at=now,
+            updated_at=now,
+            updated_by=actor,
+            revision=UnlockRequest.revision + 1,
+        )
+        .execution_options(synchronize_session=False)
+    )
+    if not cast("CursorResult[Any]", result).rowcount:
+        raise RuleStoreError("the unlock request was decided meanwhile")
+    session.refresh(request)
 
 
 def _audit_unlock(

@@ -9,6 +9,7 @@ import {
 } from "@marcbachmann/cel-js";
 
 import { CEL_JS_CODE_MAP, type CelErrorCode } from "./errors";
+import { checkLimits, LimitExceededError, MAX_EXPRESSION_BYTES, MAX_NESTING_DEPTH } from "./limits";
 import {
   decodeContext,
   encodeValue,
@@ -21,8 +22,6 @@ import {
 export type CelResult = { ok: true; value: JsonValue } | { ok: false; code: CelErrorCode; message: string };
 
 export const PROGRAM_CACHE_SIZE = 1024;
-/** Same cap as the server (backend/app/core/cel/runtime.py), counted in UTF-8 bytes. */
-export const MAX_EXPRESSION_BYTES = 4096;
 
 const utf8 = new TextEncoder();
 
@@ -31,6 +30,9 @@ const environment = new Environment({
   unlistedVariablesAreDyn: true,
   // celpy accepts mixed list/map literals such as [1, 'a'].
   homogeneousAggregateLiterals: false,
+  // The parser depth cap (limits.ts): cel-js counts it while parsing (limit_exceeded, a
+  // ParseError); the server computes the same measure in backend/app/core/cel/limits.py.
+  limits: { maxDepth: MAX_NESTING_DEPTH },
 });
 
 // The uint and duration classes are not exported by the package; take them from values.
@@ -49,6 +51,7 @@ function compile(expression: string): ParseResult {
     return cached;
   }
   const program = environment.parse(expression);
+  checkLimits(program.ast); // LimitExceededError: not cached, like a parse error
   programs.set(expression, program);
   if (programs.size > PROGRAM_CACHE_SIZE) {
     const oldest = programs.keys().next();
@@ -64,6 +67,7 @@ export function compiledProgramCount(): number {
 
 /** Map a cel-js error onto the KERP taxonomy. */
 export function classifyCelError(error: unknown): { ok: false; code: CelErrorCode; message: string } {
+  if (error instanceof LimitExceededError) return { ok: false, code: "PARSE_ERROR", message: error.message };
   if (error instanceof ParseError || error instanceof EvaluationError || error instanceof CelTypeError) {
     const fallback: CelErrorCode =
       error instanceof ParseError ? "PARSE_ERROR" : error instanceof CelTypeError ? "NO_MATCHING_OVERLOAD" : "EVAL_ERROR";

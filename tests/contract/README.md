@@ -18,6 +18,7 @@ Suites that load it (both fail if the file is missing, has no fixtures, or has d
 {
   "format": "kerp-cel-conformance/1",
   "error_codes": ["PARSE_ERROR", ...],      // the KERP taxonomy; both code enums must equal this list
+  "limits": {"max_expression_bytes": 4096, ...},  // cost limits; both runtimes' constants must equal these
   "fixtures": [
     {
       "id": "arith.int.add",               // unique, dotted
@@ -43,6 +44,38 @@ toward the T-0131 parity target.
 The `edge.*` fixtures (T-0110) cover the semantics that tend to diverge: null and absent fields,
 numeric types and overflow, strings and unicode, timestamps and time zones, list/map membership,
 short-circuiting and errors. Their gaps are summarised in `TD-471`.
+
+### Limits (T-0341)
+
+The `limits` block is the single source of the CEL cost limits. `backend/app/core/cel/limits.py`
+and `frontend/src/lib/cel/limits.ts` define the same constants and both suites assert them equal
+to this block (as for `error_codes`).
+
+| Key | Value | Answer above it | Where |
+|---|---|---|---|
+| `max_expression_bytes` | 4096 | `INVALID_ARGUMENT`, before parsing | both runtimes |
+| `max_macro_nesting` | 3 | `PARSE_ERROR`, at compile time | both runtimes |
+| `max_nesting_depth` | 100 | `PARSE_ERROR`, at compile time | both runtimes |
+| `max_eval_steps` | 50000 | `EVAL_ERROR` `evaluation step budget exceeded` | server only (TD-533) |
+
+- **Macro nesting** counts the loop macros `all`, `exists`, `exists_one`, `map`, `filter` along
+  one path, and only through a macro's *arguments* (evaluated once per element): sibling macros
+  (`l.all(..) && l.all(..)`) and chained macros (`l.filter(..).all(..)`, a macro in another
+  macro's receiver) are not nested. It is static: a branch that would not run still counts.
+- **Nesting depth** is two measures, each capped at `max_nesting_depth`: the *syntax-tree depth*
+  (every operator, selection, index, call, list/map literal and literal/identifier is one level;
+  parentheses are not nodes; a 101-term sum is depth 101) and the *parser depth* (every nested
+  sub-expression — parentheses, call arguments, list elements, map keys and values, index
+  expressions, ternary branches — is one level, and each `.field`, `.method()` or `[i]` in a
+  selection chain adds one). The parser depth is cel-js's `maxDepth` limit; the server computes
+  the same number on its parse tree. The two parsers group a comparison chain that mixes `==` /
+  `!=` with `<` / `in` differently (TD-471), so such a chain can measure one syntax-tree level
+  apart; the fixtures avoid that boundary.
+- **Step budget**: the server evaluator spends one step per parse-tree node visited (macro bodies
+  included) and stops the whole evaluation when the budget is spent; `true ||` cannot absorb it.
+  cel-js has no step hook, so the client does not apply it (TD-533).
+
+The `limits.*` fixtures pin each cap at and above its value on both runtimes.
 
 **Fail closed.** A rule passes only when the result is exactly the bool `true`
 (`CelOk(value=True)` / `{ok: true, value: true}`); every error and every non-bool value blocks.
@@ -80,7 +113,7 @@ reported as `EVAL_ERROR`.
 
 | Code | Meaning |
 |---|---|
-| `PARSE_ERROR` | Expression is not valid CEL syntax (also a misused macro) |
+| `PARSE_ERROR` | Expression is not valid CEL syntax (also a misused macro), or over the macro-nesting or nesting-depth cap |
 | `UNDECLARED_REFERENCE` | Top-level variable not present in the context |
 | `NO_SUCH_KEY` | Map key / field missing, or field selection on a non-map (e.g. `null`) |
 | `INDEX_OUT_OF_RANGE` | List index outside the list |
@@ -88,7 +121,7 @@ reported as `EVAL_ERROR`.
 | `DIVIDE_BY_ZERO` | Integer `/` or `%` by zero |
 | `INT_OVERFLOW` | int64 / uint64 out of range (arithmetic, literal, conversion) |
 | `INVALID_ARGUMENT` | Bad argument value: unparsable number / timestamp, invalid regex; expression over 4096 UTF-8 bytes |
-| `EVAL_ERROR` | Anything else, including unencodable results |
+| `EVAL_ERROR` | Anything else, including unencodable results and a spent step budget (server) |
 
 ## `field_types.json` — the field-type palette (T-0110)
 

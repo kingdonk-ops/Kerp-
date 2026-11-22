@@ -4,6 +4,7 @@ Real tokens and memberships from the store, on SQLite and, in CI, PostgreSQL und
 All users, projects and rules are synthetic.
 """
 
+import time
 import uuid
 from collections.abc import Iterator
 from pathlib import Path
@@ -19,11 +20,13 @@ from app.core.tenancy.context import TenancyContext
 from app.modules.admin import service as admin_service
 from app.modules.projects import service as projects
 from app.modules.projects.schemas import ProjectCreate
+from app.modules.validation import upgrades
 from app.modules.validation.defaults import SeedRuleSet
 from app.modules.validation.service import list_rule_sets, seed_tenant
 from tests.audit_support import migrated_database
 from tests.auth_support import PASSWORD, T1, auth_app, make_settings, seed_user
 from tests.db_support import database_url
+from tests.test_cel_limits import AUDIT_RULE, SIX_NESTED, TEN_ITEMS
 
 API = "/api/v1/validation"
 CTX = TenancyContext(tenant_id=T1)
@@ -445,6 +448,67 @@ def test_the_drift_report(api: Api) -> None:
         for e in response.json()
     ]
     assert found == [(str(api.project), CHECK, "photo", "modified", ["enabled"])]  # not "other"
+    assert "X-Next-Offset" not in response.headers  # one page
+
+
+def test_the_drift_report_pages_by_project(api: Api) -> None:
+    """T-0348: optional ``limit``/``offset``, the next page in ``X-Next-Offset``."""
+    photo = api.project_rule(CHECK, "photo")
+    assert api.client.post(f"{photo}/disable", headers=api.as_("qa")).status_code == 200
+    url = f"{API}/drift-report"
+    first = api.client.get(url, params={"limit": 1}, headers=api.as_("qd"))
+    assert first.status_code == 200, first.text
+    assert [e["rule_key"] for e in first.json()] == ["photo"]
+    assert "X-Next-Offset" not in first.headers  # the caller reads one project
+    with api.db.unit_of_work(CTX) as s:  # now also the other project (no drift there)
+        s.add(
+            ProjectMembership(
+                tenant_id=T1,
+                user_id=api.ids["qd"],
+                member_project_id=api.other,
+                persona=P.QUALITY_DIRECTOR.value,
+            )
+        )
+    whole = api.client.get(url, headers=api.as_("qd")).json()
+    pages, offset = [], "0"
+    while offset is not None:
+        page = api.client.get(url, params={"limit": 1, "offset": offset}, headers=api.as_("qd"))
+        assert page.status_code == 200, page.text
+        pages.append(page.json())
+        offset = page.headers.get("X-Next-Offset")
+    assert len(pages) == 2
+    assert [e for p in pages for e in p] == whole == first.json()
+    beyond = api.client.get(url, params={"offset": 5}, headers=api.as_("qd"))
+    assert (beyond.status_code, beyond.json()) == (200, [])
+    for bad in ({"limit": 0}, {"limit": 501}, {"offset": -1}):
+        assert api.client.get(url, params=bad, headers=api.as_("qd")).status_code == 422, bad
+
+
+@pytest.mark.parametrize("expression", [AUDIT_RULE, SIX_NESTED], ids=["four", "six"])
+def test_nested_loop_rules_are_refused_at_save_and_in_try_it(
+    api: Api, expression: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Audit 2026-11-21 item 1 (T-0341): refused by the compile step and never evaluated (the
+    # compile itself is timed in test_cel_limits.py). Evaluating would take ~1 s (four) to
+    # minutes (six) without the step budget.
+    def never(*_: object) -> None:
+        raise AssertionError("a refused rule must not be evaluated")
+
+    monkeypatch.setattr(upgrades, "evaluate", never)
+    headers = api.as_("qa")
+    rule = {**RULE, "expression": expression}
+    started = time.perf_counter()
+    tried = api.client.post(
+        api.project_rule(CHECK, "photo") + "/try",
+        json={"context": TEN_ITEMS, "rule": rule},
+        headers=headers,
+    )
+    saved = api.client.put(api.project_rule(CHECK, "nested"), json=rule, headers=headers)
+    assert time.perf_counter() - started < 10.0  # generous: two requests on a loaded CI runner
+    for response in (tried, saved):
+        assert response.status_code == 422, response.text
+        assert "CEL PARSE_ERROR" in response.json()["detail"]
+        assert "nested loop macros" in response.json()["detail"]
 
 
 def test_try_it_on_the_project_and_tenant_layers(api: Api) -> None:

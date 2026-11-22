@@ -21,6 +21,8 @@ EXPECTED: dict[str, tuple[str | None, bool]] = {
     # result is the aggregate, so any shard failing, cancelled or skipped is not "success".
     "backend-pg": ("backend", False),
     "backend-pg-coverage": ("backend", False),  # all shards cover the suite; combined floor
+    # The owner/runtime split (T-0343, ADR 0019): migrated as kerp_owner, tested as kerp_app.
+    "backend-pg-roles": ("backend", False),
     "backend-image": ("backend", False),
     "backend-publish": ("backend", True),
     "frontend": ("frontend", False),

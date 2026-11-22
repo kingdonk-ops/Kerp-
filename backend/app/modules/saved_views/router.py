@@ -89,7 +89,7 @@ def list_views(
     session: DbSession,
 ) -> list[SavedViewRead]:
     viewer = _bind_project(request, principal, grants, session, project_id)
-    return [service.present(session, v) for v in service.list_views(session, viewer, register_key)]
+    return service.present_many(session, service.list_views(session, viewer, register_key))
 
 
 @router.get(VIEWS + "/default", response_model=SavedViewRead | None)

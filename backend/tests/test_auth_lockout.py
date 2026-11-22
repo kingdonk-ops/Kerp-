@@ -454,3 +454,37 @@ def test_lockout_fails_closed_when_the_store_is_down() -> None:
     lockout = ProgressiveLockout(RedisRevocationStore(BrokenRedis()), POLICY, "pin")
     with pytest.raises(RevocationUnavailableError):
         lockout.begin("s")
+    with pytest.raises(RevocationUnavailableError):
+        lockout.at_limit("s")
+
+
+def test_at_limit_reads_the_hard_cap_without_counting() -> None:
+    """T-0345: the PIN change asks whether the device is at ``PIN_EXHAUSTED``."""
+    clock = FakeClock()
+    lockout = ProgressiveLockout(InMemoryRevocationStore(clock=clock), POLICY, "pin")
+    assert POLICY.max_attempts == 6
+    for attempt in range(1, 7):
+        assert not lockout.at_limit("s")
+        try:
+            assert lockout.begin("s") == attempt
+        except LockedOutError as exc:
+            clock.now += exc.retry_after
+            assert lockout.begin("s") == attempt
+        assert lockout.failures("s") == attempt
+    assert lockout.at_limit("s")
+    assert lockout.at_limit("s")  # asking counts nothing
+    assert lockout.failures("s") == 6
+    assert not lockout.at_limit("other")
+    lockout.succeeded("s")
+    assert not lockout.at_limit("s")
+
+
+def test_a_policy_without_a_cap_is_never_at_its_limit() -> None:
+    lockout = ProgressiveLockout(InMemoryRevocationStore(), LOGIN_POLICY, "login")
+    for _ in range(30):
+        try:
+            lockout.begin("s")
+        except LockedOutError:
+            break
+    assert lockout.failures("s") > 0
+    assert not lockout.at_limit("s")

@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 from app.core.config import Settings
 from app.core.security_headers import DOCS_CONTENT_SECURITY_POLICY, HSTS_VALUE
 from app.main import create_app
-from tests.auth_support import PRODUCTION_MAIL
+from tests.auth_support import PRODUCTION_MAIL, PRODUCTION_RUNTIME, fake_production_redis
 
 BASELINE = {
     "x-content-type-options": "nosniff",
@@ -19,8 +19,14 @@ BASELINE = {
     "referrer-policy": "no-referrer",
 }
 API_CSP = "default-src 'none'; frame-ancestors 'none'"
-# A production app needs its deployment tenant (T-0037) and outbound e-mail (T-0058) to start.
+# A production app needs its deployment tenant (T-0037), outbound e-mail (T-0058), Redis and
+# a signing key (T-0342) to start.
 TENANT = uuid.UUID("00000000-0000-4000-8000-0000000000f1")
+
+
+@pytest.fixture(autouse=True)
+def _production_redis(monkeypatch: pytest.MonkeyPatch) -> None:
+    fake_production_redis(monkeypatch)  # production apps start with Redis (T-0342)
 
 
 def _get(settings: Settings, path: str = "/health") -> httpx.Response:
@@ -101,14 +107,23 @@ def test_no_hsts_outside_production_by_default(environment: str) -> None:
 def test_hsts_in_production_by_default() -> None:
     assert HSTS_VALUE == "max-age=31536000; includeSubDomains"
     headers = _get(
-        Settings(environment="production", default_tenant_id=TENANT, **PRODUCTION_MAIL)
+        Settings(
+            environment="production",
+            default_tenant_id=TENANT,
+            **PRODUCTION_MAIL,
+            **PRODUCTION_RUNTIME,
+        )
     ).headers
     assert headers["strict-transport-security"] == HSTS_VALUE
 
 
 def test_hsts_can_be_forced_off_in_production() -> None:
     settings = Settings(
-        environment="production", hsts_enabled=False, default_tenant_id=TENANT, **PRODUCTION_MAIL
+        environment="production",
+        hsts_enabled=False,
+        default_tenant_id=TENANT,
+        **PRODUCTION_MAIL,
+        **PRODUCTION_RUNTIME,
     )
     headers = _get(settings).headers
     assert "strict-transport-security" not in headers

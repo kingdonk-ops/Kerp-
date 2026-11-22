@@ -28,7 +28,6 @@ _RESERVED = frozenset(
 )
 _TEMPLATE_KEYS = frozenset({"default_language", "fields", "sections"})
 _VALIDATION_KEYS = {"cel_expression", "error_message"}
-_VALIDATION_KEYS = {"cel_expression", "error_message"}
 _FIELD_KEYS = frozenset(
     {"field_key", "label", "help", "data_type", "options", "units", "expression", "required"}
     | {"required_if", "visible_if", "validation", "range"}

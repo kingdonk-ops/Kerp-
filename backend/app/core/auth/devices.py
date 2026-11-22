@@ -33,12 +33,11 @@ tenant-level record. The tenant comes from the session binding, never from an ar
 
 from __future__ import annotations
 
-import hashlib
 import hmac
 import secrets
 import uuid
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from typing import Final, Literal
 
 from sqlalchemy import func, select
@@ -48,8 +47,10 @@ from app.core.auth.device_signal import DeviceRevokedError
 from app.core.auth.models import DEVICE_ACTIVE, DEVICE_REVOKED, Device
 from app.core.auth.revocation import RevocationStore
 from app.core.db import Database, utcnow
+from app.core.digest import sha256_hex
 from app.core.tenancy.context import TenancyContext
 from app.core.tenancy.rls import session_tenancy
+from app.core.timestamps import aware_utc
 
 # ``last_seen_at`` is written at most this often per device (not on every request).
 SEEN_RESOLUTION: Final = timedelta(minutes=1)
@@ -58,7 +59,7 @@ SEEN_RESOLUTION: Final = timedelta(minutes=1)
 # The wipe secret: 32 random bytes (256 bits), URL-safe base64 without padding (43 chars).
 WIPE_SECRET_BYTES: Final = 32
 # Compared against when there is no stored digest, so every call runs one compare.
-_NO_DIGEST: Final = hashlib.sha256(b"kerp:no-wipe-secret").hexdigest()
+_NO_DIGEST: Final = sha256_hex("kerp:no-wipe-secret")
 
 WipeRefusal = Literal["unknown_device", "no_secret", "wrong_secret", "not_revoked"]
 
@@ -68,10 +69,9 @@ def new_wipe_secret() -> str:
     return secrets.token_urlsafe(WIPE_SECRET_BYTES)
 
 
-def wipe_secret_digest(secret: str) -> str:
-    """The stored form of a wipe secret: SHA-256, hex. A high-entropy random secret needs no
-    slow hash; the digest alone does not let anyone confirm a wipe."""
-    return hashlib.sha256(secret.encode()).hexdigest()
+# The stored form of a wipe secret: SHA-256, hex. A high-entropy random secret needs no slow
+# hash; the digest alone does not let anyone confirm a wipe.
+wipe_secret_digest = sha256_hex
 
 
 @dataclass(frozen=True, slots=True)
@@ -97,11 +97,6 @@ def _tenant_id(session: Session) -> uuid.UUID:
     if context is None or context.project_id is not None:
         raise RuntimeError("the device registry needs a tenant-level bound session")
     return context.tenant_id
-
-
-def _aware(moment: datetime) -> datetime:
-    # SQLite hands TIMESTAMPTZ back naive; it was stored as UTC.
-    return moment if moment.tzinfo is not None else moment.replace(tzinfo=UTC)
 
 
 def find_device(session: Session, device_id: uuid.UUID) -> Device | None:
@@ -225,7 +220,7 @@ def pin_device(session: Session, device_id: uuid.UUID, user_id: uuid.UUID) -> De
 def touch(device: Device, now: datetime | None = None) -> bool:
     """Move ``last_seen_at`` to now, unless it was set less than ``SEEN_RESOLUTION`` ago."""
     now = now or utcnow()
-    if now - _aware(device.last_seen_at) < SEEN_RESOLUTION:
+    if now - aware_utc(device.last_seen_at) < SEEN_RESOLUTION:
         return False
     device.last_seen_at = now
     return True

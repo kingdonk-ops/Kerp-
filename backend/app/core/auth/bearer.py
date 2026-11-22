@@ -17,17 +17,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Annotated, Final
 
-from fastapi import Depends, HTTPException, Request, status
+from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.core.auth.device_signal import DeviceRevokedError
-from app.core.auth.revocation import RevocationUnavailableError
 from app.core.auth.runtime import AuthRuntime, app_auth_runtime
 from app.core.auth.tokens import InvalidTokenError, TokenClaims
 
 bearer_scheme: Final = HTTPBearer(auto_error=False, description="KERP access token (JWT)")
-
-AUTH_UNAVAILABLE: Final = "Authentication temporarily unavailable"
 
 
 @dataclass(frozen=True, slots=True)
@@ -67,5 +64,3 @@ def get_bearer(
         return BearerResult(claims=None, presented=True)
     except DeviceRevokedError:
         return BearerResult(claims=None, presented=True, device_revoked=True)
-    except RevocationUnavailableError as exc:
-        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, AUTH_UNAVAILABLE) from exc

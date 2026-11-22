@@ -27,7 +27,8 @@ export interface ApiClientOptions {
  * `crossTab`, T-0072) and one retry. The refresh
  * token is the `httpOnly` cookie the browser sends to the auth endpoints itself. A refresh
  * the server rejects (400/401/422, e.g. 12 hours after sign-in) clears the session, which
- * signs the user out; transient failures (network, 429, 5xx) keep it.
+ * signs the user out; transient failures (network, 429, 5xx) keep it. A refreshed token for
+ * a different user than this tab's is refused and signs this tab out (T-0344).
  */
 export function createApiClient({
   baseUrl,
@@ -46,7 +47,9 @@ export function createApiClient({
     try {
       const { data, response } = await raw.POST("/api/v1/auth/refresh");
       if (data) {
-        tokens.set(data);
+        // The shared cookie may now belong to another user (signed in in another tab): that
+        // token is refused, this tab is signed out and nothing is retried with it (T-0344).
+        if (!tokens.rotate(data)) return false;
         crossTab.publishToken(data);
         return true;
       }

@@ -36,13 +36,11 @@ from fastapi import (
     status,
 )
 
-from app.core.auth.bearer import AUTH_UNAVAILABLE
 from app.core.auth.deps import CurrentPrincipal, get_auth_service, unauthorized
 from app.core.auth.device_signal import DEVICE_HEADER, request_device_id
 from app.core.auth.lockout import LockedOutError
 from app.core.auth.post_auth import invite_reference
 from app.core.auth.providers import PasswordCredentials
-from app.core.auth.revocation import RevocationUnavailableError
 from app.core.auth.runtime import AuthRuntime, get_auth_runtime
 from app.core.auth.schemas import (
     JsonWebKeySet,
@@ -182,10 +180,6 @@ _DEVICE_REVOKED_RESPONSE: Final[dict[int | str, dict[str, Any]]] = {
 }
 
 
-def _unavailable() -> HTTPException:
-    return HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, AUTH_UNAVAILABLE)
-
-
 @router.get(JWKS_PATH, response_model=JsonWebKeySet, response_model_exclude_none=True)
 def jwks(runtime: RuntimeDep, response: Response) -> JsonWebKeySet:
     """Public keys that verify KERP tokens (RFC 7517). Contains no private material."""
@@ -252,8 +246,6 @@ def login(
         raise unauthorized() from exc
     except LockedOutError as exc:
         raise _locked(exc) from exc
-    except RevocationUnavailableError as exc:
-        raise _unavailable() from exc
     return token_response(pair, response, native=native_app_origin(request, runtime.settings))
 
 
@@ -272,16 +264,17 @@ def request_magic_link(
     lookup, the eligibility check, the link and its e-mail run after the response (T-0057).
     With `invite_token` (a pending invite naming PER-14 also makes its invitee eligible) the
     invite is accepted when the link is redeemed; the link itself never carries it (T-0052).
+    Requests are limited per client address (any e-mail), then per address: `429` with
+    `Retry-After` (T-0345).
     """
     database = _database(request)
+    client = request.client.host if request.client else None
     try:
         job = service.request_magic_link(
-            email=body.email, invite_ref=invite_reference(body.invite_token)
+            email=body.email, invite_ref=invite_reference(body.invite_token), client=client
         )
     except LockedOutError as exc:
         raise _locked(exc) from exc
-    except RevocationUnavailableError as exc:
-        raise _unavailable() from exc
     if job is not None:
         tasks.add_task(service.issue_magic_link, database, job)
 
@@ -311,8 +304,6 @@ def redeem_magic_link(
         )
     except AuthenticationError as exc:
         raise unauthorized(invalid_token=True) from exc
-    except RevocationUnavailableError as exc:
-        raise _unavailable() from exc
     return token_response(pair, response, native=native_app_origin(request, runtime.settings))
 
 
@@ -355,8 +346,6 @@ def pin_unlock(
         raise unauthorized(invalid_token=True) from exc
     except LockedOutError as exc:
         raise _locked(exc) from exc
-    except RevocationUnavailableError as exc:
-        raise _unavailable() from exc
     return token_response(pair, response, native=credential.native)
 
 
@@ -374,7 +363,9 @@ def refresh(
     body: Annotated[RefreshRequest | None, Body()] = None,
     kerp_refresh: CookieToken = None,
 ) -> TokenResponse:
-    """Rotate: the refresh token is spent and a new pair is issued. Reuse revokes the session.
+    """Rotate: the refresh token is spent and a new pair is issued. Reuse revokes the session,
+    except a retry within 30 seconds of the token being spent (a lost answer): a plain `401`
+    that leaves the session alive (T-0345).
 
     The new refresh token keeps the session's end (sign-in + 12 h); after it, sign in again.
     The web SPA sends the cookie; an allow-listed native app sends ``refresh_token``. A
@@ -387,18 +378,13 @@ def refresh(
         pair = service.refresh(session, credential.token, device_id=request_device_id(request))
     except AuthenticationError as exc:
         raise unauthorized(invalid_token=True) from exc
-    except RevocationUnavailableError as exc:
-        raise _unavailable() from exc
     return token_response(pair, response, native=credential.native)
 
 
 @router.post(f"{PREFIX}/logout", status_code=status.HTTP_204_NO_CONTENT)
 def logout(principal: CurrentPrincipal, service: AuthServiceDep, response: Response) -> None:
     """Revoke this access token and every token of its login session; clear the cookie."""
-    try:
-        service.logout(principal.claims)
-    except RevocationUnavailableError as exc:
-        raise _unavailable() from exc
+    service.logout(principal.claims)
     _clear_refresh_cookie(response)
 
 

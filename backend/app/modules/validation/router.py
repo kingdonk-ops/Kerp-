@@ -15,7 +15,7 @@ One API for the tenant default layer and the project set (the same Rules screen,
 * ``GET    .../rule-sets/{set}/updates``                    upgrade offer: per-rule diff
 * ``POST   .../rule-sets/{set}/updates/{key}/accept``       accept one rule of it (T-0036)
 * ``POST   .../rule-sets/{set}/rules/{key}/try``            "Try it" on a sample context
-* ``GET    /drift-report``                                  project rules that differ from
+* ``GET    /drift-report?limit=&offset=``                   project rules that differ from
   the tenant defaults
 * ``POST   /projects/{project}/overrides``                   request a per-record override of
   a blocking finding (T-0035, Amendment A); ``GET`` lists, ``GET .../{id}`` reads,
@@ -47,7 +47,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import Annotated, Final, Literal
 
-from fastapi import APIRouter, HTTPException, Path, Query, status
+from fastapi import APIRouter, HTTPException, Path, Query, Response, status
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
@@ -85,6 +85,8 @@ PROJECT_OTHER: Final = frozenset({P.PROJECT_ADMINISTRATOR})
 TENANT_READERS: Final = frozenset({P.QUALITY_DIRECTOR, P.OPERATIONS_MANAGEMENT})
 UNLOCK_REQUESTERS: Final = frozenset({P.QUALITY_DIRECTOR})
 UNLOCK_APPROVERS: Final = frozenset({P.QUALITY_DIRECTOR, P.OPERATIONS_MANAGEMENT})  # TD-116
+# The next page of GET /drift-report (T-0348): the offset to pass; absent on the last page.
+NEXT_OFFSET_HEADER: Final = "X-Next-Offset"
 
 TENANT_SET = "/rule-sets/{rule_set_id}"
 PROJECT_SET = "/projects/{project_id}/rule-sets/{rule_set_id}"
@@ -351,9 +353,25 @@ def try_tenant_rule(
 
 
 @router.get("/drift-report", response_model=list[DriftEntryRead])
-def drift_report(grants: CallerGrants, session: DbSession) -> list[DriftEntryRead]:
+def drift_report(
+    grants: CallerGrants,
+    session: DbSession,
+    response: Response,
+    limit: Annotated[
+        int,
+        Query(
+            ge=1,
+            le=upgrades.MAX_DRIFT_PAGE,
+            description="Projects per page (whole projects, by project id).",
+        ),
+    ] = upgrades.DEFAULT_DRIFT_PAGE,
+    offset: Annotated[int, Query(ge=0, description="Projects to skip.")] = 0,
+) -> list[DriftEntryRead]:
     _require(_tenant_personas(grants), TENANT_READERS)
-    return upgrades.drift_report(session)
+    page = upgrades.drift_report_page(session, limit=limit, offset=offset)
+    if page.next_offset is not None:
+        response.headers[NEXT_OFFSET_HEADER] = str(page.next_offset)
+    return page.entries
 
 
 # --- two-person unlock (ADR 0004 §5, Amendment B, TD-116) -------------------------------------

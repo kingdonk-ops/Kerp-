@@ -22,8 +22,14 @@ from app.core.auth.device_signal import (
 )
 from app.core.auth.field import PinGateError, pin_gate_handler
 from app.core.auth.password_reset_router import router as password_reset_router
+from app.core.auth.revocation import (
+    REDIS_OUTAGE_ERRORS,
+    RevocationUnavailableError,
+    redis_unavailable_handler,
+    revocation_unavailable_handler,
+)
 from app.core.auth.router import router as auth_router
-from app.core.auth.runtime import check_startup_config, close_auth_runtime
+from app.core.auth.runtime import app_auth_runtime, check_startup_config, close_auth_runtime
 from app.core.auth.sso_router import router as sso_router
 from app.core.auth.team_grants import check_team_grants_at_startup
 from app.core.body_limit import BodyLimitMiddleware
@@ -35,6 +41,7 @@ from app.core.mail.transport import check_mail_config
 from app.core.module_loader.loader import DEFAULT_PACKAGE, install_modules, registry_of
 from app.core.request_context import RequestContextMiddleware
 from app.core.security_headers import SecurityHeadersMiddleware
+from app.core.startup_safety import check_database_role, require_redis
 from app.core.tenancy.provision import ensure_default_tenant
 from app.core.tenancy.scope import OutOfScopeError
 from app.modules.jobs import mail as jobs_mail
@@ -65,6 +72,15 @@ def create_app(
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         check_startup_config(settings)
         check_mail_config(settings)  # production refuses to start without SES (T-0058)
+        # T-0342 (TD-124): production refuses to start without Redis or a usable signing key,
+        # instead of failing on the first signed-in request. Elsewhere the runtime stays lazy
+        # (an ephemeral key and in-memory revocation are built on first use).
+        require_redis(settings)
+        if settings.environment == "production":
+            app_auth_runtime(_app)
+        # T-0342 (TD-056, TD-059): a database role that skips RLS or may edit the audit ledger
+        # refuses the start in production (a warning elsewhere; SQLite has nothing to check).
+        check_database_role(database, settings)
         # Team-derived grants without the teams module: refuse to start (T-0073, ADR 0008).
         check_team_grants_at_startup(database, registry_of(_app).names())
         # The deployment's tenant has its directory row before any tenant-scoped insert
@@ -147,6 +163,11 @@ def create_app(
     app.add_exception_handler(DeviceRevokedError, device_revoked_handler)
     app.add_exception_handler(PinGateError, pin_gate_handler)
     app.add_exception_handler(InvalidDeviceHeaderError, invalid_device_header_handler)
+    # Store outages fail closed with one 503 body, wherever they are raised (T-0349, TD-290);
+    # a raw Redis connection/timeout error is 503 too, not a generic 500 (TD-525).
+    app.add_exception_handler(RevocationUnavailableError, revocation_unavailable_handler)
+    for error in REDIS_OUTAGE_ERRORS:
+        app.add_exception_handler(error, redis_unavailable_handler)
 
     app.include_router(health_router)
     app.include_router(auth_router)  # core auth + JWKS (T-0008)

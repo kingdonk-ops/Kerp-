@@ -9,7 +9,10 @@
   session to the device (a sign-in there) clears its PIN failures.
 * ``PUT /api/v1/devices/{device_id}/pin`` (bearer, from a session bound to the device): a new
   PIN (``204``); clears the PIN failures; audited as ``pin_changed`` (never the PIN). Not the
-  caller's active device: ``404``; another session of the caller: ``403``.
+  caller's active device: ``404``; another session of the caller: ``403``. On a device at
+  the PIN-failure limit (``PIN_EXHAUSTED``) only a fresh online sign-in (password, magic link
+  or SSO within 5 minutes, never renewed by PIN unlock) may change it; any other session gets
+  ``401 {code: FRESH_SIGN_IN_REQUIRED}`` and nothing changes (TD-301, T-0345).
 * ``GET /api/v1/devices`` (bearer): the caller's own devices.
 * ``GET /api/v1/users/{user_id}/devices`` (bearer): a user's devices, for the user, a
   ``system_admin``, or a PER-09 of a project the user belongs to.
@@ -54,8 +57,8 @@ from app.core.auth.access import (
     load_grants,
     user_has_projects_beyond,
 )
-from app.core.auth.bearer import AUTH_UNAVAILABLE
 from app.core.auth.deps import CurrentPrincipal, get_auth_service
+from app.core.auth.field import fresh_sign_in_required
 from app.core.auth.lockout import WIPE_CONFIRM_POLICY, LockedOutError, ProgressiveLockout
 from app.core.auth.models import DEVICE_ACTIVE, DEVICE_REVOKED, Device
 from app.core.auth.passwords import hash_password
@@ -243,6 +246,13 @@ def _audit_pin(session: Session, device: Device, action: str, actor_id: uuid.UUI
     f"{PREFIX}/{{device_id}}/pin",
     status_code=status.HTTP_204_NO_CONTENT,
     responses={
+        status.HTTP_401_UNAUTHORIZED: {
+            "description": (
+                "Not authenticated. With `code: FRESH_SIGN_IN_REQUIRED`: the device is at the "
+                "PIN-failure limit and this session is not a fresh online sign-in (sign in "
+                "again, then change the PIN within 5 minutes)"
+            )
+        },
         status.HTTP_403_FORBIDDEN: {"description": "Not a session of this device"},
         status.HTTP_404_NOT_FOUND: {"description": "Not an active device of the caller"},
     },
@@ -257,13 +267,21 @@ def change_pin(
 ) -> Response:
     """Set a new field PIN for this device, from a signed-in session of the device (diff
     §4.2: the PIN is changed after an online sign-in; the old PIN is not needed). Clears the
-    device's PIN failures."""
+    device's PIN failures.
+
+    At the PIN-failure limit (``PIN_EXHAUSTED``) clearing them needs a fresh online sign-in
+    (TD-301, product owner 2026-11-16): a session started by password, magic link or SSO at
+    most 5 minutes ago and never renewed by PIN unlock. Any other session gets ``401`` with
+    ``code: FRESH_SIGN_IN_REQUIRED`` and nothing changes (T-0345)."""
     device = devices.find_device(session, device_id)
     if device is None or device.user_id != principal.user_id or device.status != DEVICE_ACTIVE:
         raise OutOfScopeError("device not found")
     claims = principal.claims
     if device_id not in (claims.device_id, runtime.store.session_device(claims.session_id)):
         raise _forbidden()
+    exhausted = service.pin_at_limit(principal.tenant_id, device_id)
+    if exhausted and not service.is_fresh_sign_in(claims):
+        return fresh_sign_in_required()
     devices.set_pin(session, device, hash_password(body.pin), actor_id=principal.user_id)
     service.clear_pin_failures(principal.tenant_id, device_id)
     _audit_pin(session, device, "pin_changed", principal.user_id)
@@ -423,8 +441,6 @@ def wipe_confirmed(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             headers={"Retry-After": str(exc.retry_after)},
         )
-    except RevocationUnavailableError as exc:
-        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, AUTH_UNAVAILABLE) from exc
     tenant = runtime.settings.default_tenant_id
     if tenant is None:
         return JSONResponse(WIPE_REFUSED_BODY, status_code=WIPE_REFUSED_STATUS)
