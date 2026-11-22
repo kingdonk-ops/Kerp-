@@ -139,10 +139,10 @@
 | [TD-559](../tracker/todo/TD-559.md) | MDR breakdown open points: how client acceptance of a review revision is recorded, revision scheme, Rev 0 without review, B-LTA augmentation schedule | E-05-05 | planner |
 | [TD-563](../tracker/todo/TD-563.md) | Earned value counts only verified completion: which ITP lines verify which progress steps, partial credit, reversal on re-inspection; planned vs verified-complete view | E-06-04, E-04-03, E-04-06, E-04-12 | planner |
 | [TD-567](../tracker/todo/TD-567.md) | Schedule facts in rule sets: total float and on-critical-path per anchor from the last committed P6 import (project critical definition), CEL variable names and units | T-0125, T-0104, E-04-02 | planner |
-| [TD-570](../tracker/todo/TD-570.md) | P6 schedule facts: add total_float_hours and driving_path_flag snapshot columns to oe_p6_activity_version, and list late_finish or change the §5.6 example (PR #179 review) | E-04-02 | reviewer |
-| [TD-571](../tracker/todo/TD-571.md) | Earned value wording: INSPECTED_PASSED/LOCKED_FOR_TURNOVER are ITR states, not ITP-line states; cross-reference the PER-03 sign-off default for steps without an ITP line (PR #179 review) | E-06-04 | reviewer |
+| [TD-570](../tracker/todo/TD-570.md) | P6 schedule facts: add total_float_hours and driving_path_flag snapshot columns to oe_p6_activity_version, and list late_finish or change the §5.6 example (PR #179 review) | T-0104, T-0125, E-04-02 | reviewer |
+| [TD-571](../tracker/todo/TD-571.md) | Earned value wording: INSPECTED_PASSED/LOCKED_FOR_TURNOVER are ITR states, not ITP-line states; cross-reference the PER-03 sign-off default for steps without an ITP line (PR #179 review) | E-06-04, E-04-12 | reviewer |
 | [TD-572](../tracker/todo/TD-572.md) | Diff §4.11 AI: drop stale 'platform key only if TD-545 changes'; state default conversation retention, the RLS-protected conversation store, and the budget-cap day boundary time zone (PR #179 review) | E-05-08 | reviewer |
-| [TD-573](../tracker/todo/TD-573.md) | Quality §5 no_show row should cite frozen notice_valid_at_outcome; reschedule reset should also clear notice_delivery_reason (PR #179 review) | T-0335 | reviewer |
+| [TD-573](../tracker/todo/TD-573.md) | Quality §5 no_show row should cite frozen notice_valid_at_outcome; reschedule reset should also clear notice_delivery_reason (PR #179 review) | T-0350, T-0333, T-0335 | reviewer |
 
 ## missed (12)
 
