@@ -8687,7 +8687,12 @@ export interface operations {
     };
     drift_report_api_v1_validation_drift_report_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Projects per page (whole projects, by project id). */
+                limit?: number;
+                /** @description Projects to skip. */
+                offset?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -8701,6 +8706,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DriftEntryRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

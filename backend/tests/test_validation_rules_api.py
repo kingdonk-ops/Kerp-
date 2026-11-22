@@ -448,6 +448,40 @@ def test_the_drift_report(api: Api) -> None:
         for e in response.json()
     ]
     assert found == [(str(api.project), CHECK, "photo", "modified", ["enabled"])]  # not "other"
+    assert "X-Next-Offset" not in response.headers  # one page
+
+
+def test_the_drift_report_pages_by_project(api: Api) -> None:
+    """T-0348: optional ``limit``/``offset``, the next page in ``X-Next-Offset``."""
+    photo = api.project_rule(CHECK, "photo")
+    assert api.client.post(f"{photo}/disable", headers=api.as_("qa")).status_code == 200
+    url = f"{API}/drift-report"
+    first = api.client.get(url, params={"limit": 1}, headers=api.as_("qd"))
+    assert first.status_code == 200, first.text
+    assert [e["rule_key"] for e in first.json()] == ["photo"]
+    assert "X-Next-Offset" not in first.headers  # the caller reads one project
+    with api.db.unit_of_work(CTX) as s:  # now also the other project (no drift there)
+        s.add(
+            ProjectMembership(
+                tenant_id=T1,
+                user_id=api.ids["qd"],
+                member_project_id=api.other,
+                persona=P.QUALITY_DIRECTOR.value,
+            )
+        )
+    whole = api.client.get(url, headers=api.as_("qd")).json()
+    pages, offset = [], "0"
+    while offset is not None:
+        page = api.client.get(url, params={"limit": 1, "offset": offset}, headers=api.as_("qd"))
+        assert page.status_code == 200, page.text
+        pages.append(page.json())
+        offset = page.headers.get("X-Next-Offset")
+    assert len(pages) == 2
+    assert [e for p in pages for e in p] == whole == first.json()
+    beyond = api.client.get(url, params={"offset": 5}, headers=api.as_("qd"))
+    assert (beyond.status_code, beyond.json()) == (200, [])
+    for bad in ({"limit": 0}, {"limit": 501}, {"offset": -1}):
+        assert api.client.get(url, params=bad, headers=api.as_("qd")).status_code == 422, bad
 
 
 @pytest.mark.parametrize("expression", [AUDIT_RULE, SIX_NESTED], ids=["four", "six"])

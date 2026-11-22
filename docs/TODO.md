@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 368 · **Closed:** 158
+**Open:** 366 · **Closed:** 160
 
 ## decision (40)
 
@@ -195,7 +195,7 @@
 | [TD-510](../tracker/todo/TD-510.md) | Deployment-config view lacks the mail reply-to of diff §4.7: Settings has no reply-to field yet | T-0230 | implementer |
 | [TD-533](../tracker/todo/TD-533.md) | CEL client runtime has no evaluation step budget (cel-js exposes no step hook; server is the hard gate) | T-0341 | implementer |
 
-## later (146)
+## later (144)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -266,7 +266,6 @@
 | [TD-280](../tracker/todo/TD-280.md) | Frontend Rules screen: 'Updates available' badge and per-rule diff with accept, tenant drift report view, and 'Try it' panel on the T-0036 API | T-0036 | implementer |
 | [TD-282](../tracker/todo/TD-282.md) | Sync endpoints must record last_sync_at and the device of replayed mutations | T-0043 | implementer |
 | [TD-284](../tracker/todo/TD-284.md) | Dedicated RLS policy for oe_identity_device (owner, system_admin, PER-09 of a shared project) | T-0043 | implementer |
-| [TD-289](../tracker/todo/TD-289.md) | drift_report runs one list_rules query per set per project (N+1) | T-0036 | reviewer |
 | [TD-290](../tracker/todo/TD-290.md) | Map RevocationUnavailableError to 503 in the device endpoints and resolve_request_device | T-0043 | reviewer |
 | [TD-294](../tracker/todo/TD-294.md) | Project delete revokes its memberships (T-0039, TD-184): a future project restore must re-grant them, and memberships on projects soft-deleted before T-0039 (dev databases only) stay live until revoked | T-0039 | implementer |
 | [TD-296](../tracker/todo/TD-296.md) | System-admin-only write RLS policy for oe_settings_deployment (defence in depth) | T-0044 | implementer |
@@ -307,7 +306,6 @@
 | [TD-381](../tracker/todo/TD-381.md) | saved_views: drop the deprecated oe_saved_view.team_id column (destructive, needs an ADR) | T-0074 | implementer |
 | [TD-382](../tracker/todo/TD-382.md) | frontend: team picker for sharing a saved view with several teams (team_ids) | T-0074 | implementer |
 | [TD-383](../tracker/todo/TD-383.md) | Schedule teams reconcile (report-only) as a nightly SAQ batch job and alert on drift | T-0075 | implementer |
-| [TD-387](../tracker/todo/TD-387.md) | saved_views present(): batch the team-link lookups (N+1 per view) | T-0074 | reviewer |
 | [TD-389](../tracker/todo/TD-389.md) | teams reconcile _repair: pass confirm_sod only when the drift has pending SoD items | T-0075 | reviewer |
 | [TD-390](../tracker/todo/TD-390.md) | teams reconcile CLI: distinct exit code for unexpected exceptions | T-0075 | reviewer |
 | [TD-391](../tracker/todo/TD-391.md) | audit ledger: rename _SQLITE_WRITE_LOCK and document the race-test barrier timeout | T-0077 | reviewer |
@@ -544,6 +542,7 @@
 | ✅ | [TD-283](../tracker/todo/TD-283.md) | Shared field tablets: one device_id per account, or several accounts per device? | Product owner, 2026-11-15: keep one account per device_id for Pilot-0 (T-0043 behaviour; another account enrolling the same id gets 409). The client keys its local store per account, so a revoke wipes only that account's data on the device (T-0143). Whether pilot crews share tablets is to be confirmed with the pilot team: TD-293 (if they do, a shared-device task is added before the pilot) |
 | ✅ | [TD-285](../tracker/todo/TD-285.md) | Native-origin allow-list: KERP_WEB_ORIGIN made mandatory when KERP_NATIVE_APP_ORIGINS is set; body transport also on magic-link redeem and PIN unlock | Product owner, 2026-11-15: both readings confirmed. (a) KERP_NATIVE_APP_ORIGINS requires KERP_WEB_ORIGIN (settings refuse otherwise) and the API's own origin never gets body transport; (b) body transport (out and in) also applies to magic-link redeem and PIN unlock by the same Origin rule; on the web origin /pin/unlock refuses a body token (422) and /refresh ignores it. Recorded in diff §4.2 |
 | ✅ | [TD-286](../tracker/todo/TD-286.md) | wipe-confirmed is unauthenticated: anyone who knows a revoked device_id can set its wipe time | Fixed by T-0080 (PR #94): per-device wipe secret issued once at enrolment, stored as SHA-256; wipe-confirmed requires it, uniform 404 for every refusal |
+| ✅ | [TD-289](../tracker/todo/TD-289.md) | drift_report runs one list_rules query per set per project (N+1) | T-0348: drift_report_page loads the page's project sets and the tenant default sets once and all their rules with one IN (...) query (four queries per page, however many projects); GET /drift-report pages by project (limit/offset, X-Next-Offset). Query-count test in backend/tests/test_validation_rule_upgrades.py |
 | ✅ | [TD-291](../tracker/todo/TD-291.md) | Revoked-device oracle: refuse_revoked_device on login and wipe-confirmed answer for any device id | Fixed by T-0080 (PR #94): sign-in checks credentials before the device; wipe-confirmed answers uniformly |
 | ✅ | [TD-292](../tracker/todo/TD-292.md) | Remove stale scripts/gemini_review.sh allow/deny rules from .claude/settings.json (human-only edit) | Product owner removed the stale scripts/gemini_review.sh allow rule and both deny pairs from .claude/settings.json by hand (commit 07486d9 on dev, 2026-11-21); only the deny rules protecting .claude/settings.json remain. |
 | ✅ | [TD-295](../tracker/todo/TD-295.md) | T-0044 says module admin but the route /api/v1/settings/deployment and the projects->settings dependency need a separate settings module | Product owner, 2026-11-16: separate settings module (projects depends_on settings) confirmed |
@@ -556,6 +555,7 @@
 | ✅ | [TD-384](../tracker/todo/TD-384.md) | T-0075 SoD fix: 'plus their existing rows' cannot keep a sod_pending user's stale row of the link | user decision 2026-11-21: accept the implemented reading. The sync gets the expected set minus the sod_pending users; a pending user's stale rows of that link are excess and revoked; --fix --confirm-sod then adds the correct row. T-0075 AC reworded |
 | ✅ | [TD-385](../tracker/todo/TD-385.md) | T-0075 reconcile: a live link to a deleted project expects no derived rows (rows it holds are excess, --fix revokes) | user decision 2026-11-21: accept. A live link to a deleted project expects no derived rows (matches the teams service, TD-358); rows it holds are excess and --fix revokes them; after a project restore reconcile expects them again. T-0075 AC reworded |
 | ✅ | [TD-386](../tracker/todo/TD-386.md) | audit ledger: concurrent appends to one chain race on SQLite (seq unique violation → 500) | on SQLite _lock_chain takes the database write lock (a no-op UPDATE on audit_ledger) before the tail read, so a second appender waits for the first to commit and links to it (fix/audit-ledger-sqlite-race) |
+| ✅ | [TD-387](../tracker/todo/TD-387.md) | saved_views present(): batch the team-link lookups (N+1 per view) | T-0348: present_many reads the team links in one query and the project's linked teams and the column catalogue once per list; list_views filters others' private views in SQL. Query-count test in backend/tests/test_saved_view_teams.py |
 | ✅ | [TD-396](../tracker/todo/TD-396.md) | System console and project archive: may a System admin see project-scoped records (upload quarantine rows, audit entries, archive contents) of projects where they hold no membership? | Answered by the user's decision of 2026-11-21: system_admin has global read/admin visibility across all projects of the tenant without a membership (docs/decisions/0016-system-admin-global-visibility.md, accepted; diff §4.1; T-0274-T-0276). Quarantine rows and audit chains of every project, archive export/download/restore of any project; count-only functions and membership gates dropped (T-0219, T-0221, T-0222, T-0224, T-0233, T-0237, T-0239, T-0240, T-0241). |
 | ✅ | [TD-411](../tracker/todo/TD-411.md) | Equipment (oe_equipment_asset) as an inspection anchor: accept ADR 0014 amending ADR 0003 (a third exclusive anchor for standalone equipment inspections only)? | Product owner (user, 2026-11-21): equipment becomes an informational link, not a third exclusive anchor. qa_itp inspections keep the ADR 0003 anchors; every other area is project-level with an optional location and links (asset node/Item, material, equipment). ADR 0014 superseded by the ADR 0003 amendment 2026-11-21. |
 | ✅ | [TD-412](../tracker/todo/TD-412.md) | Fleet vehicles and plant in the Phase-1 equipment register: pull this part of E-03-07 into Phase 1 (equipment_class, requires_calibration, custodian) or wait for Phase 3? | Product owner (user, 2026-11-21): yes — fleet vehicles and plant enter the Phase-1 equipment register now (equipment_class, requires_calibration, asset_number, custodian; T-0249), because some equipment must be calibrated or inspected monthly for compliance. Equipment stays an informational link of inspections, not an anchor (TD-411, ADR 0003 amendment 2026-11-21). |

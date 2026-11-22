@@ -219,6 +219,79 @@ def test_an_unlinked_or_deleted_team_stops_seeing_the_view(world: World) -> None
     assert world.update(view_id, name="Still editable").name == "Still editable"
 
 
+def _listed(world: World, viewer: Viewer) -> tuple[int, list[Any], int, set[uuid.UUID]]:
+    """(SELECTs, presented views, catalogue builds, view ids loaded) of one list request."""
+    statements: list[str] = []
+    builds: list[str] = []
+
+    def record(_conn: Any, _cursor: Any, statement: str, *_args: Any) -> None:
+        if statement.lstrip().upper().startswith("SELECT") and "set_config" not in statement:
+            statements.append(statement)
+
+    def catalogue(_session: Any) -> list[str]:
+        builds.append(REGISTER)
+        return ["name", "code"]
+
+    service.register_catalogue(REGISTER, catalogue)
+    try:
+        with world.db.unit_of_work(world.home) as s:
+            s.connection()  # the transaction (and its tenancy binding) is not counted
+            sa.event.listen(world.db.engine, "before_cursor_execute", record)
+            try:
+                found = service.present_many(s, service.list_views(s, viewer, REGISTER))
+            finally:
+                sa.event.remove(world.db.engine, "before_cursor_execute", record)
+            loaded = {o.id for o in s.identity_map.values() if isinstance(o, SavedView)}
+    finally:
+        service.register_catalogue(REGISTER, None)
+    return len(statements), found, len(builds), loaded
+
+
+def _views(world: World, count: int, tag: str) -> set[uuid.UUID]:
+    """``count`` views of each kind; returns the ids of the other user's private ones."""
+    other = Viewer(user_id=world.no_team)
+    hidden: set[uuid.UUID] = set()
+    for n in range(count):
+        world.save(name=f"{tag}-team-{n}", visibility="team", team_ids=[str(world.x), str(world.y)])
+        world.save(name=f"{tag}-project-{n}", visibility="project")
+        world.save(name=f"{tag}-mine-{n}")
+        hidden.add(world.save(other, name=f"{tag}-theirs-{n}"))
+    return hidden
+
+
+def test_listing_views_costs_the_same_queries_for_any_number_of_views(world: World) -> None:
+    """Audit 2026-11-21 item 19 (T-0348, TD-387): others' private views are filtered in SQL;
+    the team links, the linked teams and the column catalogue are read once per list."""
+    reader = world.viewer(world.x_member)
+    hidden = _views(world, 1, "a")
+    few_count, few, few_builds, loaded = _listed(world, reader)
+    assert loaded.isdisjoint(hidden)
+    hidden |= _views(world, 5, "b")
+    many_count, many, many_builds, loaded = _listed(world, reader)
+    assert loaded.isdisjoint(hidden)
+    assert (len(few), len(many)) == (2, 12)  # team and project views; no private ones
+    assert few_count == many_count <= 4
+    assert few_builds == many_builds == 1
+    team = [v for v in many if v.visibility == "team"]
+    assert len(team) == 6
+    assert all(v.team_ids == _ids(world.x, world.y) for v in team)
+    owner_count, mine, _, _ = _listed(world, SHARER)
+    assert owner_count == many_count
+    assert sorted(v.name for v in mine if v.visibility == "private") == sorted(
+        f"{t}-mine-{n}" for t, k in (("a", 1), ("b", 5)) for n in range(k)
+    )
+
+
+def test_present_many_matches_present_one_by_one(world: World) -> None:
+    world.save(name="Team", visibility="team", team_ids=[str(world.x)])
+    world.save(name="Project", visibility="project")
+    world.save(name="Mine")
+    with world.db.unit_of_work(world.home) as s:
+        views = service.list_views(s, SHARER, REGISTER)
+        assert service.present_many(s, views) == [service.present(s, v) for v in views]
+        assert service.present_many(s, []) == []
+
+
 # --- sharing --------------------------------------------------------------------------------
 
 

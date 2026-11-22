@@ -659,6 +659,29 @@ def _rebind_on_begin(
         bind_connection(connection, context)
 
 
+# One statement clears all seven settings (session level, ``is_local => false``); the policies
+# read an empty value as unset (``NULLIF(..., '')``), exactly as after a ``RESET``. Module
+# constants only, never user input.
+POOL_RESET_SQL: Final = "SELECT " + ", ".join(
+    f"set_config('{name}', '', false)" for name in SETTINGS
+)
+
+
+def reset_connection_settings(dbapi_connection: DBAPIConnection) -> None:
+    """Clear every tenancy setting of a raw driver connection: one statement, one commit.
+
+    The checkin reset (T-0348, audit item 18): it replaced a ``RESET`` per setting, so a
+    returned connection costs the driver's implicit ``BEGIN``, this statement and the
+    ``COMMIT`` instead of nine round trips.
+    """
+    cursor = dbapi_connection.cursor()
+    try:
+        cursor.execute(POOL_RESET_SQL)
+    finally:
+        cursor.close()
+    dbapi_connection.commit()
+
+
 def install_pool_reset(engine: Engine) -> None:
     """Clear the tenancy settings whenever a connection goes back to the pool."""
     if engine.dialect.name != "postgresql":
@@ -671,10 +694,6 @@ def install_pool_reset(engine: Engine) -> None:
         if dbapi_connection is None:  # pragma: no cover - invalidated connection
             return
         try:
-            cursor = dbapi_connection.cursor()
-            for name in SETTINGS:
-                cursor.execute(f"RESET {name}")
-            cursor.close()
-            dbapi_connection.commit()
+            reset_connection_settings(dbapi_connection)
         except Exception:  # pragma: no cover - a connection we cannot reset is dropped
             connection_record.invalidate()
