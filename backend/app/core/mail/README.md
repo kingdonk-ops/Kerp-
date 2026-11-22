@@ -9,12 +9,13 @@ production, always asynchronous, i18n templates, a send log that is also the del
 |---|---|
 | `service.py` | `send_mail(session, template_key, to, context, locale=None, *, recipient_user_id=None, broadcast_id=None)`; worker `deliver`; `suppress`, `record_ses_event`; admin `list_sends(SendFilter)`, `send_stats(SendFilter)`, `list_suppressions`, `remove_suppression` (audited) |
 | `queue.py` | `QueuedMail`, the post-commit hook `set_mail_enqueuer` (installed by the jobs module) |
-| `templates.py` | `MailTemplate`, `register_template`, `TEMPLATES`, `render` (text + simple HTML) |
+| `templates.py` | `MailTemplate` (audience, `required`), `register_template`, `TEMPLATES`, `render` (text + simple HTML, optional override), `override_problems`, `sample_context` |
+| `overrides.py` | Template overrides (T-0227, ADR 0021): `list_templates`, `save_override`, `reset_override`, `list_revisions`, `effective_override` (used by `deliver`), `preview`, `send_test` |
 | `i18n.py`, `locales/*.json` | `t(key, locale, **params)` over flat JSON catalogs; `en-AU` is the base |
 | `transport.py` | `MailTransport` protocol: `SesTransport`, `FakeTransport`, `LogTransport`; `check_mail_config`, `transport_from_settings` |
 | `sns.py` | SNS message verification for the SES delivery/bounce/complaint endpoint |
-| `models.py` | `mail_send_log`, `mail_suppression` (`BaseRecordMixin`, standard RLS; migration `0024`; the ledger columns: `0040`) |
-| `router.py`, `schemas.py` | `/api/v1/mail`: admin reads (history, stats), suppression removal, the public SNS endpoint |
+| `models.py` | `mail_send_log`, `mail_suppression` (`BaseRecordMixin`, standard RLS; migration `0024`; the ledger columns: `0040`), `mail_template_override` (`0041`) |
+| `router.py`, `schemas.py` | `/api/v1/mail`: admin reads (history, stats), suppression removal, template overrides, the public SNS endpoint |
 
 ## Sending
 
@@ -76,6 +77,39 @@ template in `en-AU` and fails on a missing key).
   pixel; every value is HTML-escaped. No project data beyond code and name.
 - Locale: the recipient's, else `KERP_MAIL_DEFAULT_LOCALE` (`en-AU`); a missing catalog or
   key falls back to the language (`en`), then the default, then `en-AU`.
+- Each template declares its **audience** group for the editor (`internal_staff | client |
+  external_party | deployment_wide`, default `deployment_wide`) and whether it is
+  **`required`** (sign-in, password reset, invite; RFI call-outs once registered): an override
+  may reword a required template but never leave a text block empty.
+
+## Template overrides (T-0227, ADR 0021, TD-400)
+
+The catalogue texts are the shipped defaults. A System admin rewords, per template and locale,
+the **subject, intro, outro and action label** as plain text (`mail_template_override`,
+tenant-level, one row per revision, `version` 1, 2, ...; at most one `is_current` row per
+template and locale). Never raw HTML: the renderer still escapes every value and builds the
+link and footer itself, so an override can neither move nor reveal a secret.
+
+- **Checks** (`override_problems`, on save and again at send time): no HTML, no URL (`://`,
+  `www.`, `mailto:`, `javascript:`), no control characters, no line break in the subject or
+  action label; at most 200 / 2000 / 2000 / 80 characters; placeholders only as a bare
+  `{name}` from `template.placeholders()` (its parameters plus `{app_name}`), never the secret,
+  never `{x.attr}`, `{x[0]}`, `{x!r}` or `{x:spec}`. The subject and the action label are never
+  empty; the intro and outro of a `required` template neither. Otherwise 422, one entry per
+  field (`loc: ["body", "<field>"]`).
+- **Sending**: `deliver` reads the current override in its own unit of work (no cache), along
+  the recipient's locale chain (an override at a locale wins over that locale's catalogue). The
+  next send uses a save or reset at once, in every process. An override that no longer fits
+  (a parameter was removed since) is skipped with a warning.
+- **Revisions** are kept: a save retires the current row and adds the next version; a reset
+  (`DELETE`) only retires it. Saves, resets and test sends are written to the audit ledger
+  (`mail-template:<key>:<locale>`).
+- **Preview** renders with synthetic sample values (`sample_context`: `SAMPLE-001`,
+  `Sam Sample`, a fake link secret); a draft body is checked like a save and never stored.
+- **Test send** queues the template with the sample values to the **signed-in caller's own
+  address** (the request names no recipient), in the path's locale, rendered by the worker like
+  any send. At most 5 per 10 minutes per caller (counted from the send log: e-mails the caller
+  queued to itself), else 429 with `Retry-After`. It is an ordinary send-log row.
 
 ## Send log (delivery ledger) and suppression list
 
@@ -117,6 +151,12 @@ The magic-link (and later reset and invite) flows answer neutrally whatever happ
 | GET | `/stats?from=&to=&template=` | `system_admin`; `{created_from, created_to, template_key, totals, by_template[]}` |
 | GET | `/suppressions?limit=&offset=` | `system_admin` |
 | DELETE | `/suppressions/{id}` | `system_admin`; 404 for unknown / removed / another tenant's |
+| GET | `/templates` | `system_admin`; every registered template: `key`, `audience`, `required`, `has_action`, `placeholders`, `locales[]` (`locale`, `shipped`, `override`) |
+| PUT | `/templates/{key}/{locale}` | `system_admin`; body `{subject, intro, outro, action_label}`; a new current revision (audited); 404 unknown template, 422 refused text or bad locale, 409 lost a concurrent save |
+| DELETE | `/templates/{key}/{locale}` | `system_admin`; back to the shipped default (revisions kept; audited); idempotent |
+| GET | `/templates/{key}/{locale}/revisions` | `system_admin`; every revision, newest first |
+| POST | `/templates/{key}/{locale}/preview` | `system_admin`; optional draft body; `{subject, text, html}` with sample values |
+| POST | `/templates/{key}/{locale}/test-send` | `system_admin`; 202 `{send_id}`; to the caller's own address only; 429 when rate-limited |
 | POST | `/ses-events` | public (SNS); not in the OpenAPI schema |
 
 ## The SNS endpoint (`POST /api/v1/mail/ses-events`)
@@ -165,5 +205,7 @@ SES, the sender, the topic, the web origin and the deployment tenant are set
 fake transport, SES error mapping, start-up config, the jobs hook) and
 `tests/test_mail_sns.py` (SNS verification with a generated certificate, suppression,
 admin API) and `tests/test_mail_ledger.py` (T-0226: migration `0040`, signed `Delivery`
-notifications, forward-only status changes, project sends, stats and history filters). All run
-on SQLite and PostgreSQL.
+notifications, forward-only status changes, project sends, stats and history filters) and
+`tests/test_mail_templates.py` (T-0227: every template with and without an override, the
+override checks, revisions and reset, the next send, locale chain, preview, test send and its
+rate limit, the API, migration `0041`). All run on SQLite and PostgreSQL.

@@ -3,9 +3,9 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 414 · **Closed:** 170
+**Open:** 417 · **Closed:** 170
 
-## decision (39)
+## decision (40)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -48,6 +48,7 @@
 | [TD-486](../tracker/todo/TD-486.md) | RFI witness check: may an unmet hold-point (H) witness requirement be overridden per record (ADR 0004 Amendment A), or is it non-overridable? | T-0333 | planner |
 | [TD-514](../tracker/todo/TD-514.md) | How is a passed or LOCKED_FOR_TURNOVER inspection corrected? Define void-and-reissue (revision suffix, supersedes link, ledger, MDR shows latest) | — | planner |
 | [TD-564](../tracker/todo/TD-564.md) | On-site label printing (QR / asset tags, quarantine labels): PDF label sheet, vendor print service on Android, or Web Bluetooth? Needs the printer model and device platform | T-0155, E-03-03, E-03-07, T-0141, T-0255 | planner |
+| [TD-596](../tracker/todo/TD-596.md) | Confirm T-0227 template-editor defaults: required set, empty blocks, audience of existing templates | T-0227 | implementer |
 
 ## spec-gap (94)
 
@@ -221,7 +222,7 @@
 | [TD-510](../tracker/todo/TD-510.md) | Deployment-config view lacks the mail reply-to of diff §4.7: Settings has no reply-to field yet | T-0230 | implementer |
 | [TD-533](../tracker/todo/TD-533.md) | CEL client runtime has no evaluation step budget (cel-js exposes no step hook; server is the hard gate) | T-0341 | implementer |
 
-## later (164)
+## later (166)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -389,6 +390,8 @@
 | [TD-586](../tracker/todo/TD-586.md) | Expose X-Next-Offset in the native-app CORS expose_headers before a native client pages the drift report (PR #181 review) | T-0348 | reviewer |
 | [TD-589](../tracker/todo/TD-589.md) | Title-block number check: the worker reads the document number from an uploaded PDF (text layer, then OCR) and warns, never blocks, when it differs from the registered number | E-05-01, E-05-09 | planner |
 | [TD-594](../tracker/todo/TD-594.md) | Automatic weather on the daily diary: fetched, timestamped reference only (source and time), never replaces calibrated ambient readings; new outbound data flow needs a decision | E-04-04 | planner |
+| [TD-597](../tracker/todo/TD-597.md) | Mark template test sends in the delivery ledger so stats can exclude them | T-0227 | implementer |
+| [TD-598](../tracker/todo/TD-598.md) | RFI call-out e-mail templates must register as required=True | T-0227 | implementer |
 
 ## bug (18)
 

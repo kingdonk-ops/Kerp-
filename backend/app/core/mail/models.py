@@ -1,5 +1,6 @@
 """The send log and the suppression list (T-0058, diff §4.6; migration ``0024``), the send
-log extended into the delivery ledger (T-0226, diff §4.7, ADR 0020; migration ``0039``).
+log extended into the delivery ledger (T-0226, diff §4.7, ADR 0020; migration ``0040``), and
+the template overrides (T-0227, diff §4.7, ADR 0021; migration ``0041``).
 
 Both use ``BaseRecordMixin`` and the standard tenant RLS policies (``project_id`` is the
 sending session's project, ``NULL`` for tenant-level sends: the auth e-mails). Neither ever
@@ -13,13 +14,14 @@ import uuid
 from datetime import datetime
 from typing import Final
 
-from sqlalchemy import CheckConstraint, DateTime, Index, Integer, String, text
+from sqlalchemy import Boolean, CheckConstraint, DateTime, Index, Integer, String, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.db import GUID, Base, BaseRecordMixin
 
 SEND_TABLE: Final = "mail_send_log"
 SUPPRESSION_TABLE: Final = "mail_suppression"
+OVERRIDE_TABLE: Final = "mail_template_override"
 SEND_STATUSES: Final = (
     "queued",
     "sent",
@@ -92,3 +94,46 @@ class MailSuppression(Base, BaseRecordMixin):
     # SES detail: bounce type / sub-type or complaint feedback type (``Permanent/General``).
     detail: Mapped[str | None] = mapped_column(String(100), nullable=True)
     provider_message_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+
+class MailTemplateOverride(Base, BaseRecordMixin):
+    """One revision of a System admin's wording of a template in one locale (T-0227, ADR 0021).
+
+    Tenant-level. Every save adds a row with the next ``version`` and makes it the current
+    one; at most one current row per tenant, template and locale. A reset to the shipped
+    default only clears ``is_current``: every revision is kept. Plain text with ``{name}``
+    placeholders only (``templates.override_problems``); never HTML, a URL or a secret.
+    ``version`` numbers the revisions (the mixin's ``revision`` is the row's own update
+    counter)."""
+
+    __tablename__ = OVERRIDE_TABLE
+    __table_args__ = (
+        CheckConstraint("project_id IS NULL", name="tenant_level"),
+        CheckConstraint("version >= 1", name="version"),
+        Index(
+            f"uq_{OVERRIDE_TABLE}_version",
+            "tenant_id",
+            "template_key",
+            "locale",
+            "version",
+            unique=True,
+        ),
+        Index(
+            f"uq_{OVERRIDE_TABLE}_current",
+            "tenant_id",
+            "template_key",
+            "locale",
+            unique=True,
+            postgresql_where=text("is_current"),
+            sqlite_where=text("is_current"),
+        ),
+    )
+
+    template_key: Mapped[str] = mapped_column(String(100), nullable=False)
+    locale: Mapped[str] = mapped_column(String(35), nullable=False)
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    subject: Mapped[str] = mapped_column(String(200), nullable=False)
+    intro: Mapped[str] = mapped_column(String(2000), nullable=False)
+    outro: Mapped[str] = mapped_column(String(2000), nullable=False)
+    action_label: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    is_current: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)

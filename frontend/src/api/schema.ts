@@ -605,6 +605,113 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/mail/templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Templates
+         * @description Every registered template: audience group, required flag, declared placeholders, and
+         *     per locale the shipped text and the tenant's current override.
+         */
+        get: operations["list_templates_api_v1_mail_templates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/mail/templates/{template_key}/{locale}/revisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Template Revisions
+         * @description Every saved revision of the template in this locale, newest first.
+         */
+        get: operations["list_template_revisions_api_v1_mail_templates__template_key___locale__revisions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/mail/templates/{template_key}/{locale}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Save Template Override
+         * @description Save a new revision and make it current; the next send uses it. Audited.
+         */
+        put: operations["save_template_override_api_v1_mail_templates__template_key___locale__put"];
+        post?: never;
+        /**
+         * Reset Template Override
+         * @description Back to the shipped default (revisions kept; audited). Idempotent.
+         */
+        delete: operations["reset_template_override_api_v1_mail_templates__template_key___locale__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/mail/templates/{template_key}/{locale}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview Template
+         * @description Render with synthetic sample values: the draft in the body (checked like a save,
+         *     nothing stored), else what a send would use now.
+         */
+        post: operations["preview_template_api_v1_mail_templates__template_key___locale__preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/mail/templates/{template_key}/{locale}/test-send": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send Template Test
+         * @description Queue the template with sample values to the caller's own address only (the request
+         *     names no recipient). Rate-limited (429 with ``Retry-After``); audited.
+         */
+        post: operations["send_template_test_api_v1_mail_templates__template_key___locale__test_send_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/settings/deployment": {
         parameters: {
             query?: never;
@@ -4020,6 +4127,18 @@ export interface components {
             /** Delivery Rate */
             delivery_rate: number | null;
         };
+        /**
+         * MailPreviewRead
+         * @description The rendered e-mail with synthetic sample values. ``html`` is a complete document.
+         */
+        MailPreviewRead: {
+            /** Subject */
+            subject: string;
+            /** Text */
+            text: string;
+            /** Html */
+            html: string;
+        };
         /** MailSendRead */
         MailSendRead: {
             /**
@@ -4122,6 +4241,110 @@ export interface components {
             delivery_rate: number | null;
             /** Template Key */
             template_key: string;
+        };
+        /** MailTemplateLocaleRead */
+        MailTemplateLocaleRead: {
+            /** Locale */
+            locale: string;
+            shipped: components["schemas"]["MailTemplateTextRead"];
+            override: components["schemas"]["MailTemplateOverrideRead"] | null;
+        };
+        /**
+         * MailTemplateOverrideRead
+         * @description One revision of an override. ``version`` numbers the revisions; ``is_current``: the
+         *     one sends use now (none current: the shipped text).
+         */
+        MailTemplateOverrideRead: {
+            /** Subject */
+            subject: string;
+            /** Intro */
+            intro: string;
+            /** Outro */
+            outro: string;
+            /** Action Label */
+            action_label: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Template Key */
+            template_key: string;
+            /** Locale */
+            locale: string;
+            /** Version */
+            version: number;
+            /** Is Current */
+            is_current: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Created By */
+            created_by: string | null;
+        };
+        /**
+         * MailTemplateRead
+         * @description A registered template: its audience group, whether it is required (no empty subject
+         *     or text block), whether it has an action link, the placeholders its texts may use, and
+         *     per locale the shipped text and the current override.
+         */
+        MailTemplateRead: {
+            /** Key */
+            key: string;
+            /**
+             * Audience
+             * @enum {string}
+             */
+            audience: "internal_staff" | "client" | "external_party" | "deployment_wide";
+            /** Required */
+            required: boolean;
+            /** Has Action */
+            has_action: boolean;
+            /** Placeholders */
+            placeholders: string[];
+            /** Locales */
+            locales: components["schemas"]["MailTemplateLocaleRead"][];
+        };
+        /**
+         * MailTemplateTextRead
+         * @description A template's rewordable texts in one locale, unformatted (``{name}`` placeholders).
+         *     ``action_label`` is ``null`` for a template without a link.
+         */
+        MailTemplateTextRead: {
+            /** Subject */
+            subject: string;
+            /** Intro */
+            intro: string;
+            /** Outro */
+            outro: string;
+            /** Action Label */
+            action_label: string | null;
+        };
+        /**
+         * MailTemplateTextWrite
+         * @description Plain text only, with the template's declared placeholders (``{user_name}``); no HTML,
+         *     no URL, never the link secret. ``action_label`` only for a template with a link. Checked
+         *     by the server (422 with one entry per refused field).
+         */
+        MailTemplateTextWrite: {
+            /** Subject */
+            subject: string;
+            /** Intro */
+            intro: string;
+            /** Outro */
+            outro: string;
+            /** Action Label */
+            action_label?: string | null;
+        };
+        /** MailTestSendRead */
+        MailTestSendRead: {
+            /**
+             * Send Id
+             * Format: uuid
+             */
+            send_id: string;
         };
         /** MeResponse */
         MeResponse: {
@@ -6985,6 +7208,192 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_templates_api_v1_mail_templates_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MailTemplateRead"][];
+                };
+            };
+        };
+    };
+    list_template_revisions_api_v1_mail_templates__template_key___locale__revisions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_key: string;
+                locale: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MailTemplateOverrideRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_template_override_api_v1_mail_templates__template_key___locale__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_key: string;
+                locale: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MailTemplateTextWrite"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MailTemplateOverrideRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reset_template_override_api_v1_mail_templates__template_key___locale__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_key: string;
+                locale: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_template_api_v1_mail_templates__template_key___locale__preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_key: string;
+                locale: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["MailTemplateTextWrite"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MailPreviewRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    send_template_test_api_v1_mail_templates__template_key___locale__test_send_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_key: string;
+                locale: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MailTestSendRead"];
+                };
             };
             /** @description Validation Error */
             422: {
