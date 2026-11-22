@@ -1,9 +1,10 @@
-# `src/admin` — Admin screens: access requests, devices (T-0051), admin grants, projects, members (T-0026), users (T-0331), runtime settings (T-0232)
+# `src/admin` — Admin screens: access requests, devices (T-0051), admin grants, projects, members (T-0026), users (T-0331), runtime settings (T-0232), System console (T-0224)
 
 Admin-group screens of diff §6.1 on the finished backends of T-0050 (access requests),
 T-0043 (device registry), T-0039 (admin grants), T-0012 / T-0044 (projects), T-0014 (members,
-accounts), T-0052 (invites) and T-0230 (settings registry). Everything goes through the generated
-client (`api.ts`, `invites.ts`, `users.ts`, `settings.ts`); every string through `t()` (`admin.*`, `devices.*`, `personas.*`).
+accounts), T-0052 (invites), T-0230 (settings registry) and T-0218 / T-0219 / T-0221 (System console).
+Everything goes through the generated client (`api.ts`, `invites.ts`, `users.ts`, `settings.ts`,
+`system.ts`); every string through `t()` (`admin.*`, `devices.*`, `personas.*`).
 
 ## Who sees what
 
@@ -18,8 +19,8 @@ client (`api.ts`, `invites.ts`, `users.ts`, `settings.ts`); every string through
 
 - Backbone → **Projects** (`/backbone/projects`) is shown to every signed-in user: the client
   cannot tell who holds `create_projects` (TD-449), so "New project" is offered to all and a `403`
-  is explained. Admin → System → **Settings** (`/admin/system/settings`) and **Admin grants**
-  (`/admin/system/grants`) are tabs of the System screens (`SystemTabs`, `ui.tsx`) shown to System
+  is explained. Admin → System → **Deployment**, **Queues**, **Upload quarantine** (T-0224),
+  **Settings** (`/admin/system/settings`) and **Admin grants** (`/admin/system/grants`) are tabs of the System screens (`SystemTabs`, `ui.tsx`) shown to System
   admins only; the API answers everyone else 403. The tabs are one list (`SYSTEM_TABS`, with
   `systemAdminOnly`): a new System screen (T-0224, T-0225, …) adds its row there and its route in
   `src/app/routes.tsx`. The Admin nav item `admin.system` still opens Devices, the one System
@@ -59,6 +60,36 @@ client (`api.ts`, `invites.ts`, `users.ts`, `settings.ts`); every string through
   object storage region, mail transport and sender, malware scanner, upload limits (the caps of
   the registry) and the AI provider (`none`). Nothing here is ever a secret (the API's
   allow-list); it changes only with a redeploy.
+
+## System console (`/admin/system/deployment`, `/queues`, `/uploads`; diff §4.7, §6.5, T-0224)
+
+System admins only, like Settings: `useSystemAdminGate()` (`ui.tsx`) enables the queries only for
+a System admin; anyone else gets `admin.system.forbiddenConsole` and nothing is called (a `403`
+says the same). Registers are card lists (`CARD_ITEM`, `Facts`), not tables, so nothing scrolls
+sideways on a field phone (the `RegisterPage` shell has no row actions or server paging yet:
+TD-537); actions confirm in a `Dialog` first. Fixtures: `systemFixtures.ts`.
+
+- **Deployment** (`SystemDeploymentPage`): `GET /admin/system/stats` as cards (projects, users,
+  devices; object storage per storage class with objects and size, its **as of** time or "not
+  counted yet", and **Refresh totals**: `POST .../stats/object-store/refresh`, `409` = a count is
+  already running; disabled while `refreshing`), and the module counts (labels
+  `admin.deployment.modules.*` / `moduleCounts.<module>.<key>`, else the key).
+  `GET /admin/system/health`: overall status, checked time and a tile per probe with status and
+  latency (no answer when `null`); **Check again** re-reads it.
+- **Queues** (`SystemQueuesPage`): `GET /admin/system/queues` (per queue queued, running,
+  scheduled, failed, oldest waiting; the cron tasks with last run, outcome and next run) and
+  `GET .../queues/failed` (50 per page; kind, queue, project code or "Deployment", attempts,
+  error class, message; never a payload). **Retry** (`POST .../failed/{id}/retry`; `409` = no
+  longer failed). **Abort** takes a pasted job id (UUID checked first): the API lists no queued
+  or running jobs (TD-536); `409` = not queued or running, `404` = unknown.
+- **Upload quarantine** (`SystemUploadsPage`): `GET /admin/system/uploads` with status, reason
+  and project filters (server-side, 50 per page with the total) — rows of every project
+  (ADR 0016). Each row: file, project, status, reason (`admin.quarantine.reasons.*`, else the
+  code), module, size and type, signature for `infected`, **Object deleted** when the bytes are
+  gone. **Re-check** only for `verifying` rows with their bytes (`409` `NOT_VERIFYING` /
+  `CHECK_RUNNING` / `OBJECT_GONE` explained). `GET .../uploads/counts` (unfiltered) gives the
+  counts per project and status, the reason and project filter options, and **Sweep now** per
+  project (`POST .../uploads/sweep?project=`).
 
 ## Projects (`ProjectsPage`, diff §4.1, T-0040, T-0044)
 
