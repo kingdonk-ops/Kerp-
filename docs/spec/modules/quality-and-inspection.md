@@ -255,7 +255,9 @@ planner defaults unless marked otherwise.
 The client representative co-signs with **their own KERP account (PER-15)** (user decision R1a).
 After review round 3 of PR #51 the user replaced the offline PIN check (2026-11-13): **no client
 PIN hash or other client secret is ever sent to or stored on an inspector's device.** There are
-three ways to co-sign (user decision); details marked (planner default) are planner choices.
+three ways to co-sign (user decision), plus a fourth, a scanned paper signature confirmed by the
+client in the same way as mode iii (user, 2026-11-22, TD-592); details marked (planner default)
+are planner choices.
 
 - **(i) Online, own account and PIN.** On the inspector's device ("Hand to client") the client
   signs in with username (or e-mail) and signing PIN; the server verifies it and returns a
@@ -304,9 +306,17 @@ three ways to co-sign (user decision); details marked (planner default) are plan
     cannot be approved (`CLIENT_SIGNATURE_PROVISIONAL`).
   - Reminder to the client after 24 hours and to the project's PER-06 after 72 hours; a
     provisional signature never expires on its own (planner defaults).
+- **(iv) Scanned paper signature** (user, 2026-11-22, TD-592). A page the client signed on paper
+  may be scanned and used as the client co-sign, on exactly the terms of mode iii: the uploader
+  attaches the scan to the specific record version and picks the client's PER-15 account from the
+  project list; it is stored as **provisional** (`verification_mode = provisional_scan`) with the
+  "provisional client signature" badge; the named PER-15 confirms (`client_confirmed`, linked to
+  the provisional one) or rejects with a reason (`RETURNED`) in their own account; while it is
+  provisional, approval is blocked (`CLIENT_SIGNATURE_PROVISIONAL`); the same reminders apply.
+  The scan stays as evidence and is never deleted.
 - **Ledger entry.** Every co-signature is its own sign-off ledger entry (T-0119): signer user id
   and name, persona PER-15, `verification_mode` (`online_pin | client_device_signed |
-  provisional_wet | client_confirmed`), the time evidence of diff §6.4.1, geolocation, the
+  provisional_wet | provisional_scan | client_confirmed`), the time evidence of diff §6.4.1, geolocation, the
   inspector's `device_id` (and the client `key_id` for mode ii), the record version and hash it
   covers, and the drawn image for mode iii. A co-signature covers one record version; editing the
   answers after it (for example after a return) needs a new co-signature. A template may set
@@ -428,14 +438,15 @@ before it ships carry no attestation and stay valid ("no attestation recorded" o
   TD-592). A scan of a page signed on paper can be attached to a **specific ITR revision**
   (inspection record and version) as a file of kind `wet_signed_scan`, with uploader, upload
   time, the signer's name and party as stated by the uploader, and an optional note (audited).
-  It is **plain evidence only**: it carries no attestation, counts as no sign-off and never
-  replaces any required signature. Internal formal sign-offs (the kinds above) still need their
-  own attestation, and the client co-sign still needs one of the modes of §Client co-sign with
-  the client's own PER-15 account (TD-219); the `verification_mode` values are unchanged. The
+  On its own it is **evidence only**: it carries no attestation and counts as no internal
+  sign-off; internal formal sign-offs (the kinds above) still need their own attestation. It
+  counts as the **client co-sign only through §Client co-sign mode iv** (user, 2026-11-22,
+  TD-592): the uploader names the client's PER-15 account and the co-sign stays provisional until
+  that client confirms in their own account (TD-219 unchanged: the client always confirms with
+  their own account). The
   inspection PDF and the dossier (E-05-05) list it as "Wet-signed on paper; scan uploaded by
-  <name> on <date>", next to and never in place of an attestation or co-sign block. Whether a
-  scanned paper signature may ever count as the client co-sign is an open user decision
-  (TD-592). The client's wet signature drawn on the tablet (§Client co-sign, mode iii) is a
+  <name> on <date>", next to and never in place of an attestation or co-sign block; a scan used
+  as a mode iv co-sign shows in the co-sign block with its provisional or confirmed state. The client's wet signature drawn on the tablet (§Client co-sign, mode iii) is a
   different thing and is unchanged.
 - **Keys and fingerprints** (product intake 2026-11-21, planner default; user to confirm). Every
   record sealed with a key names the fingerprint (SHA-256 of the public key or certificate) of
