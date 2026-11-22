@@ -1017,7 +1017,8 @@ party's written waiver, set by the waive-a-party action; also in its event), `no
 (`pending \| delivered \| failed`, default `pending`) and `notice_delivery_reason` (nullable:
 `bounced \| suppressed \| no_channel \| provider_error \| skipped`), set from the out-of-app
 delivery results of the party's call-out recipients (§9 "Delivery failure per party"; product
-intake 2026-11-21, planner default; user to confirm). One row per party.
+intake 2026-11-21, planner default; user to confirm), and `notice_valid_at_outcome` (boolean,
+null until an outcome is recorded; frozen validity of the party's notice, §6). One row per party.
 Points default from the linked ITP line(s) through `qms.service` (per-party points, §ITP
 authoring): with several lines, the strongest point per party (`H` > `W` > `R` > `S` > `M` >
 `none`). A changed point is `manual`, needs a reason (event payload) and, when it differs from the
@@ -1090,7 +1091,7 @@ table keeps every earlier time.
 | **waive a party** (no slot transition) | PER-15 of that party (any point); PER-06 for a `W` point only, with `waiver_ref` (the party's written waiver) | slot `requested`/`confirmed`; the party is an external H/W party | that party's `attendance = waived` (`attendance_by_user_id`; `waiver_ref` on the party row and in the event); when every external H/W party is now `waived` the slot moves to `waived` in the same action |
 | `requested \| confirmed → witnessed` | PER-06, PER-07 (site scope) | **no external H/W party `pending`**; every one `attended` or `waived`, at least one `attended` | witness requirement satisfied (§5) |
 | `requested \| confirmed → waived` | automatic, by the last **waive a party** action | every external H/W party `waived` | witness requirement satisfied |
-| `requested \| confirmed → no_show` | PER-06, PER-07 | `outcome_occurred_at` ≥ `scheduled_start` + `inspection_request.no_show_grace_minutes` (default 30); **no external H/W party `pending`**; ≥ 1 `absent` | satisfied only if every absent party's point is `W` and that party had valid notice (§6) (§5); delay entry (§7) |
+| `requested \| confirmed → no_show` | PER-06, PER-07 | `outcome_occurred_at` ≥ `scheduled_start` + `inspection_request.no_show_grace_minutes` (default 30); **no external H/W party `pending`**; ≥ 1 `absent` | satisfied only if every absent party's point is `W` and that party had valid notice (§6; §5); delay entry (§7) |
 | `requested \| confirmed → failed` | PER-06, PER-07 | `outcome_reason_code` required (§7): the call-out could not be held for a reason other than the witness's absence (work not ready, access, weather, permit, instrument) | not satisfied; delay entry (§7) |
 | `draft \| requested \| confirmed → cancelled` | requester, PER-06 | reason required unless `draft` | linked records revert (§5); notifications; PDF re-rendered; a draft request whose slots are all cancelled may be soft-deleted instead (no number was used) |
 
@@ -1134,7 +1135,7 @@ party**. It looks at the most recently issued slot that links **the record itsel
 later, so a slot that links only the line counts for the ITR, **provided the slot's anchors cover
 the ITR's anchor** (the ITR's node or Item is a slot anchor or lies in the subtree of one);
 otherwise that slot does not count for the ITR. Per party, the requirement is met when its
-attendance is `attended` or `waived`, or `absent` on a `W` point with valid notice (§6); it is unmet
+attendance is `attended` or `waived`, or `absent` on a `W` point with valid notice (§6, as frozen at the outcome); it is unmet
 when no slot was issued, its attendance is still `pending`, the party was absent on an `H`
 point or without valid notice (short notice or `notice_delivery = failed`), or the slot `failed`. Precedence: `failed` makes every party unmet;
 otherwise the party's attendance decides, and `pending` = unmet. `construction_control` adds two locked
@@ -1143,8 +1144,8 @@ evaluated from the ITP line's external points: `WITNESS_REQUIREMENT_HOLD` fails 
 parties whose point is `H`, and `WITNESS_REQUIREMENT_WITNESS` only for unmet parties whose point
 is `W`, so a line with a client `W` and a principal `H` yields separate findings and the `W`
 finding stays overridable. Findings: `RFI_REQUIRED` (no slot ever issued), `WITNESS_PENDING`
-(slot `requested`/`confirmed`), `WITNESS_NOT_SATISFIED` (absent on an H point or after short
-notice, or `failed`), each naming the parties concerned. An offline submit is checked at
+(slot `requested`/`confirmed`), `WITNESS_NOT_SATISFIED` (absent on an H point or without valid
+notice (§6), or `failed`), each naming the parties concerned. An offline submit is checked at
 sync like every other submit check.
 
 **Override (decision TD-486, planner default applied).** A per-record override (ADR 0004
@@ -1174,6 +1175,14 @@ exception to Amendment A pending TD-486.
   `contractor` (§7), which PER-02 and PER-06 can change with a reason (product intake
   2026-11-21, planner default; user to confirm). `notice_delivery = pending` at the outcome
   counts as delivered (no evidence of failure).
+- **Validity is fixed at the outcome** (planner default; user to confirm). Valid notice is
+  evaluated **once per party, when the outcome** (`witnessed`, `no_show`, `failed`, or the
+  slot-level `waived`) **is recorded**, and stored as `slot_party.notice_valid_at_outcome` (§2).
+  The witness check (§5, `witness_status`) and delay creation (§7) both use only this frozen
+  value. A delivery result that arrives later (a late bounce, a failed push retry) still updates
+  `notice_delivery`, is shown on the screen and is emitted as an event, but never changes the
+  effect of the recorded outcome. A reschedule clears the frozen value together with the
+  outcome.
 
 ### 7. Client delay attribution
 
@@ -1201,7 +1210,8 @@ decimals, set when ended), `status` (`open \| closed`), `cause_changed_by`, `cau
 whether every absent party had valid notice (§6), so it is false after a failed delivery.
 
 - **`no_show`** with at least one absent party whose point is `H` or who lacked valid notice
-  (§6: short notice, or that party's `notice_delivery = failed`): one entry, `cause_party` = the
+  (§6: short notice, or that party's `notice_delivery = failed`; the value frozen at the outcome
+  in `notice_valid_at_outcome`): one entry, `cause_party` = the
   absent party (several absent parties: `client` before `principal` before `third_party`) when
   every absent party had valid notice, else `contractor`; `started_at = scheduled_start`.
   A `no_show` where only `W` parties were absent, each with valid notice, creates no entry (work
@@ -1301,11 +1311,14 @@ notification per request per recipient per event (not one per slot).
   of that party's call-out recipients for the latest issue or reschedule failed or was skipped
   (e-mail bounced, suppressed or failed in the core-mail log, T-0226; push failed or no device;
   no out-of-app channel at all = `no_channel`), with the reason in `notice_delivery_reason`; it
-  is `delivered` once any such attempt succeeds, and `pending` until then. A reschedule resets it
+  is `delivered` once any such attempt succeeds, and `pending` until then. A recipient's own
+  opt-out of a channel (if notification preferences ever apply to call-outs) counts as
+  `skipped` for that attempt, so a party whose every recipient opted out of push and e-mail
+  is `failed` (`skipped`) (planner default; to confirm in TD-549). A reschedule resets it
   to `pending`. On `failed` the requester and PER-06 get a `high` in-app notification and the
   slot detail shows it. A failed delivery is never attendance: the party stays `pending` until
   someone records `attended`, `absent` or a waiver. Effect on outcomes: no valid notice for
-  that party (§6, §5, §7). Per-channel results come from the persisted delivery log (TD-238,
+  that party (§6, §5, §7), fixed once when the outcome is recorded (§6). Per-channel results come from the persisted delivery log (TD-238,
   TD-549).
 - **E-mail** through core mail (T-0058, diff §4.6), recipient's locale. Planner default, decision
   **TD-484**: only to project accounts above; content = project code and name, RFI no.,
