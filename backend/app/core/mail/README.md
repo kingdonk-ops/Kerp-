@@ -7,7 +7,7 @@ production, always asynchronous, i18n templates, a send log that is also the del
 
 | File | What |
 |---|---|
-| `service.py` | `send_mail(session, template_key, to, context, locale=None, *, recipient_user_id=None, broadcast_id=None)`; worker `deliver`; `suppress`, `record_ses_event`; admin `list_sends(SendFilter)`, `send_stats(SendFilter)`, `list_suppressions`, `remove_suppression` (audited) |
+| `service.py` | `send_mail(session, template_key, to, context, locale=None, *, recipient_user_id=None, broadcast_id=None)`; worker `deliver`; `suppress`, `suppressed_addresses` (which of these addresses are suppressed: a broadcast's audience, T-0228), `record_ses_event`; admin `list_sends(SendFilter)`, `send_stats(SendFilter)`, `list_suppressions`, `remove_suppression` (audited) |
 | `queue.py` | `QueuedMail`, the post-commit hook `set_mail_enqueuer` (installed by the jobs module) |
 | `templates.py` | `MailTemplate` (audience, `required`), `register_template`, `TEMPLATES`, `render` (text + simple HTML, optional override), `override_problems`, `sample_context` |
 | `overrides.py` | Template overrides (T-0227, ADR 0021): `list_templates`, `save_override`, `reset_override`, `list_revisions`, `effective_override` (used by `deliver`), `preview`, `send_test` |
@@ -27,6 +27,7 @@ send_mail(session, "auth.magic_link", user.email, {"token": token, "expires_minu
 # auth.password_changed (the notice after a reset; no parameters) - T-0077.
 # Module templates: admin.project_invite (link /invite#<invite_token>.<setup_token>) - T-0059;
 # access_requests.approved | rejected | rejected_no_reason (public link /) - T-0063.
+# notifications.broadcast (subject, multi-line message, opt-out link + List-Unsubscribe) - T-0228.
 
 # The delivery ledger (T-0226): name the recipient's user when you know it; a broadcast
 # (T-0228) passes its id. Neither replaces the address, which is kept hashed + masked only.
@@ -77,6 +78,16 @@ template in `en-AU` and fails on a missing key).
   pixel; every value is HTML-escaped. No project data beyond code and name.
 - Locale: the recipient's, else `KERP_MAIL_DEFAULT_LOCALE` (`en-AU`); a missing catalog or
   key falls back to the language (`en`), then the default, then `en-AU`.
+- **Long plain text** (T-0228): a template may name one parameter `multiline_param`; that
+  value may hold line breaks and tabs and up to 10 000 characters (no other control
+  characters). It is escaped like every value; line breaks become `<br>` in the HTML. Every
+  other value stays one line of at most 500 characters.
+- **One-click unsubscribe** (T-0228, RFC 8058): a template with a secret may declare
+  `list_unsubscribe_path` (an `/api/v1/...` path). The rendered mail then carries
+  `List-Unsubscribe: <<KERP_WEB_ORIGIN><path>?token=<secret>>` and
+  `List-Unsubscribe-Post: List-Unsubscribe=One-Click` (`RenderedMail.headers`; SES gets them
+  as message headers). This header is the one other place the secret goes; it is in a query
+  string, which the access log never records. Used by `notifications.broadcast`.
 - Each template declares its **audience** group for the editor (`internal_staff | client |
   external_party | deployment_wide`, default `deployment_wide`) and whether it is
   **`required`** (sign-in, password reset, invite; RFI call-outs once registered): an override

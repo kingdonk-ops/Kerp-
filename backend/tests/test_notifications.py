@@ -154,7 +154,7 @@ def test_notification_table_meets_the_record_contract_and_is_under_rls() -> None
 def test_notifications_module_is_loaded() -> None:
     manifest = discover_modules().get("notifications")
     assert manifest.toggleable is False
-    assert set(manifest.depends_on) == {"projects"}
+    assert set(manifest.depends_on) == {"projects", "jobs"}
 
 
 # --- request validation ---------------------------------------------------------------------

@@ -30,5 +30,9 @@
   "mail.access_requests.rejected_no_reason.subject": "Your access request for project {project_code} on {app_name} was declined",
   "mail.access_requests.rejected_no_reason.intro": "Your request for access to the project {project_code} {project_name} on {app_name} was declined.",
   "mail.access_requests.rejected_no_reason.action": "Open the lobby",
-  "mail.access_requests.rejected_no_reason.outro": "You can see the request in the lobby, and request access again from there."
+  "mail.access_requests.rejected_no_reason.outro": "You can see the request in the lobby, and request access again from there.",
+  "mail.notifications.broadcast.subject": "{subject}",
+  "mail.notifications.broadcast.intro": "{message}",
+  "mail.notifications.broadcast.action": "Unsubscribe from announcements",
+  "mail.notifications.broadcast.outro": "You received this announcement as a user of {app_name}. Unsubscribing stops announcements only: e-mails about your account and your work still reach you."
 }

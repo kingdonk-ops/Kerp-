@@ -1,12 +1,22 @@
-"""Request and response shapes of the notifications API (T-0019)."""
+"""Request and response shapes of the notifications API (T-0019; broadcasts T-0228)."""
 
 from __future__ import annotations
 
+import re
 import uuid
 from datetime import datetime
-from typing import Annotated, Any, Literal, Self
+from typing import Annotated, Any, ClassVar, Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    field_validator,
+    model_validator,
+)
+
+from app.core.mail.schemas import MailCountsRead
 
 Priority = Literal["low", "normal", "high", "critical"]
 
@@ -90,3 +100,139 @@ class NotificationSent(BaseModel):
 
     notification: NotificationRead
     deliveries: list[DeliveryRead]
+
+
+# --- broadcast e-mail (T-0228) ----------------------------------------------------------------
+
+BroadcastScope = Literal["tenant", "projects"]
+BroadcastCategory = Literal["internal", "external", "client"]
+BroadcastStatus = Literal["draft", "queued", "sending", "sent", "failed"]
+PersonaCode = Literal[
+    "PER-01",
+    "PER-02",
+    "PER-03",
+    "PER-04",
+    "PER-05",
+    "PER-06",
+    "PER-07",
+    "PER-08",
+    "PER-09",
+    "PER-10",
+    "PER-11",
+    "PER-12",
+    "PER-13",
+    "PER-14",
+    "PER-15",
+    "PER-16",
+]
+MAX_BROADCAST_PROJECTS = 100
+MAX_SUBJECT = 200
+MAX_BODY = 10_000
+# Plain text: no control characters (the body may hold line breaks and tabs).
+_SUBJECT_CONTROL = re.compile(r"[\x00-\x1f\x7f\u2028\u2029]")
+_BODY_CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f\u2028\u2029]")
+
+
+class BroadcastAudienceWrite(BaseModel):
+    """Who a broadcast goes to. ``tenant`` (System admin only): every active user;
+    ``projects``: the users with a live membership on ``project_ids`` (a PER-09: only its own
+    PER-09 projects). ``category`` and ``personas`` narrow it; both together must match."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    scope: BroadcastScope
+    project_ids: list[uuid.UUID] = Field(default_factory=list, max_length=MAX_BROADCAST_PROJECTS)
+    category: BroadcastCategory | None = None
+    personas: list[PersonaCode] = Field(default_factory=list, max_length=16)
+
+    @model_validator(mode="after")
+    def _scope_projects(self) -> Self:
+        if self.scope == "tenant" and self.project_ids:
+            raise ValueError("a tenant-wide broadcast names no projects")
+        if self.scope == "projects" and not self.project_ids:
+            raise ValueError("name at least one project")
+        if len(set(self.project_ids)) != len(self.project_ids):
+            raise ValueError("project_ids must not repeat")
+        if len(set(self.personas)) != len(self.personas):
+            raise ValueError("personas must not repeat")
+        return self
+
+
+class BroadcastWrite(BroadcastAudienceWrite):
+    """``POST /notifications/broadcasts``: the audience plus a plain-text subject and body.
+    Line breaks in the body are kept (``\\r\\n`` becomes ``\\n``); every value is escaped when
+    the e-mail is rendered."""
+
+    subject: Annotated[str, StringConstraints(min_length=1, max_length=MAX_SUBJECT)]
+    body: Annotated[str, StringConstraints(min_length=1, max_length=MAX_BODY)]
+
+    @field_validator("subject")
+    @classmethod
+    def _plain_subject(cls, value: str) -> str:
+        value = value.strip()
+        if not value or _SUBJECT_CONTROL.search(value):
+            raise ValueError("plain text on one line")
+        return value
+
+    @field_validator("body")
+    @classmethod
+    def _plain_body(cls, value: str) -> str:
+        value = value.replace("\r\n", "\n").replace("\r", "\n").strip()
+        if not value or _BODY_CONTROL.search(value):
+            raise ValueError("plain text only")
+        return value
+
+
+class BroadcastPreviewRead(BaseModel):
+    """How many users the broadcast would reach now: a count, never a list."""
+
+    recipient_count: int
+
+
+class BroadcastRead(BaseModel):
+    """A broadcast with its counts. ``delivery``: the send log's counts for it (T-0226), on
+    ``GET /broadcasts/{id}`` only."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    sender_id: uuid.UUID
+    scope: BroadcastScope
+    project_ids: list[uuid.UUID]
+    category: BroadcastCategory | None
+    personas: list[PersonaCode]
+    subject: str
+    body: str
+    status: BroadcastStatus
+    recipient_count: int
+    queued_count: int
+    skipped_count: int
+    created_at: datetime
+    finished_at: datetime | None
+    delivery: MailCountsRead | None = None
+
+
+class UnsubscribeWrite(BaseModel):
+    """``POST /notifications/broadcasts/unsubscribe``: the opaque token from the e-mail's link.
+
+    Any string is accepted, so a malformed token gets the same answer as a valid one (no
+    oracle). A real token is 43 characters (256 bits, URL-safe base64); anything longer than
+    ``MAX_TOKEN`` can never be one and is dropped here, before it is hashed or looked up,
+    instead of a ``422`` that would answer differently."""
+
+    MAX_TOKEN: ClassVar[int] = 128
+
+    token: str | None = None
+
+    @field_validator("token", mode="before")
+    @classmethod
+    def _drop_over_long(cls, value: object) -> object:
+        if isinstance(value, str) and len(value) > cls.MAX_TOKEN:
+            return None
+        return value
+
+
+class UnsubscribeRead(BaseModel):
+    """The one answer of the one-click opt-out, whatever the token."""
+
+    status: Literal["ok"] = "ok"
