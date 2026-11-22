@@ -24,7 +24,7 @@ export const PAGE_SIZE = 50;
  */
 export type ActionResult = { kind: "ok" } | { kind: "conflict"; code: string } | { kind: "gone" };
 
-function actionResult(status: number, error: unknown): ActionResult {
+export function actionResult(status: number, error: unknown): ActionResult {
   if (status === 404) return { kind: "gone" };
   if (status === 409) {
     const detail = (error as { detail?: unknown } | undefined)?.detail;

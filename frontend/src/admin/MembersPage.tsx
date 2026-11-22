@@ -21,6 +21,7 @@ import {
   type UserSummary,
 } from "./api";
 import { PendingInvites } from "./PendingInvites";
+import { ProjectAdminPanel } from "./ProjectAdminPanel";
 import { PersonaFields, SITE_PERSONA, toGrants, type Persona } from "./personas";
 import { PROJECTS_KEY } from "./ProjectsPage";
 import { BUTTON, Dialog, INPUT, PRIMARY } from "./ui";
@@ -71,6 +72,7 @@ export function MembersPage() {
   return (
     <section className="space-y-3">
       <h1 className="text-2xl font-bold">{t("admin.members.title", { project: label })}</h1>
+      {current && <ProjectAdminPanel project={current} label={label} />}
       <p role="status">{notice}</p>
       <form
         className="flex flex-wrap items-end gap-touch-gap"

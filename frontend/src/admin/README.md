@@ -1,10 +1,10 @@
-# `src/admin` — Admin screens: access requests, devices (T-0051), admin grants, projects, members (T-0026), users (T-0331), runtime settings (T-0232), System console (T-0224)
+# `src/admin` — Admin screens: access requests, devices (T-0051), admin grants, projects, members (T-0026), users (T-0331), runtime settings (T-0232), System console (T-0224), audit log and legal hold (T-0225)
 
 Admin-group screens of diff §6.1 on the finished backends of T-0050 (access requests),
 T-0043 (device registry), T-0039 (admin grants), T-0012 / T-0044 (projects), T-0014 (members,
-accounts), T-0052 (invites), T-0230 (settings registry) and T-0218 / T-0219 / T-0221 (System console).
+accounts), T-0052 (invites), T-0230 (settings registry) and T-0218 / T-0219 / T-0221 / T-0222 / T-0223 (System console, audit explorer, legal hold).
 Everything goes through the generated client (`api.ts`, `invites.ts`, `users.ts`, `settings.ts`,
-`system.ts`); every string through `t()` (`admin.*`, `devices.*`, `personas.*`).
+`system.ts`, `audit.ts`); every string through `t()` (`admin.*`, `devices.*`, `personas.*`).
 
 ## Who sees what
 
@@ -20,7 +20,7 @@ Everything goes through the generated client (`api.ts`, `invites.ts`, `users.ts`
 - Backbone → **Projects** (`/backbone/projects`) is shown to every signed-in user: the client
   cannot tell who holds `create_projects` (TD-449), so "New project" is offered to all and a `403`
   is explained. Admin → System → **Deployment**, **Queues**, **Upload quarantine** (T-0224),
-  **Settings** (`/admin/system/settings`) and **Admin grants** (`/admin/system/grants`) are tabs of the System screens (`SystemTabs`, `ui.tsx`) shown to System
+  **Settings** (`/admin/system/settings`), **Audit log** (`/admin/system/audit`, T-0225) and **Admin grants** (`/admin/system/grants`) are tabs of the System screens (`SystemTabs`, `ui.tsx`) shown to System
   admins only; the API answers everyone else 403. The tabs are one list (`SYSTEM_TABS`, with
   `systemAdminOnly`): a new System screen (T-0224, T-0225, …) adds its row there and its route in
   `src/app/routes.tsx`. The Admin nav item `admin.system` still opens Devices, the one System
@@ -91,6 +91,22 @@ TD-537); actions confirm in a `Dialog` first. Fixtures: `systemFixtures.ts`.
   counts per project and status, the reason and project filter options, and **Sweep now** per
   project (`POST .../uploads/sweep?project=`).
 
+- **Audit log** (`SystemAuditPage`, `/admin/system/audit`, T-0222, T-0225; `audit.ts`):
+  `GET /admin/system/audit`, newest first, 50 per page with the keyset cursor (Previous / Next
+  keep the cursors of the pages seen). Filters, applied on **Apply filters**: actor id, device id,
+  chain-key prefix, `event`, a boolean payload `flag` (e.g. `sod_warning`) and a date range in
+  the user's time zone (from local midnight; the "to" day is included: `created_to` is the next
+  local midnight, the API bound is exclusive). Ids that are not UUIDs and malformed flag keys are
+  marked and not sent (the server would answer `422`). Each entry is a card (event, chain, seq,
+  project or *Tenant level*, time, actor, device, source) with **Hashes and payload**
+  (content hash, previous hash, hash version, the payload as JSON) and **Verify chain**
+  (`POST .../audit/verify` with the entry's `chain_key` and `project_id`; inline: intact with
+  length and head hash, or broken at a seq with the problem count and the first 100 problems;
+  `404` = the chain no longer exists for the caller). **Verify all** (`POST .../audit/verify-all`,
+  `202`) polls `GET /jobs/{id}` every second while queued or running (status, progress bar) and
+  then shows the job's result (chains, entries, broken chains, first broken chain and seq) or
+  its error. Nothing here writes to the ledger except the verifications the server records.
+
 ## Projects (`ProjectsPage`, diff §4.1, T-0040, T-0044)
 
 - `GET /projects`, by code. **New project** asks for code (`[A-Za-z0-9][A-Za-z0-9._-]{0,31}`,
@@ -104,6 +120,14 @@ TD-537); actions confirm in a `Dialog` first. Fixtures: `systemFixtures.ts`.
 
 ## Members (`MembersPage`, `/admin/projects/:projectId/members`, diff §4.1, edge spec §5)
 
+- **Project section** (`ProjectAdminPanel.tsx`, T-0223, T-0225) at the top of the page: the
+  legal-hold state (`legal_hold` of `GET /projects`; the reason is only in the ledger). System
+  admins get **Put on legal hold** / **Lift legal hold**: a dialog with a mandatory reason
+  (trimmed, ≤ 500 characters) sends `PUT /admin/system/projects/{p}/legal-hold` `{on, reason}`
+  and the project list is re-read. **Delete project** asks first and sends `DELETE /projects/{p}`;
+  `409 LEGAL_HOLD_ACTIVE` shows `admin.projectAdmin.conflicts.LEGAL_HOLD_ACTIVE` (never the
+  server text), `409 team_links_present`, `403` and `404` are explained; on success the screen
+  returns to Backbone → Projects.
 - `GET /admin/projects/{p}/members`: each member's personas with site; team-derived grants are
   marked with their team and never edited (ADR 0008).
 - **Add a member by e-mail**: `POST /admin/users/lookup` (exact e-mail, active accounts; no

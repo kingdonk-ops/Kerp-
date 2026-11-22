@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 380 · **Closed:** 153
+**Open:** 381 · **Closed:** 153
 
 ## decision (41)
 
@@ -212,7 +212,7 @@
 | [TD-508](../tracker/todo/TD-508.md) | Verify the e2e suite on the make up compose stack, and give it its own database | T-0027 | implementer |
 | [TD-510](../tracker/todo/TD-510.md) | Deployment-config view lacks the mail reply-to of diff §4.7: Settings has no reply-to field yet | T-0230 | implementer |
 
-## later (150)
+## later (151)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -364,6 +364,7 @@
 | [TD-556](../tracker/todo/TD-556.md) | Undo a committed P6 or asset import while nothing refers to the imported nodes yet | T-0129, T-0104, T-0138 | planner |
 | [TD-557](../tracker/todo/TD-557.md) | Client-mandated PDF forms: AcroForm fill or coordinate mapping, fixed slots with overflow note, form revision by inspection date, rendered in the worker | T-0158, T-0110 | planner |
 | [TD-558](../tracker/todo/TD-558.md) | Navigation placement check: TQs, submittals, RFIs, NCRs, material lots and calibration certificates against diff §6.1 | T-0024 | planner |
+| [TD-562](../tracker/todo/TD-562.md) | Project admin page shows only the legal-hold flag: no read endpoint for the active hold's reason, set-by and set-at (LegalHoldRead only from the PUT) | T-0225 | implementer |
 | [TD-565](../tracker/todo/TD-565.md) | Risk register with a probability x impact matrix per project (configurable scales, heat map, links to anchors, issues and P6 activities) | E-06-06 | planner |
 | [TD-566](../tracker/todo/TD-566.md) | Inline read-only Gantt preview of an XER held in document control, from the server-side parse; display only, never an import path | E-04-01, E-04-12 | planner |
 
