@@ -46,6 +46,7 @@ from app.modules.validation.service import (
     _context,
     _guard_reset_keeps_locks,
     _guard_source,
+    _locked_rule_set,
     _message,
     _parent_set,
     _record_change,
@@ -204,7 +205,7 @@ def accept_update(
     context = _context(session)
     _guard_source(source)
     actor = actor_id or context.user_id
-    rule_set = get_or_404(session, RuleSet, rule_set_id)
+    rule_set = _locked_rule_set(session, rule_set_id)
     parent, mine, defaults = _state(session, rule_set)
     update = next((u for u in _diff(rule_set, mine, defaults) if u.rule_key == rule_key), None)
     if update is None:

@@ -32,7 +32,8 @@ Scope/Job Package/Line under one contract).
 **Once nodes use a level** changes are additive (ADR 0003): `key`, `depth`, `code_uniqueness`
 and the `work_anchor` role are frozen and `allowed_parent_keys` may only gain keys (409
 otherwise). Labels, other roles, the pattern (new codes only) and the display template (stored
-`display_code`s are recomputed) may change.
+`display_code`s are recomputed; clearing the last template sets every `display_code` back to
+the node's own code, T-0347) may change.
 
 ## `oe_asset_node` — the tree
 
@@ -89,7 +90,7 @@ project. Routers answer **422** for `NoWorkAnchor`. Callers: TD-125.
 `move_node` keeps the node id and changes the parent. One `UPDATE` rewrites `tree_path`
 (`new || subpath(tree_path, nlevel(old))`) and `display_path` of the whole subtree, bumps each
 row's `revision`, and sets the moved node's `parent_id` and `code_scope_key`. `display_code`s are
-then recomputed where a template exists. The ledger chain `asset_node:<id>` gets
+then recomputed where a template exists (with none, each already is the node's own code). The ledger chain `asset_node:<id>` gets
 `{action: move, old/new_parent_id, old/new_tree_path, old/new_display_path}`; node creation and
 level changes are ledgered too (`asset_level_def:<id>`).
 
