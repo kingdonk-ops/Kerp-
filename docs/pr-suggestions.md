@@ -3,7 +3,78 @@
 > **Generated — do not hand-edit.** Rebuild with `python scripts/pr_suggestions.py rebuild`.
 > A running digest of everything agents surfaced on merged PRs — review notes, must-fix items, suggestions, nits, follow-ups and ideas — so nothing is lost after a squash-merge. Formal follow-ups also live as `TD-xxx` in `tracker/todo/` and on [TODO.md](TODO.md); this file is the readable skim. Each item links back to its PR or review for full context.
 
-_Repo `kingdonk-ops/Kerp-`, base `dev` · 181 merged PRs · 180 with surfaced notes._
+_Repo `kingdonk-ops/Kerp-`, base `dev` · 182 merged PRs · 181 with surfaced notes._
+
+---
+
+## PR #186 — Plan: user decisions TD-538/TD-549 + product intake 2026-11-22 (3) (AI change cards, numbering, joint breakout, competency, paper pages)
+task `T-0351` · merged 2026-11-22 · by `kingdonk-ops` · [PR](https://github.com/kingdonk-ops/Kerp-/pull/186)
+
+**TODOs raised**
+
+- TD-587: spec-gap. The notification rule model and delivery log, carried over from TD-549.
+- TD-588: spec-gap. Which task builds the shared numbering service.
+- TD-589: later. Check the title-block number on uploaded documents (warning only).
+- TD-590: spec-gap. Reset a bolted joint's integrity status on breakout.
+- TD-591: spec-gap. Competency check at sign-off.
+- TD-592: spec-gap. Upload of paper-signed pages.
+- TD-593: spec-gap. Client-supplied material arriving late for its work pack.
+- TD-594: later. Weather reference on the daily diary; the new outbound data flow needs a decision.
+- TD-595: bug. The "Visible in lobby" checkbox renders as an empty 48 dp square (`size-touch` on a native checkbox).
+- Resolved: TD-538, TD-549
+
+**Review by `kingdonk-ops` — KERP-REVIEW: CHANGES_REQUESTED patch-id=f8d388367393a001490a5968f140ce34deeccfe8** · [full review](https://github.com/kingdonk-ops/Kerp-/pull/186#pullrequestreview-6010784356)
+
+- _Must fix_
+  1. **`docs/spec/modules/quality-and-inspection.md:430-438` (and `tracker/todo/TD-592.md:13-17`): a paper scan "standing for" the client co-signature contradicts user decision R1a / TD-219.**
+     - **What is wrong.** By default (`inspection.require_e_signature` is off), the client signature would be a scan with "the signer's name and party as stated by the uploader". TD-219 (user, 2026-11-13) and §Client co-sign (`:255`) say the client co-signs **with their own KERP account (PER-15)** in one of three modes. Even mode iii (wet signature on the tablet) requires naming the PER-15 account and that client's own online confirmation. "Reviewed like a provisional wet signature" does not say who confirms it, against which account, or whether `CLIENT_SIGNATURE_PROVISIONAL` blocks approval until then. `paper_scan` is also missing from the ledger's `verification_mode` enum at `:308-309`, so the two sections disagree.
+     - **Fixed looks like one of these:**
+       - (a) When a scan is used as the client co-sign, the uploader must pick the client's PER-15 account (as in mode iii). It is stored as provisional (`verification_mode = paper_scan`), and `CLIENT_SIGNATURE_PROVISIONAL` blocks approval while it is pending. Only that PER-15's confirmation in their own account turns it into `client_confirmed`, and a rejection returns the inspection as in mode iii. Add `paper_scan` to the enum at `:308-309`, mirror the change in TD-592, and note that third-party signers follow the persona from TD-435.
+       - (b) Drop "can stand for the client co-sign" from the spec. The scan is then plain evidence only,
+
+- _Suggestions (non-blocking)_
+  - **`quality-and-inspection.md:1051` and `:1344`.** `notice_delivery_reason` still lists `skipped`. Since the TD-549 decision, opt-out is no longer a source of it for call-outs. Say what still produces `skipped` (if anything), or drop it from the enum.
+  - **`tracker/todo/TD-238.md:14`.** Still points at TD-549 for the wider delivery-log model. Add a note pointing to TD-587.
+  - **`tracker/tasks/T-0312.md:23-24`.** The new criterion "Verifier ≠ resolver" overlaps the existing one, "Verifier ≠ rectifier enforced in `service.py`…". Merge them into one criterion.
+  - **Diff §4.11 change cards.**
+    - Say whether Apply, Reject and Undo of already-staged cards stay available while AI is fail-closed (503 `AI_UNAVAILABLE` or `AI_BUDGET_REACHED`). They make no provider call, so allowing them is probably right.
+    - Say who the "requester" is for cards proposed by a scheduled or watchdog operation with no asking user.
+    - Say that Undo is refused for workflow transitions or attested sign-offs, not only for field values.
+  - **TD-595.** `DynamicForm.tsx:25` and `RegisterPage.tsx:45` use `size-touch` with `accent-brand` on native checkboxes. Include them when checking the fix. Also note that the reported "empty square" may simply be the unchecked state at 48 px with no styling.
+  - **T-0351.** The criterion "Module/README.md and docs updated" is boilerplate that does not fit a platform/CI task. Consider narrowing it to `docs/WORKFLOW.md` plus `docs/security/`.
+  KERP-REVIEW: CHANGES_REQUESTED patch-id=f8d388367393a001490a5968f140ce34deeccfe8
+  ---
+  _Generated by [Claude Code](https://claude.ai/code
+
+**Review by `kingdonk-ops` — KERP-REVIEW: APPROVED patch-id=9caff72826502ca00ae3365625f0eb98f0ccf8d3** · [full review](https://github.com/kingdonk-ops/Kerp-/pull/186#pullrequestreview-6010796031)
+
+- _Must-fix 1 (paper scan vs user decision R1a / TD-219): fixed, option (b)_
+  - **Spec.** `docs/spec/modules/quality-and-inspection.md:427-440` now makes a `wet_signed_scan` plain evidence only:
+    - it has no attestation, counts as no sign-off and never replaces a required signature;
+    - the client co-sign still needs a §Client co-sign mode with the client's own PER-15 account (TD-219);
+    - the `verification_mode` enum is unchanged.
+  - **Grep.** `paper_scan` and `require_e_signature` no longer appear anywhere in `docs/` or `tracker/`. No text lets a scan stand for or count as a signature, except the open question in TD-592.
+  - **TD-592.** It is now `kind: decision` and asks the user plainly whether a scan may ever count as the client co-sign. If yes, the proposal follows mode iii, with a PER-15 account, a provisional state that blocks approval, and confirmation in the client's own account. The planner default until decided is "no", which is consistent with R1a.
+
+- _Round 1 suggestions: all taken and correct_
+  - **`skipped` (`quality-and-inspection.md:1049-1051`).** Now defined as a non-opt-out reason, for example a notification-rule condition (TD-587). It is never a recipient's opt-out, which is consistent with the TD-549 decision.
+  - **TD-238.** Has a note pointing to TD-587.
+  - **T-0312.** The two criteria are merged into one, with no loss: the role list, self-verify, self-close and `allow_self_approval` are all kept.
+  - **Diff §4.11 change cards.**
+    - Undo is limited to field values. Transitions and attested sign-offs use the owning workflow's reverse or void path.
+    - A watchdog or scheduled card names the operation as the requester, and a person must still Apply it.
+    - Apply, Reject, Undo and edit stay available while AI is fail-closed, and only new proposals fail closed. This is consistent with TD-545 and the human-confirmation rule.
+  - **TD-595.** `DynamicForm.tsx` and `RegisterPage.tsx` are now listed, and the note about the unchecked state is added.
+  - **T-0351.** The docs criterion is narrowed to `docs/WORKFLOW.md` plus `docs/security/`. The CI change is still additive only.
+
+- _Must fix_
+  None.
+
+- _Suggestions (non-blocking)_
+  - None new.
+  KERP-REVIEW: APPROVED patch-id=9caff72826502ca00ae3365625f0eb98f0ccf8d3
+  ---
+  _Generated by [Claude Code](https://claude.ai/code)_
 
 ---
 
