@@ -36,13 +36,11 @@ from fastapi import (
     status,
 )
 
-from app.core.auth.bearer import AUTH_UNAVAILABLE
 from app.core.auth.deps import CurrentPrincipal, get_auth_service, unauthorized
 from app.core.auth.device_signal import DEVICE_HEADER, request_device_id
 from app.core.auth.lockout import LockedOutError
 from app.core.auth.post_auth import invite_reference
 from app.core.auth.providers import PasswordCredentials
-from app.core.auth.revocation import RevocationUnavailableError
 from app.core.auth.runtime import AuthRuntime, get_auth_runtime
 from app.core.auth.schemas import (
     JsonWebKeySet,
@@ -182,10 +180,6 @@ _DEVICE_REVOKED_RESPONSE: Final[dict[int | str, dict[str, Any]]] = {
 }
 
 
-def _unavailable() -> HTTPException:
-    return HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, AUTH_UNAVAILABLE)
-
-
 @router.get(JWKS_PATH, response_model=JsonWebKeySet, response_model_exclude_none=True)
 def jwks(runtime: RuntimeDep, response: Response) -> JsonWebKeySet:
     """Public keys that verify KERP tokens (RFC 7517). Contains no private material."""
@@ -252,8 +246,6 @@ def login(
         raise unauthorized() from exc
     except LockedOutError as exc:
         raise _locked(exc) from exc
-    except RevocationUnavailableError as exc:
-        raise _unavailable() from exc
     return token_response(pair, response, native=native_app_origin(request, runtime.settings))
 
 
@@ -283,8 +275,6 @@ def request_magic_link(
         )
     except LockedOutError as exc:
         raise _locked(exc) from exc
-    except RevocationUnavailableError as exc:
-        raise _unavailable() from exc
     if job is not None:
         tasks.add_task(service.issue_magic_link, database, job)
 
@@ -314,8 +304,6 @@ def redeem_magic_link(
         )
     except AuthenticationError as exc:
         raise unauthorized(invalid_token=True) from exc
-    except RevocationUnavailableError as exc:
-        raise _unavailable() from exc
     return token_response(pair, response, native=native_app_origin(request, runtime.settings))
 
 
@@ -358,8 +346,6 @@ def pin_unlock(
         raise unauthorized(invalid_token=True) from exc
     except LockedOutError as exc:
         raise _locked(exc) from exc
-    except RevocationUnavailableError as exc:
-        raise _unavailable() from exc
     return token_response(pair, response, native=credential.native)
 
 
@@ -392,18 +378,13 @@ def refresh(
         pair = service.refresh(session, credential.token, device_id=request_device_id(request))
     except AuthenticationError as exc:
         raise unauthorized(invalid_token=True) from exc
-    except RevocationUnavailableError as exc:
-        raise _unavailable() from exc
     return token_response(pair, response, native=credential.native)
 
 
 @router.post(f"{PREFIX}/logout", status_code=status.HTTP_204_NO_CONTENT)
 def logout(principal: CurrentPrincipal, service: AuthServiceDep, response: Response) -> None:
     """Revoke this access token and every token of its login session; clear the cookie."""
-    try:
-        service.logout(principal.claims)
-    except RevocationUnavailableError as exc:
-        raise _unavailable() from exc
+    service.logout(principal.claims)
     _clear_refresh_cookie(response)
 
 

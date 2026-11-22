@@ -22,6 +22,12 @@ from app.core.auth.device_signal import (
 )
 from app.core.auth.field import PinGateError, pin_gate_handler
 from app.core.auth.password_reset_router import router as password_reset_router
+from app.core.auth.revocation import (
+    REDIS_OUTAGE_ERRORS,
+    RevocationUnavailableError,
+    redis_unavailable_handler,
+    revocation_unavailable_handler,
+)
 from app.core.auth.router import router as auth_router
 from app.core.auth.runtime import app_auth_runtime, check_startup_config, close_auth_runtime
 from app.core.auth.sso_router import router as sso_router
@@ -157,6 +163,11 @@ def create_app(
     app.add_exception_handler(DeviceRevokedError, device_revoked_handler)
     app.add_exception_handler(PinGateError, pin_gate_handler)
     app.add_exception_handler(InvalidDeviceHeaderError, invalid_device_header_handler)
+    # Store outages fail closed with one 503 body, wherever they are raised (T-0349, TD-290);
+    # a raw Redis connection/timeout error is 503 too, not a generic 500 (TD-525).
+    app.add_exception_handler(RevocationUnavailableError, revocation_unavailable_handler)
+    for error in REDIS_OUTAGE_ERRORS:
+        app.add_exception_handler(error, redis_unavailable_handler)
 
     app.include_router(health_router)
     app.include_router(auth_router)  # core auth + JWKS (T-0008)

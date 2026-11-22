@@ -28,7 +28,11 @@ from app.core.auth.access import Persona, load_grants
 from app.core.auth.device_signal import DEVICE_HEADER
 from app.core.auth.keys import AuthConfigError
 from app.core.auth.models import DEVICE_ACTIVE, DEVICE_REVOKED, Device, ProjectMembership, User
-from app.core.auth.revocation import InMemoryRevocationStore, RedisRevocationStore
+from app.core.auth.revocation import (
+    AUTH_UNAVAILABLE,
+    InMemoryRevocationStore,
+    RedisRevocationStore,
+)
 from app.core.auth.router import REFRESH_COOKIE
 from app.core.auth.runtime import AuthRuntime, check_startup_config
 from app.core.auth.sso_router import PREAUTH_COOKIE
@@ -420,6 +424,7 @@ def test_the_start_limit_fails_closed_without_the_store(tmp_path: Path, db: Data
     with harness.client:
         response = harness.client.get(START, follow_redirects=False)
     assert response.status_code == 503
+    assert response.json() == {"detail": AUTH_UNAVAILABLE}  # the app-wide body (T-0349)
 
 
 # --- the happy path ---------------------------------------------------------------------

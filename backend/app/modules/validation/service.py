@@ -23,7 +23,6 @@ per-record override of a blocked check (Amendment A, T-0035) is in ``overrides.p
 
 from __future__ import annotations
 
-import dataclasses
 import json
 import logging
 import re
@@ -33,7 +32,7 @@ from functools import cache
 from typing import TYPE_CHECKING, Any, Final, cast
 
 from sqlalchemy import ColumnElement, or_, select, update
-from sqlalchemy.exc import IntegrityError, OperationalError, SQLAlchemyError
+from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.audit import service as audit
@@ -42,7 +41,8 @@ from app.core.db import SIDE_WRITE_DB_KEY, Database, utcnow
 from app.core.module_loader import service as module_settings
 from app.core.module_loader.loader import discover_modules
 from app.core.tenancy.context import TenancyContext
-from app.core.tenancy.rls import SESSION_INFO_KEY, bind_tenancy, session_tenancy
+from app.core.tenancy.rebind import project_binding
+from app.core.tenancy.rls import bind_tenancy, session_tenancy
 from app.core.tenancy.scope import OutOfScopeError, get_or_404
 from app.modules.projects import service as projects
 from app.modules.validation import overrides
@@ -657,7 +657,7 @@ def seed_project(
     context = _tenant_context(session)
     enabled = _default_enabled_modules()
     actor = actor_id or context.user_id
-    with _ProjectBinding(session, context, project_id):
+    with project_binding(session, project_id):
         return _copy_to_project(
             session, lambda s: s.module is None or s.module in enabled, source_pack, actor
         )
@@ -1011,40 +1011,6 @@ def _copy_to_project(
         and wanted(tenant_set)
         and tenant_set.source_pack in (None, source_pack)
     ]
-
-
-class _ProjectBinding:
-    """Re-bind a tenant-level session to one project for a copy, then back (same transaction).
-
-    ``bind_tenancy`` refuses to switch a session holding objects, so they are flushed,
-    detached, and re-attached once the session is back in the tenant scope.
-    """
-
-    def __init__(self, session: Session, context: TenancyContext, project_id: uuid.UUID) -> None:
-        self.session, self.context = session, context
-        self.project = dataclasses.replace(context, project_id=project_id)
-        self.held: list[object] = []
-
-    def __enter__(self) -> None:
-        self.session.flush()
-        self.held = list(self.session.identity_map.values())
-        self.session.expunge_all()
-        bind_tenancy(self.session, self.project)
-
-    def __exit__(self, exc_type: object, *_exc: object) -> None:
-        if exc_type is None:
-            self.session.flush()
-        self.session.expunge_all()
-        if exc_type is None:
-            bind_tenancy(self.session, self.context)
-        else:
-            try:
-                bind_tenancy(self.session, self.context)
-            except SQLAlchemyError:
-                # The transaction is already failed (it will be rolled back): restore the
-                # scope on the session without touching the connection.
-                self.session.info[SESSION_INFO_KEY] = self.context
-        self.session.add_all(self.held)
 
 
 @cache  # module manifests are static for the life of the process, so discover them once

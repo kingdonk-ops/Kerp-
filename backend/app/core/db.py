@@ -50,7 +50,7 @@ from sqlalchemy.orm import (
 from sqlalchemy.types import TypeEngine
 
 from app.core.config import Settings, get_settings
-from app.core.tenancy.context import TenancyContext, get_tenancy_context, use_tenancy
+from app.core.tenancy.context import TenancyContext, get_tenancy_context
 from app.core.tenancy.rls import bind_tenancy, install_pool_reset
 
 # Deterministic constraint names, so Alembic autogenerate produces stable diffs.
@@ -394,9 +394,9 @@ class Database:
         """A bound unit of work outside a request: SAQ jobs, scripts, service calls.
 
         A job never inherits the enqueuing request's context; it binds the tenant and
-        project recorded on the job explicitly. The context variables are set too.
+        project recorded on the job explicitly.
         """
-        with use_tenancy(tenancy), contextmanager(self.session)(tenancy) as session:
+        with contextmanager(self.session)(tenancy) as session:
             yield session
 
     def dispose(self) -> None:

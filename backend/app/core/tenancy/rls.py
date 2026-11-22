@@ -609,6 +609,18 @@ def session_tenancy(session: Session) -> TenancyContext | None:
     return context
 
 
+def tenant_level_context(session: Session, what: str) -> TenancyContext:
+    """The context of a session bound tenant-level (no project); ``RuntimeError`` otherwise.
+
+    ``what`` names the caller in the error (``"<what> needs a tenant-level bound session"``):
+    an unbound or project-bound session reaching tenant-level work is a programming error.
+    """
+    context = session_tenancy(session)
+    if context is None or context.project_id is not None:
+        raise RuntimeError(f"{what} needs a tenant-level bound session")
+    return context
+
+
 def bind_connection(connection: Connection, context: TenancyContext | None) -> None:
     """Bind the current transaction of a Core ``connection`` (``SET LOCAL`` semantics).
 

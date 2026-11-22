@@ -195,6 +195,18 @@ rows with `tests/db_support.seed_tenants` (synthetic ids only).
   loaded objects or pending changes to a *different* context, because `session.get` would
   hand out identity-map objects of the old scope without SQL. Commit and `expunge_all()`
   first, or use a new session (`unit_of_work`) per tenant/project batch.
+- **Another scope for one block, same transaction** (`rebind.py`, T-0349): `with
+  project_binding(session, project_id):` binds a tenant-level session to one project and back
+  (the caller's site filter and everything else kept); `SessionRebinding(session, target)` does
+  the same for any target (the invite module's narrow system path subclasses it). The session's
+  objects are flushed, detached and re-attached. Leaving the block always restores the caller's
+  scope: also when the block or its closing flush fails. A restore that fails on a *failed*
+  transaction puts the scope back on the session only (the rollback makes the connection
+  agree); on a good transaction it propagates, so the unit of work rolls back instead of
+  running on with the connection still in the target scope.
+- **Tenant-level work:** `tenant_level_context(session, what)` (`rls.py`) returns the session's
+  context when it is bound tenant-level (no project) and raises `RuntimeError("<what> needs a
+  tenant-level bound session")` otherwise.
 
 ## Reads, writes, 404
 

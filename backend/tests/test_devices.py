@@ -32,6 +32,7 @@ from app.core.auth.field import MAGIC_LINK_TTL
 from app.core.auth.lockout import WIPE_CONFIRM_POLICY
 from app.core.auth.models import DEVICE_TABLE, Device, ProjectMembership
 from app.core.auth.revocation import (
+    AUTH_UNAVAILABLE,
     InMemoryRevocationStore,
     RedisRevocationStore,
     RevocationUnavailableError,
@@ -40,6 +41,7 @@ from app.core.auth.runtime import AuthRuntime
 from app.core.db import Base, Database, contract_violations, utcnow
 from app.core.tenancy.context import TenancyContext
 from app.core.tenancy.rls import POLICY_NAMES, expected_policy_names, rls_tables
+from app.core.timestamps import aware_utc
 from app.modules.admin import service as admin_service
 from app.modules.projects import service as projects
 from app.modules.projects.schemas import ProjectCreate
@@ -298,7 +300,7 @@ def test_requests_through_a_device_update_last_seen(api: Api) -> None:
         assert row is not None
         row.last_seen_at = utcnow() - timedelta(hours=2)
     assert api.client.get(ME, headers=api.bearer(tokens)).status_code == 200
-    assert utcnow() - devices._aware(api.row(device).last_seen_at) < timedelta(minutes=1)
+    assert utcnow() - aware_utc(api.row(device).last_seen_at) < timedelta(minutes=1)
 
 
 def test_last_seen_is_written_at_most_once_a_minute() -> None:
@@ -547,7 +549,8 @@ def test_a_failed_session_kill_after_the_commit_still_refuses_the_device(
         raise RevocationUnavailableError("synthetic outage")
 
     monkeypatch.setattr(api.runtime.store, "revoke_device", unavailable)
-    assert api.revoke(admin, device).status_code == 500  # 503 mapping: TD-290
+    failed = api.revoke(admin, device)
+    assert (failed.status_code, failed.json()) == (503, {"detail": AUTH_UNAVAILABLE})  # TD-290
     monkeypatch.undo()
     assert api.row(device).status == "revoked"  # committed before the kill
     (entry,) = [e for e in api.chain(f"device:{device}") if e["action"] == "revoke"]
@@ -557,6 +560,41 @@ def test_a_failed_session_kill_after_the_commit_still_refuses_the_device(
     assert api.revoke(admin, device).status_code == 200
     assert api.runtime.store.device_session_count(device) == 0
     assert [e["action"] for e in api.chain(f"device:{device}")] == ["enrol", "revoke"]
+
+
+def test_enrolment_answers_503_while_the_store_is_down(
+    api: Api, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """TD-290: the device endpoints answer a store outage with the app-wide 503 (T-0349)."""
+    tokens = api.login(GREG)
+
+    def unavailable(*_args: Any, **_kwargs: Any) -> None:
+        raise RevocationUnavailableError("synthetic outage")
+
+    monkeypatch.setattr(api.runtime.store, "bind_device", unavailable)
+    device = uuid.uuid4()
+    response = api.enrol(tokens, device)
+    monkeypatch.undo()
+    assert (response.status_code, response.json()) == (503, {"detail": AUTH_UNAVAILABLE})
+    with api.db.unit_of_work(ROOT) as s:
+        assert devices.find_device(s, device) is None  # rolled back with the request
+
+
+def test_resolving_the_request_device_answers_503_while_the_store_is_down(
+    api: Api, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """TD-290: ``resolve_request_device`` reads the session's binding from the store; an
+    outage there is the app-wide 503, never a 500 and never "no device" (T-0349)."""
+    tokens, device = api.device_on(GREG)
+
+    def unavailable(*_args: Any, **_kwargs: Any) -> None:
+        raise RevocationUnavailableError("synthetic outage")
+
+    monkeypatch.setattr(api.runtime.store, "session_device", unavailable)
+    response = api.client.get(ME, headers=api.bearer(tokens, device))
+    monkeypatch.undo()
+    assert (response.status_code, response.json()) == (503, {"detail": AUTH_UNAVAILABLE})
+    assert api.client.get(ME, headers=api.bearer(tokens, device)).status_code == 200
 
 
 def test_any_later_call_from_the_revoked_device_is_device_revoked(api: Api) -> None:

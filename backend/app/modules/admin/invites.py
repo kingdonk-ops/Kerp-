@@ -52,18 +52,17 @@ password or an e-mail address: the invitee is named by account id.
 from __future__ import annotations
 
 import dataclasses
-import hashlib
 import logging
 import math
 import secrets
 import uuid
 from collections.abc import Collection, Iterable
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from typing import Any, Final, cast
 
 from sqlalchemy import CursorResult, select, update
-from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.audit import service as audit
@@ -75,12 +74,15 @@ from app.core.auth.models import User, normalize_email
 from app.core.auth.password_policy import PasswordPolicyError
 from app.core.auth.post_auth import PostAuthOutcome, register_post_authentication_hook
 from app.core.db import utcnow
+from app.core.digest import sha256_hex
 from app.core.mail.addresses import InvalidAddressError
 from app.core.mail.service import send_mail
 from app.core.mail.templates import MailTemplate, TemplateError, register_template
 from app.core.tenancy.context import TenancyContext
-from app.core.tenancy.rls import SESSION_INFO_KEY, bind_tenancy, session_tenancy
+from app.core.tenancy.rebind import SessionRebinding
+from app.core.tenancy.rls import bind_tenancy, session_tenancy
 from app.core.tenancy.scope import OutOfScopeError
+from app.core.timestamps import aware_utc
 from app.modules.admin import service as admin
 from app.modules.admin.models import (
     INVITE_ACCEPTED,
@@ -233,14 +235,8 @@ class SetupPreview:
     project_name: str | None = None
 
 
-def token_digest(token: str) -> str:
-    """The only form of an invite token that is ever stored or carried: its SHA-256."""
-    return hashlib.sha256(token.encode()).hexdigest()
-
-
-def _aware(moment: datetime) -> datetime:
-    """SQLite hands ``TIMESTAMPTZ`` back naive; every value was stored in UTC."""
-    return moment if moment.tzinfo is not None else moment.replace(tzinfo=UTC)
+# The only form of an invite token that is ever stored or carried: its SHA-256.
+token_digest = sha256_hex
 
 
 def _context(session: Session) -> TenancyContext:
@@ -251,7 +247,7 @@ def _context(session: Session) -> TenancyContext:
 
 
 def _effective_status(invite: ProjectInvite, now: datetime) -> str:
-    if invite.status == INVITE_PENDING and _aware(invite.expires_at) <= now:
+    if invite.status == INVITE_PENDING and aware_utc(invite.expires_at) <= now:
         return INVITE_EXPIRED
     return invite.status
 
@@ -326,7 +322,7 @@ def _key_rows(session: Session, project_id: uuid.UUID, email: str) -> list[Proje
 
 
 def _recent_sends(rows: Iterable[ProjectInvite], now: datetime) -> list[datetime]:
-    sends = (_aware(datetime.fromisoformat(stamp)) for row in rows for stamp in row.sent_at)
+    sends = (aware_utc(datetime.fromisoformat(stamp)) for row in rows for stamp in row.sent_at)
     return sorted(moment for moment in sends if now - moment < SEND_WINDOW)
 
 
@@ -373,7 +369,7 @@ def _queue_invite_mail(
         "project_code": project.code,
         "project_name": _one_line(project.name),
         "inviter_name": _one_line(name) or UNKNOWN_INVITER,
-        "expires_at": _aware(invite.expires_at).strftime("%Y-%m-%d %H:%M UTC"),
+        "expires_at": aware_utc(invite.expires_at).strftime("%Y-%m-%d %H:%M UTC"),
         "link_token": f"{token}.{setup_token}",
     }
     try:
@@ -590,7 +586,7 @@ def resend_invite(
         invite,
         "resend",
         actor_id,
-        expires_at=_aware(invite.expires_at).isoformat(),
+        expires_at=aware_utc(invite.expires_at).isoformat(),
         email_queued=_queue_invite_mail(session, invite, token, setup_token, actor_id),
     )
     return IssuedInvite(InviteEntry(invite, INVITE_PENDING, _next_send_at(rows, now)), token)
@@ -599,38 +595,18 @@ def resend_invite(
 # --- the invitee's side: the narrow system path ---------------------------------------------
 
 
-class _SystemPath:
+class _SystemPath(SessionRebinding):
     """Re-bind the session with ``is_system_admin`` for the narrow invite lookup, and back.
 
     The invite policy shows a row only to its project's administrators; the invitee reaches
-    exactly one row, by token hash. ``bind_tenancy`` refuses to switch a session that holds
-    objects, so they are flushed, detached and re-attached (the pattern of the access-request
-    notifications). The caller's own context is restored even when the block raises.
+    exactly one row, by token hash. The session's objects are flushed, detached and
+    re-attached, and the caller's own context is restored even when the block raises
+    (``core.tenancy.rebind``).
     """
 
     def __init__(self, session: Session, user_id: uuid.UUID | None) -> None:
-        self.session = session
-        self.context = _context(session)
-        self.elevated = dataclasses.replace(self.context, user_id=user_id, is_system_admin=True)
-        self.held: list[object] = []
-
-    def __enter__(self) -> None:
-        self.session.flush()
-        self.held = list(self.session.identity_map.values())
-        self.session.expunge_all()
-        bind_tenancy(self.session, self.elevated)
-
-    def __exit__(self, exc_type: object, *_exc: object) -> None:
-        try:
-            if exc_type is None:
-                self.session.flush()
-        finally:  # a failing flush never leaves the session elevated
-            self.session.expunge_all()
-            try:
-                bind_tenancy(self.session, self.context)
-            except SQLAlchemyError:  # pragma: no cover - the transaction failed, rolls back
-                self.session.info[SESSION_INFO_KEY] = self.context
-            self.session.add_all(self.held)
+        elevated = dataclasses.replace(_context(session), user_id=user_id, is_system_admin=True)
+        super().__init__(session, elevated)
 
 
 @dataclass(frozen=True, slots=True)

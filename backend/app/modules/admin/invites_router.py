@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import replace
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 from typing import Annotated, Any, Final
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
@@ -39,17 +39,16 @@ from app.core.auth.access import (
     Grant,
     project_access,
 )
-from app.core.auth.bearer import AUTH_UNAVAILABLE
 from app.core.auth.deps import CurrentPrincipal, get_auth_service
 from app.core.auth.device_signal import DEVICE_HEADER, request_device_id
 from app.core.auth.password_policy import PasswordPolicyError
 from app.core.auth.post_auth import PostAuthOutcome
-from app.core.auth.revocation import RevocationUnavailableError
 from app.core.auth.router import native_app_origin, token_response
 from app.core.auth.runtime import AuthRuntime, get_auth_runtime
 from app.core.auth.schemas import TokenResponse
 from app.core.auth.service import AuthService
 from app.core.db import DbSession, utcnow
+from app.core.timestamps import aware_utc
 from app.modules.admin import invites, service
 from app.modules.admin.schemas import (
     GrantRead,
@@ -117,11 +116,6 @@ def _rate_limited(exc: invites.InviteRateLimitedError) -> HTTPException:
     )
 
 
-def _utc(moment: datetime) -> datetime:
-    """SQLite hands ``TIMESTAMPTZ`` back naive; every value was stored in UTC."""
-    return moment if moment.tzinfo is not None else moment.replace(tzinfo=UTC)
-
-
 def _read(entry: invites.InviteEntry) -> dict[str, Any]:
     invite = entry.invite
     return {
@@ -129,8 +123,8 @@ def _read(entry: invites.InviteEntry) -> dict[str, Any]:
         "email": invite.invited_email,
         "grants": [GrantRead.model_validate(g) for g in invite.grants],
         "status": entry.status,
-        "expires_at": _utc(invite.expires_at),
-        "last_sent_at": _utc(invite.last_sent_at),
+        "expires_at": aware_utc(invite.expires_at),
+        "last_sent_at": aware_utc(invite.last_sent_at),
         "resend_available_at": entry.resend_available_at,
     }
 
@@ -473,7 +467,5 @@ def accept_with_password(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             headers={"Cache-Control": "no-store"},
         )
-    except RevocationUnavailableError as exc:
-        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, AUTH_UNAVAILABLE) from exc
     signed_in = replace(pair, invite=PostAuthOutcome(joined_project_id=joined))
     return token_response(signed_in, response, native=native_app_origin(request, runtime.settings))

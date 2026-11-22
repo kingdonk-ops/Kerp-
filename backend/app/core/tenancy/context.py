@@ -10,8 +10,6 @@ request session is unbound; on PostgreSQL an unbound session sees no RLS-protect
 from __future__ import annotations
 
 import uuid
-from collections.abc import Iterator
-from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import Annotated
@@ -73,26 +71,9 @@ class TenancyContext:
         return self.readable_project_ids | self.member_project_ids
 
 
-current_tenant_id: ContextVar[uuid.UUID | None] = ContextVar("current_tenant_id", default=None)
-current_project_id: ContextVar[uuid.UUID | None] = ContextVar("current_project_id", default=None)
-current_user_id: ContextVar[uuid.UUID | None] = ContextVar("current_user_id", default=None)
 # The enrolled field device a request comes through (T-0043): set at authentication from the
 # session's device binding, never from the request alone. The audit ledger records it.
 current_device_id: ContextVar[uuid.UUID | None] = ContextVar("current_device_id", default=None)
-
-
-@contextmanager
-def use_tenancy(context: TenancyContext) -> Iterator[TenancyContext]:
-    """Set the context variables for the duration of a block (workers, scripts)."""
-    tenant_token = current_tenant_id.set(context.tenant_id)
-    project_token = current_project_id.set(context.project_id)
-    user_token = current_user_id.set(context.user_id)
-    try:
-        yield context
-    finally:
-        current_user_id.reset(user_token)
-        current_project_id.reset(project_token)
-        current_tenant_id.reset(tenant_token)
 
 
 def get_tenancy_context(

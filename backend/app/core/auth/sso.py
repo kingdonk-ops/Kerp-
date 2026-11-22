@@ -21,7 +21,6 @@ native exchange codes, the ``acct_claim_missing`` health marker, and the audit t
 
 from __future__ import annotations
 
-import hashlib
 import json
 import secrets
 import time
@@ -34,6 +33,7 @@ from sqlalchemy.orm import Session
 
 from app.core.audit import service as audit
 from app.core.auth.revocation import RevocationStore
+from app.core.digest import sha256_hex
 
 STATE_TTL: Final = timedelta(minutes=10)
 EXCHANGE_CODE_TTL: Final = timedelta(seconds=60)
@@ -47,8 +47,7 @@ SECRET_BYTES: Final = 32
 ACCT_MISSING_WARNING: Final = "sso_acct_claim_missing"
 
 
-def digest(value: str) -> str:
-    return hashlib.sha256(value.encode()).hexdigest()
+digest = sha256_hex
 
 
 def new_secret() -> str:

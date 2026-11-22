@@ -57,7 +57,6 @@ from app.core.auth.access import (
     load_grants,
     user_has_projects_beyond,
 )
-from app.core.auth.bearer import AUTH_UNAVAILABLE
 from app.core.auth.deps import CurrentPrincipal, get_auth_service
 from app.core.auth.field import fresh_sign_in_required
 from app.core.auth.lockout import WIPE_CONFIRM_POLICY, LockedOutError, ProgressiveLockout
@@ -280,10 +279,7 @@ def change_pin(
     claims = principal.claims
     if device_id not in (claims.device_id, runtime.store.session_device(claims.session_id)):
         raise _forbidden()
-    try:
-        exhausted = service.pin_at_limit(principal.tenant_id, device_id)
-    except RevocationUnavailableError as exc:
-        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, AUTH_UNAVAILABLE) from exc
+    exhausted = service.pin_at_limit(principal.tenant_id, device_id)
     if exhausted and not service.is_fresh_sign_in(claims):
         return fresh_sign_in_required()
     devices.set_pin(session, device, hash_password(body.pin), actor_id=principal.user_id)
@@ -445,8 +441,6 @@ def wipe_confirmed(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             headers={"Retry-After": str(exc.retry_after)},
         )
-    except RevocationUnavailableError as exc:
-        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, AUTH_UNAVAILABLE) from exc
     tenant = runtime.settings.default_tenant_id
     if tenant is None:
         return JSONResponse(WIPE_REFUSED_BODY, status_code=WIPE_REFUSED_STATUS)

@@ -24,7 +24,7 @@ from app.core.auth.runtime import AuthRuntime, get_auth_runtime
 from app.core.auth.service import AuthenticationError, AuthService, load_active_user
 from app.core.auth.tokens import TokenClaims
 from app.core.db import Database, DbSession
-from app.core.tenancy.context import current_device_id, current_tenant_id, current_user_id
+from app.core.tenancy.context import current_device_id
 
 
 def unauthorized(*, invalid_token: bool = False) -> HTTPException:
@@ -106,13 +106,11 @@ def get_current_user(
 async def get_principal(
     principal: Annotated[Principal, Depends(get_current_user)],
 ) -> Principal:
-    """Require authentication; also publish the tenant/user/device in the request's context vars.
+    """Require authentication; also publish the device in the request's context var.
 
-    Async on purpose: it runs in the request's own context, so the values are visible to
-    the endpoint (sync dependencies run in a copied context and their writes are lost).
+    Async on purpose: it runs in the request's own context, so the value is visible to the
+    endpoint (sync dependencies run in a copied context and their writes are lost).
     """
-    current_tenant_id.set(principal.tenant_id)
-    current_user_id.set(principal.user_id)
     current_device_id.set(principal.device_id)
     return principal
 

@@ -23,7 +23,7 @@ from app.core.config import Settings
 from app.core.db import Database, utcnow
 from app.core.stats.registry import register_stats_provider
 from app.core.tenancy.context import TenancyContext
-from app.core.tenancy.rls import session_tenancy
+from app.core.tenancy.rls import session_tenancy, tenant_level_context
 from app.core.tenancy.scope import OutOfScopeError, get_or_404
 from app.modules.jobs.service import CONSOLE_CHAIN, JOB_REGISTRY, create_job, job_status
 from app.modules.projects import service as projects
@@ -451,6 +451,8 @@ def schedule_sweep(session: Session, *, actor_id: uuid.UUID | None = None) -> Jo
 # The statuses the monitor shows: still in the check, refused, or never completed.
 MONITORED_STATUSES: Final = ("verifying", "rejected", "expired")
 MAX_QUARANTINE_LIST: Final = 200
+# Who needs the tenant-level session, named in the error when it is not one (T-0349).
+_MONITOR: Final = "the quarantine monitor"
 
 
 @dataclass(frozen=True, slots=True)
@@ -492,14 +494,6 @@ class QuarantineCount:
     count: int
 
 
-def _console_tenant(session: Session) -> uuid.UUID:
-    """The tenant of the caller's tenant-level request session (checked before any write)."""
-    context = session_tenancy(session)
-    if context is None or context.project_id is not None:
-        raise RuntimeError("the quarantine monitor needs a tenant-level bound session")
-    return context.tenant_id
-
-
 def _monitor_filters(
     statuses: Collection[str] | None, reason: str | None, project_id: uuid.UUID | None
 ) -> list[Any]:
@@ -535,7 +529,7 @@ def quarantine_files(
     ``object_deleted`` is set; there is no purge. A project soft-deleted since keeps its
     rows, without a code. Reason codes are passed through, never enumerated (T-0169).
     """
-    _console_tenant(session)
+    tenant_level_context(session, _MONITOR)  # checked before any read
     filters = _monitor_filters(statuses, reason, project_id)
     total = session.scalar(select(func.count()).select_from(UploadedFile).where(*filters)) or 0
     rows = list(
@@ -584,7 +578,7 @@ def quarantine_counts(
     A ``GROUP BY`` under the same normal RLS as ``quarantine_files``; no ``SECURITY DEFINER``
     function (ADR 0016). Sorted by project code, status and reason.
     """
-    _console_tenant(session)
+    tenant_level_context(session, _MONITOR)  # checked before any read
     rows = session.execute(
         select(
             UploadedFile.project_id,
@@ -619,7 +613,7 @@ def _console_audit(
     # failed commit of the request session leaves the action unaudited (TD-455).
     audit.append(
         session,
-        CONSOLE_CHAIN.format(tenant_id=_console_tenant(session)),
+        CONSOLE_CHAIN.format(tenant_id=tenant_level_context(session, _MONITOR).tenant_id),
         {"event": event, **payload},
         actor_id=actor_id,
         source="api",
@@ -655,7 +649,7 @@ def recheck_upload(
     ``storage`` defaults to the configured object store.
     """
     storage = storage or get_storage()
-    tenant_id = _console_tenant(session)
+    tenant_id = tenant_level_context(session, _MONITOR).tenant_id
     file = get_or_404(session, UploadedFile, file_id)
     if file.tenant_id != tenant_id or file.project_id is None:  # defence in depth
         raise OutOfScopeError("UploadedFile not found")
@@ -696,7 +690,7 @@ def queue_project_sweep(
     every project of its tenant, ADR 0016), else ``OutOfScopeError`` (404). The job is created
     in the project's own scope and runs there, as the hourly sweep does (T-0215).
     """
-    tenant_id = _console_tenant(session)
+    tenant_id = tenant_level_context(session, _MONITOR).tenant_id
     project = projects.get_project(session, project_id)
     if project.tenant_id != tenant_id:  # defence in depth: RLS and the ORM scope hide it
         raise OutOfScopeError("Project not found")

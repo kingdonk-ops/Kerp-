@@ -48,12 +48,17 @@ short-lived values: ``pwreset:token:<sha256(token)>`` (JSON ``{uid, tid}``, take
 single use) and ``pwreset:user:<tid>:<uid>`` (the digest of the account's one live token),
 both with the link lifetime as TTL.
 
-Any store failure raises ``RevocationUnavailableError``; callers fail closed (503), they
-never treat an unreachable store as "not revoked" or "not locked".
+Any store failure raises ``RevocationUnavailableError``; callers fail closed, they never
+treat an unreachable store as "not revoked" or "not locked". Callers let it propagate: one
+app-wide handler (``revocation_unavailable_handler``, registered in ``app.main``) answers
+``503`` with ``{"detail": AUTH_UNAVAILABLE}`` wherever it is raised (T-0349, TD-290). A raw
+Redis connection or timeout error that escapes elsewhere gets the same status with
+``{"detail": REDIS_UNAVAILABLE}`` (``redis_unavailable_handler``, TD-525).
 """
 
 from __future__ import annotations
 
+import logging
 import math
 import threading
 import time
@@ -63,6 +68,8 @@ from datetime import timedelta
 from typing import Final, Protocol, cast
 
 import redis
+from fastapi import Request
+from fastapi.responses import JSONResponse
 
 KEY_PREFIX: Final = "kerp:auth:"
 # Optimistic-transaction retries in ``begin_attempt`` before giving up (fail closed). Each
@@ -71,8 +78,30 @@ KEY_PREFIX: Final = "kerp:auth:"
 MAX_ATTEMPT_RETRIES: Final = 32
 
 
+# The one body of a revocation-store outage, whichever endpoint hit it (T-0349).
+AUTH_UNAVAILABLE: Final = "Authentication temporarily unavailable"
+# The body of any other Redis outage that reaches the app (TD-525). Never the driver's
+# message: it can name the host.
+REDIS_UNAVAILABLE: Final = "Service temporarily unavailable"
+# The Redis errors that mean "unreachable right now"; any other Redis error is a bug (500).
+REDIS_OUTAGE_ERRORS: Final = (redis.ConnectionError, redis.TimeoutError)
+
+logger = logging.getLogger(__name__)
+
+
 class RevocationUnavailableError(RuntimeError):
     """The revocation store cannot be reached. Authentication must fail closed."""
+
+
+async def revocation_unavailable_handler(_request: Request, _exc: Exception) -> JSONResponse:
+    """App-wide: a revocation-store outage is ``503``, never "not revoked" and never 500."""
+    return JSONResponse({"detail": AUTH_UNAVAILABLE}, status_code=503)
+
+
+async def redis_unavailable_handler(_request: Request, exc: Exception) -> JSONResponse:
+    """App-wide: an unreachable Redis is ``503``, not a generic 500 (TD-525)."""
+    logger.warning("redis unavailable: %s", type(exc).__name__)
+    return JSONResponse({"detail": REDIS_UNAVAILABLE}, status_code=503)
 
 
 class RevocationStore(Protocol):

@@ -34,7 +34,6 @@ chain with the user id and a reason: never the token, the password or the e-mail
 
 from __future__ import annotations
 
-import hashlib
 import json
 import logging
 import secrets
@@ -63,6 +62,7 @@ from app.core.auth.password_policy import (
 from app.core.auth.runtime import AuthRuntime
 from app.core.auth.service import UNKNOWN_CLIENT, apply_checked_password
 from app.core.db import Database
+from app.core.digest import sha256_hex
 from app.core.tenancy.context import TenancyContext
 from app.core.tenancy.rls import bind_tenancy
 
@@ -84,9 +84,8 @@ def new_reset_token() -> str:
     return secrets.token_urlsafe(RESET_TOKEN_BYTES)
 
 
-def reset_digest(token: str) -> str:
-    """Only the SHA-256 of a reset token is stored: a store dump resets nobody's password."""
-    return hashlib.sha256(token.encode()).hexdigest()
+# Only the SHA-256 of a reset token is stored: a store dump resets nobody's password.
+reset_digest = sha256_hex
 
 
 def _token_key(digest: str) -> str:

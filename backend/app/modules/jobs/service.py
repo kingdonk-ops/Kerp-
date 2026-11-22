@@ -15,7 +15,7 @@ import re
 import uuid
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from typing import Any, Final
 
 from sqlalchemy import event, func, select, text
@@ -26,8 +26,9 @@ from app.core.db import Database, utcnow
 from app.core.request_context import get_request_id
 from app.core.stats.registry import register_stats_provider
 from app.core.tenancy.context import TenancyContext
-from app.core.tenancy.rls import session_tenancy
+from app.core.tenancy.rls import session_tenancy, tenant_level_context
 from app.core.tenancy.scope import OutOfScopeError, get_or_404, is_visible
+from app.core.timestamps import aware_utc
 from app.modules.jobs.broker import QUEUE_NAMES, JobBroker, JobRef, QueueMonitor
 from app.modules.jobs.models import MAX_TEXT, STATUSES, TABLE, Job
 from app.modules.jobs.registry import (
@@ -326,11 +327,6 @@ def _running_since(db: Database, scope: TenancyContext, cutoff: datetime) -> lis
         return list(session.scalars(query))
 
 
-def _aware(moment: datetime) -> datetime:
-    """SQLite hands back naive datetimes; every stored timestamp is UTC."""
-    return moment if moment.tzinfo is not None else moment.replace(tzinfo=UTC)
-
-
 def _recover(
     db: Database, scope: TenancyContext, job_id: uuid.UUID, attempts: int, max_attempts: int
 ) -> str | None:
@@ -364,7 +360,7 @@ async def _recover_running(
     for job in await asyncio.to_thread(_running_since, db, scope, moment - margin):
         job_kind = _kind(registry, job.kind)
         ref = _ref(job, job_kind)
-        started = _aware(job.started_at) if job.started_at is not None else moment
+        started = aware_utc(job.started_at) if job.started_at is not None else moment
         if started + timedelta(seconds=ref.timeout_s) + margin > moment:
             continue  # may still be running within its timeout
         if await broker.has_job(ref.queue, ref.key):
@@ -427,6 +423,9 @@ def _kind(registry: JobRegistry, kind: str) -> JobKind | None:
 CONSOLE_CHAIN: Final = "admin-system:{tenant_id}"
 ABORTED: Final = "Aborted by an administrator"
 MAX_FAILED_LIST: Final = 200
+# Who needs the tenant-level session, named in the error when it is not one (T-0349).
+_MONITOR: Final = "the queue monitor"
+_TENANT_JOB: Final = "a tenant-level job"
 _INTERNAL = re.compile(r"^Internal error \(([A-Za-z_][A-Za-z0-9_.]*)\)$")
 # Error texts the worker writes itself, by class (``worker.CANCELLED``, ``ABORTED``).
 _KNOWN_ERRORS: Final = {
@@ -581,21 +580,13 @@ def list_failed_jobs(session: Session, *, limit: int = 50, offset: int = 0) -> l
     ]
 
 
-def _console_tenant(session: Session) -> uuid.UUID:
-    """The tenant of the caller's tenant-level request session (checked before any write)."""
-    context = session_tenancy(session)
-    if context is None or context.project_id is not None:
-        raise RuntimeError("the queue monitor needs a tenant-level bound session")
-    return context.tenant_id
-
-
 def _visible_job(session: Session, job_id: uuid.UUID) -> Job:
     """The job if the caller's session shows it (normal RLS + ORM scope), else 404.
 
     This is the only gate before the write in the job's own scope: a job of a project outside
     the caller's read scope, or of another tenant, is ``OutOfScopeError`` (CLAUDE.md §6).
     """
-    tenant_id = _console_tenant(session)
+    tenant_id = tenant_level_context(session, _MONITOR).tenant_id
     job = get_job(session, job_id)
     if job.tenant_id != tenant_id:  # defence in depth: RLS and the ORM scope already hide it
         raise OutOfScopeError("Job not found")
@@ -607,7 +598,7 @@ def _console_audit(session: Session, event: str, job: Job, actor_id: uuid.UUID |
     # failed commit of the request session leaves the action unaudited (TD-455).
     audit.append(
         session,
-        CONSOLE_CHAIN.format(tenant_id=_console_tenant(session)),
+        CONSOLE_CHAIN.format(tenant_id=tenant_level_context(session, _MONITOR).tenant_id),
         {
             "event": event,
             "job_id": str(job.id),
@@ -685,13 +676,6 @@ def abort_job(
 _SQLITE_WRITE_LOCK: Final = text(f"UPDATE {TABLE} SET status = status WHERE 0")
 
 
-def _tenant_scope(session: Session) -> uuid.UUID:
-    context = session_tenancy(session)
-    if context is None or context.project_id is not None:
-        raise RuntimeError("a tenant-level job needs a tenant-level bound session")
-    return context.tenant_id
-
-
 def _tenant_jobs(session: Session, kind: str, statuses: Iterable[str]) -> Job | None:
     """The newest tenant-level job of ``kind`` in ``statuses`` of the session's own tenant.
 
@@ -700,7 +684,7 @@ def _tenant_jobs(session: Session, kind: str, statuses: Iterable[str]) -> Job | 
     query = (
         select(Job)
         .where(
-            Job.tenant_id == _tenant_scope(session),
+            Job.tenant_id == tenant_level_context(session, _TENANT_JOB).tenant_id,
             Job.project_id.is_(None),
             Job.kind == kind,
             Job.status.in_(list(statuses)),
@@ -721,7 +705,7 @@ def last_succeeded_job(session: Session, kind: str) -> Job | None:
     query = (
         select(Job)
         .where(
-            Job.tenant_id == _tenant_scope(session),
+            Job.tenant_id == tenant_level_context(session, _TENANT_JOB).tenant_id,
             Job.project_id.is_(None),
             Job.kind == kind,
             Job.status == "succeeded",
@@ -755,7 +739,7 @@ def create_single_run_job(
     Returns ``(job, created)``: the new job, or the pending one with ``created`` false. One
     run at a time per tenant and kind, also for concurrent callers (a transaction-scoped
     lock: PostgreSQL advisory lock, SQLite write lock)."""
-    _lock_kind(session, _tenant_scope(session), job_kind.kind)
+    _lock_kind(session, tenant_level_context(session, _TENANT_JOB).tenant_id, job_kind.kind)
     pending = pending_job(session, job_kind.kind)
     if pending is not None:
         return pending, False

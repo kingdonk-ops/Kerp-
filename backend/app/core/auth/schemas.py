@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Annotated, Final, Literal
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, field_validator
 
 from app.core.auth.field import MAX_OFFLINE_FAILURES, PIN_LENGTH, PIN_PATTERN, is_weak_pin
+from app.core.timestamps import aware_utc
 
 INVITE_TOKEN_MAX_LENGTH: Final = 512
 
@@ -288,10 +289,7 @@ class DeviceRead(BaseModel):
     )
     @classmethod
     def _utc(cls, value: datetime | None) -> datetime | None:
-        # SQLite hands TIMESTAMPTZ back naive; every value was stored in UTC.
-        if value is not None and value.tzinfo is None:
-            return value.replace(tzinfo=UTC)
-        return value
+        return None if value is None else aware_utc(value)
 
 
 class DeviceEnrolled(DeviceRead):

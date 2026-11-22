@@ -26,7 +26,7 @@ from app.core.config import Settings
 from app.core.db import Base, Database, contract_violations, utcnow
 from app.core.module_loader.loader import discover_modules, import_job_handlers
 from app.core.request_context import request_id_var
-from app.core.tenancy.context import TenancyContext, current_tenant_id
+from app.core.tenancy.context import TenancyContext
 from app.core.tenancy.rls import RLS_EXEMPT, rls_tables
 from app.main import create_app
 from app.modules.jobs import registry as registry_module
@@ -63,7 +63,7 @@ class RecordingBroker:
 
 async def echo(job: JobContext) -> dict[str, Any]:
     await job.update(50, "half way")
-    return {"echo": job.payload, "tenant": str(current_tenant_id.get())}
+    return {"echo": job.payload, "tenant": str(job.tenancy.tenant_id)}
 
 
 async def boom(job: JobContext) -> None:

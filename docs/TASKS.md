@@ -136,7 +136,7 @@
 | 🟦 | [T-0346](../tracker/tasks/T-0346.md) | Job, mail and upload reliability: requeue cancelled retryable jobs, recover stale running rows, expire stuck queued mail, single scan per upload, bounded SES timeouts | jobs | M | — |  |
 | 🟦 | [T-0347](../tracker/tasks/T-0347.md) | Validation unlock/version races and display-code refresh when the last template is cleared | validation | S | — |  |
 | 🟦 | [T-0348](../tracker/tasks/T-0348.md) | Pool-return reset in one round trip; batch the rule-drift report (with paging) and the saved-views list | platform | M | — |  |
-| ⬜ | [T-0349](../tracker/tasks/T-0349.md) | Remove duplicated helpers and dead code (sha256 hex, session binding, _aware/_utc, _unavailable → one 503 handler, tenant-scope helpers) | platform | M | T-0341, T-0342, T-0343, T-0344, T-0345, T-0346, T-0347, T-0348 |  |
+| 🟦 | [T-0349](../tracker/tasks/T-0349.md) | Remove duplicated helpers and dead code (sha256 hex, session binding, _aware/_utc, _unavailable → one 503 handler, tenant-scope helpers) | platform | M | T-0341, T-0342, T-0343, T-0344, T-0345, T-0346, T-0347, T-0348 |  |
 | ✅ | [T-0224](../tracker/tasks/T-0224.md) | Frontend: Admin → System console — deployment stats + health, queue monitor, upload quarantine | frontend | M | T-0026, T-0219, T-0218, T-0221 | #175 |
 | ▶ | [T-0225](../tracker/tasks/T-0225.md) | Frontend: Admin → System → Audit log (filters, verify chain, verify all) and legal-hold toggle on the project admin page | frontend | S | T-0026, T-0222, T-0223 |  |
 | ⬜ | [T-0229](../tracker/tasks/T-0229.md) | Frontend: Admin → Communications — broadcast composer, delivery stats and history, automated template editor | frontend | M | T-0026, T-0226, T-0227, T-0228 |  |

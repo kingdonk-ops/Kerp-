@@ -94,6 +94,7 @@ from app.core.db import Database, utcnow
 from app.core.tenancy.context import TenancyContext
 from app.core.tenancy.rls import bind_tenancy, session_tenancy
 from app.core.tenancy.scope import get_or_404
+from app.core.timestamps import aware_utc
 
 _logger = logging.getLogger("kerp.auth")
 
@@ -352,16 +353,11 @@ def set_user_password(
     return user
 
 
-def _aware(moment: datetime) -> datetime:
-    # SQLite hands TIMESTAMPTZ back naive; it was stored as UTC.
-    return moment if moment.tzinfo is not None else moment.replace(tzinfo=UTC)
-
-
 def _credential_state(user: User) -> tuple[str | None, datetime | None]:
     """What a password change changes, comparable before and after a re-read: the stamp is
     made aware, since SQLite hands back naive what was written aware in the same session."""
     changed = user.password_changed_at
-    return user.password_hash, _aware(changed) if changed is not None else None
+    return user.password_hash, aware_utc(changed) if changed is not None else None
 
 
 def token_predates_password_change(user: User, claims: TokenClaims) -> bool:
@@ -370,7 +366,7 @@ def token_predates_password_change(user: User, claims: TokenClaims) -> bool:
     it (e.g. the login right after ``set_password``) is accepted, even within one second."""
     if user.password_changed_at is None:
         return False
-    return claims.issued_at < _aware(user.password_changed_at)
+    return claims.issued_at < aware_utc(user.password_changed_at)
 
 
 def magic_link_predates_password_change(user: User, issued_at: object) -> bool:
@@ -385,7 +381,7 @@ def magic_link_predates_password_change(user: User, issued_at: object) -> bool:
         issued = datetime.fromtimestamp(issued_at, tz=UTC)
     else:
         issued = utcnow() - MAGIC_LINK_TTL
-    return issued < _aware(user.password_changed_at)
+    return issued < aware_utc(user.password_changed_at)
 
 
 def load_active_user(session: Session, claims: TokenClaims, *, for_update: bool = False) -> User:

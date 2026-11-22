@@ -40,7 +40,6 @@ from app.core.auth.device_signal import DeviceRevokedError, device_revoked_respo
 from app.core.auth.lockout import SSO_START_CLIENT_POLICY, LockedOutError, ProgressiveLockout
 from app.core.auth.models import User
 from app.core.auth.post_auth import invite_reference
-from app.core.auth.revocation import RevocationUnavailableError
 from app.core.auth.router import (
     PREFIX,
     TOO_MANY_ATTEMPTS,
@@ -94,10 +93,6 @@ router = APIRouter(tags=["auth"])
 
 RuntimeDep = Annotated[AuthRuntime, Depends(get_auth_runtime)]
 AuthServiceDep = Annotated[AuthService, Depends(get_auth_service)]
-
-
-def _unavailable() -> HTTPException:
-    return HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Authentication unavailable")
 
 
 def _enabled(runtime: AuthRuntime) -> tuple[EntraSso, uuid.UUID]:
@@ -269,8 +264,6 @@ def _count_start(runtime: AuthRuntime, request: Request, tenant: uuid.UUID) -> N
             TOO_MANY_ATTEMPTS,
             headers={"Retry-After": str(exc.retry_after)},
         ) from exc
-    except RevocationUnavailableError as exc:
-        raise _unavailable() from exc
 
 
 def _start(
@@ -297,10 +290,7 @@ def _start(
         device_id=str(device_id) if device_id is not None else None,
         app_challenge=app_challenge,
     )
-    try:
-        sso.put_state(runtime.store, state, entry)
-    except RevocationUnavailableError as exc:
-        raise _unavailable() from exc
+    sso.put_state(runtime.store, state, entry)
     query = urlencode(
         {
             "client_id": config.client_id,
@@ -382,8 +372,6 @@ def sso_callback(
         return _complete(session, runtime, service, entra_sso, tenant, entry, code)
     except entra.SsoRefusedError as refusal:
         return _refuse(session, runtime, refusal, entry, flow, fallback)
-    except RevocationUnavailableError as exc:
-        raise _unavailable() from exc
 
 
 def _complete(
@@ -516,39 +504,36 @@ def sso_exchange(
     if not native_app_origin(request, runtime.settings):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Cross-origin request refused")
     bind_tenancy(session, TenancyContext(tenant_id=tenant))
+    grant = sso.take_exchange_code(runtime.store, body.code)
+    if grant is None:
+        reused_by = sso.spent_code_user(runtime.store, body.code)
+        if reused_by is not None:
+            return _exchange_refused(session, EXCHANGE_CODE_REUSED, reused_by)
+        return _exchange_refused(session, EXCHANGE_CODE_UNKNOWN)
+    challenge = entra.pkce_challenge(body.verifier)
+    if not hmac.compare_digest(challenge.encode(), grant.app_challenge.encode()):
+        return _exchange_refused(session, EXCHANGE_VERIFIER_MISMATCH, grant.user_id)
+    if grant.device_id != str(body.device_id) or grant.tenant_id != str(tenant):
+        return _exchange_refused(session, EXCHANGE_DEVICE_MISMATCH, grant.user_id)
+    user_id = uuid.UUID(grant.user_id)
+    bind_tenancy(session, TenancyContext(tenant_id=tenant, user_id=user_id))
+    user = session.scalars(
+        select(User).where(User.id == user_id, User.tenant_id == tenant)
+    ).one_or_none()
+    if user is None or not user.is_active:
+        return _exchange_refused(session, entra.ACCOUNT_DEACTIVATED, grant.user_id)
     try:
-        grant = sso.take_exchange_code(runtime.store, body.code)
-        if grant is None:
-            reused_by = sso.spent_code_user(runtime.store, body.code)
-            if reused_by is not None:
-                return _exchange_refused(session, EXCHANGE_CODE_REUSED, reused_by)
-            return _exchange_refused(session, EXCHANGE_CODE_UNKNOWN)
-        challenge = entra.pkce_challenge(body.verifier)
-        if not hmac.compare_digest(challenge.encode(), grant.app_challenge.encode()):
-            return _exchange_refused(session, EXCHANGE_VERIFIER_MISMATCH, grant.user_id)
-        if grant.device_id != str(body.device_id) or grant.tenant_id != str(tenant):
-            return _exchange_refused(session, EXCHANGE_DEVICE_MISMATCH, grant.user_id)
-        user_id = uuid.UUID(grant.user_id)
-        bind_tenancy(session, TenancyContext(tenant_id=tenant, user_id=user_id))
-        user = session.scalars(
-            select(User).where(User.id == user_id, User.tenant_id == tenant)
-        ).one_or_none()
-        if user is None or not user.is_active:
-            return _exchange_refused(session, entra.ACCOUNT_DEACTIVATED, grant.user_id)
-        try:
-            # Only now, with the code and the verifier proven, is the device looked at.
-            refuse_revoked_device(session, body.device_id)
-        except DeviceRevokedError:
-            entra.log_refusal(DEVICE_REVOKED_REASON, flow=NATIVE)
-            sso.audit_event(
-                session, "sso_refused", flow=NATIVE, reason=DEVICE_REVOKED_REASON, user_id=user.id
-            )
-            return device_revoked_response()
-        pair = service.start_session(
-            session, user, method=AMR_SSO, device_id=body.device_id, invite_ref=grant.invite_ref
+        # Only now, with the code and the verifier proven, is the device looked at.
+        refuse_revoked_device(session, body.device_id)
+    except DeviceRevokedError:
+        entra.log_refusal(DEVICE_REVOKED_REASON, flow=NATIVE)
+        sso.audit_event(
+            session, "sso_refused", flow=NATIVE, reason=DEVICE_REVOKED_REASON, user_id=user.id
         )
-    except RevocationUnavailableError as exc:
-        raise _unavailable() from exc
+        return device_revoked_response()
+    pair = service.start_session(
+        session, user, method=AMR_SSO, device_id=body.device_id, invite_ref=grant.invite_ref
+    )
     sso.audit_event(session, "sso_signed_in", flow=NATIVE, user_id=user.id)
     return token_response(pair, response, native=True)
 

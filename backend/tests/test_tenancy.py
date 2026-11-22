@@ -22,10 +22,7 @@ from app.core.config import Settings
 from app.core.db import Database, DbSession
 from app.core.tenancy.context import (
     TenancyContext,
-    current_project_id,
-    current_tenant_id,
     get_tenancy_context,
-    use_tenancy,
 )
 from app.core.tenancy.rls import (
     ALLOWED_READ_POLICY_NAME,
@@ -71,17 +68,6 @@ def _names(db: Database, ctx: TenancyContext, **options: object) -> set[str]:
 
 
 # --- context ---------------------------------------------------------------------------
-
-
-def test_use_tenancy_sets_and_resets_context_vars() -> None:
-    assert current_tenant_id.get() is None
-    with use_tenancy(CTX_A):
-        assert current_tenant_id.get() == T1
-        assert current_project_id.get() == PA
-    assert current_tenant_id.get() is None
-    assert current_project_id.get() is None
-    with use_tenancy(CTX_T1):
-        assert current_project_id.get() is None
 
 
 def test_tenancy_seam_comes_from_the_verified_token_only() -> None:

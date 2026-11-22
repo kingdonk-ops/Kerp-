@@ -19,10 +19,8 @@ from typing import Annotated, Any, Final
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response, status
 from fastapi.responses import JSONResponse
 
-from app.core.auth.bearer import AUTH_UNAVAILABLE
 from app.core.auth.lockout import LockedOutError
 from app.core.auth.password_reset import PasswordResetService
-from app.core.auth.revocation import RevocationUnavailableError
 from app.core.auth.router import PREFIX, TOO_MANY_ATTEMPTS
 from app.core.auth.runtime import AuthRuntime, get_auth_runtime
 from app.core.auth.schemas import (
@@ -62,10 +60,6 @@ def _locked(exc: LockedOutError) -> HTTPException:
     )
 
 
-def _unavailable() -> HTTPException:
-    return HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, AUTH_UNAVAILABLE)
-
-
 def _client(request: Request) -> str | None:
     # Behind a proxy, uvicorn sets this from X-Forwarded-For only for trusted peers.
     return request.client.host if request.client else None
@@ -97,8 +91,6 @@ def request_password_reset(
         job = service.request(email=body.email, client=_client(request))
     except LockedOutError as exc:
         raise _locked(exc) from exc
-    except RevocationUnavailableError as exc:
-        raise _unavailable() from exc
     if job is not None:
         tasks.add_task(service.issue, database, job)
 
@@ -145,8 +137,6 @@ def confirm_password_reset(
         )
     except LockedOutError as exc:
         raise _locked(exc) from exc
-    except RevocationUnavailableError as exc:
-        raise _unavailable() from exc
     # Refusals are ordinary responses, not exceptions: the request's unit of work commits,
     # and with it their audit entries.
     if result.status == "refused" and result.error is not None:

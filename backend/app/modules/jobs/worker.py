@@ -32,7 +32,7 @@ from app.core.module_loader.loader import (
 )
 from app.core.request_context import request_id_var
 from app.core.startup_safety import check_database_role
-from app.core.tenancy.context import TenancyContext, use_tenancy
+from app.core.tenancy.context import TenancyContext
 from app.modules.jobs import mail, scheduler, service
 from app.modules.jobs.broker import QUEUE_NAMES, RUN_JOB, LoopDispatcher, SaqBroker
 from app.modules.jobs.registry import JOB_REGISTRY, JobContext, JobRegistry
@@ -93,10 +93,9 @@ async def run_job(
 
         try:
             handler = registry.get(kind).handler
-            with use_tenancy(tenancy):
-                result = await handler(
-                    JobContext(row_id, kind, tenancy, payload, request_id, update, db)
-                )
+            result = await handler(
+                JobContext(row_id, kind, tenancy, payload, request_id, update, db)
+            )
         except service.RetryLaterError as exc:
             # The handler asked to run again later (T-0218): SAQ retries with back-off while
             # the kind allows more attempts; the last one fails the row with the message.

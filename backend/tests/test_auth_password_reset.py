@@ -1091,7 +1091,7 @@ def test_confirm_is_rate_limited_per_client(h: Harness) -> None:
 
 
 def test_a_store_outage_fails_closed(h: Harness, monkeypatch: pytest.MonkeyPatch) -> None:
-    from app.core.auth.revocation import RevocationUnavailableError
+    from app.core.auth.revocation import AUTH_UNAVAILABLE, RevocationUnavailableError
 
     token = h.link(ACTIVE)
 
@@ -1099,9 +1099,9 @@ def test_a_store_outage_fails_closed(h: Harness, monkeypatch: pytest.MonkeyPatch
         raise RevocationUnavailableError("synthetic outage")
 
     monkeypatch.setattr(h.runtime.store._inner, "begin_attempt", down)
-    assert h.request(ACTIVE).status_code == 503
-    assert h.confirm(token).status_code == 503
-    assert h.login(ACTIVE, NEW_PASSWORD).status_code == 503
+    for response in (h.request(ACTIVE), h.confirm(token), h.login(ACTIVE, NEW_PASSWORD)):
+        assert response.status_code == 503
+        assert response.json() == {"detail": AUTH_UNAVAILABLE}  # the app-wide body (T-0349)
 
 
 def test_without_a_deployment_tenant_nothing_is_issued_or_accepted(

@@ -18,8 +18,8 @@ holders of its project and System admins.
 * **Notification**: the project's PER-09 holders get an in-app notification of a new request
   (``notifications.notify``, kind ``access_requests.requested``) in the same transaction. The
   notification is project-scoped, so the session is re-bound to the project for the write and
-  back (``_ProjectBinding``); the requester reads nothing of the project through it. The
-  requester gets no notification (not a member): ``mine`` is the outcome channel.
+  back (``core.tenancy.rebind.project_binding``); the requester reads nothing of the project
+  through it. The requester gets no notification (not a member): ``mine`` is the outcome channel.
 * **Approval** creates the direct membership through the admin service (``assign_member``:
   the PER-09 + hold-authority ``sod_warning`` / ``confirm_sod`` rule, audited on
   ``project-members:<project>``) in the same transaction. A request is never decided by its
@@ -39,12 +39,11 @@ decider.
 
 from __future__ import annotations
 
-import dataclasses
 import logging
 import uuid
 from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from typing import Final
 
 from sqlalchemy import select
@@ -61,7 +60,9 @@ from app.core.mail.addresses import InvalidAddressError
 from app.core.mail.service import send_mail
 from app.core.mail.templates import MailTemplate, TemplateError, register_template
 from app.core.tenancy.context import TenancyContext
-from app.core.tenancy.rls import SESSION_INFO_KEY, bind_tenancy, session_tenancy
+from app.core.tenancy.rebind import project_binding
+from app.core.tenancy.rls import session_tenancy
+from app.core.timestamps import aware_utc
 from app.modules.access_requests.models import (
     APPROVED,
     PENDING,
@@ -217,18 +218,13 @@ def _own_requests(
     return list(session.scalars(query.order_by(AccessRequest.created_at, AccessRequest.id)))
 
 
-def _aware(moment: datetime) -> datetime:
-    """SQLite hands ``TIMESTAMPTZ`` back naive; every value was stored in UTC."""
-    return moment if moment.tzinfo is not None else moment.replace(tzinfo=UTC)
-
-
 def _retry_after(
     rows: Iterable[AccessRequest], cooldown: timedelta, now: datetime
 ) -> datetime | None:
     """The end of the re-request cooldown of the latest rejection while it is still running
     (``now`` before it), else ``None``. A zero cooldown never runs."""
     rejected = [
-        _aware(r.decided_at) for r in rows if r.status == REJECTED and r.decided_at is not None
+        aware_utc(r.decided_at) for r in rows if r.status == REJECTED and r.decided_at is not None
     ]
     if not rejected or cooldown <= timedelta(0):
         return None
@@ -320,33 +316,6 @@ def _discovered(
     return True
 
 
-class _ProjectBinding:
-    """Re-bind the tenant-level session to one project and back, in the same transaction
-    (``bind_tenancy`` refuses to switch a session holding objects, so they are flushed,
-    detached and re-attached). The pattern of the validation module's project seeding."""
-
-    def __init__(self, session: Session, context: TenancyContext, project_id: uuid.UUID) -> None:
-        self.session, self.context = session, context
-        self.project = dataclasses.replace(context, project_id=project_id, site_node_ids=None)
-        self.held: list[object] = []
-
-    def __enter__(self) -> None:
-        self.session.flush()
-        self.held = list(self.session.identity_map.values())
-        self.session.expunge_all()
-        bind_tenancy(self.session, self.project)
-
-    def __exit__(self, exc_type: object, *_exc: object) -> None:
-        if exc_type is None:
-            self.session.flush()
-        self.session.expunge_all()
-        try:
-            bind_tenancy(self.session, self.context)
-        except SQLAlchemyError:  # pragma: no cover - the transaction failed and rolls back
-            self.session.info[SESSION_INFO_KEY] = self.context
-        self.session.add_all(self.held)
-
-
 def _notify_project_admins(
     session: Session,
     context: TenancyContext,
@@ -357,7 +326,7 @@ def _notify_project_admins(
     requester = users.get_user(session, request.requester_id)
     label = (requester.display_name or requester.email)[:_PARAM_MAX]
     actor = request.requester_id
-    with _ProjectBinding(session, context, project.id):
+    with project_binding(session, project.id):
         holders = persona_holders(
             session, context.tenant_id, project.id, Persona.PROJECT_ADMINISTRATOR
         )
@@ -413,7 +382,7 @@ def list_mine(session: Session, *, cooldown: timedelta, now: datetime) -> list[M
         r
         for r in latest.values()
         if r.status == PENDING
-        or (r.closed_at is not None and now - _aware(r.closed_at) <= PANEL_WINDOW)
+        or (r.closed_at is not None and now - aware_utc(r.closed_at) <= PANEL_WINDOW)
     ]
     refs = projects.lobby_projects_by_id(session, {r.requested_project_id for r in shown})
     entries = []

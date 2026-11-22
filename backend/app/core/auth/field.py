@@ -35,7 +35,6 @@ link and never runs in production.
 
 from __future__ import annotations
 
-import hashlib
 import logging
 import secrets
 import uuid
@@ -48,6 +47,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings
+from app.core.digest import sha256_hex
 
 MAGIC_LINK_TTL: Final = timedelta(minutes=15)
 MAGIC_LINK_TOKEN_BYTES: Final = 32
@@ -116,9 +116,8 @@ def new_magic_link_token() -> str:
     return secrets.token_urlsafe(MAGIC_LINK_TOKEN_BYTES)
 
 
-def magic_link_digest(token: str) -> str:
-    """Only the SHA-256 of a link token is stored, so a store dump cannot sign anyone in."""
-    return hashlib.sha256(token.encode()).hexdigest()
+# Only the SHA-256 of a link token is stored, so a store dump cannot sign anyone in.
+magic_link_digest = sha256_hex
 
 
 @dataclass(frozen=True, slots=True)

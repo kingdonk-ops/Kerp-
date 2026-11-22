@@ -14,7 +14,7 @@ rewritten (HS256 → RS256/EdDSA + JWKS + `jti` revocation in Redis).
 | `password_reset.py`, `password_reset_router.py` | Self-service password reset by e-mail (T-0077): `PasswordResetService` (neutral request, post-response issue, single-use hashed token, confirm), endpoints `/auth/password-reset/{request,confirm}` (*Self-service password reset*) |
 | `keys.py` | Ed25519 / RSA signing key, retired verification keys, RFC 7638 `kid`, JWKS document |
 | `tokens.py` | `TokenService`: issue/verify access (15 min) and refresh tokens |
-| `revocation.py` | `RevocationStore`: Redis (prod) / in-memory (dev, tests) — `jti` + session blacklist, one-time refresh tokens |
+| `revocation.py` | `RevocationStore`: Redis (prod) / in-memory (dev, tests) — `jti` + session blacklist, one-time refresh tokens; the app-wide `503` handlers for a store outage and a raw Redis outage (T-0349) |
 | `runtime.py` | `AuthRuntime` (keys + tokens + store) built from settings, cached on `app.state.auth`: lazily outside production; in production at startup, so a missing or invalid signing key (or a missing `KERP_REDIS_URL`) refuses the start (T-0342, `app/core/startup_safety.py`) |
 | `bearer.py` | `get_bearer`: verifies the `Authorization: Bearer` token once per request (no DB) |
 | `deps.py` | `CurrentPrincipal` (401 unless a valid token of an active user), `require_claims` |
@@ -257,7 +257,12 @@ The SPA (`frontend/src/auth/tokenStore.ts`) keeps the access token in memory and
 Every rejection is `401 {"detail": "Not authenticated"}` with a `WWW-Authenticate: Bearer`
 challenge (`error="invalid_token"` when a token was presented). Unknown user, wrong
 password, inactive user and wrong tenant are indistinguishable, and an unknown user still
-costs one scrypt round. An unreachable revocation store is `503` (fail closed).
+costs one scrypt round. An unreachable revocation store is `503` (fail closed) with the
+body `{"detail": "Authentication temporarily unavailable"}` on every endpoint: callers let
+`RevocationUnavailableError` propagate to the one app-wide handler
+(`revocation.revocation_unavailable_handler`, T-0349, TD-290). A raw Redis connection or
+timeout error that reaches the app is `503 {"detail": "Service temporarily unavailable"}`
+(`redis_unavailable_handler`, TD-525); any other Redis error stays a 500.
 
 ## Native app origins: refresh token in the body (T-0043, TD-203)
 
@@ -753,8 +758,8 @@ the key up by `kid` and accepts only that key's algorithm (no `none`, no HS/RS c
 unrevoked access token binds the request session to `TenancyContext(tid, user_id=sub)`
 before any query, so RLS and the ORM scope confine it to the token's tenant. No token or a
 bad token leaves the session unbound (RLS shows it nothing). Endpoints that need a user take
-`principal: CurrentPrincipal`, which also sets the `current_tenant_id` / `current_user_id`
-context vars. The session also gets the read-only allowed projects from the user's
+`principal: CurrentPrincipal`, which also sets the `current_device_id` context var (the
+audit ledger reads it). The session also gets the read-only allowed projects from the user's
 memberships (below). The write project is not bound from the request yet (TD-122).
 
 **System admin flag and user binding (T-0014, edge spec §6 amendments).** In the same short

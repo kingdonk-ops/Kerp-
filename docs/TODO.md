@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 368 · **Closed:** 160
+**Open:** 368 · **Closed:** 162
 
 ## decision (40)
 
@@ -196,7 +196,7 @@
 | [TD-510](../tracker/todo/TD-510.md) | Deployment-config view lacks the mail reply-to of diff §4.7: Settings has no reply-to field yet | T-0230 | implementer |
 | [TD-533](../tracker/todo/TD-533.md) | CEL client runtime has no evaluation step budget (cel-js exposes no step hook; server is the hard gate) | T-0341 | implementer |
 
-## later (145)
+## later (146)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -267,7 +267,6 @@
 | [TD-280](../tracker/todo/TD-280.md) | Frontend Rules screen: 'Updates available' badge and per-rule diff with accept, tenant drift report view, and 'Try it' panel on the T-0036 API | T-0036 | implementer |
 | [TD-282](../tracker/todo/TD-282.md) | Sync endpoints must record last_sync_at and the device of replayed mutations | T-0043 | implementer |
 | [TD-284](../tracker/todo/TD-284.md) | Dedicated RLS policy for oe_identity_device (owner, system_admin, PER-09 of a shared project) | T-0043 | implementer |
-| [TD-290](../tracker/todo/TD-290.md) | Map RevocationUnavailableError to 503 in the device endpoints and resolve_request_device | T-0043 | reviewer |
 | [TD-294](../tracker/todo/TD-294.md) | Project delete revokes its memberships (T-0039, TD-184): a future project restore must re-grant them, and memberships on projects soft-deleted before T-0039 (dev databases only) stay live until revoked | T-0039 | implementer |
 | [TD-296](../tracker/todo/TD-296.md) | System-admin-only write RLS policy for oe_settings_deployment (defence in depth) | T-0044 | implementer |
 | [TD-302](../tracker/todo/TD-302.md) | Use the did token claim in CurrentPrincipal device resolution so DEVICE_REVOKED and last_seen survive an evicted device:sid binding | T-0038 | implementer |
@@ -345,8 +344,10 @@
 | [TD-532](../tracker/todo/TD-532.md) | Registry entries declared by later tasks add their label to admin.settings.entries (and a new category to admin.settings.categories) in the Settings screen | T-0232 | implementer |
 | [TD-535](../tracker/todo/TD-535.md) | Startup role check: also refuse a runtime role that owns any app table (owner can drop FORCE or re-grant), once every deployment runs the owner/runtime split | T-0342 | implementer |
 | [TD-537](../tracker/todo/TD-537.md) | RegisterPage shell lacks per-row actions and server-side paging, so the System console registers (failed jobs, upload quarantine) use admin card lists; adopt the shell once it supports both (diff §6.5) | T-0224 | implementer |
+| [TD-563](../tracker/todo/TD-563.md) | Adopt core tenant_level_context in the remaining tenant-level session guards | T-0349 | implementer |
+| [TD-564](../tracker/todo/TD-564.md) | Use core sha256_hex for the remaining inline SHA-256 hex digests (lockout subject, mail address, admin e-mail) | T-0349 | implementer |
 
-## bug (18)
+## bug (17)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -363,7 +364,6 @@
 | [TD-519](../tracker/todo/TD-519.md) | Promotion fails red when CI runs on dev finish out of order (promote.yml checks origin/dev, not the run's head_sha) | — | planner |
 | [TD-523](../tracker/todo/TD-523.md) | Locale check accepts a trailing newline: _LOCALE regex in core/locale.py uses $ with re.match | — | planner |
 | [TD-524](../tracker/todo/TD-524.md) | Password-change revocation can miss tokens when server clocks drift (iat compared with password_changed_at from another clock) | T-0345 | planner |
-| [TD-525](../tracker/todo/TD-525.md) | Some Redis errors surface as 500 instead of 503 (raw redis ConnectionError/TimeoutError outside RevocationUnavailableError) | T-0349 | planner |
 | [TD-527](../tracker/todo/TD-527.md) | Published upload files can be orphaned (object kept with no live owner row, or row pointing at a deleted object) | T-0346 | planner |
 | [TD-528](../tracker/todo/TD-528.md) | Two concurrent adds of the same user to a team return 500 (unique violation) instead of the already-a-member answer | — | planner |
 | [TD-534](../tracker/todo/TD-534.md) | API shutdown raises when Redis is unreachable: SaqBroker.close() (SAQ RedisQueue.disconnect) connects to close its pub/sub | T-0342 | implementer |
@@ -545,6 +545,7 @@
 | ✅ | [TD-285](../tracker/todo/TD-285.md) | Native-origin allow-list: KERP_WEB_ORIGIN made mandatory when KERP_NATIVE_APP_ORIGINS is set; body transport also on magic-link redeem and PIN unlock | Product owner, 2026-11-15: both readings confirmed. (a) KERP_NATIVE_APP_ORIGINS requires KERP_WEB_ORIGIN (settings refuse otherwise) and the API's own origin never gets body transport; (b) body transport (out and in) also applies to magic-link redeem and PIN unlock by the same Origin rule; on the web origin /pin/unlock refuses a body token (422) and /refresh ignores it. Recorded in diff §4.2 |
 | ✅ | [TD-286](../tracker/todo/TD-286.md) | wipe-confirmed is unauthenticated: anyone who knows a revoked device_id can set its wipe time | Fixed by T-0080 (PR #94): per-device wipe secret issued once at enrolment, stored as SHA-256; wipe-confirmed requires it, uniform 404 for every refusal |
 | ✅ | [TD-289](../tracker/todo/TD-289.md) | drift_report runs one list_rules query per set per project (N+1) | T-0348: drift_report_page loads the page's project sets and the tenant default sets once and all their rules with one IN (...) query (four queries per page, however many projects); GET /drift-report pages by project (limit/offset, X-Next-Offset). Query-count test in backend/tests/test_validation_rule_upgrades.py |
+| ✅ | [TD-290](../tracker/todo/TD-290.md) | Map RevocationUnavailableError to 503 in the device endpoints and resolve_request_device | T-0349: one app-wide handler (app.core.auth.revocation.revocation_unavailable_handler, registered in app.main) turns RevocationUnavailableError into 503 {detail: 'Authentication temporarily unavailable'} wherever it is raised; the per-endpoint mappings are gone. Device enrol/revoke and resolve_request_device now answer 503 (tests in test_devices.py). |
 | ✅ | [TD-291](../tracker/todo/TD-291.md) | Revoked-device oracle: refuse_revoked_device on login and wipe-confirmed answer for any device id | Fixed by T-0080 (PR #94): sign-in checks credentials before the device; wipe-confirmed answers uniformly |
 | ✅ | [TD-292](../tracker/todo/TD-292.md) | Remove stale scripts/gemini_review.sh allow/deny rules from .claude/settings.json (human-only edit) | Product owner removed the stale scripts/gemini_review.sh allow rule and both deny pairs from .claude/settings.json by hand (commit 07486d9 on dev, 2026-11-21); only the deny rules protecting .claude/settings.json remain. |
 | ✅ | [TD-295](../tracker/todo/TD-295.md) | T-0044 says module admin but the route /api/v1/settings/deployment and the projects->settings dependency need a separate settings module | Product owner, 2026-11-16: separate settings module (projects depends_on settings) confirmed |
@@ -572,3 +573,4 @@
 | ✅ | [TD-502](../tracker/todo/TD-502.md) | ADR for the legal-hold columns on oe_projects_project (core-table change, T-0223) | ADR 0018 (docs/decisions/0018-project-legal-hold.md), accepted 2026-11-21: legal-hold columns on oe_projects_project (additive, no RLS change); reason/set_by/set_at describe the active hold only, history in admin-system:<tenant>; ProjectRead exposes only the flag; delete 409 LEGAL_HOLD_ACTIVE; is_on_legal_hold contract for the archive (T-0233) |
 | ✅ | [TD-516](../tracker/todo/TD-516.md) | Client bootstrap caching: 'ETag / no-store per the auth rules' has no auth rule to follow; default Cache-Control no-store + strong ETag over the values + If-None-Match -> 304 (T-0231); confirm, and that T-0248 clients revalidate with If-None-Match | User, 2026-11-21: default accepted. GET /api/v1/settings/client answers Cache-Control: no-store with a strong ETag over the values; If-None-Match -> 304. T-0248 clients store the values themselves and revalidate with If-None-Match. |
 | ✅ | [TD-521](../tracker/todo/TD-521.md) | Login redirect drops the query string and hash: RequireAuth stores only location.pathname as state.from | Fixed in T-0344: RequireAuth stores pathname + search + hash; LoginPage returnPath() keeps the /login loop guard (also for /login?… and /login#…) and accepts only in-app paths; tests in frontend/src/auth/sessionIsolation.test.tsx. |
+| ✅ | [TD-525](../tracker/todo/TD-525.md) | Some Redis errors surface as 500 instead of 503 (raw redis ConnectionError/TimeoutError outside RevocationUnavailableError) | T-0349: redis.ConnectionError and redis.TimeoutError that reach the app are 503 {detail: 'Service temporarily unavailable'} via one app-wide handler (redis_unavailable_handler), logged as a warning without the driver message; other Redis errors (bugs) stay 500. Request paths already wrap Redis (revocation store -> RevocationUnavailableError, settings cache swallows RedisError, queue monitor catches); the handler is the safety net for any that escape. Errors in post-response/background work (job dispatch, mail payloads) never reach a request and are unaffected. Tests: tests/test_service_unavailable.py. |
