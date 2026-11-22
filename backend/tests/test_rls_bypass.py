@@ -20,6 +20,7 @@ import os
 import uuid
 from collections.abc import Iterator
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -621,11 +622,53 @@ def _admin_reads_of_b(url: str) -> int:
         database.dispose()
 
 
+# One project-B ledger entry in the schema of ``0035`` (hash v2). Raw SQL, not
+# ``audit.append``: the ORM model maps columns of later revisions (``impersonated_by_user_id``,
+# ``0043``, T-0279) that a database at ``0035`` does not have.
+_LEDGER_ENTRY_AT_0035 = (
+    "INSERT INTO audit_ledger (id, tenant_id, project_id, scope_id, chain_key, seq, prev_hash,"
+    " content_hash, payload, created_at, updated_at, custom_fields, source, revision,"
+    " hash_version) VALUES (:id, :tenant, :project, :project, :key, 1, :prev, :hash,"
+    " CAST(:payload AS jsonb), :at, :at, CAST('{}' AS jsonb), 'system', 1, 2)"
+)
+
+
+def _ledger_entry_at_0035(session: Session) -> None:
+    from app.core.audit.hashing import GENESIS_HASH, compute_content_hash
+    from app.core.db import utcnow
+
+    entry = SimpleNamespace(
+        tenant_id=T1,
+        project_id=PB,
+        chain_key=f"widget:{uuid.uuid4()}",
+        seq=1,
+        prev_hash=GENESIS_HASH,
+        created_at=utcnow(),
+        created_by=None,
+        source="system",
+        payload={"note": "synthetic"},
+        device_id=None,
+        impersonated_by_user_id=None,
+        hash_version=2,
+    )
+    session.execute(
+        text(_LEDGER_ENTRY_AT_0035),
+        {
+            "id": uuid.uuid4(),
+            "tenant": T1,
+            "project": PB,
+            "key": entry.chain_key,
+            "prev": GENESIS_HASH,
+            "hash": compute_content_hash(entry),
+            "payload": '{"note": "synthetic"}',
+            "at": entry.created_at,
+        },
+    )
+
+
 def test_migration_0035_widens_only_project_isolation_policy_and_downgrades() -> None:
     """ADR 0016 (T-0274): ``0035`` replaces ``project_isolation_policy`` on every table that has
     it, changes no other policy, and its downgrade restores the exact rule."""
-    from app.core.audit import service as audit
-
     url = postgres_url()
     cfg = Config(str(ALEMBIC_INI))
     cfg.attributes.update(url=url, configure_logger=False)
@@ -636,7 +679,7 @@ def test_migration_0035_widens_only_project_isolation_policy_and_downgrades() ->
     try:
         seed_tenants(writer, T1)
         with writer.unit_of_work(CTX_B) as s:
-            audit.append(s, f"widget:{uuid.uuid4()}", {"note": "synthetic"})
+            _ledger_entry_at_0035(s)
     finally:
         writer.dispose()
     head = _policy_snapshot(url)
