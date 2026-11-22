@@ -4,8 +4,11 @@ import { AccessRequestsPage } from "../admin/AccessRequestsPage";
 import { AdminDevicesPage, MyDevicesPage } from "../admin/DevicesPage";
 import { MembersPage } from "../admin/MembersPage";
 import { ProjectsPage } from "../admin/ProjectsPage";
+import { SystemDeploymentPage } from "../admin/SystemDeploymentPage";
 import { SystemGrantsPage } from "../admin/SystemGrantsPage";
+import { SystemQueuesPage } from "../admin/SystemQueuesPage";
 import { SystemSettingsPage } from "../admin/SystemSettingsPage";
+import { SystemUploadsPage } from "../admin/SystemUploadsPage";
 import { UsersPage } from "../admin/UsersPage";
 import { RequireAuth } from "../auth/RequireAuth";
 import { SSO_RETURN_PATH } from "../auth/sso";
@@ -44,6 +47,9 @@ export const routes: RouteObject[] = [
           })),
           { path: "admin/users", element: <UsersPage /> },
           { path: "admin/access-requests", element: <AccessRequestsPage /> },
+          { path: "admin/system/deployment", element: <SystemDeploymentPage /> },
+          { path: "admin/system/queues", element: <SystemQueuesPage /> },
+          { path: "admin/system/uploads", element: <SystemUploadsPage /> },
           { path: "admin/system/devices", element: <AdminDevicesPage /> },
           { path: "admin/system/grants", element: <SystemGrantsPage /> },
           { path: "admin/system/settings", element: <SystemSettingsPage /> },
