@@ -35,6 +35,7 @@ from app.core.auth.service import AuthenticationError, set_user_password
 from app.core.auth.tokens import IMPERSONATION_TYP, InvalidTokenError, TokenService
 from app.core.db import Base, Database, contract_violations
 from app.core.mail import service as mail_service
+from app.core.mail.models import MailSend
 from app.core.mail.queue import QueuedMail, set_mail_enqueuer
 from app.core.mail.templates import TEMPLATES, render
 from app.core.tenancy.context import TenancyContext
@@ -602,6 +603,9 @@ def _assert_one_notice(api: Api, target: str = BOB) -> QueuedMail:
     with api.db.unit_of_work(TenancyContext(tenant_id=T1)) as s:
         email = s.get_one(User, api.users[target]).email
     assert mail.to == email
+    # The delivery ledger knows whose address it is (T-0226, TD-577).
+    with api.db.unit_of_work(TenancyContext(tenant_id=T1)) as s:
+        assert s.get_one(MailSend, mail.send_id).recipient_user_id == api.users[target]
     return mail
 
 

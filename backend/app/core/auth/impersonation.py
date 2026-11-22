@@ -258,7 +258,13 @@ def _notify_target(session: Session, row: ImpersonationSession, ended_at: dateti
     }
     try:
         with session.begin_nested():
-            send_mail(session, NOTICE_TEMPLATE.key, target.email, context)
+            send_mail(
+                session,
+                NOTICE_TEMPLATE.key,
+                target.email,
+                context,
+                recipient_user_id=target.id,
+            )
     except (ValueError, SQLAlchemyError):
         logger.warning("impersonation %s ended: the target's notice was not queued", row.id)
 
