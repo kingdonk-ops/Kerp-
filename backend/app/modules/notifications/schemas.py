@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 import uuid
 from datetime import datetime
-from typing import Annotated, Any, Literal, Self
+from typing import Annotated, Any, ClassVar, Literal, Self
 
 from pydantic import (
     BaseModel,
@@ -214,9 +214,22 @@ class BroadcastRead(BaseModel):
 
 class UnsubscribeWrite(BaseModel):
     """``POST /notifications/broadcasts/unsubscribe``: the opaque token from the e-mail's link.
-    Any string is accepted (a malformed one gets the same answer as a valid one)."""
+
+    Any string is accepted, so a malformed token gets the same answer as a valid one (no
+    oracle). A real token is 43 characters (256 bits, URL-safe base64); anything longer than
+    ``MAX_TOKEN`` can never be one and is dropped here, before it is hashed or looked up,
+    instead of a ``422`` that would answer differently."""
+
+    MAX_TOKEN: ClassVar[int] = 128
 
     token: str | None = None
+
+    @field_validator("token", mode="before")
+    @classmethod
+    def _drop_over_long(cls, value: object) -> object:
+        if isinstance(value, str) and len(value) > cls.MAX_TOKEN:
+            return None
+        return value
 
 
 class UnsubscribeRead(BaseModel):

@@ -18008,7 +18008,7 @@
         },
         "type": "object",
         "title": "UnsubscribeWrite",
-        "description": "``POST /notifications/broadcasts/unsubscribe``: the opaque token from the e-mail's link.\nAny string is accepted (a malformed one gets the same answer as a valid one)."
+        "description": "``POST /notifications/broadcasts/unsubscribe``: the opaque token from the e-mail's link.\n\nAny string is accepted, so a malformed token gets the same answer as a valid one (no\noracle). A real token is 43 characters (256 bits, URL-safe base64); anything longer than\n``MAX_TOKEN`` can never be one and is dropped here, before it is hashed or looked up,\ninstead of a ``422`` that would answer differently."
       },
       "UploadCreate": {
         "properties": {

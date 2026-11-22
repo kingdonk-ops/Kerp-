@@ -6235,7 +6235,11 @@ export interface components {
         /**
          * UnsubscribeWrite
          * @description ``POST /notifications/broadcasts/unsubscribe``: the opaque token from the e-mail's link.
-         *     Any string is accepted (a malformed one gets the same answer as a valid one).
+         *
+         *     Any string is accepted, so a malformed token gets the same answer as a valid one (no
+         *     oracle). A real token is 43 characters (256 bits, URL-safe base64); anything longer than
+         *     ``MAX_TOKEN`` can never be one and is dropped here, before it is hashed or looked up,
+         *     instead of a ``422`` that would answer differently.
          */
         UnsubscribeWrite: {
             /** Token */

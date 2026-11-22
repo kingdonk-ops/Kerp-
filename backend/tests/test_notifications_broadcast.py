@@ -59,7 +59,11 @@ from app.modules.notifications.models import (
     BroadcastOptOut,
     BroadcastRecipient,
 )
-from app.modules.notifications.schemas import BroadcastAudienceWrite, BroadcastWrite
+from app.modules.notifications.schemas import (
+    BroadcastAudienceWrite,
+    BroadcastWrite,
+    UnsubscribeWrite,
+)
 from app.modules.projects import service as projects
 from app.modules.projects.schemas import ProjectCreate
 from tests.audit_support import ALEMBIC_INI, migrated_database
@@ -364,6 +368,13 @@ def test_subject_and_body_are_plain_text() -> None:
             BroadcastWrite.model_validate({**base, **bad})
 
 
+def test_an_over_long_unsubscribe_token_is_dropped_not_refused() -> None:
+    limit = UnsubscribeWrite.MAX_TOKEN
+    assert UnsubscribeWrite.model_validate({"token": "x" * limit}).token == "x" * limit
+    assert UnsubscribeWrite.model_validate({"token": "x" * (limit + 1)}).token is None
+    assert UnsubscribeWrite.model_validate({}).token is None
+
+
 # --- audience -------------------------------------------------------------------------------
 
 
@@ -434,6 +445,51 @@ def test_a_project_administrator_reaches_only_its_own_projects(world: World) -> 
     assert world.preview(ADMIN, Audience("projects", frozenset({world.b}))) == 1
     with pytest.raises(OutOfScopeError):
         world.preview(ADMIN, Audience("projects", frozenset({world.foreign})))
+
+
+def test_a_project_administrator_cannot_reach_a_project_it_only_works_on(world: World) -> None:
+    """pm is PER-09 on A and also PER-02 on B: B's project row and memberships are visible
+    to pm's session, yet B is not one of pm's PER-09 projects, so it stays a 404."""
+    _grant(world.db, world.users[PM], world.b, Persona.PROJECT_MANAGER)
+    to_b = world.create(ADMIN, Audience("projects", frozenset({world.b})))
+    scope = TenancyContext(
+        tenant_id=T1,
+        user_id=world.users[PM],
+        member_project_ids=frozenset({world.a, world.b}),
+        admin_project_ids=frozenset({world.a}),
+    )
+    sender = world.sender(PM)
+    for projects_ in ({world.b}, {world.a, world.b}):
+        audience = Audience("projects", frozenset(projects_))
+        with world.db.unit_of_work(scope) as s:
+            assert {p.id for p in projects.list_projects(s, projects_)} == projects_  # visible
+            with pytest.raises(OutOfScopeError):
+                broadcasts.preview(s, sender, audience)
+        with world.db.unit_of_work(scope) as s, pytest.raises(OutOfScopeError):
+            broadcasts.create(s, sender, audience, subject="S", body="B")
+    with world.db.unit_of_work(scope) as s:
+        with pytest.raises(OutOfScopeError):
+            broadcasts.get_broadcast(s, sender, to_b)
+        assert broadcasts.list_broadcasts(s, sender) == []
+
+
+def test_the_api_hides_a_project_the_administrator_only_works_on(http: Http) -> None:
+    world = http.world
+    _grant(world.db, world.users[PM], world.b, Persona.PROJECT_MANAGER)
+    created = http.post("", ADMIN, _body(world, project_ids=[str(world.b)]))
+    assert created.status_code == 202, created.text
+    to_b = created.json()["id"]
+    for ids in ([str(world.b)], [str(world.a), str(world.b)]):
+        audience = {"scope": "projects", "project_ids": ids}
+        assert http.post("/preview", PM, audience).status_code == 404
+        assert http.post("", PM, _body(world, project_ids=ids)).status_code == 404
+    assert http.get(f"/{to_b}", PM).status_code == 404
+    listed = http.get("", PM)
+    assert listed.status_code == 200
+    assert listed.json() == []
+    with world.db.unit_of_work(TENANT) as s:  # pm queued nothing
+        senders = set(s.scalars(select(Broadcast.sender_id)))
+    assert senders == {world.users[ADMIN]}
 
 
 def test_opted_out_and_suppressed_users_are_excluded(world: World) -> None:
@@ -837,6 +893,8 @@ def test_the_spa_unsubscribe_takes_the_token_in_the_body_only(http: Http, outbox
         call(),  # no body
         call(params={"token": tokens[ALICE]}),  # a token in the URL is never read here
         call(json={"user_id": str(world.users[ALICE])}),
+        call(json={"token": "C" * (UnsubscribeWrite.MAX_TOKEN + 1)}),  # over-long: neutral too
+        call(json={"token": tokens[ALICE] + "x" * 5000}),
     ]
     assert all(answer == first for answer in answers)
     assert world.opted_out() == {world.users[BOB]}

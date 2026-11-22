@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 421 · **Closed:** 170
+**Open:** 423 · **Closed:** 170
 
 ## decision (40)
 
@@ -223,7 +223,7 @@
 | [TD-510](../tracker/todo/TD-510.md) | Deployment-config view lacks the mail reply-to of diff §4.7: Settings has no reply-to field yet | T-0230 | implementer |
 | [TD-533](../tracker/todo/TD-533.md) | CEL client runtime has no evaluation step budget (cel-js exposes no step hook; server is the hard gate) | T-0341 | implementer |
 
-## later (168)
+## later (170)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -395,6 +395,8 @@
 | [TD-598](../tracker/todo/TD-598.md) | RFI call-out e-mail templates must register as required=True | T-0227 | implementer |
 | [TD-602](../tracker/todo/TD-602.md) | Impersonation guardrail: classify the broadcast routes (POST /notifications/broadcasts forbid; preview, reads and the public unsubscribe allow) | T-0278 | implementer |
 | [TD-603](../tracker/todo/TD-603.md) | Broadcast opt-out: let a user opt back in (profile setting) and show the state | T-0228 | implementer |
+| [TD-605](../tracker/todo/TD-605.md) | Broadcast list: filter by readable projects and page in SQL | T-0228 | implementer |
+| [TD-606](../tracker/todo/TD-606.md) | Pin pydantic (or normalise the export) so the generated OpenAPI Decimal pattern does not drift | T-0228 | implementer |
 
 ## bug (18)
 

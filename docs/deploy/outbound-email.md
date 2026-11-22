@@ -100,3 +100,11 @@ public HTTPS).
 The API and the worker both refuse to start in production unless `KERP_MAIL_TRANSPORT=ses`,
 `KERP_MAIL_FROM_ADDRESS`, `KERP_MAIL_SNS_TOPIC_ARN`, `KERP_WEB_ORIGIN` and
 `KERP_DEFAULT_TENANT_ID` are set (the configuration set is optional but recommended).
+
+**Access logs in front of the API (T-0228).** The one-click unsubscribe URL of broadcast
+e-mails carries the recipient's opt-out token in its query string
+(`/api/v1/notifications/broadcasts/unsubscribe/one-click?token=…`; RFC 8058 needs it in the
+URI). KERP's own access log never records query strings, but a reverse proxy, load balancer
+(ALB) or CDN in front of the API may. Configure their access logs to drop the query string
+(log the path only), or at least for `/api/v1/notifications/broadcasts/unsubscribe/one-click`.
+A leaked token can only opt its one recipient out of broadcasts, but it must not sit in logs.
