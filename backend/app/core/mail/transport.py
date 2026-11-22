@@ -131,7 +131,8 @@ class LogTransport:
 
 
 class SesTransport:
-    """AWS SES v2 ``SendEmail`` (simple content: subject, text, HTML)."""
+    """AWS SES v2 ``SendEmail`` (simple content: subject, text, HTML, and the rendered extra
+    headers such as ``List-Unsubscribe``)."""
 
     def __init__(
         self,
@@ -177,6 +178,10 @@ class SesTransport:
             },
             "EmailTags": [{"Name": "template", "Value": message.template_key.replace(".", "_")}],
         }
+        if message.rendered.headers:  # List-Unsubscribe (T-0228)
+            request["Content"]["Simple"]["Headers"] = [
+                {"Name": name, "Value": value} for name, value in message.rendered.headers
+            ]
         if self.configuration_set:
             request["ConfigurationSetName"] = self.configuration_set
         try:

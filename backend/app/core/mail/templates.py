@@ -10,6 +10,13 @@ context parameters it needs. Rules every template obeys by construction:
 * **No remote content.** The HTML has no images, no external styles, no scripts and no
   tracking pixel; its only URL is the link above.
 * Every context value is escaped in the HTML.
+* **One-click unsubscribe** (T-0228, RFC 8058): a template with a ``list_unsubscribe_path``
+  (an API path) also carries ``List-Unsubscribe: <<web origin><path>?token=<secret>>`` and
+  ``List-Unsubscribe-Post: List-Unsubscribe=One-Click``. That header is the one other place
+  its secret goes (in a query string, which the access log never records).
+* A ``multiline_param`` (the body of a broadcast, T-0228) may hold up to
+  ``MAX_MULTILINE_VALUE`` characters of plain text with line breaks; it is escaped like any
+  value.
 
 Core and modules register their templates with ``register_template``; the registry is
 process-wide (``TEMPLATES``).
@@ -35,6 +42,11 @@ from app.core.mail.i18n import FALLBACK_LOCALE, placeholder_fields, shipped, t
 
 KEY_PATTERN: Final = re.compile(r"^[a-z][a-z0-9_]{1,39}\.[a-z][a-z0-9_]{1,59}$")
 MAX_CONTEXT_VALUE: Final = 500
+MAX_MULTILINE_VALUE: Final = 10_000
+# Control characters a multi-line value may not hold (tab and line feed are allowed).
+_VALUE_CONTROL: Final = re.compile(r"[\x00-\x08\x0b-\x1f\x7f\u2028\u2029]")
+_API_PATH: Final = re.compile(r"^/api/v1/[a-z0-9/_-]+$")
+LIST_UNSUBSCRIBE_POST: Final = "List-Unsubscribe=One-Click"
 ContextValue = str | int
 _SECRET_CHARS: Final = re.compile(r"^[A-Za-z0-9._~-]{16,512}$")
 
@@ -58,7 +70,10 @@ class MailTemplate:
     a template must say so explicitly, so a link that should carry a secret never goes out
     without one by mistake. ``audience``: the group the template editor lists it under.
     ``required``: an override may reword it but never leave its subject or a text block empty
-    (sign-in, invite, password reset, RFI call-outs; diff §4.7 Editor details)."""
+    (sign-in, invite, password reset, RFI call-outs; diff §4.7 Editor details).
+    ``multiline_param``: the one parameter that may hold long plain text with line breaks
+    (T-0228). ``list_unsubscribe_path``: the API path of the one-click unsubscribe endpoint
+    (RFC 8058); it needs a ``secret``, which then also goes into that header's query."""
 
     key: str
     params: tuple[str, ...] = ()
@@ -67,6 +82,8 @@ class MailTemplate:
     public_link: bool = False
     audience: Audience = "deployment_wide"
     required: bool = False
+    multiline_param: str | None = None
+    list_unsubscribe_path: str | None = None
 
     def __post_init__(self) -> None:
         if not KEY_PATTERN.match(self.key):
@@ -84,6 +101,14 @@ class MailTemplate:
             raise ValueError(f"mail template {self.key!r}: the secret is never a text parameter")
         if self.audience not in AUDIENCES:
             raise ValueError(f"mail template {self.key!r}: unknown audience {self.audience!r}")
+        if self.multiline_param is not None and self.multiline_param not in self.params:
+            raise ValueError(f"mail template {self.key!r}: the multi-line value is a parameter")
+        if self.list_unsubscribe_path is not None and (
+            self.secret is None or not _API_PATH.match(self.list_unsubscribe_path)
+        ):
+            raise ValueError(
+                f"mail template {self.key!r}: List-Unsubscribe needs a secret and an API path"
+            )
 
     @property
     def has_action(self) -> bool:
@@ -122,7 +147,10 @@ class MailTemplate:
         for name, value in context.items():
             if isinstance(value, bool) or not isinstance(value, str | int):
                 raise TemplateError(f"mail context {name!r} must be a string or an integer")
-            if isinstance(value, str) and (len(value) > MAX_CONTEXT_VALUE or "\n" in value):
+            if isinstance(value, str) and name == self.multiline_param:
+                if len(value) > MAX_MULTILINE_VALUE or _VALUE_CONTROL.search(value):
+                    raise TemplateError(f"mail context {name!r} is too long or not plain text")
+            elif isinstance(value, str) and (len(value) > MAX_CONTEXT_VALUE or "\n" in value):
                 raise TemplateError(f"mail context {name!r} is too long or has a line break")
             checked[name] = value
         if self.secret is not None:
@@ -255,9 +283,12 @@ def sample_context(template: MailTemplate) -> dict[str, ContextValue]:
 
 @dataclass(frozen=True, slots=True)
 class RenderedMail:
+    """``headers``: extra message headers (``List-Unsubscribe``, T-0228), else empty."""
+
     subject: str
     text: str
     html: str
+    headers: tuple[tuple[str, str], ...] = ()
 
 
 class TemplateRegistry:
@@ -376,10 +407,18 @@ def render(
         html_lines.append(f"<p>{_paragraph(outro)}</p>")
     text_lines += ["--", footer, ""]
     html_lines.append(f'<hr><p style="font-size:12px;color:#555555">{html.escape(footer)}</p>')
+    headers: tuple[tuple[str, str], ...] = ()
+    if template.list_unsubscribe_path is not None and template.secret is not None:
+        token = quote(str(context[template.secret]), safe="")
+        target = f"{web_origin.rstrip('/')}{template.list_unsubscribe_path}?token={token}"
+        headers = (
+            ("List-Unsubscribe", f"<{target}>"),
+            ("List-Unsubscribe-Post", LIST_UNSUBSCRIBE_POST),
+        )
     body = "\n".join(html_lines)
     document = (
         f'<!DOCTYPE html>\n<html lang="{html.escape(lang)}"><head><meta charset="utf-8">'
         f"<title>{html.escape(subject)}</title></head>\n"
         f'<body style="font-family:Arial,sans-serif;font-size:14px">\n{body}\n</body></html>\n'
     )
-    return RenderedMail(subject=subject, text="\n".join(text_lines), html=document)
+    return RenderedMail(subject=subject, text="\n".join(text_lines), html=document, headers=headers)

@@ -77,6 +77,24 @@ def project_member_grants(
     return members
 
 
+def member_grants(
+    session: Session, project_ids: Collection[uuid.UUID] | None = None
+) -> dict[uuid.UUID, set[Grant]]:
+    """Every live grant (any source) the session can read, per user: on ``project_ids`` when
+    given, else on every project the session sees memberships of (all of the tenant's for a
+    ``system_admin`` session; the caller's own projects for anyone else, under the
+    membership-based policy). A broadcast's audience is resolved from it (T-0228)."""
+    if project_ids is not None and not project_ids:
+        return {}
+    query = select(ProjectMembership).where(ProjectMembership.tenant_id == _tenant_id(session))
+    if project_ids is not None:
+        query = query.where(ProjectMembership.member_project_id.in_(list(project_ids)))
+    members: dict[uuid.UUID, set[Grant]] = {}
+    for row in session.scalars(query):
+        members.setdefault(row.user_id, set()).add(_grant(row))
+    return members
+
+
 def project_grants(session: Session, project_id: uuid.UUID) -> dict[uuid.UUID, set[Grant]]:
     """The live **individual** (``direct``) grants on ``project_id``, per user."""
     members: dict[uuid.UUID, set[Grant]] = {}

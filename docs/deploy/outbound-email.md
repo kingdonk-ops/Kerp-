@@ -93,7 +93,7 @@ public HTTPS).
 | `KERP_MAIL_SNS_TOPIC_ARN` | `arn:aws:sns:ap-southeast-2:<account>:kerp-mail-events` | Must be in `KERP_AWS_REGION` |
 | `KERP_AWS_REGION` | `ap-southeast-2` | Deployment region (SES client, SNS certificate host) |
 | `KERP_MAIL_DEFAULT_LOCALE` | `en-AU` | Locale when the recipient has none |
-| `KERP_WEB_ORIGIN` | `https://kerp.company.example` | Base of every link in an e-mail |
+| `KERP_WEB_ORIGIN` | `https://kerp.company.example` | Base of every link in an e-mail, and of the one-click `List-Unsubscribe` URL of broadcast e-mails (`<origin>/api/v1/notifications/broadcasts/unsubscribe/one-click?token=…`, T-0228): this origin must route `/api` to the API |
 | `KERP_DEFAULT_TENANT_ID` | (deployment tenant) | Bounce/complaint rows are written under it |
 | `KERP_REDIS_URL` | `redis://…` | The send queue (SAQ interactive queue) |
 

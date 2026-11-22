@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 417 · **Closed:** 170
+**Open:** 421 · **Closed:** 170
 
 ## decision (40)
 
@@ -149,7 +149,7 @@
 | [TD-591](../tracker/todo/TD-591.md) | Competency at sign-off: read-only rule-set fact 'signer holds a valid credential of type X at signing time', snapshotted in the attestation | T-0118, T-0289, T-0291 | planner |
 | [TD-593](../tracker/todo/TD-593.md) | Client-supplied material late for its work pack: warning readiness conflict when expected delivery is after the installing pack's planned start (supplied_by flag on material lines) | E-03-03, E-03-02, E-04-02, E-06b-02, T-0266 | planner |
 
-## missed (13)
+## missed (14)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -166,6 +166,7 @@
 | [TD-543](../tracker/todo/TD-543.md) | System console i18n: label for quarantine reason verify_failed; plural _one forms for count strings | T-0224 | reviewer |
 | [TD-544](../tracker/todo/TD-544.md) | Upload quarantine file cards: show SHA-256, uploader and created time (returned by the API, listed in §4.7) | T-0224 | reviewer |
 | [TD-599](../tracker/todo/TD-599.md) | Mode iv screen: upload a scan of a paper-signed page to a record version and pick the client's PER-15 account (inspector or PER-06, anchor in their subtree); no frontend task covers it (T-0164 covers modes i-iii only) | T-0174, T-0176, T-0164 | coordinator |
+| [TD-601](../tracker/todo/TD-601.md) | SPA page /unsubscribe#<token> for the broadcast opt-out link (T-0228 e-mails link to it) | T-0229 | implementer |
 
 ## deferred (50)
 
@@ -222,7 +223,7 @@
 | [TD-510](../tracker/todo/TD-510.md) | Deployment-config view lacks the mail reply-to of diff §4.7: Settings has no reply-to field yet | T-0230 | implementer |
 | [TD-533](../tracker/todo/TD-533.md) | CEL client runtime has no evaluation step budget (cel-js exposes no step hook; server is the hard gate) | T-0341 | implementer |
 
-## later (166)
+## later (168)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -392,6 +393,8 @@
 | [TD-594](../tracker/todo/TD-594.md) | Automatic weather on the daily diary: fetched, timestamped reference only (source and time), never replaces calibrated ambient readings; new outbound data flow needs a decision | E-04-04 | planner |
 | [TD-597](../tracker/todo/TD-597.md) | Mark template test sends in the delivery ledger so stats can exclude them | T-0227 | implementer |
 | [TD-598](../tracker/todo/TD-598.md) | RFI call-out e-mail templates must register as required=True | T-0227 | implementer |
+| [TD-602](../tracker/todo/TD-602.md) | Impersonation guardrail: classify the broadcast routes (POST /notifications/broadcasts forbid; preview, reads and the public unsubscribe allow) | T-0278 | implementer |
+| [TD-603](../tracker/todo/TD-603.md) | Broadcast opt-out: let a user opt back in (profile setting) and show the state | T-0228 | implementer |
 
 ## bug (18)
 
@@ -416,7 +419,7 @@
 | [TD-560](../tracker/todo/TD-560.md) | review gate counts dismissed reviews: a dismissed KERP-REVIEW APPROVED still satisfies scripts/review_gate.py | — | planner |
 | [TD-595](../tracker/todo/TD-595.md) | Projects screen: the 'Visible in lobby' checkbox renders as a large empty square with no visible check mark or checkbox styling (desktop, /backbone/projects) | T-0026, T-0046 | planner |
 
-## risk (36)
+## risk (37)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -456,6 +459,7 @@
 | [TD-520](../tracker/todo/TD-520.md) | Review gate accepts a 7-character patch-id prefix (MARKER_RE [0-9a-f]{7,40} plus prefix matching) | — | planner |
 | [TD-574](../tracker/todo/TD-574.md) | Mail history exact-address lookup puts the address in the GET query string: load-balancer/proxy access logs (e.g. ALB) would record it | T-0226 | implementer |
 | [TD-584](../tracker/todo/TD-584.md) | Refresh grace: a failed commit after the token is consumed leaves the client unable to refresh; log replays inside the 30 s grace window (PR #181 review) | T-0345 | reviewer |
+| [TD-604](../tracker/todo/TD-604.md) | Broadcast template override can drop {message}; broadcast rate limit is not serialised | T-0228 | implementer |
 
 ## Closed
 

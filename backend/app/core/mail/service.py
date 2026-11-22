@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from typing import Any, Final
@@ -369,6 +369,33 @@ def suppress(
     session.add(row)
     session.flush()
     return row
+
+
+SUPPRESSION_LOOKUP_CHUNK: Final = 500
+
+
+def suppressed_addresses(session: Session, addresses: Collection[str]) -> frozenset[str]:
+    """The addresses among ``addresses`` (normalised) on the session tenant's suppression list.
+
+    For callers that exclude suppressed recipients before queueing (a broadcast's audience,
+    T-0228); ``deliver`` still skips a suppressed address on its own. A value that is not an
+    address is ignored. Only hashes are compared; nothing is written."""
+    by_hash: dict[str, str] = {}
+    for address in addresses:
+        try:
+            normalised = normalize_address(address)
+        except ValueError:
+            continue
+        by_hash[address_hash(normalised)] = normalised
+    hashes = list(by_hash)
+    found: set[str] = set()
+    for start in range(0, len(hashes), SUPPRESSION_LOOKUP_CHUNK):
+        chunk = hashes[start : start + SUPPRESSION_LOOKUP_CHUNK]
+        query = select(MailSuppression.recipient_hash).where(
+            MailSuppression.recipient_hash.in_(chunk)
+        )
+        found.update(by_hash[digest] for digest in session.scalars(query))
+    return frozenset(found)
 
 
 # How far a send has got. A notification moves a row forward only, so applying the same
