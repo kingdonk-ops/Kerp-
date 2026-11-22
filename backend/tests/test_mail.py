@@ -382,7 +382,7 @@ def test_send_mail_refuses_bad_input_before_writing(db: Database) -> None:
 def test_magic_link_request_queues_the_mail_and_never_sends_it(
     tmp_path: Path, db: Database, captured: Captured
 ) -> None:
-    seed_field_worker(db, T1, ALICE)  # PER-14: may sign in by magic link (T-0057)
+    alice = seed_field_worker(db, T1, ALICE)  # PER-14: may sign in by magic link (T-0057)
     settings = _settings(database_url=database_url(tmp_path))
     app, _ = auth_app(settings)  # default sender: the mail service
     with TestClient(app) as client:
@@ -396,6 +396,9 @@ def test_magic_link_request_queues_the_mail_and_never_sends_it(
         rows = session.scalars(select(MailSend)).all()
         assert len(rows) == 1
         assert not any(token in value for value in _values(rows[0]))
+        # The delivery ledger (T-0226) knows the user, never the address in clear.
+        assert (rows[0].recipient_user_id, rows[0].broadcast_id) == (alice, None)
+        assert not any(ALICE.lower() in value.lower() for value in _values(rows[0]))
 
 
 # --- worker side: deliver --------------------------------------------------------------------

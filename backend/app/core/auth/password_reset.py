@@ -343,6 +343,6 @@ class PasswordResetService:
         from app.core.mail.service import send_mail
 
         try:
-            send_mail(session, template, to, context)
+            send_mail(session, template, to, context, recipient_user_id=user_id)
         except InvalidAddressError:
             _logger.warning("%s for user %s not queued: invalid address", template, user_id)

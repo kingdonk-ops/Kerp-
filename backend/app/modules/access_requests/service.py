@@ -548,5 +548,5 @@ def _send_decision_mail(session: Session, request: AccessRequest) -> bool:
         if request.rejection_reason:
             template = REJECTED_TEMPLATE
             context["reason"] = _one_line(request.rejection_reason)
-    send_mail(session, template.key, requester.email, context)
+    send_mail(session, template.key, requester.email, context, recipient_user_id=requester.id)
     return True

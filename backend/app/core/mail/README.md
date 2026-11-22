@@ -2,18 +2,19 @@
 
 One core service for every transactional e-mail: core auth (magic links; password reset,
 T-0077) and modules (invites, T-0059; access-request decisions, T-0063). AWS SES in
-production, always asynchronous, i18n templates, a send log, and bounce/complaint suppression.
+production, always asynchronous, i18n templates, a send log that is also the delivery ledger
+(T-0226, ADR 0020), and bounce/complaint suppression.
 
 | File | What |
 |---|---|
-| `service.py` | `send_mail(session, template_key, to, context, locale=None)`; worker `deliver`; `suppress`, `record_ses_event`; admin `list_sends`, `list_suppressions`, `remove_suppression` (audited) |
+| `service.py` | `send_mail(session, template_key, to, context, locale=None, *, recipient_user_id=None, broadcast_id=None)`; worker `deliver`; `suppress`, `record_ses_event`; admin `list_sends(SendFilter)`, `send_stats(SendFilter)`, `list_suppressions`, `remove_suppression` (audited) |
 | `queue.py` | `QueuedMail`, the post-commit hook `set_mail_enqueuer` (installed by the jobs module) |
 | `templates.py` | `MailTemplate`, `register_template`, `TEMPLATES`, `render` (text + simple HTML) |
 | `i18n.py`, `locales/*.json` | `t(key, locale, **params)` over flat JSON catalogs; `en-AU` is the base |
 | `transport.py` | `MailTransport` protocol: `SesTransport`, `FakeTransport`, `LogTransport`; `check_mail_config`, `transport_from_settings` |
-| `sns.py` | SNS message verification for the SES bounce/complaint endpoint |
-| `models.py` | `mail_send_log`, `mail_suppression` (`BaseRecordMixin`, standard RLS; migration `0024`) |
-| `router.py`, `schemas.py` | `/api/v1/mail`: admin reads, suppression removal, the public SNS endpoint |
+| `sns.py` | SNS message verification for the SES delivery/bounce/complaint endpoint |
+| `models.py` | `mail_send_log`, `mail_suppression` (`BaseRecordMixin`, standard RLS; migration `0024`; the ledger columns: `0039`) |
+| `router.py`, `schemas.py` | `/api/v1/mail`: admin reads (history, stats), suppression removal, the public SNS endpoint |
 
 ## Sending
 
@@ -25,6 +26,10 @@ send_mail(session, "auth.magic_link", user.email, {"token": token, "expires_minu
 # auth.password_changed (the notice after a reset; no parameters) - T-0077.
 # Module templates: admin.project_invite (link /invite#<invite_token>.<setup_token>) - T-0059;
 # access_requests.approved | rejected | rejected_no_reason (public link /) - T-0063.
+
+# The delivery ledger (T-0226): name the recipient's user when you know it; a broadcast
+# (T-0228) passes its id. Neither replaces the address, which is kept hashed + masked only.
+send_mail(session, "auth.password_changed", user.email, {}, recipient_user_id=user.id)
 ```
 
 - Call it inside the caller's unit of work. It checks the template and the address, adds a
@@ -72,12 +77,29 @@ template in `en-AU` and fails on a missing key).
 - Locale: the recipient's, else `KERP_MAIL_DEFAULT_LOCALE` (`en-AU`); a missing catalog or
   key falls back to the language (`en`), then the default, then `en-AU`.
 
-## Send log and suppression list
+## Send log (delivery ledger) and suppression list
 
 `mail_send_log`: template key, recipient SHA-256 + masked form (`b***@example.test`), locale,
-status `queued | sent | bounced | complained | failed | suppressed`, attempts, provider
-message id, short error code, `created_at` / `sent_at` / `status_at`. **Never** the address in
-clear, the link, the token or the body.
+status `queued | sent | delivered | bounced | complained | failed | suppressed`, attempts,
+provider message id, short error code, `created_at` / `sent_at` / `status_at`, and (T-0226,
+ADR 0020) `recipient_user_id`, `broadcast_id` and the record's own `project_id` (the sending
+session's project, `NULL` for tenant-level sends). **Never** the address in clear, the link,
+the token or the body.
+
+Status changes from SES notifications only move forward:
+`sent → delivered → bounced → complained` (`STATUS_RANK`). A repeated notification, a delivery
+arriving after the bounce or complaint of the same message, or a notification for a `queued`,
+`failed` or `suppressed` row changes nothing, so the result does not depend on the order SNS
+delivers in.
+
+**Stats** (`send_stats`, `GET /stats`) count the sends created in `[from, to)` (of one template
+when given), in total and per template: `total`, `queued`, `sent` (accepted by SES: now `sent`,
+`delivered`, `bounced` or `complained`), `delivered` (now `delivered` or `complained`: a
+complaint comes from someone who received it), `bounced`, `complained`, `failed`,
+`suppressed`, and `delivery_rate = delivered / sent` (4 decimals, `null` when nothing was
+sent). Counts only, never a row. **History** (`list_sends`, `GET /sends`): newest first,
+filtered by template, status, period, broadcast and an exact address (normalised and hashed
+server-side, matched on `recipient_hash`; never stored, echoed or logged).
 
 `mail_suppression` (tenant-level): recipient hash + masked form, reason `bounce | complaint`,
 SES detail, at most one live row per address. A **permanent** bounce or a complaint adds the
@@ -91,7 +113,8 @@ The magic-link (and later reset and invite) flows answer neutrally whatever happ
 
 | Method | Path | Who |
 |---|---|---|
-| GET | `/sends?status=&limit=&offset=` | `system_admin` (else 403) |
+| GET | `/sends?template=&status=&from=&to=&broadcast_id=&address=&limit=&offset=` | `system_admin` (else 403); `from` inclusive, `to` exclusive, both with a UTC offset; `from` after `to`, a bad status or a non-address: 422 |
+| GET | `/stats?from=&to=&template=` | `system_admin`; `{created_from, created_to, template_key, totals, by_template[]}` |
 | GET | `/suppressions?limit=&offset=` | `system_admin` |
 | DELETE | `/suppressions/{id}` | `system_admin`; 404 for unknown / removed / another tenant's |
 | POST | `/ses-events` | public (SNS); not in the OpenAPI schema |
@@ -113,8 +136,11 @@ fetched or written (`sns.py`):
 4. The SHA256withRSA signature verifies over the SNS canonical string.
 
 Our topic's `SubscriptionConfirmation` is confirmed by a GET of its `SubscribeURL` (same host
-check). Notifications are applied under `KERP_DEFAULT_TENANT_ID`; no tenant or account value
-of the payload is ever used. Refusals are logged with a reason code, never the body.
+check). Notifications (`Delivery`, `Bounce`, `Complaint`; others are logged and ignored) are
+applied under `KERP_DEFAULT_TENANT_ID`; no tenant or account value of the payload is ever used.
+The unit of work is that tenant with `is_system_admin` (ADR 0016, never crossing the tenant),
+so the row of a project's send (an invite) is updated too, while the suppression list is still
+written at tenant level. Refusals are logged with a reason code, never the body.
 
 ## Configuration
 
@@ -123,7 +149,7 @@ of the payload is ever used. Refusals are logged with a reason code, never the b
 | `KERP_MAIL_TRANSPORT` | `ses` (required in production) or `log` (development; refused in production). Unset: `log` outside production |
 | `KERP_MAIL_FROM_ADDRESS` | Sender, e.g. `KERP <no-reply@mail.company.example>` (a verified SES identity) |
 | `KERP_MAIL_SES_CONFIGURATION_SET` | SES configuration set (event publishing, suppression settings) |
-| `KERP_MAIL_SNS_TOPIC_ARN` | The topic SES publishes bounces and complaints to; must be in `KERP_AWS_REGION` |
+| `KERP_MAIL_SNS_TOPIC_ARN` | The topic SES publishes deliveries, bounces and complaints to; must be in `KERP_AWS_REGION` |
 | `KERP_AWS_REGION` | The deployment region (diff §4.4), default `ap-southeast-2` |
 | `KERP_MAIL_DEFAULT_LOCALE` | Locale when the recipient has none, default `en-AU` |
 | `KERP_WEB_ORIGIN` | Base of every link in an e-mail (required in production) |
@@ -138,4 +164,6 @@ SES, the sender, the topic, the web origin and the deployment tenant are set
 `tests/test_mail.py` (boundary, contract, templates, enqueue-after-commit, delivery with the
 fake transport, SES error mapping, start-up config, the jobs hook) and
 `tests/test_mail_sns.py` (SNS verification with a generated certificate, suppression,
-admin API). Both run on SQLite and PostgreSQL.
+admin API) and `tests/test_mail_ledger.py` (T-0226: migration `0039`, signed `Delivery`
+notifications, forward-only status changes, project sends, stats and history filters). All run
+on SQLite and PostgreSQL.

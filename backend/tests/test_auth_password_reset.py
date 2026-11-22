@@ -671,6 +671,8 @@ def test_confirm_sends_the_password_changed_notice_off_the_request_path(h: Harne
             ("auth.password_reset", "queued"),
             ("auth.password_changed", "queued"),
         ]
+        # The delivery ledger (T-0226): both name the user, neither the address in clear.
+        assert {r.recipient_user_id for r in rows} == {h.users[ACTIVE]}
 
 
 def test_a_refused_password_keeps_the_link_and_says_why(h: Harness) -> None:

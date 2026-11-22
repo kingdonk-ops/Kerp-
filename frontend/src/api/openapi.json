@@ -1158,6 +1158,7 @@
           "mail"
         ],
         "summary": "List Sends",
+        "description": "The delivery ledger, newest first. ``address`` is an exact lookup: hashed here and\nmatched on the stored hash (the request log never records query strings).",
         "operationId": "list_sends_api_v1_mail_sends_get",
         "security": [
           {
@@ -1175,6 +1176,7 @@
                   "enum": [
                     "queued",
                     "sent",
+                    "delivered",
                     "bounced",
                     "complained",
                     "failed",
@@ -1187,6 +1189,93 @@
                 }
               ],
               "title": "Status"
+            }
+          },
+          {
+            "name": "template",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Template"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          },
+          {
+            "name": "broadcast_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Broadcast Id"
+            }
+          },
+          {
+            "name": "address",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 3,
+                  "maxLength": 254
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Address"
             }
           },
           {
@@ -1224,6 +1313,97 @@
                     "$ref": "#/components/schemas/MailSendRead"
                   },
                   "title": "Response List Sends Api V1 Mail Sends Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/mail/stats": {
+      "get": {
+        "tags": [
+          "mail"
+        ],
+        "summary": "Send Stats",
+        "description": "Sent, delivered, bounced, complained, failed and suppressed counts and the delivery\nrate of the sends created in ``[from, to)``, in total and per template.",
+        "operationId": "send_stats_api_v1_mail_stats_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "template",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Template"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MailStatsRead"
                 }
               }
             }
@@ -11934,6 +12114,67 @@
         ],
         "title": "MagicLinkRequest"
       },
+      "MailCountsRead": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "queued": {
+            "type": "integer",
+            "title": "Queued"
+          },
+          "sent": {
+            "type": "integer",
+            "title": "Sent"
+          },
+          "delivered": {
+            "type": "integer",
+            "title": "Delivered"
+          },
+          "bounced": {
+            "type": "integer",
+            "title": "Bounced"
+          },
+          "complained": {
+            "type": "integer",
+            "title": "Complained"
+          },
+          "failed": {
+            "type": "integer",
+            "title": "Failed"
+          },
+          "suppressed": {
+            "type": "integer",
+            "title": "Suppressed"
+          },
+          "delivery_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delivery Rate"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total",
+          "queued",
+          "sent",
+          "delivered",
+          "bounced",
+          "complained",
+          "failed",
+          "suppressed",
+          "delivery_rate"
+        ],
+        "title": "MailCountsRead",
+        "description": "Delivery-ledger counts (T-0226). ``sent``: accepted by SES (now sent, delivered,\nbounced or complained); ``delivered``: SES reported the delivery (now delivered or\ncomplained); the others: sends in that status. ``delivery_rate`` = delivered / sent\n(0..1, 4 decimals), ``null`` when nothing was sent."
+      },
       "MailSendRead": {
         "properties": {
           "id": {
@@ -11958,12 +12199,49 @@
             "enum": [
               "queued",
               "sent",
+              "delivered",
               "bounced",
               "complained",
               "failed",
               "suppressed"
             ],
             "title": "Status"
+          },
+          "recipient_user_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recipient User Id"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "broadcast_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Broadcast Id"
           },
           "attempts": {
             "type": "integer",
@@ -12028,6 +12306,9 @@
           "recipient_masked",
           "recipient_hash",
           "status",
+          "recipient_user_id",
+          "project_id",
+          "broadcast_id",
           "attempts",
           "provider_message_id",
           "error_code",
@@ -12036,6 +12317,65 @@
           "status_at"
         ],
         "title": "MailSendRead"
+      },
+      "MailStatsRead": {
+        "properties": {
+          "created_from": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created From"
+          },
+          "created_to": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created To"
+          },
+          "template_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Template Key"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/MailCountsRead"
+          },
+          "by_template": {
+            "items": {
+              "$ref": "#/components/schemas/MailTemplateCountsRead"
+            },
+            "type": "array",
+            "title": "By Template"
+          }
+        },
+        "type": "object",
+        "required": [
+          "created_from",
+          "created_to",
+          "template_key",
+          "totals",
+          "by_template"
+        ],
+        "title": "MailStatsRead",
+        "description": "Counts of the sends created in ``[from, to)`` (of ``template`` when given), in total and\nper template key. Counts only, never a row."
       },
       "MailSuppressionRead": {
         "properties": {
@@ -12087,6 +12427,71 @@
           "created_at"
         ],
         "title": "MailSuppressionRead"
+      },
+      "MailTemplateCountsRead": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "queued": {
+            "type": "integer",
+            "title": "Queued"
+          },
+          "sent": {
+            "type": "integer",
+            "title": "Sent"
+          },
+          "delivered": {
+            "type": "integer",
+            "title": "Delivered"
+          },
+          "bounced": {
+            "type": "integer",
+            "title": "Bounced"
+          },
+          "complained": {
+            "type": "integer",
+            "title": "Complained"
+          },
+          "failed": {
+            "type": "integer",
+            "title": "Failed"
+          },
+          "suppressed": {
+            "type": "integer",
+            "title": "Suppressed"
+          },
+          "delivery_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delivery Rate"
+          },
+          "template_key": {
+            "type": "string",
+            "title": "Template Key"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total",
+          "queued",
+          "sent",
+          "delivered",
+          "bounced",
+          "complained",
+          "failed",
+          "suppressed",
+          "delivery_rate",
+          "template_key"
+        ],
+        "title": "MailTemplateCountsRead"
       },
       "MeResponse": {
         "properties": {

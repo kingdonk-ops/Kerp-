@@ -156,6 +156,7 @@ class MailMagicLinkSender:
                 MAGIC_LINK_TEMPLATE,
                 link.email,
                 {"token": link.token, "expires_minutes": minutes},
+                recipient_user_id=link.user_id,
             )
         except ValueError:  # an address the mail service cannot send to: answer neutrally
             _logger.warning("magic link for user %s not queued: invalid address", link.user_id)

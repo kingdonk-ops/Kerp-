@@ -511,8 +511,33 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Sends */
+        /**
+         * List Sends
+         * @description The delivery ledger, newest first. ``address`` is an exact lookup: hashed here and
+         *     matched on the stored hash (the request log never records query strings).
+         */
         get: operations["list_sends_api_v1_mail_sends_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/mail/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Send Stats
+         * @description Sent, delivered, bounced, complained, failed and suppressed counts and the delivery
+         *     rate of the sends created in ``[from, to)``, in total and per template.
+         */
+        get: operations["send_stats_api_v1_mail_stats_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3857,6 +3882,33 @@ export interface components {
              */
             invite_token?: string | null;
         };
+        /**
+         * MailCountsRead
+         * @description Delivery-ledger counts (T-0226). ``sent``: accepted by SES (now sent, delivered,
+         *     bounced or complained); ``delivered``: SES reported the delivery (now delivered or
+         *     complained); the others: sends in that status. ``delivery_rate`` = delivered / sent
+         *     (0..1, 4 decimals), ``null`` when nothing was sent.
+         */
+        MailCountsRead: {
+            /** Total */
+            total: number;
+            /** Queued */
+            queued: number;
+            /** Sent */
+            sent: number;
+            /** Delivered */
+            delivered: number;
+            /** Bounced */
+            bounced: number;
+            /** Complained */
+            complained: number;
+            /** Failed */
+            failed: number;
+            /** Suppressed */
+            suppressed: number;
+            /** Delivery Rate */
+            delivery_rate: number | null;
+        };
         /** MailSendRead */
         MailSendRead: {
             /**
@@ -3874,7 +3926,13 @@ export interface components {
              * Status
              * @enum {string}
              */
-            status: "queued" | "sent" | "bounced" | "complained" | "failed" | "suppressed";
+            status: "queued" | "sent" | "delivered" | "bounced" | "complained" | "failed" | "suppressed";
+            /** Recipient User Id */
+            recipient_user_id: string | null;
+            /** Project Id */
+            project_id: string | null;
+            /** Broadcast Id */
+            broadcast_id: string | null;
             /** Attempts */
             attempts: number;
             /** Provider Message Id */
@@ -3890,6 +3948,22 @@ export interface components {
             sent_at: string | null;
             /** Status At */
             status_at: string | null;
+        };
+        /**
+         * MailStatsRead
+         * @description Counts of the sends created in ``[from, to)`` (of ``template`` when given), in total and
+         *     per template key. Counts only, never a row.
+         */
+        MailStatsRead: {
+            /** Created From */
+            created_from: string | null;
+            /** Created To */
+            created_to: string | null;
+            /** Template Key */
+            template_key: string | null;
+            totals: components["schemas"]["MailCountsRead"];
+            /** By Template */
+            by_template: components["schemas"]["MailTemplateCountsRead"][];
         };
         /** MailSuppressionRead */
         MailSuppressionRead: {
@@ -3914,6 +3988,29 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+        };
+        /** MailTemplateCountsRead */
+        MailTemplateCountsRead: {
+            /** Total */
+            total: number;
+            /** Queued */
+            queued: number;
+            /** Sent */
+            sent: number;
+            /** Delivered */
+            delivered: number;
+            /** Bounced */
+            bounced: number;
+            /** Complained */
+            complained: number;
+            /** Failed */
+            failed: number;
+            /** Suppressed */
+            suppressed: number;
+            /** Delivery Rate */
+            delivery_rate: number | null;
+            /** Template Key */
+            template_key: string;
         };
         /** MeResponse */
         MeResponse: {
@@ -6633,7 +6730,12 @@ export interface operations {
     list_sends_api_v1_mail_sends_get: {
         parameters: {
             query?: {
-                status?: ("queued" | "sent" | "bounced" | "complained" | "failed" | "suppressed") | null;
+                status?: ("queued" | "sent" | "delivered" | "bounced" | "complained" | "failed" | "suppressed") | null;
+                template?: string | null;
+                from?: string | null;
+                to?: string | null;
+                broadcast_id?: string | null;
+                address?: string | null;
                 limit?: number;
                 offset?: number;
             };
@@ -6650,6 +6752,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MailSendRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    send_stats_api_v1_mail_stats_get: {
+        parameters: {
+            query?: {
+                template?: string | null;
+                from?: string | null;
+                to?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MailStatsRead"];
                 };
             };
             /** @description Validation Error */
