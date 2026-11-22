@@ -453,7 +453,7 @@
 | [TD-497](../tracker/todo/TD-497.md) | Quarantine re-check: a second verify job can still overlap one whose worker thread is mid-check after a queue-monitor abort (failed/ABORTED while the to_thread verify_upload runs on) or a queue-monitor retry of the replaced failed job; the later job finds the shared quarantine object gone and rejects a clean file as missing_object, the other leaves an orphan content object (fail-safe, nothing published unscanned) | T-0221 | implementer |
 | [TD-520](../tracker/todo/TD-520.md) | Review gate accepts a 7-character patch-id prefix (MARKER_RE [0-9a-f]{7,40} plus prefix matching) | — | planner |
 | [TD-574](../tracker/todo/TD-574.md) | Mail history exact-address lookup puts the address in the GET query string: load-balancer/proxy access logs (e.g. ALB) would record it | T-0226 | implementer |
-| [TD-581](../tracker/todo/TD-581.md) | Migration 0039 collides with T-0226's 0039 (parallel branches): the second to merge must renumber and re-chain | T-0277 | implementer |
+| [TD-581](../tracker/todo/TD-581.md) | Migration 0040 collides with T-0226's 0040 (parallel branches): the second to merge must renumber and re-chain | T-0277 | implementer |
 | [TD-584](../tracker/todo/TD-584.md) | Refresh grace: a failed commit after the token is consumed leaves the client unable to refresh; log replays inside the 30 s grace window (PR #181 review) | T-0345 | reviewer |
 
 ## Closed

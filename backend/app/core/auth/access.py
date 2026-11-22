@@ -476,7 +476,8 @@ def _impersonation_scope(
     # admin-grant policy shows a session its own rows), then rebound to the target to read
     # the target's memberships. Column reads only, so the rebind is allowed.
     with database.unit_of_work(TenancyContext(tenant_id=base.tenant_id, user_id=admin_id)) as s:
-        allowed = admin_may_impersonate(s, base.tenant_id, admin_id)
+        # ``iat``: a password change of the admin after it ends the impersonation too.
+        allowed = admin_may_impersonate(s, base.tenant_id, admin_id, since=claims.issued_at)
         if allowed:
             bind_tenancy(s, own)
             grants = load_grants(s, base.tenant_id, claims.user_id)

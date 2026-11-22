@@ -31,6 +31,7 @@ from app.core.auth.keys import KeySet, generate_signing_key
 from app.core.auth.models import IMPERSONATION_TABLE, ImpersonationSession, User
 from app.core.auth.revocation import InMemoryRevocationStore
 from app.core.auth.runtime import AuthRuntime
+from app.core.auth.service import AuthenticationError, set_user_password
 from app.core.auth.tokens import IMPERSONATION_TYP, InvalidTokenError, TokenService
 from app.core.db import Base, Database, contract_violations
 from app.core.mail import service as mail_service
@@ -569,14 +570,11 @@ def test_a_client_representative_session_is_read_only(api: Api) -> None:
 def test_an_impersonation_is_never_bound_to_a_device(api: Api) -> None:
     token = api.impersonate(BOB)["access_token"]
     headers = {**bearer(token), "X-KERP-Device-Id": str(uuid.uuid4())}
+    # A device header does not bind the request: the principal has no device.
     assert api.client.get(PRINCIPAL_PROBE, headers=headers).json()["device_id"] == ""
-    # Device-bound field endpoints: there is no refresh token to unlock or renew with.
-    unlock = api.client.post(
-        "/api/v1/auth/pin/unlock",
-        json={"pin": "482915"},
-        headers={**cookie_headers(token), "X-KERP-Device-Id": str(uuid.uuid4())},
-    )
-    assert unlock.status_code == 401
+    # Nor does the token: no ``did`` claim, and a token that carries one never verifies (the
+    # forged ``did`` case of test_an_access_token_carries_its_session_end_and_refuses_...).
+    assert "did" not in jwt.decode(token, options={"verify_signature": False})
 
 
 # --- no refresh ---------------------------------------------------------------------------------
@@ -682,6 +680,90 @@ def test_deactivating_the_admin_revokes_the_impersonation(api: Api) -> None:
     assert api.client.get(ME, headers=bearer(token)).status_code == 401
     assert [e["reason"] for e in api.ended()] == ["revoked"]
     _assert_one_notice(api)
+
+
+NEW_PASSWORD = "plum-Radio 41 kettle"  # synthetic
+
+
+def _change_password(api: Api, email: str) -> None:
+    """An admin-side password set or reset of ``email`` (stamps ``password_changed_at``)."""
+    with api.db.unit_of_work(TenancyContext(tenant_id=T1)) as s:
+        set_user_password(s, api.users[email], NEW_PASSWORD, settings=make_settings())
+
+
+def test_an_admin_password_change_revokes_the_impersonation(api: Api) -> None:
+    # The "admin's account compromised: reset the password" case (ADR 0015 §2-3): the change
+    # kills the admin's tokens through ``password_changed_at``, not a session revocation, and
+    # must end the impersonation started from them as well.
+    admin_login = api.login(ALICE)
+    token = api.start(BOB, headers=bearer(admin_login["access_token"])).json()["access_token"]
+    assert api.client.get(ME, headers=bearer(token)).status_code == 200
+    _change_password(api, ALICE)
+    assert api.client.get(ME, headers=bearer(admin_login["access_token"])).status_code == 401
+    assert api.client.get(ME, headers=bearer(token)).status_code == 401
+    assert api.client.get(ME, headers=bearer(token)).status_code == 401
+    assert [e["reason"] for e in api.ended()] == ["revoked"]
+    _assert_one_notice(api)
+    # An impersonation started after the change (a new sign-in) is not refused by it.
+    relogin = api.client.post("/api/v1/auth/login", json={"email": ALICE, "password": NEW_PASSWORD})
+    assert relogin.status_code == 200, relogin.text
+    fresh = api.start(BOB, headers=bearer(relogin.json()["access_token"]))
+    assert fresh.status_code == 200, fresh.text
+    assert api.client.get(ME, headers=bearer(fresh.json()["access_token"])).status_code == 200
+
+
+def test_the_sweep_revokes_after_an_admin_password_change(api: Api) -> None:
+    store = api.runtime.store
+    live = api.impersonate(BOB)
+    assert impersonation.sweep(api.db, store, T1) == {"expired": 0, "revoked": 0}
+    _change_password(api, ALICE)
+    assert impersonation.sweep(api.db, store, T1) == {"expired": 0, "revoked": 1}
+    assert impersonation.sweep(api.db, store, T1) == {"expired": 0, "revoked": 0}
+    assert api.row(live["impersonation_session_id"]).end_reason == "revoked"
+    assert api.client.get(ME, headers=bearer(live["access_token"])).status_code == 401
+    assert [e["reason"] for e in api.ended()] == ["revoked"]
+    _assert_one_notice(api)
+    # A password change of the target or another user does not touch the admin's sessions.
+    other = api.impersonate(CAROL, caller=ERIN)
+    _change_password(api, DAVE)
+    assert impersonation.sweep(api.db, store, T1) == {"expired": 0, "revoked": 0}
+    assert api.client.get(ME, headers=bearer(other["access_token"])).status_code == 200
+
+
+def test_no_impersonation_starts_from_a_token_older_than_the_admin_password(
+    api: Api, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # A change committed between the request's authentication and the start: the admin's row
+    # is re-checked under its lock before the impersonation token is issued (T-0077).
+    admin_token = api.login(ALICE)["access_token"]
+    claims = api.runtime.tokens.verify(admin_token, "access")
+    _change_password(api, ALICE)
+    with (
+        api.db.unit_of_work(TenancyContext(tenant_id=T1, user_id=api.users[ALICE])) as s,
+        pytest.raises(AuthenticationError),
+    ):
+        impersonation.start(
+            s,
+            api.runtime.tokens,
+            admin=claims,
+            admin_device_id=None,
+            target_id=api.users[BOB],
+            reason=REASON,
+            max_minutes=30,
+            client_ip=None,
+            user_agent=None,
+        )
+    assert api.chain() == []
+    # Through the endpoint the same refusal is a 401 (the caller's own token is dead too).
+    monkeypatch.setattr(impersonation, "load_active_user", _refuse_authentication)
+    refused = api.start(BOB, caller=ERIN)
+    assert refused.status_code == 401
+    assert refused.headers["WWW-Authenticate"] == 'Bearer error="invalid_token"'
+    assert api.chain() == []
+
+
+def _refuse_authentication(*_args: Any, **_kwargs: Any) -> User:
+    raise AuthenticationError("user not active")
 
 
 def test_an_expired_token_is_refused_and_ends_the_session_lazily(

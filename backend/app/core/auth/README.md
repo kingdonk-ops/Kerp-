@@ -27,7 +27,7 @@ rewritten (HS256 → RS256/EdDSA + JWKS + `jti` revocation in Redis).
 | `magic_link.py` | Magic links for Field Workers only (T-0057): `magic_link_eligible` (PER-14 via `load_grants`, plus registered providers), the eligibility extension point (`register_magic_link_eligibility`), `MagicLinkJob` (the post-response half of a request), refusal reason `magic_link_not_field_worker` |
 | `post_auth.py` | The post-authentication hook (T-0052): what a sign-in does with an `invite_token`. Empty by default; the module owning invites registers it (*Post-authentication hook*) |
 | `lockout.py` | `ProgressiveLockout` + policies, Redis-backed (T-0009); offline failures counted with `extra` (T-0038) |
-| `models.py` | `auth_user` table (tenant-level rows, RLS) — migration `0003`, internal staff flag + Entra link in `0013` (T-0049, ADR 0009); `auth_project_membership` (T-0010) — migration `0006`, persona CHECK widened for PER-16 in `0012` (T-0076), membership-based RLS in `0015` (T-0014), grant sources (`source_type`, `source_id`) in `0025` (T-0073, ADR 0008); `oe_identity_device` (T-0043) — migration `0016`, `wipe_secret_hash` in `0018` (T-0080), `pin_hash` + `pin_set_at` in `0019` (T-0038); `auth_impersonation_session` (T-0277) — migration `0039` |
+| `models.py` | `auth_user` table (tenant-level rows, RLS) — migration `0003`, internal staff flag + Entra link in `0013` (T-0049, ADR 0009); `auth_project_membership` (T-0010) — migration `0006`, persona CHECK widened for PER-16 in `0012` (T-0076), membership-based RLS in `0015` (T-0014), grant sources (`source_type`, `source_id`) in `0025` (T-0073, ADR 0008); `oe_identity_device` (T-0043) — migration `0016`, `wipe_secret_hash` in `0018` (T-0080), `pin_hash` + `pin_set_at` in `0019` (T-0038); `auth_impersonation_session` (T-0277) — migration `0040` |
 | `memberships.py` | The membership store's write side for **individual** (`direct`) rows (`project_grants`, `set_user_grants`, `revoke_project`; revoke = soft delete, re-grant revives) and the member list with sources (`project_member_grants`), used by the admin module (T-0014) and the projects module (creator PER-09, revoke on delete; T-0039) |
 | `team_grants.py` | Team-derived grants (T-0073, ADR 0008): `sync_team_link_grants`, `revoke_team_link_grants`, `team_link_grants` for the teams module, and the startup check (below) |
 | `access.py` | Persona matrix, capability tiers, SoD, scope resolution, `ProjectAccess` (`has`, `can_release_hold`) (T-0010); admin-grant lookup seam, `is_system_admin` binding, `CallerIsSystemAdmin`, `sod_warning` (T-0014); `system_admin` capabilities on every project, `system_admin_holders` (T-0275); `CallerAdminGrants` (the caller's own `system_admin` / `create_projects`, cached with the scope; T-0039) |
@@ -798,7 +798,10 @@ A `system_admin` starts a time-boxed session as a non-admin user with `POST
 /api/v1/admin/users/{id}/impersonate` `{reason}` (admin module, `impersonation_router.py`;
 refusals: nested `403 IMPERSONATION_ACTION_FORBIDDEN`, non-admin `403`, oneself `422
 CANNOT_IMPERSONATE_SELF`, unknown `404`, deactivated `422 USER_DEACTIVATED`, a System admin
-`403 CANNOT_IMPERSONATE_SYSTEM_ADMIN`; `reason` 1-500 characters). Targets holding
+`403 CANNOT_IMPERSONATE_SYSTEM_ADMIN`; `reason` 1-500 characters). The start locks the
+admin's `auth_user` row and re-checks the admin's token against it (`load_active_user`,
+T-0077): a password change committed since the request was authenticated is `401`, and one
+still to come is stamped after `started_at`. Targets holding
 `create_projects` (§8) and PER-15 Client Representatives (§9, read-only) may be impersonated.
 
 - **Token.** `type: impersonation`, header `typ: imp+jwt`, the T-0008 key set: `sub` = the
@@ -812,8 +815,10 @@ CANNOT_IMPERSONATE_SELF`, unknown `404`, deactivated `422 USER_DEACTIVATED`, a S
 - **Every request** (`bearer.py`): refused (`401`) when its `jti` or `sid` is revoked, the
   admin's `imp_sid` is revoked (admin logout, force sign-out, device revoke) or it expired.
   `access.resolve_request_scope` re-checks, in the unit of work that loads the grants, that
-  the admin still holds `system_admin` and is active (bound to the admin, then rebound to the
-  target), and builds the **target's** scope: `app.current_user_id` = target, its
+  the admin still holds `system_admin`, is active and has not had a password change after the
+  token's `iat` (`impersonation.admin_may_impersonate`; a password change or reset kills the
+  admin's tokens through `password_changed_at`, not a session revocation, so `imp_sid` alone
+  would not show it) (bound to the admin, then rebound to the target), and builds the **target's** scope: `app.current_user_id` = target, its
   allowed/member/admin projects, its site filter, `app.is_system_admin` **false**. It stores an
   `ImpersonationScope` on `request.state`; without it `get_current_user` refuses the token.
 - **Principal.** `user` / `user_id` are the target (so `created_by` / `updated_by` are the
@@ -827,8 +832,9 @@ CANNOT_IMPERSONATE_SELF`, unknown `404`, deactivated `422 USER_DEACTIVATED`, a S
   /auth/impersonation/exit` or logout with the impersonation token; revokes `jti` and `sid`
   for the token's remaining lifetime), `expired` (the first refused use after `exp`, or the
   batch cron `impersonation_sweep`, every 5 minutes), `revoked` (the first refused use after
-  the admin's session was revoked, the admin lost `system_admin` or was deactivated; or the
-  sweep). The admin's own access token and refresh cookie are never touched, so the SPA
+  the admin's session was revoked, the admin lost `system_admin`, was deactivated or had a
+  password change after the start; or the sweep, which compares the password change with
+  `started_at`). The admin's own access token and refresh cookie are never touched, so the SPA
   resumes the admin's session.
 - **Ledger** (tenant chain `admin-impersonation:<tenant>`): `impersonation.started` (session
   id, admin, target, reason, client IP, user agent, `started_at`, `expires_at`, admin device)

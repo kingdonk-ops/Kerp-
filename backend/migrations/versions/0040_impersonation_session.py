@@ -10,8 +10,12 @@ reason; never the token).
 
 No existing table, row or policy changes. The downgrade drops the table.
 
-Revision ID: 0039
-Revises: 0038
+Runtime role (ADR 0019): no grant of its own. ``0039``'s default privileges give the runtime
+role ``SELECT, INSERT, UPDATE, DELETE`` on this table when the owner creates it; the table is
+not append-only (the end is an ``UPDATE``), so nothing is revoked.
+
+Revision ID: 0040
+Revises: 0039
 Create Date: 2026-11-22
 """
 
@@ -22,8 +26,8 @@ from alembic import op
 
 from app.core.db import GUID, JSONType
 
-revision: str = "0039"
-down_revision: str | None = "0038"
+revision: str = "0040"
+down_revision: str | None = "0039"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

@@ -24,7 +24,7 @@ from fastapi.responses import JSONResponse
 from app.core.auth import impersonation
 from app.core.auth import service as auth_service
 from app.core.auth.access import CallerIsSystemAdmin, system_admin_holders
-from app.core.auth.deps import CurrentPrincipal
+from app.core.auth.deps import CurrentPrincipal, unauthorized
 from app.core.auth.runtime import AuthRuntime, get_auth_runtime
 from app.core.auth.schemas import (
     ImpersonationRefusal,
@@ -111,18 +111,23 @@ def impersonate(
     max_minutes = runtime_settings.get_int(
         session, IMPERSONATION_MAX_MINUTES.key, config=runtime.settings
     )
-    started = impersonation.start(
-        session,
-        runtime.tokens,
-        admin=principal.claims,
-        admin_device_id=principal.device_id,
-        target_id=target.id,
-        reason=body.reason,
-        max_minutes=max_minutes,
-        # Behind a proxy, uvicorn sets this from X-Forwarded-For only for trusted peers.
-        client_ip=request.client.host if request.client else None,
-        user_agent=request.headers.get("user-agent"),
-    )
+    try:
+        started = impersonation.start(
+            session,
+            runtime.tokens,
+            admin=principal.claims,
+            admin_device_id=principal.device_id,
+            target_id=target.id,
+            reason=body.reason,
+            max_minutes=max_minutes,
+            # Behind a proxy, uvicorn sets this from X-Forwarded-For only for trusted peers.
+            client_ip=request.client.host if request.client else None,
+            user_agent=request.headers.get("user-agent"),
+        )
+    except auth_service.AuthenticationError as exc:
+        # The caller's password changed (or the account was deactivated) since the request
+        # was authenticated: the caller's own token is dead too.
+        raise unauthorized(invalid_token=True) from exc
     # A token response: never cached (RFC 6749 §5.1).
     response.headers["Cache-Control"] = "no-store"
     response.headers["Pragma"] = "no-cache"
