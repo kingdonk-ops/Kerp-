@@ -344,8 +344,8 @@
 | [TD-532](../tracker/todo/TD-532.md) | Registry entries declared by later tasks add their label to admin.settings.entries (and a new category to admin.settings.categories) in the Settings screen | T-0232 | implementer |
 | [TD-535](../tracker/todo/TD-535.md) | Startup role check: also refuse a runtime role that owns any app table (owner can drop FORCE or re-grant), once every deployment runs the owner/runtime split | T-0342 | implementer |
 | [TD-537](../tracker/todo/TD-537.md) | RegisterPage shell lacks per-row actions and server-side paging, so the System console registers (failed jobs, upload quarantine) use admin card lists; adopt the shell once it supports both (diff §6.5) | T-0224 | implementer |
-| [TD-563](../tracker/todo/TD-563.md) | Adopt core tenant_level_context in the remaining tenant-level session guards | T-0349 | implementer |
-| [TD-564](../tracker/todo/TD-564.md) | Use core sha256_hex for the remaining inline SHA-256 hex digests (lockout subject, mail address, admin e-mail) | T-0349 | implementer |
+| [TD-568](../tracker/todo/TD-568.md) | Adopt core tenant_level_context in the remaining tenant-level session guards | T-0349 | implementer |
+| [TD-569](../tracker/todo/TD-569.md) | Use core sha256_hex for the remaining inline SHA-256 hex digests (lockout subject, mail address, admin e-mail) | T-0349 | implementer |
 
 ## bug (17)
 
