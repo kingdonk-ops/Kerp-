@@ -19,6 +19,12 @@ installed spool. Commitments only — money is an external read-only mirror.
 - MRIR acceptance clears the AWP **material constraint** when 100 % of an IWP's line items are
   staged; heat numbers link to every weld execution id.
 - MTRs + inspection certs auto-compile into the **MDR** ([`documents-and-mdr.md`](documents-and-mdr.md)).
+- **Client-supplied (free-issue) material** (product intake 2026-11-22 (3), planner default;
+  user to confirm; TD-593): material lines and lots carry `supplied_by` (`kaefer | client`, the
+  same flag as weld joint sides in welding-and-nde.md, TD-091) and, for client-supplied lines,
+  an `expected_delivery` date. A client-supplied line expected after the planned start of the
+  work that installs it raises a warning readiness conflict (quality-and-inspection.md
+  §Schedule readiness conflicts), never a block.
 
 ## MTR verification gate (user, 2026-11-21; planner defaults; T-0265, Phase 2)
 - A heat/MTR record (T-0205) carries `verification_status` (`pending_verification | verified |

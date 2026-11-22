@@ -416,6 +416,29 @@ before it ships carry no attestation and stay valid ("no attestation recorded" o
   the consumer passes the template revision id and its content hash. A later change of name,
   credential expiry or template revision never alters the stored snapshot. Records signed before
   this lands show "not recorded", never a value derived after the fact.
+- **Competency at signing** (product intake 2026-11-22 (3), planner default; user to confirm;
+  TD-591). The `credentials` service (T-0118) exposes a read-only fact to sign-off rule sets:
+  the signer holds a valid credential of qualification type X (and level, where the type has
+  levels) **at the signing time** (`as_of` = the sign-off's `occurred_at`, the same as-of rule
+  as §eligibility service). A rule set can require it (for example a torque or bolting `H`/`W`
+  line needs a current bolting certificate); it is evaluated by `run_checks` like any other
+  fact, never as a hard-wired check. Every credential the rule set read is written to
+  `credential_snapshot` above, so the evidence shows what was valid when the person signed.
+- **Paper-signed pages** (product intake 2026-11-22 (3), planner default; user to confirm;
+  TD-592). A scan of a page signed on paper can be attached to a **specific ITR revision**
+  (inspection record and version) as a file of kind `wet_signed_scan`, with uploader, upload
+  time, the signer's name and party as stated by the uploader, and an optional note (audited).
+  It is evidence, not an attested e-signature: it carries no attestation, and an internal formal
+  sign-off (the kinds above) always needs its own attestation. Where the project allows it, the
+  scan can stand for a **client or third-party signature** on that ITR revision (the client
+  co-sign, §Client co-sign), recorded as `verification_mode = paper_scan` and reviewed like a
+  provisional wet signature. The inspection PDF and the dossier (E-05-05) show it as
+  "Wet-signed on paper; scan uploaded by <name> on <date>", next to and never in place of an
+  attestation block. A project rule can require e-signature instead (project setting
+  `inspection.require_e_signature`, default off): when on, the co-sign rule set refuses a
+  paper scan as the client signature and an electronic co-sign mode is needed; the scan can
+  still be attached as plain evidence. The client's wet signature drawn on the tablet (§Client
+  co-sign, mode iii) is a different thing and is unchanged.
 - **Keys and fingerprints** (product intake 2026-11-21, planner default; user to confirm). Every
   record sealed with a key names the fingerprint (SHA-256 of the public key or certificate) of
   that key: client device co-sign assertions (T-0173), PAdES signatures of dossiers and Delay
@@ -826,6 +849,16 @@ the Look-Ahead board (E-04-02).
   change, verification approved). A conflict that no longer holds resolves itself. Conflict alerts
   (in-app + e-mail `schedule_readiness_conflict`) go to the matching rule's recipients, again only
   when the target dates change.
+- **Client-supplied material late** (product intake 2026-11-22 (3), planner default; user to
+  confirm; TD-593). A second conflict kind, from the materials provider: a material line or lot
+  with `supplied_by = client` (the flag of welding-and-nde.md, TD-091, reused on materials
+  records) whose `expected_delivery` is later than the planned start of the work pack, work-plan
+  line or P6 activity that installs it (or has no expected delivery date while that start is
+  inside the look-ahead). Resource kind `client_supplied_material`, the date compared is the
+  target's planned **start** (not finish). It is a **warning** only, never a block; the
+  Look-Ahead board (E-04-02) and the AWP constraint view (E-06b-02) show it as a material
+  constraint warning. It resolves itself when the delivery date moves or the material is
+  received.
 
 ## `eligibility` service (stateless, no tables)
 Answers "is this person / instrument / material valid **on the inspection date**?" (ADR 0004
@@ -1303,7 +1336,7 @@ notification per request per recipient per event (not one per slot).
   `reminder_sent_at`; a slot issued inside the lead time gets no reminder.
   A reminder that cannot go out before `scheduled_start` (worker backlog, outage) is recorded
   as failed (`too_late`) and never sent late (product intake 2026-11-21, planner default; user
-  to confirm; general rule in TD-549).
+  to confirm; general rule in TD-587, carried over from TD-549).
 - **Delivery failure per party** (product intake 2026-11-21, planner default; user to confirm;
   task T-0350). Every call-out recipient is a project account, so the in-app row always exists;
   delivery is therefore judged over the **out-of-app channels only** (push and e-mail). A
@@ -1311,15 +1344,17 @@ notification per request per recipient per event (not one per slot).
   of that party's call-out recipients for the latest issue or reschedule failed or was skipped
   (e-mail bounced, suppressed or failed in the core-mail log, T-0226; push failed or no device;
   no out-of-app channel at all = `no_channel`), with the reason in `notice_delivery_reason`; it
-  is `delivered` once any such attempt succeeds, and `pending` until then. A recipient's own
-  opt-out of a channel (if notification preferences ever apply to call-outs) counts as
-  `skipped` for that attempt, so a party whose every recipient opted out of push and e-mail
-  is `failed` (`skipped`) (planner default; to confirm in TD-549). A reschedule resets it
+  is `delivered` once any such attempt succeeds, and `pending` until then. **Call-outs ignore
+  opt-out** (user, 2026-11-22; TD-549 resolved): call-out and inspection-request notices are
+  contractual, transactional messages, so a recipient's channel opt-out or unsubscribe never
+  suppresses them and is never a `skipped` reason for them; opt-out applies to optional
+  notifications only (as for broadcasts, diff §4.7). A missing address or a bounce is still
+  recorded per party as above (`no_channel`, `bounced`, `suppressed`). A reschedule resets it
   to `pending`. On `failed` the requester and PER-06 get a `high` in-app notification and the
   slot detail shows it. A failed delivery is never attendance: the party stays `pending` until
   someone records `attended`, `absent` or a waiver. Effect on outcomes: no valid notice for
   that party (§6, §5, §7), fixed once when the outcome is recorded (§6). Per-channel results come from the persisted delivery log (TD-238,
-  TD-549).
+  TD-587).
 - **E-mail** through core mail (T-0058, diff §4.6), recipient's locale. Planner default, decision
   **TD-484**: only to project accounts above; content = project code and name, RFI no.,
   discipline title, the event, and a link to the request page behind sign-in; **no** scheduled
