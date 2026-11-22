@@ -3,12 +3,12 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 101/320 tasks done (32%) · **ready now:** 21 · **epics awaiting breakdown:** 49
+**Overall:** 101/321 tasks done (31%) · **ready now:** 21 · **epics awaiting breakdown:** 49
 
 | Phase | Tasks done | Progress |
 |---|---|---|
 | 0 · Platform foundations | 99/126 | `███████░░░` 79% |
-| 1 · Asset & Quality backbone | 2/168 (+2 epics) | `░░░░░░░░░░` 1% |
+| 1 · Asset & Quality backbone | 2/169 (+2 epics) | `░░░░░░░░░░` 1% |
 | 2 · Welding quality | 0/11 | `░░░░░░░░░░` 0% |
 | 3 · Logistics | 0/2 (+7 epics) | `░░░░░░░░░░` 0% |
 | 4 · Execution | 0/0 (+15 epics) | `░░░░░░░░░░` 0% |
@@ -323,6 +323,7 @@
 | ⬜ | [T-0338](../tracker/tasks/T-0338.md) | Frontend: RFI register, create/issue draft with slots, detail with history and comments, confirm/reschedule/outcome/waive/cancel actions; PER-15 client view | inspection_requests | M | T-0333, T-0334, T-0335, T-0336 |  |
 | ⬜ | [T-0339](../tracker/tasks/T-0339.md) | Frontend: RFI calendar — month/week/day/agenda in the main web app and the PER-15 client view, and offline read-only on the tablet from the local store | inspection_requests | M | T-0337, T-0338, T-0142, T-0149 |  |
 | ⬜ | [T-0340](../tracker/tasks/T-0340.md) | inspection_requests: discipline configuration editing — API and settings screen for titles, inspection types, location label, max slots (PER-06/PER-09) | inspection_requests | S | T-0115 |  |
+| 🟥 | [T-0350](../tracker/tasks/T-0350.md) | inspection_requests: per-party call-out delivery state — notice_delivery on slot parties from push/e-mail results, failed delivery treated like short notice *(blocked by TD-238)* | inspection_requests | S | T-0335, T-0334, T-0333, T-0226 |  |
 
 ## Phase 2 — Welding quality
 

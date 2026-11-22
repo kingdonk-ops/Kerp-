@@ -673,6 +673,9 @@ Pilot-0 gate (2026-11-14), the transport is a Pilot-0 dependency. Planner defaul
   bounce/complaint notification wiring.
 - Portal extras of TD-084 (PDF attachments, digests: `modules/portal-plan-review.md`) build on
   this service in their own epics.
+- **Channels** are in-app, push (Android, T-0144) and e-mail. No SMS (TD-413). **No
+  Teams/WhatsApp messaging bridge** (user decision 2026-11-21): KERP neither reads field input
+  from nor sends notifications to chat platforms.
 
 ### 4.7 Admin operations, communications and runtime settings (user, 2026-11-21; planner defaults)
 
@@ -755,6 +758,13 @@ visibility).
   the next send uses the change without a redeploy. Templates added by later tasks (handover,
   inspection returned/overdue, co-sign confirmation/reminder, archive ready/restored) appear when
   they are registered. The magic-link template is sent only to Field Workers (PER-14, §4.2).
+  Editor details (product intake 2026-11-21, planner default; user to confirm): templates are
+  listed grouped by audience (internal staff, client, witness / external party, deployment-wide);
+  the placeholders a template declares are listed beside the editor and can be inserted from
+  there; a template marked required (sign-in, invite, password reset, RFI call-outs) can be
+  reworded but not saved with an empty subject or empty text blocks (422); a mail-health banner
+  on the screen says when sending is not possible (mail not configured, sender not verified,
+  bounce wiring missing), from the same checks as the health probes, never showing credentials.
 - **Broadcast e-mail** (T-0228): a System admin targets all active users, one or more projects,
   an audience category (`internal` = `is_internal`, `external` = not internal, `client` = PER-15
   holders) or personas (PER-01–PER-16); a PER-09 only users with an active membership on its own
@@ -859,7 +869,7 @@ additive and need an ADR (CLAUDE.md §6).
 
 The user's enterprise roadmap of 2026-11-21, applied through the coordinator's assessment that
 the user approved. E-signature and delegation are in `modules/quality-and-inspection.md`
-(§Signing attestation, §Delegation of authority); metering is §4.10; feature flags are in §4.7.
+(§Signing attestation, §Delegation of authority); metering is §4.10; feature flags are in §4.7; AI data use, assurance and the project assistant are §4.11.
 
 - **SCIM provisioning (after Pilot-0; T-0298–T-0300; ADR 0017; TD-437).** Entra ID provisions
   and deprovisions KERP accounts through SCIM 2.0 at `/scim/v2/` (off unless
@@ -957,6 +967,44 @@ come later (Phase 6, T-0303–T-0305, epic E-06-05). Rules:
   advisories (in-app and e-mail) to PER-09 holders and System admins.
 - **E-mail carries a link and the project code/name only** (§4.6); numbers stay in the app and
   in the statement CSV download.
+
+### 4.11 AI assistance: data use, assurance record, project assistant (user decision and product intake, 2026-11-21)
+
+- **Data use** (user decision 2026-11-21): client and site data of a project may be sent to an
+  external AI provider for KERP's AI features (assistant, ITP drafting and watchdog, ingestion
+  second pass, text refinement). The CLAUDE.md §6 rule is unchanged: every AI-initiated mutation
+  carries `source="ai"` and needs human confirmation before it applies.
+- **Provider, residency, credentials** (product intake 2026-11-21, planner default; user to
+  confirm, TD-545): one provider per deployment (= the tenant, §4.1), chosen from OpenAI,
+  Anthropic Claude or a self-hosted model, hosted in the deployment region (Australian region,
+  TD-078). Credentials are the company's own (tenant-owned key) held in the deployment secret
+  store, never a registry entry (§4.7, TD-398). **Fail closed:** with no provider or no valid
+  credentials every AI feature is unavailable (entry points hidden; endpoints answer 503
+  `AI_UNAVAILABLE`); nothing falls back to another provider or region.
+- **AI assurance record** (product intake 2026-11-21, planner default; user to confirm). Every
+  AI call writes one metadata row (BaseRecordMixin, project RLS for project calls): feature,
+  provider, model id, credentials owner (tenant key, or platform key only if TD-545 changes),
+  prompt template id and version, input record references (ids only), output artifact reference, start and end time, token counts, outcome.
+  An AI call with no project (for example tenant-library ITP drafting, T-0187) writes a
+  tenant-scoped row (`project_id` null, tenant RLS; read by `system_admin` and PER-13).
+  **No prompt or completion text is stored** in this record. A result that becomes a proposal
+  links to the human decision (`confirmed | edited_and_confirmed | rejected`, reviewer, time):
+  the reviewer's control is a named "I reviewed this" per AI call. The assurance screen lists
+  calls (not reviews) and highlights calls whose output nobody reviewed. Rows follow the
+  retention schedule (TD-175).
+- **Refine note** (product intake 2026-11-21, planner default; user to confirm): on issue and
+  NCR descriptions and diary text, the user may ask for a reworded version; it is shown as a
+  diff, applied only when the user accepts it, and the saved change carries `source="ai"` in its
+  audit entry with the assurance record id.
+- **Project-scoped assistant** (product intake 2026-11-21, planner default; user to confirm;
+  E-05-08). Retrieval runs **as the asking user**: every lookup goes through the owning module's
+  `service.py` under the user's session, RLS and project membership (site scope, granted subtree,
+  `internal_commercial` class), never through a service role or a shared index that bypasses
+  them. An embedding index, if used, is per project and filtered by the same visibility at query
+  time. Structured queries are preferred over embeddings where the data is structured (for
+  example "what blocks milestone X": P6 links, the asset subtree, open issues with
+  `mdr_effect = blocks`, unsigned hold points). The assistant reads and drafts only; any change
+  it proposes is a draft with `source="ai"`, confirmed by a person in the normal screen.
 
 ---
 
