@@ -104,8 +104,9 @@ Planner defaults (user to confirm) unless marked as a user decision.
   field. Gating stays configuration (ADR 0004): projects tune it through their rule-set copy and
   per-record overrides, never through hard-wired status checks.
 - **Draft compile vs Issue** (product intake 2026-11-21, planner default; user to confirm).
-  *Draft compile* runs whatever the readiness list says, stamps every page "DRAFT – not for
-  issue", is not signed, gets no revision letter and is kept only as the latest draft per scope.
+  *Draft compile* compiles regardless of open readiness findings (they are listed on the
+  draft's cover), stamps every page "DRAFT – not for issue", is not signed, gets no revision
+  letter and is kept only as the latest draft per scope.
   *Issue* runs `mdr.compile`, allocates the revision and signs the result (PAdES-B-LTA + RFC
   3161, above).
 - **Revisions** (product intake 2026-11-21, planner default; user to confirm). The first issued

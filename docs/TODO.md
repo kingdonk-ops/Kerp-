@@ -3,9 +3,9 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 376 · **Closed:** 151
+**Open:** 377 · **Closed:** 151
 
-## decision (41)
+## decision (42)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -50,6 +50,7 @@
 | [TD-486](../tracker/todo/TD-486.md) | RFI witness check: may an unmet hold-point (H) witness requirement be overridden per record (ADR 0004 Amendment A), or is it non-overridable? | T-0333 | planner |
 | [TD-514](../tracker/todo/TD-514.md) | How is a passed or LOCKED_FOR_TURNOVER inspection corrected? Define void-and-reissue (revision suffix, supersedes link, ledger, MDR shows latest) | — | planner |
 | [TD-545](../tracker/todo/TD-545.md) | AI provider, region and credentials (data use allowed by the user 2026-11-21): confirm one provider per deployment, Australian region, company-owned key in the secret store, fail closed | E-05-08, T-0187, T-0189 | planner |
+| [TD-561](../tracker/todo/TD-561.md) | Grant ceiling questions: second approver when PER-09 assigns a hold-authority persona it does not hold? May external accounts hold PER-14 (Field Worker)? | T-0014, T-0026, T-0296 | planner |
 
 ## spec-gap (82)
 

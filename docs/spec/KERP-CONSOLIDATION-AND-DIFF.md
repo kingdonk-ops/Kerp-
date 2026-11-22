@@ -968,9 +968,6 @@ come later (Phase 6, T-0303–T-0305, epic E-06-05). Rules:
 - **E-mail carries a link and the project code/name only** (§4.6); numbers stay in the app and
   in the statement CSV download.
 
----
-
-
 ### 4.11 AI assistance: data use, assurance record, project assistant (user decision and product intake, 2026-11-21)
 
 - **Data use** (user decision 2026-11-21): client and site data of a project may be sent to an
@@ -985,9 +982,11 @@ come later (Phase 6, T-0303–T-0305, epic E-06-05). Rules:
   credentials every AI feature is unavailable (entry points hidden; endpoints answer 503
   `AI_UNAVAILABLE`); nothing falls back to another provider or region.
 - **AI assurance record** (product intake 2026-11-21, planner default; user to confirm). Every
-  AI call writes one metadata row (BaseRecordMixin, project RLS): feature, provider, model id,
-  credentials owner (tenant key or platform key), prompt template id and version, input record
-  references (ids only), output artifact reference, start and end time, token counts, outcome.
+  AI call writes one metadata row (BaseRecordMixin, project RLS for project calls): feature,
+  provider, model id, credentials owner (tenant key, or platform key only if TD-545 changes),
+  prompt template id and version, input record references (ids only), output artifact reference, start and end time, token counts, outcome.
+  An AI call with no project (for example tenant-library ITP drafting, T-0187) writes a
+  tenant-scoped row (`project_id` null, tenant RLS; read by `system_admin` and PER-13).
   **No prompt or completion text is stored** in this record. A result that becomes a proposal
   links to the human decision (`confirmed | edited_and_confirmed | rejected`, reviewer, time):
   the reviewer's control is a named "I reviewed this" per AI call. The assurance screen lists
@@ -1006,6 +1005,8 @@ come later (Phase 6, T-0303–T-0305, epic E-06-05). Rules:
   example "what blocks milestone X": P6 links, the asset subtree, open issues with
   `mdr_effect = blocks`, unsigned hold points). The assistant reads and drafts only; any change
   it proposes is a draft with `source="ai"`, confirmed by a person in the normal screen.
+
+---
 
 ## 5. Equipment calibration lifecycle & hard quality gate
 
