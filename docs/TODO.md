@@ -3,9 +3,9 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 377 · **Closed:** 151
+**Open:** 380 · **Closed:** 153
 
-## decision (42)
+## decision (41)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -49,10 +49,9 @@
 | [TD-484](../tracker/todo/TD-484.md) | RFI notification e-mail: may it carry the date/time/location, the RFI PDF attachment and an .ics invite, and go to client distribution addresses without a KERP account? | T-0335 | planner |
 | [TD-486](../tracker/todo/TD-486.md) | RFI witness check: may an unmet hold-point (H) witness requirement be overridden per record (ADR 0004 Amendment A), or is it non-overridable? | T-0333 | planner |
 | [TD-514](../tracker/todo/TD-514.md) | How is a passed or LOCKED_FOR_TURNOVER inspection corrected? Define void-and-reissue (revision suffix, supersedes link, ledger, MDR shows latest) | — | planner |
-| [TD-545](../tracker/todo/TD-545.md) | AI provider, region and credentials (data use allowed by the user 2026-11-21): confirm one provider per deployment, Australian region, company-owned key in the secret store, fail closed | E-05-08, T-0187, T-0189 | planner |
-| [TD-561](../tracker/todo/TD-561.md) | Grant ceiling questions: second approver when PER-09 assigns a hold-authority persona it does not hold? May external accounts hold PER-14 (Field Worker)? | T-0014, T-0026, T-0296 | planner |
+| [TD-564](../tracker/todo/TD-564.md) | On-site label printing (QR / asset tags, quarantine labels): PDF label sheet, vendor print service on Android, or Web Bluetooth? Needs the printer model and device platform | T-0155, E-03-03, E-03-07, T-0141 | planner |
 
-## spec-gap (82)
+## spec-gap (84)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -138,6 +137,8 @@
 | [TD-554](../tracker/todo/TD-554.md) | Per-person share links for MDR and report access: expiry stamped at creation, policy change affects new links only, counted bulk re-expiry, immediate revoke, distinct expired vs revoked messages | E-07-01, E-07-04 | planner |
 | [TD-555](../tracker/todo/TD-555.md) | Three-way upgrade of default ITP templates and rule sets into customised projects: counts, overlapping pairs, keep ours / take theirs, auto-update untouched, mark dropped | T-0137, T-0281, T-0036 | planner |
 | [TD-559](../tracker/todo/TD-559.md) | MDR breakdown open points: how client acceptance of a review revision is recorded, revision scheme, Rev 0 without review, B-LTA augmentation schedule | E-05-05 | planner |
+| [TD-563](../tracker/todo/TD-563.md) | Earned value counts only verified completion: which ITP lines verify which progress steps, partial credit, reversal on re-inspection; planned vs verified-complete view | E-06-04, E-04-03, E-04-06, E-04-12 | planner |
+| [TD-567](../tracker/todo/TD-567.md) | Schedule facts in rule sets: total float and on-critical-path per anchor from the last committed P6 import (project critical definition), CEL variable names and units | T-0125, T-0104, E-04-02 | planner |
 
 ## missed (12)
 
@@ -211,7 +212,7 @@
 | [TD-508](../tracker/todo/TD-508.md) | Verify the e2e suite on the make up compose stack, and give it its own database | T-0027 | implementer |
 | [TD-510](../tracker/todo/TD-510.md) | Deployment-config view lacks the mail reply-to of diff §4.7: Settings has no reply-to field yet | T-0230 | implementer |
 
-## later (148)
+## later (150)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -363,6 +364,8 @@
 | [TD-556](../tracker/todo/TD-556.md) | Undo a committed P6 or asset import while nothing refers to the imported nodes yet | T-0129, T-0104, T-0138 | planner |
 | [TD-557](../tracker/todo/TD-557.md) | Client-mandated PDF forms: AcroForm fill or coordinate mapping, fixed slots with overflow note, form revision by inspection date, rendered in the worker | T-0158, T-0110 | planner |
 | [TD-558](../tracker/todo/TD-558.md) | Navigation placement check: TQs, submittals, RFIs, NCRs, material lots and calibration certificates against diff §6.1 | T-0024 | planner |
+| [TD-565](../tracker/todo/TD-565.md) | Risk register with a probability x impact matrix per project (configurable scales, heat map, links to anchors, issues and P6 activities) | E-06-06 | planner |
+| [TD-566](../tracker/todo/TD-566.md) | Inline read-only Gantt preview of an XER held in document control, from the server-side parse; display only, never an import path | E-04-01, E-04-12 | planner |
 
 ## bug (10)
 
@@ -572,3 +575,5 @@
 | ✅ | [TD-492](../tracker/todo/TD-492.md) | Phase 0 exit 'module toggled': no shipped module is toggleable yet (every manifest has toggleable=False), so the e2e journey cannot switch one off and on | User, 2026-11-21: planner default (a) accepted. T-0027 tests the refusals now (platform module 409, unknown module 404, state unchanged); the switch-off/switch-on step is test.skip with TD-492 in the reason until the first toggleable module merges, whose task removes the skip. |
 | ✅ | [TD-502](../tracker/todo/TD-502.md) | ADR for the legal-hold columns on oe_projects_project (core-table change, T-0223) | ADR 0018 (docs/decisions/0018-project-legal-hold.md), accepted 2026-11-21: legal-hold columns on oe_projects_project (additive, no RLS change); reason/set_by/set_at describe the active hold only, history in admin-system:<tenant>; ProjectRead exposes only the flag; delete 409 LEGAL_HOLD_ACTIVE; is_on_legal_hold contract for the archive (T-0233) |
 | ✅ | [TD-516](../tracker/todo/TD-516.md) | Client bootstrap caching: 'ETag / no-store per the auth rules' has no auth rule to follow; default Cache-Control no-store + strong ETag over the values + If-None-Match -> 304 (T-0231); confirm, and that T-0248 clients revalidate with If-None-Match | User, 2026-11-21: default accepted. GET /api/v1/settings/client answers Cache-Control: no-store with a strong ETag over the values; If-None-Match -> 304. T-0248 clients store the values themselves and revalidate with If-None-Match. |
+| ✅ | [TD-545](../tracker/todo/TD-545.md) | AI provider, region and credentials (data use allowed by the user 2026-11-21): confirm one provider per deployment, Australian region, company-owned key in the secret store, fail closed | User decision 2026-11-22: planner defaults accepted — one AI provider per deployment, Australian region, company-owned (tenant) key in the deployment secret store, fail closed when anything is missing (diff §4.11) |
+| ✅ | [TD-561](../tracker/todo/TD-561.md) | Grant ceiling questions: second approver when PER-09 assigns a hold-authority persona it does not hold? May external accounts hold PER-14 (Field Worker)? | User decision 2026-11-22: planner defaults accepted — no second approver when PER-09 assigns a hold-authority persona it does not hold; external subcontractor crews may hold PER-14 Field Worker (diff §4.1, §4.9) |

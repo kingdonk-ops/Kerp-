@@ -159,6 +159,23 @@ exist before any PDF arrives.
   if `anchor_code` names exactly one work-anchor node below it, otherwise the activity goes to the
   Unmatched-Row Linking Screen. Never guessed.
 
+### 5.6 Schedule facts in rule sets (product intake 2026-11-22, planner default; user to confirm)
+- `asset_management.service` exposes read-only, P6-owned facts of the committed import for an
+  anchor's linked activities (§4, §7): `total_float_hours` (from the XER's total float),
+  `on_critical_path` and `critical_basis`. "Critical" follows the project's own definition, a
+  project setting `p6.critical_definition` = `total_float_le` (threshold hours, default 0) or
+  `longest_path` (the XER's longest-path flag where the schedule carries it). Several linked
+  activities: the minimum float and `on_critical_path` if any is critical.
+- Rule sets of other modules may read these facts as CEL context variables (for example raise the
+  priority of an open NCR or an unsigned hold point whose anchor is on a critical-path
+  activity, or warn when an RFI is rescheduled past an activity's late finish). The facts never
+  block anything by themselves; any effect is a rule in the consumer's rule set (ADR 0004),
+  so gating stays configuration. Facts are as of the last committed import (`data_date`
+  shown with them); KERP never recomputes the schedule. Open details: TD-567.
+- **Inline schedule preview** (later): an XER held in document control may be previewed as a
+  read-only Gantt drawn from the server-side parse of the stored original; display only, never
+  an import path (TD-566).
+
 ---
 
 ## 6. Re-import and change-impact report
