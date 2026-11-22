@@ -1,4 +1,5 @@
-// Synthetic System console payloads (T-0224 tests). No real client data.
+// Synthetic System console payloads (T-0224, T-0225 tests). No real client data.
+import type { AuditEntry } from "./audit";
 import type {
   FailedJob,
   QuarantineCount,
@@ -125,3 +126,38 @@ export const COUNTS: QuarantineCount[] = [
   { project_id: PROJECT_B, project_code: "SYN-B", status: "rejected", reason: "infected", count: 4 },
   { project_id: PROJECT_B, project_code: "SYN-B", status: "rejected", reason: "size_mismatch", count: 1 },
 ];
+
+// --- audit explorer (T-0225) ------------------------------------------------------------------
+
+export const ACTOR = "00000000-0000-4000-8000-00000000e001";
+export const DEVICE_ID = "00000000-0000-4000-8000-00000000e002";
+
+export function auditEntry(extra: Partial<AuditEntry> = {}): AuditEntry {
+  return {
+    id: "00000000-0000-4000-8000-00000000a001",
+    project_id: PROJECT_A,
+    chain_key: "inspections:synthetic-001",
+    seq: 4,
+    created_at: "2026-11-21T07:00:00Z",
+    actor_id: ACTOR,
+    device_id: DEVICE_ID,
+    source: "api",
+    payload: { event: "inspection_signed", sod_warning: true },
+    prev_hash: "a".repeat(64),
+    content_hash: "b".repeat(64),
+    hash_version: 1,
+    ...extra,
+  };
+}
+
+export const PROJECT_ENTRY = auditEntry();
+export const TENANT_ENTRY = auditEntry({
+  id: "00000000-0000-4000-8000-00000000a002",
+  project_id: null,
+  chain_key: "admin-system:synthetic",
+  seq: 9,
+  device_id: null,
+  payload: { event: "legal_hold_set", reason: "Synthetic dispute" },
+  prev_hash: "c".repeat(64),
+  content_hash: "d".repeat(64),
+});

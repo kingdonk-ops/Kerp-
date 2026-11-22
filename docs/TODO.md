@@ -3,9 +3,9 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 384 · **Closed:** 153
+**Open:** 384 · **Closed:** 154
 
-## decision (41)
+## decision (40)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -34,7 +34,6 @@
 | [TD-419](../tracker/todo/TD-419.md) | Calendar iCal feed GET /api/v1/calendar/ical/{token}.ics: a second token-authenticated no-JWT endpoint — decide with ADR 0013 (same tenant-from-JWT conflict) | E-04-15 | planner |
 | [TD-422](../tracker/todo/TD-422.md) | Shelf-life extension approver when the requester is PER-06: PER-13 Quality Director approves (user) — PER-13 has 'audit oversight', not QA approval (A), in the persona matrix | T-0184, T-0185, T-0187, T-0188 | planner |
 | [TD-423](../tracker/todo/TD-423.md) | Internal-QA product substitution: may the Quality Engineer who raises it also approve it (user: 'raises and approves directly'), or does it need a second QE (no self-approval, as T-0184 and T-0140)? | T-0185 | planner |
-| [TD-426](../tracker/todo/TD-426.md) | System admin impersonation (user's pasted 'T-0076'): may a system_admin act as another user, or only view as them? Accept ADR 0015 with (a) full impersonation, (b) admin-member projects only, (c) read-only view-as, or (d) target consent by one-time code | T-0277, T-0278, T-0279, T-0280 | planner |
 | [TD-427](../tracker/todo/TD-427.md) | system_admin global visibility (ADR 0016): should reads of project records by a system_admin who holds no membership on that project be access-logged? | T-0274, T-0275 | planner |
 | [TD-429](../tracker/todo/TD-429.md) | Pasted 'pending_qa_review' is not an inspection lifecycle state: keep auto-generated ITPs out of oe_inspections_inspection until QA activates them (planner default), or add a new state? And re-pinning PENDING lines on master propagation | T-0188, T-0281 | planner |
 | [TD-431](../tracker/todo/TD-431.md) | QA reviewer's own certificate/credential/MTR upload: verify immediately (user's T-0181 paste) or four eyes (TD-070 default)? | T-0181, T-0260, T-0261, T-0265 | planner |
@@ -216,7 +215,7 @@
 | [TD-508](../tracker/todo/TD-508.md) | Verify the e2e suite on the make up compose stack, and give it its own database | T-0027 | implementer |
 | [TD-510](../tracker/todo/TD-510.md) | Deployment-config view lacks the mail reply-to of diff §4.7: Settings has no reply-to field yet | T-0230 | implementer |
 
-## later (150)
+## later (151)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -368,6 +367,7 @@
 | [TD-556](../tracker/todo/TD-556.md) | Undo a committed P6 or asset import while nothing refers to the imported nodes yet | T-0129, T-0104, T-0138 | planner |
 | [TD-557](../tracker/todo/TD-557.md) | Client-mandated PDF forms: AcroForm fill or coordinate mapping, fixed slots with overflow note, form revision by inspection date, rendered in the worker | T-0158, T-0110 | planner |
 | [TD-558](../tracker/todo/TD-558.md) | Navigation placement check: TQs, submittals, RFIs, NCRs, material lots and calibration certificates against diff §6.1 | T-0024 | planner |
+| [TD-562](../tracker/todo/TD-562.md) | Project admin page shows only the legal-hold flag: no read endpoint for the active hold's reason, set-by and set-at (LegalHoldRead only from the PUT) | T-0225 | implementer |
 | [TD-565](../tracker/todo/TD-565.md) | Risk register with a probability x impact matrix per project (configurable scales, heat map, links to anchors, issues and P6 activities) | E-06-06 | planner |
 | [TD-566](../tracker/todo/TD-566.md) | Inline read-only Gantt preview of an XER held in document control, from the server-side parse; display only, never an import path | E-04-01, E-04-12 | planner |
 
@@ -569,6 +569,7 @@
 | ✅ | [TD-396](../tracker/todo/TD-396.md) | System console and project archive: may a System admin see project-scoped records (upload quarantine rows, audit entries, archive contents) of projects where they hold no membership? | Answered by the user's decision of 2026-11-21: system_admin has global read/admin visibility across all projects of the tenant without a membership (docs/decisions/0016-system-admin-global-visibility.md, accepted; diff §4.1; T-0274-T-0276). Quarantine rows and audit chains of every project, archive export/download/restore of any project; count-only functions and membership gates dropped (T-0219, T-0221, T-0222, T-0224, T-0233, T-0237, T-0239, T-0240, T-0241). |
 | ✅ | [TD-411](../tracker/todo/TD-411.md) | Equipment (oe_equipment_asset) as an inspection anchor: accept ADR 0014 amending ADR 0003 (a third exclusive anchor for standalone equipment inspections only)? | Product owner (user, 2026-11-21): equipment becomes an informational link, not a third exclusive anchor. qa_itp inspections keep the ADR 0003 anchors; every other area is project-level with an optional location and links (asset node/Item, material, equipment). ADR 0014 superseded by the ADR 0003 amendment 2026-11-21. |
 | ✅ | [TD-412](../tracker/todo/TD-412.md) | Fleet vehicles and plant in the Phase-1 equipment register: pull this part of E-03-07 into Phase 1 (equipment_class, requires_calibration, custodian) or wait for Phase 3? | Product owner (user, 2026-11-21): yes — fleet vehicles and plant enter the Phase-1 equipment register now (equipment_class, requires_calibration, asset_number, custodian; T-0249), because some equipment must be calibrated or inspected monthly for compliance. Equipment stays an informational link of inspections, not an anchor (TD-411, ADR 0003 amendment 2026-11-21). |
+| ✅ | [TD-426](../tracker/todo/TD-426.md) | System admin impersonation (user's pasted 'T-0076'): may a system_admin act as another user, or only view as them? Accept ADR 0015 with (a) full impersonation, (b) admin-member projects only, (c) read-only view-as, or (d) target consent by one-time code | User decision 2026-11-22: option (a) full impersonation. Mutations allowed and attributed to the target with impersonated_by in the ledger; the central guardrail blocks A/S authority, signing, client co-sign, inspection submit/approve, hold release, override decisions, password/PIN/device/admin-grant mutations (403 IMPERSONATION_ACTION_FORBIDDEN). Sub-questions not answered separately; planner defaults apply, confirmable later: (1) create_projects holders may be impersonated, project creation blocked while impersonating; (2) PER-15 Client Representatives may be impersonated, read-only; (3) the target gets an e-mail notice after impersonation ends via core mail (diff 4.6). ADR 0015 accepted; T-0277-T-0280 unblocked. |
 | ✅ | [TD-443](../tracker/todo/TD-443.md) | Issues on a path with no work-anchor node (audit findings above the work-anchor level, condition surveys): create_issue skips + notifies (planner default) vs allowing issues without a work anchor | Product owner (user, 2026-11-21): issues from project-level inspections (audit, H&S and every non-qa_itp area) are project-level (no work anchor) with optional location/links; they never block work completion; with mdr_effect=blocks a project-level issue blocks every MDR of the project and a location-tagged one only the MDRs whose scope covers the location. Remaining case (a qa_itp inspection on a path without a work anchor): the planner default stays (manual raise 422 until a work anchor is picked; create_issue logged skipped NO_WORK_ANCHOR and notifies). |
 | ✅ | [TD-444](../tracker/todo/TD-444.md) | Pilot-0 scope after the issues re-plan: T-0311-T-0314 replace T-0116/T-0117 in the Phase 1 pilot subset; screens T-0318-T-0320, upgrade/escalate, create_issue and pins outside the gate (planner default) | Product owner (user, 2026-11-21): T-0318 (register, raise, punch detail) and a slimmed T-0319 (NCR detail workflow up to the ncr_close_verify sign-off) join the Pilot-0 gate, with T-0311-T-0314 and the seeded starting templates T-0322 (T-0108 transitively). Flag-override, upgrade and raise-external dialogs split to T-0321 after the pilot; T-0315, T-0317 stay outside the pilot; shared template designer epic E-01-03 after Pilot-0. |
 | ✅ | [TD-445](../tracker/todo/TD-445.md) | MDR gate: mdr_effect alone governs mdr.compile (the open-Cat-A-punch clause is replaced); Cat A punch templates default to mdr_effect=blocks; Cat A always blocks work completion | Product owner (user, 2026-11-21) approved the planner default as-is: mdr_effect alone governs mdr.compile; punch templates that use Cat A (all system-default punch templates) default to mdr_effect=blocks; an open Cat A punch always blocks work_anchor.complete regardless of mdr_effect. |

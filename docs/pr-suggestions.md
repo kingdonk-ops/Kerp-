@@ -3,7 +3,181 @@
 > **Generated — do not hand-edit.** Rebuild with `python scripts/pr_suggestions.py rebuild`.
 > A running digest of everything agents surfaced on merged PRs — review notes, must-fix items, suggestions, nits, follow-ups and ideas — so nothing is lost after a squash-merge. Formal follow-ups also live as `TD-xxx` in `tracker/todo/` and on [TODO.md](TODO.md); this file is the readable skim. Each item links back to its PR or review for full context.
 
-_Repo `kingdonk-ops/Kerp-`, base `dev` · 172 merged PRs · 171 with surfaced notes._
+_Repo `kingdonk-ops/Kerp-`, base `dev` · 176 merged PRs · 175 with surfaced notes._
+
+---
+
+## PR #179 — Plan: product intake follow-up 2026-11-22 (AI operations, verified EV, schedule facts, user decisions)
+merged 2026-11-22 · by `kingdonk-ops` · [PR](https://github.com/kingdonk-ops/Kerp-/pull/179)
+
+**TODOs raised**
+
+- TD-563 — spec-gap: EV counts only verified completion
+- TD-564 — decision: on-site label printing
+- TD-565 — later: risk register
+- TD-566 — later: inline read-only XER Gantt preview
+- TD-567 — spec-gap: schedule facts in rule sets
+
+**Review by `kingdonk-ops` — KERP-REVIEW: APPROVED patch-id=d81d21e4ebfff96b08c67c3f56411d8c55c929fd** · [full review](https://github.com/kingdonk-ops/Kerp-/pull/179#pullrequestreview-6009775011)
+
+- _Must fix_
+  None.
+
+- _Suggestions (non-blocking)_
+  - **p6 §4 data model:** `oe_p6_activity_version` has dates but no total-float column and no longest-path flag. §5.6 needs both, although §7 already lists float as a `p6`-owned field. Add "additive snapshot columns `total_float_hours`, `driving_path_flag`" to TD-567's open list.
+  - **p6 §5.6 example:** the example "warn when an RFI is rescheduled past an activity's late finish" uses late finish, which is not one of the facts listed. Either list `late_finish` as a fact or change the example.
+  - **`commercial-and-claims.md` EV section:** it says "ITP line(s) that verify it are `INSPECTED_PASSED` / `LOCKED_FOR_TURNOVER`". Those are statuses of the inspection record (ITR) against the line, not of the ITP line itself. TD-563 already says "passed ITR". Align the wording.
+  - **TD-563 default vs spec wording:** TD-563's default "a step with no ITP line earns on PER-03 sign-off, flagged not QA-verified" needs a cross-reference in the spec text. Without it, "never on self-reported percent complete alone" can read as a contradiction.
+  - **Diff §4.11 assurance record:** "credentials owner (tenant key, or platform key only if TD-545 changes)" is stale now that TD-545 is resolved. Consider "tenant key (TD-545)".
+  - **Diff §4.11 company controls:**
+    - State the default for conversation retention days.
+    - State where conversation text lives. The assurance record stores no prompt or completion text, so conversations need their own store with its own RLS.
+    - Say which time zone "until the next day" uses for the budget cap (the deployment's?).
+  - **`quality-and-inspection.md` §5 table:** the `no_
+
+---
+
+## PR #177 — docs(spec): product intake 2026-11-21 — MDR builder, signing evidence, RFI, notifications, offline, AI, access
+task `T-0289` · merged 2026-11-22 · by `kingdonk-ops` · [PR](https://github.com/kingdonk-ops/Kerp-/pull/177)
+
+**TODOs raised**
+
+- TD-545 (decision): AI provider, region and credentials. Default: one provider per deployment, Australian region, company-owned key, fail closed.
+- TD-546: multi-signer completion policy · TD-547: results awaited on the ITR · TD-548: RFI holidays and shutdowns
+- TD-549: notification rules, delivery log with skip reasons, Outbox card · TD-550: offline client behaviour · TD-551: ITR capture speed
+- TD-552: grant ceilings as tests, and external accounts never hold staff personas · TD-553: admin safety · TD-554: per-person share links
+- TD-555: three-way template/rule-set upgrade · TD-556: undo of a committed import · TD-557: client-mandated PDF forms · TD-558: navigation check · TD-559: MDR breakdown open points
+- Dated notes added to TD-175, 238, 400, 419, 259, 280, 011, 398 and 484.
+
+**Review by `kingdonk-ops` — KERP-REVIEW: CHANGES_REQUESTED patch-id=429cb70303f359ecb91fce1c0e6344728494ed7b** · [full review](https://github.com/kingdonk-ops/Kerp-/pull/177#pullrequestreview-6009159022)
+
+- _Must fix_
+  1. **The delivery-failure rule contradicts §5/§7 and can never trigger as written.** Location: `docs/spec/modules/quality-and-inspection.md:1284-1292` (§9 "Delivery failure per party"), together with §2 (`oe_inspection_requests_slot_party`, ~l.1011), §5 (~l.1121, 1132-1135) and §7 (~l.1191-1195). Attributing a `no_show` after an undelivered notice to `contractor` is the right default in principle: the contractor owns the notice, like the existing short-notice rule, and PER-02/PER-06 can change it. But the spec text has three problems:
+     - (a) **The rule can never fire.** It says in-app is "always delivered" and that failure means "no channel reached any call-out recipient". Every RFI recipient is a project account (TD-484), so the in-app row always "reaches" them and `notice_delivery = failed` can never be set. The suppressed-e-mail example in T-0335 could not fail either.
+     - (b) **§7 still says the opposite.** It still attributes a `no_show` to the absent party when `notice_met`, and the new rule only lives as a forward reference in §9.
+     - (c) **The W case is not covered.** If the absent party's point is `W` and `notice_met = true` but the notice was never delivered, §5 still counts the witness requirement as **satisfied** and §7 creates **no** delay entry, so work proceeds as if the client had declined after valid notice. The brief (item 12) wanted exactly the opposite.
+     Fixed looks like this:
+     - Define "reached" over the out-of-app channels only: `failed` when every push and e-mail attempt for all of the party's call-out recipients failed or was skipped.
+     - A
+
+- _Suggestions (non-blocking)_
+  - `KERP-CONSOLIDATION-AND-DIFF.md` §4.11 is inserted after the `---` that closes §4.10, and it adds a double blank line, so it sits visually outside section 4. Move it above the separator.
+  - §4.11 assurance record: every row is project-RLS scoped, but some AI calls may have no project (for example tenant-library ITP drafting, T-0187). Say whether those use a tenant-scoped row.
+  - §4.11 lists "credentials owner (tenant key or platform key)", while TD-545 says no platform key is offered by default. This is fine as a recorded field. A short "(platform key only if TD-545 changes)" would avoid confusing readers.
+  - In documents-and-mdr.md, *Draft compile* "runs whatever the readiness list says" reads oddly. Consider "compiles regardless of open readiness findings (they are listed on the draft's cover)".
+  - TD-552 contains an open question for the user (second approver, PER-14 for externals). The `spec-gap` kind is acceptable, but a separate `decision` TODO for the question would make it visible on the decisions board.
+  KERP-REVIEW: CHANGES_REQUESTED patch-id=429cb70303f359ecb91fce1c0e6344728494ed7b
+  ---
+  _Generated by [Claude Code](https://claude.ai/code)_
+
+**Review by `kingdonk-ops` — KERP-REVIEW: CHANGES_REQUESTED patch-id=f166e60e82aff868fa18632c444e8277e1a30247** · [full review](https://github.com/kingdonk-ops/Kerp-/pull/177#pullrequestreview-6009177305)
+
+- _Must-fix 1 from round 1 (RFI delivery failure): mostly resolved_
+  - **(a) The rule can now fire.** Delivery is judged over push and e-mail only (§9, l.1297-1310). `failed` means every out-of-app attempt for all call-out recipients of the latest issue or reschedule failed or was skipped. `no_channel` covers recipients with no out-of-app channel at all.
+  - **§2 entity.** `notice_delivery` (`pending | delivered | failed`, default `pending`) and `notice_delivery_reason` are on `slot_party` (l.1016-1020).
+  - **(b) "Valid notice" is applied consistently.** §6 defines it as `notice_met` and `notice_delivery` not `failed` (l.1170-1176). The §3 transition row (l.1093), §4 (l.1125), §5 (l.1137-1139) and §7 (l.1200-1208) all use it. §7 now records the delay's `notice_met` as "every absent party had valid notice".
+  - **(c) The W case is covered.** A `W` party absent after a failed delivery leaves the requirement unmet (§5). It creates a `no_show` delay entry with default cause `contractor` (§7), and PER-02/PER-06 can change the cause. The rule is marked as a planner default.
+  - No contradiction remains in the **static** rules. One timing gap remains, and it comes from the new "`pending` at the outcome counts as delivered" sentence. See must-fix 1 below.
+  **Is "pending at outcome = delivered" sound?** The choice itself is defensible. An accepted send is the normal standard for contractual notice. After TD-238, `pending` only lasts through an outage or backlog. Treating it as "not valid" would blame the contractor without any evidence.
+  The problem is that the rule names a moment ("at the outcome") while the state it reads keeps changing afterwards:
+  - `wit
+
+- _Must-fix 2 from round 1 (T-0335 scope): resolved_
+  - **T-0350.** Size S. `depends_on: [T-0335, T-0334, T-0333, T-0226]`, `blocked_by: [TD-238]`. The criteria are testable: bounced, suppressed and delivered cases; W and H; reschedule reset; once-per-party notification; reads through the other modules' services, never their tables.
+  - **T-0335** is back to its scope, plus only the `too_late` reminder rule.
+  - **T-0338 and T-0339** show the notice-delivery column only once T-0350 lands.
+  - **Ids.** T-0350 and TD-561 exist only on this branch, checked across every `origin/*` branch and open PR (#171, #177). The audit branch uses T-0341..T-0349 and TD-560, so neither id collides.
+
+- _Applied suggestions: all fine_
+  - **§4.11 placement.** §4.11 now sits inside §4, and the `---` separator is moved below it.
+  - **No-project assurance rows.** These are now tenant-scoped (`project_id` null, tenant RLS, read by `system_admin` and PER-13).
+  - **Platform-key wording.** It now says "platform key only if TD-545 changes".
+  - **Draft compile wording.** It is fixed, and open findings are listed on the draft's cover.
+  - **TD-561** (`decision`) carries both open questions with planner defaults. TD-552 points to it.
+
+- _Must fix_
+  1. **`docs/spec/modules/quality-and-inspection.md:1175-1176` (§6), and `tracker/tasks/T-0350.md` (the "Valid notice per party" criterion): define when notice validity is fixed.**
+     - **What is wrong:** "`notice_delivery = pending` at the outcome counts as delivered" names a moment, but nothing freezes the value. §5 `witness_status` reads `notice_delivery` live, while §7 creates the delay entry only once, at the transition. A delivery failure reported after a `no_show` (a late or soft bounce, or a failed push retry under TD-238) therefore makes §5 report the W party unmet with no §7 delay entry. It can also invalidate an ITR that was already submitted against it.
+     - **What fixed looks like:** one sentence in §6 (or §9) choosing one of these:
+       - (i) Validity is evaluated **once**, when the outcome is recorded. §5 and §7 both use that frozen value, for example a per-party `notice_valid_at_outcome` on `slot_party`, or the delay's `notice_met` plus a party-level flag. A later delivery result is still shown and emitted as an event, but never changes the outcome's effect.
+       - (ii) A later `failed` re-evaluates: it creates the delay entry and re-opens the witness requirement, and the spec says what happens to an ITR already submitted.
+       Option (i) is simpler and matches how `notice_met` is already snapshotted. Add a T-0350 test: `no_show` with the W party `pending`, then a bounce arrives, and `witness_status` and the delay table are unchanged (or the option (ii) behaviour).
+
+- _Suggestions (non-blocking)_
+  - **l.1146:** the `WITNESS_NOT_SATISFIED` description still reads "absent on an H point or after short notice, or `failed`". Make it "or without valid notice (§6)" so the finding text matches §5.
+  - **l.1093:** "(§6) (§5)" is doubled. Make it "valid notice (§6; §5)".
+  - **§9 `skipped` reason:** state whether a recipient's own channel opt-out (if notification preferences ever apply to RFI call-outs) counts as `skipped`, and so as failure blamed on `contractor`, or whether call-out e-mail ignores opt-out. TD-549 is the natural home for this.
+  KERP-REVIEW: CHANGES_REQUESTED patch-id=f166e60e82aff868fa18632c444e8277e1a30247
+  ---
+  _Generated by [Claude Code](https://claude.ai/code)_
+
+**Review by `kingdonk-ops` — KERP-REVIEW: APPROVED patch-id=845717ebc9043527d1c969275501206ef142b9c8** · [full review](https://github.com/kingdonk-ops/Kerp-/pull/177#pullrequestreview-6009186290)
+
+- _Must-fix 1 from round 2 (notice validity timing): resolved_
+  The PR takes option (i).
+  - **Frozen once at the outcome.** §6 (l.1178-1185) says valid notice is evaluated once per party when the outcome is recorded (`witnessed`, `no_show`, `failed`, or slot-level `waived`). The result is stored in `slot_party.notice_valid_at_outcome`, and §2 (l.1020-1021) adds that column, null until an outcome exists.
+  - **§5 and §7 read only the frozen value.** §5 `witness_status` (l.1138, "as frozen at the outcome") and §7 delay creation (l.1212-1214) both use it.
+  - **A later delivery result changes nothing.** It updates `notice_delivery`, is shown and is emitted as an event, but never changes the outcome's effect (§6). §9 repeats this at l.1320.
+  - **A reschedule clears the frozen value** together with the outcome. This matters because §3 l.1090 allows a reschedule from `no_show`/`failed`, and it fits §9's reset of `notice_delivery` to `pending`.
+  - **"`pending` at the outcome counts as delivered" is now well-defined**, because the moment it names is the moment the value is frozen.
+  - **T-0350 adds what was asked.** It adds the column to the migration criterion and a separate "frozen at the outcome" criterion with the late-bounce test: `no_show` with the W party `pending`, then a bounce arrives; `witness_status` and the delay table stay unchanged, and `notice_delivery = failed` plus an event are recorded.
+  - **No new contradictions.** I re-read §2, §3, §4, §5, §6, §7, §9 and §14. Offline outcomes (§14) are applied at sync, so the value freezes when the server records them. That is consistent with "when the outcome is recorded".
+
+- _Suggestions from round 2: all applied_
+  - **`WITNESS_NOT_SATISFIED` (l.1147-1148)** now reads "absent on an H point or without valid notice (§6), or `failed`", which matches §5.
+  - **The doubled reference (l.1094)** now reads "(§6; §5)".
+  - **§9 opt-out (l.1314-1317)** now treats a recipient's own channel opt-out as `skipped`, so a party whose every recipient opted out counts as `failed (skipped)`. This is marked as a planner default, and a dated note on TD-549 states the open question and the alternative (call-out e-mail as a transactional message that ignores opt-out). T-0350 has a matching criterion.
+    - **Is the default reasonable? Yes.** It follows the spec's evidence rule: if nothing reached the party outside the app, there was no valid notice. PER-02/PER-06 can re-attribute the cause, and the question is correctly flagged for the user.
+
+- _Suggestions (non-blocking)_
+  - **l.1140:** the parenthetical "(short notice or `notice_delivery = failed`)" could say "as frozen in `notice_valid_at_outcome`". Today the qualifier comes only from the preceding sentence. The §4 `no_show` row (l.1126) could get the same pointer.
+  - **§3 reschedule row (l.1090):** the clears list ("confirmation, attendance and `reminder_sent_at` cleared") could add "`notice_delivery` reset, `notice_valid_at_outcome` cleared", so the transition table matches §6/§9.
+  - **TD-549:** when the user decides, a likely answer is that contractual call-outs are transactional and ignore opt-out. Blaming the contractor for a client user's own opt-out may not hold up commercially. The current flag covers this, so nothing is needed now.
+
+---
+
+## PR #176 — chore(tracker): TD-540..TD-544 from PR #175 review suggestions
+task `T-0224` · merged 2026-11-22 · by `kingdonk-ops` · [PR](https://github.com/kingdonk-ops/Kerp-/pull/176)
+
+**TODOs raised**
+
+- TD-540 … TD-544 (above)
+
+**Review by `kingdonk-ops` — KERP-REVIEW: APPROVED patch-id=04f7f5583b971829b79c9c096054b04394a4d259** · [full review](https://github.com/kingdonk-ops/Kerp-/pull/176#pullrequestreview-6009016761)
+
+- _Must fix_
+  None.
+
+- _Suggestions (non-blocking)_
+  None.
+  KERP-REVIEW: APPROVED patch-id=04f7f5583b971829b79c9c096054b04394a4d259
+  ---
+  _Generated by [Claude Code](https://claude.ai/code)_
+
+---
+
+## PR #175 — T-0224: Frontend: Admin → System console — deployment stats + health, queue monitor, upload quarantine
+task `T-0224` · merged 2026-11-22 · by `kingdonk-ops` · [PR](https://github.com/kingdonk-ops/Kerp-/pull/175)
+
+**TODOs raised**
+
+- TD-536 — spec-gap: no API lists queued/running jobs, so Abort takes a pasted job id.
+- TD-537 — later: shared `RegisterPage` lacks per-row actions and server paging; these screens use card lists (wide tables failed axe at phone/tablet sizes).
+
+**Review by `kingdonk-ops` — KERP-REVIEW: APPROVED patch-id=9dff40532532976262d4371e09663f4d42593dc5** · [full review](https://github.com/kingdonk-ops/Kerp-/pull/175#pullrequestreview-6008997280)
+
+- _Must fix_
+  None.
+
+- _Suggestions (non-blocking)_
+  - `frontend/src/admin/SystemUploadsPage.tsx:300`: the `!f.object_deleted` part of the Re-check guard is untested. Removing it still passes all 13 tests (mutation run): the only `object_deleted: true` fixture is `rejected`. A `verifying` + `object_deleted` row in the first test would cover it.
+  - Sweep now is only offered for projects that already have quarantine rows (`CountsList`). A project with orphaned staging objects but no quarantine rows can't be swept from the UI. Consider a project picker, or a `later` TODO.
+  - `SystemDeploymentPage`: while `refreshing` is true nothing re-reads the stats, so the totals only update on a manual reload. A `refetchInterval` while refreshing would close the loop.
+  - `en.ts` `admin.quarantine.reasons` has no label for `verify_failed` (§4.7). It falls back to the raw code. `admin.deployment.objects` / `admin.queues.*` with `count` have no `_one` forms ("1 objects").
+  - The file cards leave out SHA-256, uploader id and created time, which the API returns (§4.7 lists them). Worth adding for investigation.
+  KERP-REVIEW: APPROVED patch-id=9dff40532532976262d4371e09663f4d42593dc5
+  ---
+  _Generated by [Claude Code](https://claude.ai/code)_
 
 ---
 

@@ -118,6 +118,7 @@ describe("deployment stats and health", () => {
       i18n.t("admin.system.queuesTab"),
       i18n.t("admin.system.uploadsTab"),
       i18n.t("admin.system.settingsTab"),
+      i18n.t("admin.system.auditTab"),
       i18n.t("admin.system.grantsTab"),
       i18n.t("admin.system.devicesTab"),
     ]);

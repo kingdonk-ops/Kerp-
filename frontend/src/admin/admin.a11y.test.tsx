@@ -1,4 +1,4 @@
-// Admin screens (T-0051, T-0026, T-0232, T-0224) with their dialogs open: WCAG 2.1
+// Admin screens (T-0051, T-0026, T-0232, T-0224, T-0225) with their dialogs open: WCAG 2.1
 // AA, contrast and 48 px glove targets in both themes on the field breakpoints (diff §6.3).
 import { fireEvent, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
@@ -8,7 +8,17 @@ import { auditA11y, FIELD_VIEWPORTS, formatFindings, setViewport } from "../test
 import { FAKE_USER, json } from "../test/fakeApi";
 import { applyTheme, THEMES } from "../theme/theme";
 import { DEPLOYMENT_CONFIG, REGISTRY } from "./settingsFixtures";
-import { COUNTS, FAILED_JOB, HEALTH, INFECTED_FILE, QUEUES, STATS, STUCK_FILE } from "./systemFixtures";
+import {
+  COUNTS,
+  FAILED_JOB,
+  HEALTH,
+  INFECTED_FILE,
+  PROJECT_ENTRY,
+  QUEUES,
+  STATS,
+  STUCK_FILE,
+  TENANT_ENTRY,
+} from "./systemFixtures";
 import { ADMIN_PROJECT, project, renderAdmin } from "./testing";
 
 // The T-0026 cases wait on mocked round-trips through the whole shell (slow under load).
@@ -149,6 +159,59 @@ describe.each(THEMES)("admin screens in the %s theme", (theme) => {
       await screen.findByRole("region", { name: i18n.t("admin.quarantine.countsTitle") }, WAIT);
       fireEvent.click(within(row).getByRole("button", { name: i18n.t("admin.quarantine.recheck") }));
       await screen.findByRole("dialog", {}, WAIT);
+
+      const findings = await auditA11y(document.body, theme);
+      expect(findings, formatFindings(findings)).toEqual([]);
+    }, SLOW);
+
+    it("audit log with an open entry, a broken chain and an invalid filter", async () => {
+      await setViewport(viewport);
+      renderAdmin(
+        "/admin/system/audit",
+        {
+          "GET /api/v1/admin/system/audit": () => json({ items: [PROJECT_ENTRY, TENANT_ENTRY], next_cursor: "c1" }),
+          "POST /api/v1/admin/system/audit/verify": () =>
+            json({
+              chain_key: PROJECT_ENTRY.chain_key,
+              project_id: PROJECT_ENTRY.project_id,
+              ok: false,
+              length: 5,
+              head_hash: "e".repeat(64),
+              first_broken_seq: 3,
+              problem_count: 1,
+              problems: ["seq 3: content_hash mismatch"],
+            }),
+        },
+        { theme, systemAdmin: true, projects: [] },
+      );
+      const row = await screen.findByRole("listitem", { name: `${PROJECT_ENTRY.chain_key} #4` }, WAIT);
+      fireEvent.click(within(row).getByText(i18n.t("admin.audit.details")));
+      fireEvent.click(within(row).getByRole("button", { name: i18n.t("admin.audit.verify") }));
+      await within(row).findByText("seq 3: content_hash mismatch", {}, WAIT);
+      fireEvent.change(screen.getByLabelText(i18n.t("admin.audit.flag")), { target: { value: "9bad" } });
+
+      const findings = await auditA11y(document.body, theme);
+      expect(findings, formatFindings(findings)).toEqual([]);
+    }, SLOW);
+
+    it("project admin page with the legal-hold dialog", async () => {
+      await setViewport(viewport);
+      renderAdmin(
+        `/admin/projects/${ADMIN_PROJECT.id}/members`,
+        {
+          "GET /api/v1/projects": () => json([project({ legal_hold: true })]),
+          [`GET /api/v1/admin/projects/${ADMIN_PROJECT.id}/members`]: () => json([]),
+        },
+        { theme, systemAdmin: true },
+      );
+      fireEvent.click(
+        await screen.findByRole("button", { name: i18n.t("admin.projectAdmin.clearHold") }, WAIT),
+      );
+      await screen.findByRole("dialog", {}, WAIT);
+      // axe measures a field's contrast only with a value in it.
+      fireEvent.change(screen.getByLabelText(i18n.t("admin.projectAdmin.reason")), {
+        target: { value: "Synthetic dispute settled" },
+      });
 
       const findings = await auditA11y(document.body, theme);
       expect(findings, formatFindings(findings)).toEqual([]);

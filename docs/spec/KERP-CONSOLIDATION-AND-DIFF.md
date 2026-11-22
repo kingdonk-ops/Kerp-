@@ -468,10 +468,10 @@ Wins over any earlier text on tenant selection, tenant administrators and projec
   worker's link; the worker can still sign in by password where they have one, or unlock
   offline with the PIN within the grace (offline grace, above).
 
-- **Support impersonation (user paste "T-0076", 2026-11-21) — pending decision TD-426; ADR 0015
-  proposed; tasks T-0277–T-0280 blocked.** Nothing below may be built until TD-426 is decided.
-  A `system_admin` may start a time-boxed session as a non-admin user to see that user's exact
-  projects, personas, capabilities and site scope:
+- **Support impersonation (user paste "T-0076", 2026-11-21; user decision 2026-11-22, TD-426
+  option (a) full impersonation; ADR 0015 accepted; T-0277–T-0280).** A `system_admin` may
+  start a time-boxed session as a non-admin user to see that user's exact projects, personas,
+  capabilities and site scope, and to act as that user within the guardrail below:
   - `POST /api/v1/admin/users/{id}/impersonate` (`system_admin`, reason required): never a
     deactivated user (422) or another `system_admin` (`403 CANNOT_IMPERSONATE_SYSTEM_ADMIN`), never
     nested. It issues a separate **impersonation token** (T-0008 keys; `sub` = target, `imp` =
@@ -489,8 +489,16 @@ Wins over any earlier text on tenant selection, tenant administrators and projec
     `403 IMPERSONATION_ACTION_FORBIDDEN` for any `A` or `S` action (sign-off, signing ledger,
     client co-sign, inspection submit/approve, hold release, override decisions), password, PIN
     and device changes, admin grants, memberships, invites, access-request decisions, teams,
-    settings, project creation and `/api/v1/admin/*` mutations. **Planner default (TD-426 option
-    (c)): read-only "view as"**, every mutating request refused except exit and logout.
+    settings, project creation and `/api/v1/admin/*` mutations. **Every other mutation is
+    allowed** (user, 2026-11-22, option (a)) with the target's own RLS and tiers and is
+    attributed to the target (`created_by` / `updated_by`). The rejected planner default (c),
+    read-only "view as", is kept in ADR 0015 §Alternatives.
+  - **Planner defaults for the TD-426 sub-questions** (confirmable by the user, ADR 0015
+    §8–§10): a target holding `create_projects` may be impersonated, but project creation is
+    refused while impersonating; a PER-15 Client Representative may be impersonated **read-only**
+    (every mutation except exit and logout refused); when the impersonation ends (exit, expiry or
+    revocation) the target receives one e-mail through core mail (§4.6) naming the admin and the
+    start and end time, never the reason.
   - **Audit**: `impersonation.started` (admin, target, reason, IP, user agent, expiry),
     `impersonation.ended`, `impersonation.denied` in the chain `admin-impersonation:<tenant>`;
     ledger entries written during impersonation carry `created_by` = target and
@@ -799,7 +807,7 @@ tokens): registration refuses them. The §4.4 settings become registry entries;
 | `max_audio_duration_s`, `max_audio_size_mb` | 300, 10 | 5–1800, 1–100 | forms, media probe |
 | `cosign_pin_token_ttl_minutes` | 5 | 1–15 | signing (T-0162) |
 | `provisional_cosign_client_reminder_hours`, `provisional_cosign_escalation_hours` | 24, 72 | 1–720 (client < escalation) | signing (T-0174) |
-| `impersonation_max_minutes` (not client-visible; pending TD-426) | 30 | 5–60 | support impersonation (§4.2, T-0277) |
+| `impersonation_max_minutes` (not client-visible; ADR 0015) | 30 | 5–60 | support impersonation (§4.2, T-0277) |
 | `signing_reauth_ttl_minutes` (not client-visible; enterprise roadmap 2026-11-21) | 5 | 1–15 | signing attestation (T-0289) |
 | `api_key_rate_per_minute` (not client-visible) | 600 | 60–6000 | API keys (§4.9, T-0308) |
 
@@ -1306,7 +1314,7 @@ the navigation **and** refused by the API (403 for admin surfaces).
 
 | Area | Screens | Who | Tasks |
 |---|---|---|---|
-| **Users** | user directory (status, presence, sessions, logins, grants, filters, search; resend invite, force sign-out, activate/deactivate); user detail with memberships across projects (§4.8); "Login as user (support)" with reason, and the impersonation banner with Exit on every screen (§4.2 *Support impersonation*; pending TD-426) | `system_admin`; PER-09 memberships tab for its own projects | T-0026, T-0246, T-0280 |
+| **Users** | user directory (status, presence, sessions, logins, grants, filters, search; resend invite, force sign-out, activate/deactivate); user detail with memberships across projects (§4.8); "Login as user (support)" with reason, and the impersonation banner with Exit on every screen (§4.2 *Support impersonation*; ADR 0015) | `system_admin`; PER-09 memberships tab for its own projects | T-0026, T-0246, T-0280 |
 | **System** | deployment stats + health; queue monitor (retry / abort); upload quarantine (rows of every project; re-check, sweep now); runtime settings (editable registry + read-only deployment configuration); admin grants (T-0026); devices (T-0048); audit log (filters, verify chain); legal hold on the project admin page | `system_admin` | T-0224, T-0225, T-0232 |
 | **Communications** | broadcast composer (audience, count, send); delivery stats (cards) and history; automated e-mail templates (edit, preview, test send, reset) | `system_admin`; PER-09 composer and stats for its own projects | T-0229 |
 | **Project archives** | archive list; export; storage tier toggle; download; start a deep-archive restore; restore wizard (deleted project or new project) | `system_admin` (any project of the tenant, live or deleted; ADR 0016) | T-0241 (epic E-01-02) |
