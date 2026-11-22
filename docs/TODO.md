@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 410 · **Closed:** 168
+**Open:** 411 · **Closed:** 168
 
 ## decision (39)
 
@@ -148,7 +148,7 @@
 | [TD-591](../tracker/todo/TD-591.md) | Competency at sign-off: read-only rule-set fact 'signer holds a valid credential of type X at signing time', snapshotted in the attestation | T-0118, T-0289, T-0291 | planner |
 | [TD-593](../tracker/todo/TD-593.md) | Client-supplied material late for its work pack: warning readiness conflict when expected delivery is after the installing pack's planned start (supplied_by flag on material lines) | E-03-03, E-03-02, E-04-02, E-06b-02, T-0266 | planner |
 
-## missed (12)
+## missed (13)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -164,6 +164,7 @@
 | [TD-542](../tracker/todo/TD-542.md) | Deployment screen: re-read stats while an object-store count is running (poll while refreshing) | T-0224 | reviewer |
 | [TD-543](../tracker/todo/TD-543.md) | System console i18n: label for quarantine reason verify_failed; plural _one forms for count strings | T-0224 | reviewer |
 | [TD-544](../tracker/todo/TD-544.md) | Upload quarantine file cards: show SHA-256, uploader and created time (returned by the API, listed in §4.7) | T-0224 | reviewer |
+| [TD-599](../tracker/todo/TD-599.md) | Mode iv screen: upload a scan of a paper-signed page to a record version and pick the client's PER-15 account (inspector or PER-06, anchor in their subtree); no frontend task covers it (T-0164 covers modes i-iii only) | T-0174, T-0176, T-0164 | coordinator |
 
 ## deferred (50)
 

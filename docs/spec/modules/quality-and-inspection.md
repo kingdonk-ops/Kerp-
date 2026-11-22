@@ -309,7 +309,8 @@ are planner choices.
 - **(iv) Scanned paper signature** (user, 2026-11-22, TD-592). A page the client signed on paper
   may be scanned and used as the client co-sign, on exactly the terms of mode iii: the uploader
   attaches the scan to the specific record version and picks the client's PER-15 account from the
-  project list; it is stored as **provisional** (`verification_mode = provisional_scan`) with the
+  project list (planner default: the uploader is the inspection's inspector or the project's
+  PER-06, with the anchor in their granted subtree); it is stored as **provisional** (`verification_mode = provisional_scan`) with the
   "provisional client signature" badge; the named PER-15 confirms (`client_confirmed`, linked to
   the provisional one) or rejects with a reason (`RETURNED`) in their own account; while it is
   provisional, approval is blocked (`CLIENT_SIGNATURE_PROVISIONAL`); the same reminders apply.
@@ -318,7 +319,9 @@ are planner choices.
   and name, persona PER-15, `verification_mode` (`online_pin | client_device_signed |
   provisional_wet | provisional_scan | client_confirmed`), the time evidence of diff §6.4.1, geolocation, the
   inspector's `device_id` (and the client `key_id` for mode ii), the record version and hash it
-  covers, and the drawn image for mode iii. A co-signature covers one record version; editing the
+  covers, the drawn image for mode iii, and for mode iv the `wet_signed_scan` file, its SHA-256
+  and the uploader (user id and the uploader's own `device_id`, which may differ from the
+  inspector's; planner default). A co-signature covers one record version; editing the
   answers after it (for example after a return) needs a new co-signature. A template may set
   `requires_client_signature`; then submit checks `CLIENT_SIGNATURE_MISSING`.
 - **Hand-over and hand-back.** "Hand to client" locks the inspector's work behind the inspector's
@@ -326,7 +329,9 @@ are planner choices.
   the client entered except the co-sign mutation and returns to the inspector only after the
   inspector's PIN (T-0143 local unlock). The PDF prints each co-signature with its mode.
 - **Residual risk** (TD-216): a provisional wet signature is only an
-  inspector-witnessed claim until the client confirms it; a stolen client device key is stopped by
+  inspector-witnessed claim until the client confirms it, and a mode iv scan is only the
+  uploader's claim (the uploader may not have witnessed the signing) until the client confirms
+  it; a stolen client device key is stopped by
   revoking the device (T-0043), and assertions signed before the revocation stay valid.
 
 ## Signing attestation (e-signature) (user, 2026-11-21, enterprise roadmap; planner defaults TD-433)
