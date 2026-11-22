@@ -407,6 +407,29 @@ before it ships carry no attestation and stay valid ("no attestation recorded" o
   block per formal sign-off: signer and persona, "on behalf of <name>" when signed by a delegate,
   intent text and version, method, signed time (occurred time and confidence offline), device
   id and IP, through one shared renderer in `signing` (T-0291).
+- **Snapshot of what was signed** (product intake 2026-11-21, planner default; user to
+  confirm). The attestation also records, at the moment of signing and never backfilled later:
+  `signer_snapshot` (display name, organisation, persona and site scope used) and
+  `credential_snapshot` (each credential or qualification the consumer checked for this
+  sign-off: credential id, type, level, number, valid-until and verification state at that
+  instant; empty when the kind needs none). For sign-offs against a template or contract text,
+  the consumer passes the template revision id and its content hash. A later change of name,
+  credential expiry or template revision never alters the stored snapshot. Records signed before
+  this lands show "not recorded", never a value derived after the fact.
+- **Keys and fingerprints** (product intake 2026-11-21, planner default; user to confirm). Every
+  record sealed with a key names the fingerprint (SHA-256 of the public key or certificate) of
+  that key: client device co-sign assertions (T-0173), PAdES signatures of dossiers and Delay
+  Notices (documents-and-mdr.md). Rotated or retired keys and certificates are kept (public part
+  only, with their validity window and retirement time) so older records stay verifiable; a key
+  is never deleted while a record names it. The hash-chained ledger itself is not key-signed and
+  is unaffected.
+- **Retention vs erasure** (product intake 2026-11-21, planner default; user to confirm). A
+  signature image (provisional wet signature, T-0174; drawn signatures) is a file with its own
+  retention schedule (TD-175); when it is erased, the ledger entry, attestation and image hash
+  remain, so the fact of signing survives and the PDF prints "signature image removed under
+  retention policy, <date>". A privacy erasure request does not erase a signature on a formal or
+  co-signed record: it is retained as evidence (legal-obligation basis), and the refusal is
+  recorded in the erasure log.
 
 ## Delegation of authority (narrow; user, 2026-11-21, enterprise roadmap; planner defaults TD-434)
 
@@ -680,7 +703,8 @@ the `equipment.activate` tagout provider; equipment is a link, TD-411 resolved),
   (planner rule): no automatic transition to `active`.
 - **`notify_users`:** personas (resolved to project members at send time), the equipment
   custodian, explicit users; in-app high priority (T-0019), push, and an e-mail with project
-  code/name and a deep link only (diff §4.6). No SMS (TD-413). Manual API notifications stay
+  code/name and a deep link only (diff §4.6). No SMS (TD-413). No Teams/WhatsApp messaging
+  bridge (user decision 2026-11-21). Manual API notifications stay
   PER-09-only (diff §4.1); automations notify through the service.
 - **`create_action_task`:** `oe_inspections_follow_up` (paste: `oe_inspection_follow_up`) with
   `kind` (`tagout_confirmation | repair_request | supervisor_review`), assignee persona/user,
@@ -989,7 +1013,12 @@ none`), `point_source` (`itp \| manual`), `witness_user_id` (optional named witn
 member who may witness for that party: PER-15 for `client`, the TD-435 persona for
 `third_party`, an internal member for `contractor`, any project member for `principal`), `attendance` (`pending \|
 attended \| absent \| waived`), `attendance_by_user_id`, `attendance_at`, `waiver_ref` (the
-party's written waiver, set by the waive-a-party action; also in its event). One row per party.
+party's written waiver, set by the waive-a-party action; also in its event), `notice_delivery`
+(`pending \| delivered \| failed`, default `pending`) and `notice_delivery_reason` (nullable:
+`bounced \| suppressed \| no_channel \| provider_error \| skipped`), set from the out-of-app
+delivery results of the party's call-out recipients (§9 "Delivery failure per party"; product
+intake 2026-11-21, planner default; user to confirm), and `notice_valid_at_outcome` (boolean,
+null until an outcome is recorded; frozen validity of the party's notice, §6). One row per party.
 Points default from the linked ITP line(s) through `qms.service` (per-party points, §ITP
 authoring): with several lines, the strongest point per party (`H` > `W` > `R` > `S` > `M` >
 `none`). A changed point is `manual`, needs a reason (event payload) and, when it differs from the
@@ -1062,7 +1091,7 @@ table keeps every earlier time.
 | **waive a party** (no slot transition) | PER-15 of that party (any point); PER-06 for a `W` point only, with `waiver_ref` (the party's written waiver) | slot `requested`/`confirmed`; the party is an external H/W party | that party's `attendance = waived` (`attendance_by_user_id`; `waiver_ref` on the party row and in the event); when every external H/W party is now `waived` the slot moves to `waived` in the same action |
 | `requested \| confirmed → witnessed` | PER-06, PER-07 (site scope) | **no external H/W party `pending`**; every one `attended` or `waived`, at least one `attended` | witness requirement satisfied (§5) |
 | `requested \| confirmed → waived` | automatic, by the last **waive a party** action | every external H/W party `waived` | witness requirement satisfied |
-| `requested \| confirmed → no_show` | PER-06, PER-07 | `outcome_occurred_at` ≥ `scheduled_start` + `inspection_request.no_show_grace_minutes` (default 30); **no external H/W party `pending`**; ≥ 1 `absent` | satisfied only if every absent party's point is `W` and `notice_met` (§5); delay entry (§7) |
+| `requested \| confirmed → no_show` | PER-06, PER-07 | `outcome_occurred_at` ≥ `scheduled_start` + `inspection_request.no_show_grace_minutes` (default 30); **no external H/W party `pending`**; ≥ 1 `absent` | satisfied only if every absent party's point is `W` and that party had valid notice (§6; §5); delay entry (§7) |
 | `requested \| confirmed → failed` | PER-06, PER-07 | `outcome_reason_code` required (§7): the call-out could not be held for a reason other than the witness's absence (work not ready, access, weather, permit, instrument) | not satisfied; delay entry (§7) |
 | `draft \| requested \| confirmed → cancelled` | requester, PER-06 | reason required unless `draft` | linked records revert (§5); notifications; PDF re-rendered; a draft request whose slots are all cancelled may be soft-deleted instead (no number was used) |
 
@@ -1094,7 +1123,7 @@ Called through `inspections.service` (the inspections module owns its lifecycle 
 | `confirmed` | unchanged (`INSPECTION_REQUESTED`; field view "Scheduled") |
 | `requested` (reschedule) | stays `INSPECTION_REQUESTED`; `planned_start` moved to the new date |
 | `witnessed`, `waived` | stays `INSPECTION_REQUESTED`; **witness requirement satisfied**: the ITR may be submitted |
-| `no_show` | stays `INSPECTION_REQUESTED`; satisfied only when every absent party had a `W` point and `notice_met` (the CDRL rule: on W the client may stay away after valid notice and work proceeds; on H it may not). Otherwise not satisfied: reschedule or cancel |
+| `no_show` | stays `INSPECTION_REQUESTED`; satisfied only when every absent party had a `W` point and valid notice (§6: `notice_met` and its `notice_delivery` not `failed`) (the CDRL rule: on W the client may stay away after valid notice and work proceeds; on H it may not). Otherwise not satisfied: reschedule or cancel |
 | `failed` | stays `INSPECTION_REQUESTED`; not satisfied: reschedule or cancel |
 | `cancelled` | back to `prior_status` if the record is still `INSPECTION_REQUESTED` and on no other live slot; a record that has moved on (submitted, returned, approved) is not touched |
 
@@ -1106,17 +1135,17 @@ party**. It looks at the most recently issued slot that links **the record itsel
 later, so a slot that links only the line counts for the ITR, **provided the slot's anchors cover
 the ITR's anchor** (the ITR's node or Item is a slot anchor or lies in the subtree of one);
 otherwise that slot does not count for the ITR. Per party, the requirement is met when its
-attendance is `attended` or `waived`, or `absent` on a `W` point with `notice_met`; it is unmet
+attendance is `attended` or `waived`, or `absent` on a `W` point with valid notice (§6, as frozen at the outcome); it is unmet
 when no slot was issued, its attendance is still `pending`, the party was absent on an `H`
-point or after short notice, or the slot `failed`. Precedence: `failed` makes every party unmet;
+point or without valid notice (short notice or `notice_delivery = failed`), or the slot `failed`. Precedence: `failed` makes every party unmet;
 otherwise the party's attendance decides, and `pending` = unmet. `construction_control` adds two locked
 system-default `check` rules (ADR 0004 §5) to `inspection.submit` (§Review and return),
 evaluated from the ITP line's external points: `WITNESS_REQUIREMENT_HOLD` fails only for unmet
 parties whose point is `H`, and `WITNESS_REQUIREMENT_WITNESS` only for unmet parties whose point
 is `W`, so a line with a client `W` and a principal `H` yields separate findings and the `W`
 finding stays overridable. Findings: `RFI_REQUIRED` (no slot ever issued), `WITNESS_PENDING`
-(slot `requested`/`confirmed`), `WITNESS_NOT_SATISFIED` (absent on an H point or after short
-notice, or `failed`), each naming the parties concerned. An offline submit is checked at
+(slot `requested`/`confirmed`), `WITNESS_NOT_SATISFIED` (absent on an H point or without valid
+notice (§6), or `failed`), each naming the parties concerned. An offline submit is checked at
 sync like every other submit check.
 
 **Override (decision TD-486, planner default applied).** A per-record override (ADR 0004
@@ -1139,6 +1168,21 @@ exception to Amendment A pending TD-486.
   sees it before confirming, it is in the event). A project may make it blocking through its rule
   copy (ADR 0004). A short-notice slot can never satisfy a witness requirement through
   `no_show`, and its no-show delay is attributed to `contractor` (§7).
+- **Valid notice for a party** = `notice_met` on the slot **and** that party's
+  `notice_delivery` is not `failed` (§2, §9). A party whose call-out was never delivered out of
+  the app is treated exactly like short notice for that party: its absence never satisfies the
+  witness requirement through `no_show`, it creates a delay entry, and the default cause is
+  `contractor` (§7), which PER-02 and PER-06 can change with a reason (product intake
+  2026-11-21, planner default; user to confirm). `notice_delivery = pending` at the outcome
+  counts as delivered (no evidence of failure).
+- **Validity is fixed at the outcome** (planner default; user to confirm). Valid notice is
+  evaluated **once per party, when the outcome** (`witnessed`, `no_show`, `failed`, or the
+  slot-level `waived`) **is recorded**, and stored as `slot_party.notice_valid_at_outcome` (§2).
+  The witness check (§5, `witness_status`) and delay creation (§7) both use only this frozen
+  value. A delivery result that arrives later (a late bounce, a failed push retry) still updates
+  `notice_delivery`, is shown on the screen and is emitted as an event, but never changes the
+  effect of the recorded outcome. A reschedule clears the frozen value together with the
+  outcome.
 
 ### 7. Client delay attribution
 
@@ -1162,13 +1206,16 @@ reschedule`, one or more), `default_cause_party`, `active`. Defaults:
 reschedule`), `cause_party` (`client \| principal \| third_party \| contractor \| other`),
 `reason_code`, `notice_met`, `started_at`, `ended_at` (nullable), `hours` (wall-clock, 2
 decimals, set when ended), `status` (`open \| closed`), `cause_changed_by`, `cause_changed_at`,
-`cause_change_reason`. Anchors are the slot's (§2).
+`cause_change_reason`. Anchors are the slot's (§2). For a `no_show` entry, `notice_met` records
+whether every absent party had valid notice (§6), so it is false after a failed delivery.
 
-- **`no_show`** with at least one absent party whose point is `H`, or after short notice: one
-  entry, `cause_party` = the absent party (several absent parties: `client` before `principal`
-  before `third_party`) when `notice_met`, else `contractor`; `started_at = scheduled_start`.
-  A `no_show` where only `W` parties were absent after valid notice creates no entry (work
-  proceeds).
+- **`no_show`** with at least one absent party whose point is `H` or who lacked valid notice
+  (§6: short notice, or that party's `notice_delivery = failed`; the value frozen at the outcome
+  in `notice_valid_at_outcome`): one entry, `cause_party` = the
+  absent party (several absent parties: `client` before `principal` before `third_party`) when
+  every absent party had valid notice, else `contractor`; `started_at = scheduled_start`.
+  A `no_show` where only `W` parties were absent, each with valid notice, creates no entry (work
+  proceeds). PER-02/PER-06 may change the cause as below.
 - **`failed`**: one entry, `cause_party` = the reason code's default, `started_at =
   scheduled_start`.
 - An open entry closes when the slot (after its reschedules) reaches `witnessed` or `waived`
@@ -1254,6 +1301,25 @@ notification per request per recipient per event (not one per slot).
   slot in `requested` or `confirmed` once `now ≥ scheduled_start −
   inspection_request.reminder_lead_minutes` (default 120); idempotent through
   `reminder_sent_at`; a slot issued inside the lead time gets no reminder.
+  A reminder that cannot go out before `scheduled_start` (worker backlog, outage) is recorded
+  as failed (`too_late`) and never sent late (product intake 2026-11-21, planner default; user
+  to confirm; general rule in TD-549).
+- **Delivery failure per party** (product intake 2026-11-21, planner default; user to confirm;
+  task T-0350). Every call-out recipient is a project account, so the in-app row always exists;
+  delivery is therefore judged over the **out-of-app channels only** (push and e-mail). A
+  party's `notice_delivery` (§2) is `failed` when **every** push and e-mail attempt for **all**
+  of that party's call-out recipients for the latest issue or reschedule failed or was skipped
+  (e-mail bounced, suppressed or failed in the core-mail log, T-0226; push failed or no device;
+  no out-of-app channel at all = `no_channel`), with the reason in `notice_delivery_reason`; it
+  is `delivered` once any such attempt succeeds, and `pending` until then. A recipient's own
+  opt-out of a channel (if notification preferences ever apply to call-outs) counts as
+  `skipped` for that attempt, so a party whose every recipient opted out of push and e-mail
+  is `failed` (`skipped`) (planner default; to confirm in TD-549). A reschedule resets it
+  to `pending`. On `failed` the requester and PER-06 get a `high` in-app notification and the
+  slot detail shows it. A failed delivery is never attendance: the party stays `pending` until
+  someone records `attended`, `absent` or a waiver. Effect on outcomes: no valid notice for
+  that party (§6, §5, §7), fixed once when the outcome is recorded (§6). Per-channel results come from the persisted delivery log (TD-238,
+  TD-549).
 - **E-mail** through core mail (T-0058, diff §4.6), recipient's locale. Planner default, decision
   **TD-484**: only to project accounts above; content = project code and name, RFI no.,
   discipline title, the event, and a link to the request page behind sign-in; **no** scheduled
@@ -1318,6 +1384,12 @@ language (fallback `en`; only English ships, TD-172). Empty values print blank: 
   label; times in UTC with the project's IANA time zone. `mine=true` limits to slots where the
   caller is requester, named witness or (PER-15) call-out recipient. Several slots on one day and
   overlapping slots are allowed and listed.
+- **Why a slot is open** (product intake 2026-11-21, planner default; user to confirm). The
+  detail screen (T-0338) and the calendar event popover (T-0339) show, beside the slot state,
+  one line per external party: party, its point (H / W), attendance (`pending | attended |
+  absent | waived`) and notice delivery (`pending | delivered | failed`, §9; T-0350), so the reason a slot is still
+  open is visible without opening the history. PER-15 sees the same lines (no
+  `internal_commercial` fields, §13).
 - **Who sees what:** internal members with `V` (PER-07 only inside their site nodes); PER-15 only
   slots of issued requests whose every anchor is in their granted subtree; a named witness the
   slots naming them. The same rule applies to the register and detail (§12).

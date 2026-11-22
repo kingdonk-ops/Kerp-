@@ -3,9 +3,9 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 361 · **Closed:** 151
+**Open:** 377 · **Closed:** 151
 
-## decision (40)
+## decision (42)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -49,8 +49,10 @@
 | [TD-484](../tracker/todo/TD-484.md) | RFI notification e-mail: may it carry the date/time/location, the RFI PDF attachment and an .ics invite, and go to client distribution addresses without a KERP account? | T-0335 | planner |
 | [TD-486](../tracker/todo/TD-486.md) | RFI witness check: may an unmet hold-point (H) witness requirement be overridden per record (ADR 0004 Amendment A), or is it non-overridable? | T-0333 | planner |
 | [TD-514](../tracker/todo/TD-514.md) | How is a passed or LOCKED_FOR_TURNOVER inspection corrected? Define void-and-reissue (revision suffix, supersedes link, ledger, MDR shows latest) | — | planner |
+| [TD-545](../tracker/todo/TD-545.md) | AI provider, region and credentials (data use allowed by the user 2026-11-21): confirm one provider per deployment, Australian region, company-owned key in the secret store, fail closed | E-05-08, T-0187, T-0189 | planner |
+| [TD-561](../tracker/todo/TD-561.md) | Grant ceiling questions: second approver when PER-09 assigns a hold-authority persona it does not hold? May external accounts hold PER-14 (Field Worker)? | T-0014, T-0026, T-0296 | planner |
 
-## spec-gap (72)
+## spec-gap (82)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -126,6 +128,16 @@
 | [TD-505](../tracker/todo/TD-505.md) | Runtime settings registry: categories, the unit and ceiling of max_upload_size_mb, and client-visible flags are implementer readings | T-0230 | implementer |
 | [TD-515](../tracker/todo/TD-515.md) | Field registry has no multi-point measurement field: add measurement_set (list of values + unit) with CEL list statistics (mean/min/max/count) | — | planner |
 | [TD-536](../tracker/todo/TD-536.md) | Queue monitor: no API lists queued/running jobs, so the System console aborts by pasted job id; add a list (or job id on stuck quarantine rows) so abort can be picked from the screen | T-0224 | implementer |
+| [TD-546](../tracker/todo/TD-546.md) | Multi-signer completion policy (all / any / quorum) with per-signer state (sent, viewed, signed, declined, expired, delivery_failed) and a derived aggregate | E-06-07, T-0291, E-05-05, E-07-02 | planner |
+| [TD-547](../tracker/todo/TD-547.md) | Results awaited: tests witnessed on site whose result arrives later (pull-off, lab) — place the waiting state on the ITR, not the RFI slot | T-0333, T-0111, T-0336 | planner |
+| [TD-549](../tracker/todo/TD-549.md) | Notification rules (trigger, recipients by role, delay, channel, template, conditions), per-notification delivery log with skipped reasons and an Outbox card, issued vs amended triggers, never-late reminders | T-0019, T-0335, T-0228 | planner |
+| [TD-550](../tracker/todo/TD-550.md) | Offline client behaviour: connection pill with queued count, photo states, Not syncing state, sign-out clearing, restore-while-offline backup slot, no visible rollback on reconnect, responsive panes | T-0127, T-0149, T-0165, T-0157 | planner |
+| [TD-551](../tracker/todo/TD-551.md) | ITR capture speed: big result buttons with number keys, filter tabs with live counts, section progress, canned comments, clone last, speed mode over unanswered items | T-0165 | planner |
+| [TD-552](../tracker/todo/TD-552.md) | Grant ceilings as tests (PER-09 cannot grant tenant grants, etc.) and an enforced fence: external accounts can never hold staff personas | T-0014, T-0026, T-0296, T-0073 | planner |
+| [TD-553](../tracker/todo/TD-553.md) | Admin safety: destructive verbs (template/rule-set delete) off by default and refused while in use; policy changes state existing vs new records; impossible values flagged | T-0232, T-0246, T-0036, E-01-03 | planner |
+| [TD-554](../tracker/todo/TD-554.md) | Per-person share links for MDR and report access: expiry stamped at creation, policy change affects new links only, counted bulk re-expiry, immediate revoke, distinct expired vs revoked messages | E-07-01, E-07-04 | planner |
+| [TD-555](../tracker/todo/TD-555.md) | Three-way upgrade of default ITP templates and rule sets into customised projects: counts, overlapping pairs, keep ours / take theirs, auto-update untouched, mark dropped | T-0137, T-0281, T-0036 | planner |
+| [TD-559](../tracker/todo/TD-559.md) | MDR breakdown open points: how client acceptance of a review revision is recorded, revision scheme, Rev 0 without review, B-LTA augmentation schedule | E-05-05 | planner |
 
 ## missed (12)
 
@@ -199,7 +211,7 @@
 | [TD-508](../tracker/todo/TD-508.md) | Verify the e2e suite on the make up compose stack, and give it its own database | T-0027 | implementer |
 | [TD-510](../tracker/todo/TD-510.md) | Deployment-config view lacks the mail reply-to of diff §4.7: Settings has no reply-to field yet | T-0230 | implementer |
 
-## later (144)
+## later (148)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -347,6 +359,10 @@
 | [TD-532](../tracker/todo/TD-532.md) | Registry entries declared by later tasks add their label to admin.settings.entries (and a new category to admin.settings.categories) in the Settings screen | T-0232 | implementer |
 | [TD-537](../tracker/todo/TD-537.md) | RegisterPage shell lacks per-row actions and server-side paging, so the System console registers (failed jobs, upload quarantine) use admin card lists; adopt the shell once it supports both (diff §6.5) | T-0224 | implementer |
 | [TD-541](../tracker/todo/TD-541.md) | Upload quarantine: 'Sweep now' for any project (picker), not only projects that already have quarantine rows | T-0224 | reviewer |
+| [TD-548](../tracker/todo/TD-548.md) | RFI scheduling on holidays and site shutdown days: block / allow with confirmation / allow as an issue/reschedule rule, plus an internal warn-or-block option | T-0333, E-04-15 | planner |
+| [TD-556](../tracker/todo/TD-556.md) | Undo a committed P6 or asset import while nothing refers to the imported nodes yet | T-0129, T-0104, T-0138 | planner |
+| [TD-557](../tracker/todo/TD-557.md) | Client-mandated PDF forms: AcroForm fill or coordinate mapping, fixed slots with overflow note, form revision by inspection date, rendered in the worker | T-0158, T-0110 | planner |
+| [TD-558](../tracker/todo/TD-558.md) | Navigation placement check: TQs, submittals, RFIs, NCRs, material lots and calibration certificates against diff §6.1 | T-0024 | planner |
 
 ## bug (10)
 
