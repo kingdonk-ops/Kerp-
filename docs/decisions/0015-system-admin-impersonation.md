@@ -1,9 +1,9 @@
-# ADR 0015 — Support impersonation by a system_admin (break-glass "view as")
+# ADR 0015 — Support impersonation by a system_admin
 
-- **Status:** **proposed** (planner, 2026-11-21; decision TD-426 is open; nothing may be built on
-  it until the user accepts it)
-- **Date:** 2026-11-21
-- **Affects:** T-0277, T-0278, T-0279, T-0280 (blocked by TD-426); `app/core/auth` (`tokens.py`,
+- **Status:** **accepted** (user decision, 2026-11-22, TD-426: option (a) full impersonation;
+  proposed by the planner 2026-11-21 with option (c) as default, rejected)
+- **Date:** 2026-11-21 (proposed), 2026-11-22 (accepted)
+- **Affects:** T-0277, T-0278, T-0279, T-0280; `app/core/auth` (`tokens.py`,
   `bearer.py`, `deps.py`, `access.py`, `revocation.py`); the `audit_ledger` core table (hash v3,
   migration after the ADR 0010 one); the runtime settings registry (T-0230,
   `impersonation_max_minutes`); diff §4.2 *Support impersonation*; edge spec §5. Builds on
@@ -32,7 +32,13 @@ impersonation narrows visibility and never widens it. What remains:
    session, `jti`/`sid` revocation in Redis) and T-0043 (sessions bound to enrolled devices) must
    not gain a second, weaker path.
 
-## Decision (proposed; planner default for TD-426 = option (c))
+## Decision (accepted 2026-11-22: TD-426 option (a), full impersonation)
+
+The user decided on 2026-11-22: **option (a)**. Mutations are allowed while impersonating and
+are attributed to the target, with the admin as `impersonated_by_user_id` in the ledger; the
+central guardrail blocks the enumerated actions with `403 IMPERSONATION_ACTION_FORBIDDEN`. The
+three sub-questions of TD-426 were not answered separately; the planner defaults below
+(§8–§10) apply and can be confirmed or revised by the user later.
 
 1. **Start.** `POST /api/v1/admin/users/{id}/impersonate` with a required reason, `system_admin`
    only. Refused: deactivated targets (422), `system_admin` targets
@@ -58,11 +64,9 @@ impersonation narrows visibility and never widens it. What remains:
    T-0119 signing, client co-sign, inspection submit/approve, hold release, override decisions,
    password/PIN/device changes, admin grants, memberships, invites, access-request decisions,
    teams, settings, project creation, `/api/v1/admin/*` mutations, impersonation start. A
-   contract test enumerates `app.routes`.
-   - **Option (c), planner default:** every mutating route except exit and logout is `forbid`
-     (read-only "view as").
-   - **Option (a), if the user chooses it:** the remaining mutating routes are `allow`, and the
-     records they write are attributed as in §6.
+   contract test enumerates `app.routes`. Every other mutating route is classified `allow`
+   explicitly (a router-level default per module is allowed, with per-route overrides), and the
+   records it writes are attributed as in §6. Exit and logout are always `allow`.
 6. **Audit.** Tenant chain `admin-impersonation:<tenant>`: `impersonation.started` (admin,
    target, reason, IP, user agent, expiry, admin device), `impersonation.ended`
    (`exit | expired | revoked`), `impersonation.denied`. **Core-table change:** `audit_ledger`
@@ -73,11 +77,26 @@ impersonation narrows visibility and never widens it. What remains:
    second column.
 7. **No side effects on the target.** Impersonation does not change the target's last login,
    last active, presence, session index or last-used project.
+8. **Targets holding `create_projects`** (planner default, TD-426 sub-question 1; confirmable):
+   may be impersonated; project creation is in the `forbid` list, so the grant is unusable while
+   impersonating.
+9. **PER-15 Client Representatives** (planner default, TD-426 sub-question 2; confirmable): may
+   be impersonated, **read-only**. When the target holds a PER-15 membership on any project
+   (evaluated per request from the memberships loaded with the grants), every mutating route
+   except exit and logout is `forbid` for that session, as under the rejected option (c).
+10. **Target notice** (planner default, TD-426 sub-question 3; confirmable): when an
+    impersonation ends (`exit`, `expired` or `revoked`), the target receives one e-mail through
+    core mail (diff §4.6, `send_mail`, after commit on the interactive queue): the admin's name,
+    start and end time, and that actions taken were recorded under the target's name and
+    audited as impersonated. The reason is not included. A failed send never affects the
+    session or the ledger.
 
 ## Consequences
 
-- With (c) nothing is ever written under the target's name; the ledger column is still built
-  so moving to (a) is an allow-list change, not a schema change.
+- Records written while impersonating carry the target in `created_by` / `updated_by`; the
+  ledger entry (hash v3) is the only place that names the admin. Investigations of "who really
+  did this" go through the audit explorer filter on `impersonated_by_user_id`.
+- The target learns of every impersonation by e-mail after it ends.
 - Every future mutating endpoint has to be classified, or it is refused while impersonating
   (the contract test tells its author).
 - The impersonation token outlives the 15-minute access-token rule (up to 30 minutes by
@@ -87,10 +106,19 @@ impersonation narrows visibility and never widens it. What remains:
 ## Alternatives (TD-426)
 
 - **(a) Impersonation as specified** (mutations allowed, attributed to the target with
-  `impersonated_by_user_id` in the ledger, guardrails as above).
+  `impersonated_by_user_id` in the ledger, guardrails as above): **chosen** by the user,
+  2026-11-22.
 - **(b) Only targets in projects where the admin is a member.** Moot under ADR 0016: the admin
   sees every project, so it narrows nothing.
-- **(c) Read-only "view as"** (default above).
+- **(c) Read-only "view as"** (every mutating route except exit and logout refused): the
+  planner's default while TD-426 was open, **rejected** by the user on 2026-11-22. Its
+  reasoning, kept for the record: least privilege; it served the support need ("what does
+  this user see and why can they not press X") without ever writing a record under someone
+  else's name, kept A/S authority unreachable by construction rather than by an enumerated
+  list, and since ADR 0016 an admin can already create and edit on every project under their
+  own identity. The user chose (a) because support also needs to act as the user (the paste's
+  "Mutations are attributed to the target"). (c) survives only as the mode for PER-15 targets
+  (§9).
 - **(d) Target consent with a one-time code** e-mailed to the target; combinable with (a) or
   (c); it fails the "user cannot sign in" support case.
 - **Second column on `BaseRecordMixin`** (`impersonated_by` on every row): rejected, a core-mixin

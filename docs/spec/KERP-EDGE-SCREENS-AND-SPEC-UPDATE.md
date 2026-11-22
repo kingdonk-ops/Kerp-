@@ -564,19 +564,24 @@ submissions and witness attendance, `S` only for witness lines naming it, never 
 above is unchanged until TD-435 is decided. Independently, accounts with `is_internal = false`
 never read `internal_commercial` routes or fields, whatever their persona (diff §4.9, T-0295).
 
-**Support impersonation (user paste "T-0076", 2026-11-21) — pending decision TD-426; ADR 0015
-proposed; T-0277–T-0280 blocked.** While a `system_admin` views KERP as another user
+**Support impersonation (user paste "T-0076", 2026-11-21; user decision 2026-11-22, TD-426
+option (a); ADR 0015 accepted; T-0277–T-0280).** While a `system_admin` views KERP as another user
 (`KERP-CONSOLIDATION-AND-DIFF.md` §4.2 *Support impersonation*), the session has exactly that
 user's personas, tiers and site scope from this matrix, **minus `A` and `S`**: approvals, hold
 release, inspection submit/approve, override decisions, signing and co-sign answer
-`403 IMPERSONATION_ACTION_FORBIDDEN` (planner default: every mutation is refused, read-only
-"view as"). UI contract (T-0280):
+`403 IMPERSONATION_ACTION_FORBIDDEN`, as do credential, device and grant changes and project
+creation. Every other action works as the target and is recorded under the target's name, with
+the admin in the ledger (`impersonated_by_user_id`). A PER-15 target is impersonated read-only,
+and the target is e-mailed when the session ends (planner defaults, ADR 0015 §8–§10). UI
+contract (T-0280):
 - **Admin → Users** row and user detail: action **"Login as user (support)"**, `system_admin`
   only, hidden for deactivated users and other System admins; a modal asks for the reason
-  (required) and states the time limit (`impersonation_max_minutes`, default 30).
+  (required) and states the time limit (`impersonation_max_minutes`, default 30), that actions
+  are recorded under the target's name and audited as impersonated, and that the target is
+  e-mailed when the session ends.
 - **Impersonation banner** on every screen, phone and tablet widths included, high contrast, not
   dismissible, above the top bar: "Viewing as {target_name} ({target_email}) — impersonated by
-  {admin_name} · {remaining} remaining" (plus "read-only" under the default) and **"Exit
+  {admin_name} · {remaining} remaining" (plus "read-only" for a PER-15 target) and **"Exit
   impersonation"**. Exit or expiry returns to the admin's own session on Admin → Users with a
   notice. Forbidden actions are disabled and the 403 is shown inline. Nothing of the impersonated
   session is stored offline. Strings through `t()`.

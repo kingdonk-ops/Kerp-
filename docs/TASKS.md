@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 102/321 tasks done (32%) · **ready now:** 20 · **epics awaiting breakdown:** 49
+**Overall:** 102/321 tasks done (32%) · **ready now:** 21 · **epics awaiting breakdown:** 49
 
 | Phase | Tasks done | Progress |
 |---|---|---|
@@ -144,9 +144,9 @@
 | ✅ | [T-0274](../tracker/tasks/T-0274.md) | tenancy: system_admin global project visibility (ADR 0016) — additive migration replacing project_isolation_policy on every project-scoped table through the frozen-DDL helper, ORM scope mirror, RLS contract tests updated | tenancy | M | T-0007, T-0014, T-0033 | #151 |
 | ✅ | [T-0275](../tracker/tasks/T-0275.md) | identity/projects: system_admin capabilities on every project (V, C, E, administer; never A or S), all projects in GET /projects and /me/projects, SoD warning for hold personas on system_admins | identity | S | T-0274, T-0010, T-0014, T-0042 | #158 |
 | ✅ | [T-0276](../tracker/tasks/T-0276.md) | Frontend: project picker and All-Projects scope show every project for a system_admin (badge for admin access without membership; no A/S actions) | frontend | S | T-0275, T-0042, T-0024 | #163 |
-| 🟥 | [T-0277](../tracker/tasks/T-0277.md) | identity: system_admin impersonation token — POST /admin/users/{id}/impersonate and /auth/impersonation/exit, single-session impersonation JWT (no refresh), target RLS with is_system_admin = false (blocked by TD-426) *(blocked by TD-426)* | identity | M | T-0006, T-0008, T-0010, T-0014, T-0039, T-0043, T-0230, T-0274 |  |
-| 🟥 | [T-0278](../tracker/tasks/T-0278.md) | identity: central impersonation guardrail — 403 IMPERSONATION_ACTION_FORBIDDEN for A/S authority, signing, co-sign, inspection submit/approve, hold release, overrides and credential/device/grant mutations; route-classification contract test (blocked by TD-426) *(blocked by TD-426)* | identity | M | T-0277, T-0010 |  |
-| 🟥 | [T-0279](../tracker/tasks/T-0279.md) | audit: dual-identity ledger entries during impersonation — impersonated_by_user_id column, ledger hash v3, attribution in the audit explorer (ADR 0015; blocked by TD-426) *(blocked by TD-426)* | audit | S | T-0006, T-0043, T-0277 |  |
+| ▶ | [T-0277](../tracker/tasks/T-0277.md) | identity: system_admin impersonation token — POST /admin/users/{id}/impersonate and /auth/impersonation/exit, single-session impersonation JWT (no refresh), target RLS with is_system_admin = false, end-of-session e-mail to the target | identity | M | T-0006, T-0008, T-0010, T-0014, T-0039, T-0043, T-0058, T-0230, T-0274 |  |
+| ⬜ | [T-0278](../tracker/tasks/T-0278.md) | identity: central impersonation guardrail — 403 IMPERSONATION_ACTION_FORBIDDEN for A/S authority, signing, co-sign, inspection submit/approve, hold release, overrides and credential/device/grant mutations; route-classification contract test | identity | M | T-0277, T-0010 |  |
+| ⬜ | [T-0279](../tracker/tasks/T-0279.md) | audit: dual-identity ledger entries during impersonation — impersonated_by_user_id column, ledger hash v3, attribution in the audit explorer (ADR 0015) | audit | S | T-0006, T-0043, T-0277 |  |
 
 ## Phase 1 — Asset & Quality backbone
 
@@ -299,7 +299,7 @@
 | ⬜ | [T-0271](../tracker/tasks/T-0271.md) | materials/inspections: substitutions in the offline reference bundle, substitution_id bound on the answer, read-only substitution note on the inspection and its PDF | materials | M | T-0270, T-0147, T-0158, T-0111 |  |
 | ⬜ | [T-0321](../tracker/tasks/T-0321.md) | Frontend: issue flag override dialog (guardrails, loosening warning), upgrade punch → NCR and "Raise external NCR from this" dialogs; NCR effectiveness verify through the signing ceremony | frontend | M | T-0314, T-0315, T-0319, T-0290, T-0291, T-0323 |  |
 | ⬜ | [T-0272](../tracker/tasks/T-0272.md) | Frontend: product selector shows approved substitutes badged "Approved Substitute (ref)" with the equivalency document viewable offline; selecting binds substitution_id | materials | S | T-0271, T-0165 |  |
-| 🟥 | [T-0280](../tracker/tasks/T-0280.md) | Frontend: Admin → Users 'Login as user (support)' with reason modal, persistent impersonation banner with countdown and Exit, session hand-back (blocked by TD-426) *(blocked by TD-426)* | frontend | M | T-0246, T-0026, T-0277, T-0278, T-0279 |  |
+| ⬜ | [T-0280](../tracker/tasks/T-0280.md) | Frontend: Admin → Users 'Login as user (support)' with reason modal, persistent impersonation banner with countdown and Exit, session hand-back | frontend | M | T-0246, T-0026, T-0277, T-0278, T-0279 |  |
 | ⬜ | [T-0289](../tracker/tasks/T-0289.md) | signing: e-signature attestation for formal sign-offs — re-authentication grant (signing PIN or password; device PIN offline), versioned intent statement, timestamp/device/IP evidence in the sign-off ledger, refused under impersonation (offline sync branch: T-0310) | signing | M | T-0119, T-0162, T-0143, T-0177, T-0230 |  |
 | ⬜ | [T-0290](../tracker/tasks/T-0290.md) | Frontend: signing ceremony — intent statement dialog, re-authentication prompt (signing PIN or password online, device PIN on Android offline), set/reset signing PIN for every user | frontend | M | T-0289, T-0310, T-0143, T-0153 |  |
 | ⬜ | [T-0310](../tracker/tasks/T-0310.md) | signing: offline formal sign-off acceptance at sync — no grant for device_pin_offline, intent version resolved at occurred_at (intent_outdated flag, never 409), signer standing from durable identity events (signer_inactive, never effective → QA queue) | signing | M | T-0289, T-0143, T-0162, T-0177, T-0181, T-0244, T-0014 |  |
