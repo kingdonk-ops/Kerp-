@@ -428,17 +428,15 @@ before it ships carry no attestation and stay valid ("no attestation recorded" o
   TD-592). A scan of a page signed on paper can be attached to a **specific ITR revision**
   (inspection record and version) as a file of kind `wet_signed_scan`, with uploader, upload
   time, the signer's name and party as stated by the uploader, and an optional note (audited).
-  It is evidence, not an attested e-signature: it carries no attestation, and an internal formal
-  sign-off (the kinds above) always needs its own attestation. Where the project allows it, the
-  scan can stand for a **client or third-party signature** on that ITR revision (the client
-  co-sign, §Client co-sign), recorded as `verification_mode = paper_scan` and reviewed like a
-  provisional wet signature. The inspection PDF and the dossier (E-05-05) show it as
-  "Wet-signed on paper; scan uploaded by <name> on <date>", next to and never in place of an
-  attestation block. A project rule can require e-signature instead (project setting
-  `inspection.require_e_signature`, default off): when on, the co-sign rule set refuses a
-  paper scan as the client signature and an electronic co-sign mode is needed; the scan can
-  still be attached as plain evidence. The client's wet signature drawn on the tablet (§Client
-  co-sign, mode iii) is a different thing and is unchanged.
+  It is **plain evidence only**: it carries no attestation, counts as no sign-off and never
+  replaces any required signature. Internal formal sign-offs (the kinds above) still need their
+  own attestation, and the client co-sign still needs one of the modes of §Client co-sign with
+  the client's own PER-15 account (TD-219); the `verification_mode` values are unchanged. The
+  inspection PDF and the dossier (E-05-05) list it as "Wet-signed on paper; scan uploaded by
+  <name> on <date>", next to and never in place of an attestation or co-sign block. Whether a
+  scanned paper signature may ever count as the client co-sign is an open user decision
+  (TD-592). The client's wet signature drawn on the tablet (§Client co-sign, mode iii) is a
+  different thing and is unchanged.
 - **Keys and fingerprints** (product intake 2026-11-21, planner default; user to confirm). Every
   record sealed with a key names the fingerprint (SHA-256 of the public key or certificate) of
   that key: client device co-sign assertions (T-0173), PAdES signatures of dossiers and Delay
@@ -1048,7 +1046,9 @@ member who may witness for that party: PER-15 for `client`, the TD-435 persona f
 attended \| absent \| waived`), `attendance_by_user_id`, `attendance_at`, `waiver_ref` (the
 party's written waiver, set by the waive-a-party action; also in its event), `notice_delivery`
 (`pending \| delivered \| failed`, default `pending`) and `notice_delivery_reason` (nullable:
-`bounced \| suppressed \| no_channel \| provider_error \| skipped`), set from the out-of-app
+`bounced \| suppressed \| no_channel \| provider_error \| skipped`; `skipped` = an attempt not
+made for a reason other than opt-out, for example a channel excluded by a notification rule
+condition, TD-587; never a recipient's opt-out, §9), set from the out-of-app
 delivery results of the party's call-out recipients (§9 "Delivery failure per party"; product
 intake 2026-11-21, planner default; user to confirm), and `notice_valid_at_outcome` (boolean,
 null until an outcome is recorded; frozen validity of the party's notice, §6). One row per party.

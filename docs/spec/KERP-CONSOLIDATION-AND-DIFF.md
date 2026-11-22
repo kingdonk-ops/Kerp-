@@ -1082,8 +1082,15 @@ come later (Phase 6, T-0303–T-0305, epic E-06-05). Rules:
   - **Undo** restores the previous values through the same service path only while the record
     version is still the one Apply produced (optimistic check). After any later change Undo is
     refused and the user is told to fix the record manually; nothing is merged automatically.
+    Undo covers field values only: a card whose apply made a workflow transition or an attested
+    sign-off cannot be undone (the owning workflow's own reverse or void path applies).
   - **Audit:** the audit ledger records both the requester and the approver (the person who
-    applied, rejected or undid) on the card's state change and on the mutation itself.
+    applied, rejected or undid) on the card's state change and on the mutation itself. For a
+    card proposed by a scheduled or watchdog operation (no asking user) the requester is that
+    named operation; a person must still Apply it.
+  - **While AI is unavailable** (503 `AI_UNAVAILABLE`, 429 `AI_BUDGET_REACHED`): Apply, Reject,
+    Undo and editing of cards already staged stay available, because they make no provider
+    call; only new proposals fail closed.
   - **Changes list** per project: every card with state `waiting | applied | rejected | undone
     | expired`, filters (module, requester, record kind, state, age) and batch review so a QA
     lead can open, apply or reject drafts one by one or in a batch. Batch apply applies each

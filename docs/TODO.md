@@ -5,7 +5,7 @@
 
 **Open:** 408 · **Closed:** 167
 
-## decision (39)
+## decision (40)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -48,8 +48,9 @@
 | [TD-486](../tracker/todo/TD-486.md) | RFI witness check: may an unmet hold-point (H) witness requirement be overridden per record (ADR 0004 Amendment A), or is it non-overridable? | T-0333 | planner |
 | [TD-514](../tracker/todo/TD-514.md) | How is a passed or LOCKED_FOR_TURNOVER inspection corrected? Define void-and-reissue (revision suffix, supersedes link, ledger, MDR shows latest) | — | planner |
 | [TD-564](../tracker/todo/TD-564.md) | On-site label printing (QR / asset tags, quarantine labels): PDF label sheet, vendor print service on Android, or Web Bluetooth? Needs the printer model and device platform | T-0155, E-03-03, E-03-07, T-0141, T-0255 | planner |
+| [TD-592](../tracker/todo/TD-592.md) | May a scanned paper signature ever count as the client (PER-15) co-sign? (paper-signed pages are plain evidence until decided) | T-0291, E-05-05, T-0158 | planner |
 
-## spec-gap (94)
+## spec-gap (93)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -145,7 +146,6 @@
 | [TD-588](../tracker/todo/TD-588.md) | Shared numbering service for documents, ITPs, transmittals and dossiers: which task builds it before T-0108, T-0312 and T-0185 consume it | T-0108, E-05-01, T-0312, T-0185 | planner |
 | [TD-590](../tracker/todo/TD-590.md) | Bolted joint breakout reset: a breakout event resets the joint's integrity status and reopens ITP lines and test-pack checks through run_checks; earlier sign-offs kept as superseded | E-06b-01, E-03-03 | planner |
 | [TD-591](../tracker/todo/TD-591.md) | Competency at sign-off: read-only rule-set fact 'signer holds a valid credential of type X at signing time', snapshotted in the attestation | T-0118, T-0289, T-0291 | planner |
-| [TD-592](../tracker/todo/TD-592.md) | Paper-signed page upload: scan attached to a specific ITR revision as wet-signed evidence, shown in the dossier; project rule can require e-signature instead | T-0291, E-05-05, T-0158 | planner |
 | [TD-593](../tracker/todo/TD-593.md) | Client-supplied material late for its work pack: warning readiness conflict when expected delivery is after the installing pack's planned start (supplied_by flag on material lines) | E-03-03, E-03-02, E-04-02, E-06b-02, T-0266 | planner |
 
 ## missed (12)
