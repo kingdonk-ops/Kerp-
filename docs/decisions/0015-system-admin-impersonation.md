@@ -97,6 +97,12 @@ three sub-questions of TD-426 were not answered separately; the planner defaults
   ledger entry (hash v3) is the only place that names the admin. Investigations of "who really
   did this" go through the audit explorer filter on `impersonated_by_user_id`.
 - The target learns of every impersonation by e-mail after it ends.
+- The ledger change (T-0279) is migration `0042`; `audit.append` reads the admin from the
+  request context only (set by the authenticated principal), and outside impersonation entries
+  stay v2. Like ADR 0010, its downgrade is for development databases only: it drops
+  `impersonated_by_user_id` and restores `hash_version IN (1, 2)`, and fails while any v3 entry
+  exists, so the admin can never be stripped from an entry silently. A production rollback keeps
+  the column (roll the code back, not the schema).
 - Every future mutating endpoint has to be classified, or it is refused while impersonating
   (the contract test tells its author).
 - The impersonation token outlives the 15-minute access-token rule (up to 30 minutes by

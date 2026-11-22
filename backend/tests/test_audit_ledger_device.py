@@ -55,6 +55,7 @@ class _Fields:
     content_hash: str = ""
     deleted_at: datetime | None = None
     device_id: uuid.UUID | None = None
+    impersonated_by_user_id: uuid.UUID | None = None
     hash_version: int = HASH_VERSION
 
 
@@ -119,7 +120,7 @@ def test_v1_hash_is_unchanged_and_never_covers_a_device() -> None:
         compute_content_hash(_entry(hash_version=1, device_id=DEVICE))
 
 
-@pytest.mark.parametrize("version", [0, 3, True])
+@pytest.mark.parametrize("version", [0, 4, True])
 def test_unknown_hash_versions_are_refused(version: int) -> None:
     with pytest.raises(ValueError, match="unknown ledger hash version"):
         compute_content_hash(_entry(hash_version=version))
@@ -175,7 +176,7 @@ def test_changing_a_stored_device_id_is_detected(db: Database) -> None:
 @pytest.mark.parametrize(
     ("sql", "params"),
     [
-        ("UPDATE audit_ledger SET hash_version = 3", {}),
+        ("UPDATE audit_ledger SET hash_version = 4", {}),
         ("UPDATE audit_ledger SET hash_version = 1", {}),  # a v1 row with a device
     ],
 )

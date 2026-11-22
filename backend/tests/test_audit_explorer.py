@@ -20,7 +20,7 @@ from app.core.audit import service as audit
 from app.core.audit.hashing import ChainProblem, find_problems, verify_entries
 from app.core.auth.access import SYSTEM_ADMIN, Persona
 from app.core.db import Database
-from app.core.tenancy.context import TenancyContext
+from app.core.tenancy.context import TenancyContext, current_impersonator_id
 from app.modules.admin import audit_explorer, audit_jobs
 from app.modules.admin import service as admin
 from app.modules.jobs import service as jobs
@@ -92,11 +92,18 @@ class Api:
         tenant: uuid.UUID = T1,
         actor: uuid.UUID | None = None,
         device: uuid.UUID | None = None,
+        impersonator: uuid.UUID | None = None,
     ) -> str:
+        """``impersonator`` stands for an impersonation request's context (T-0279)."""
         with self._patch.context() as patch:
             patch.setattr(audit, "utcnow", lambda: START + timedelta(minutes=minute))
-            with self.db.unit_of_work(TenancyContext(tenant_id=tenant, project_id=project)) as s:
-                return str(audit.append(s, key, payload, actor_id=actor, device_id=device).id)
+            reset = current_impersonator_id.set(impersonator)
+            try:
+                scope = TenancyContext(tenant_id=tenant, project_id=project)
+                with self.db.unit_of_work(scope) as s:
+                    return str(audit.append(s, key, payload, actor_id=actor, device_id=device).id)
+            finally:
+                current_impersonator_id.reset(reset)
 
     def get(self, **params: Any) -> dict[str, Any]:
         response = self.client.get(AUDIT, params=params, headers=self.headers(ALICE))
@@ -214,6 +221,7 @@ def test_a_system_admin_without_membership_reads_tenant_and_every_project_chain(
         "created_at": items[1]["created_at"],
         "actor_id": None,
         "device_id": None,
+        "impersonated_by_user_id": None,
         "source": "system",
         "payload": {"event": "b"},
         "hash_version": 2,
@@ -283,9 +291,28 @@ def test_filters(
     assert api.ids(**params) == [seeded[name] for name in expected]
 
 
+def test_entries_written_while_impersonating_name_the_admin_and_filter_by_it(api: Api) -> None:
+    # T-0279, ADR 0015 §6: who really did it is found through the impersonator filter.
+    alice, bob = api.users[ALICE], api.users[BOB]
+    plain = api.entry("t0279:1", {"event": "x"}, minute=1, actor=bob, project=api.home)
+    acted = api.entry(
+        "t0279:1", {"event": "x"}, minute=2, actor=bob, project=api.home, impersonator=alice
+    )
+    items = api.get(chain_key_prefix="t0279:")["items"]
+    seen = [
+        (i["id"], i["actor_id"], i["impersonated_by_user_id"], i["hash_version"]) for i in items
+    ]
+    assert seen == [(acted, str(bob), str(alice), 3), (plain, str(bob), None, 2)]
+    assert api.ids(chain_key_prefix="t0279:", impersonated_by_user_id=str(alice)) == [acted]
+    assert api.ids(chain_key_prefix="t0279:", impersonated_by_user_id=str(bob)) == []
+    assert api.ids(chain_key_prefix="t0279:", actor_id=str(bob)) == [acted, plain]
+    assert api.verify("t0279:1", api.home).json()["ok"] is True
+
+
 @pytest.mark.parametrize(
     "params",
     [
+        {"impersonated_by_user_id": "not-a-uuid"},
         {"flag": "sod warning"},
         {"flag": '$."x"'},
         {"actor_id": "not-a-uuid"},
@@ -487,17 +514,16 @@ def test_the_job_verifies_every_readable_chain_and_stores_the_report(
         "broken_chains": 0,
         "first_broken": None,
     }
-    assert api.console()[-1] == {"event": "audit_verify_all_finished", "job_id": job_id} | (
-        polled["result"]
+    assert (
+        api.console()[-1]
+        == {"event": "audit_verify_all_finished", "job_id": job_id} | (polled["result"])
     )
     with api.db.unit_of_work(ROOT) as s:
         assert audit.chain_entries(s, CONSOLE)[-1].created_by == api.users[ALICE]
 
 
 @needs_tamper_role
-def test_the_job_reports_the_first_broken_chain_and_seq(
-    api: Api, dispatched: list[JobRef]
-) -> None:
+def test_the_job_reports_the_first_broken_chain_and_seq(api: Api, dispatched: list[JobRef]) -> None:
     _three(api, "t0222:all", None)
     _three(api, "t0222:all", api.home)
     _three(api, "t0222:zz", api.home)

@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 423 · **Closed:** 170
+**Open:** 424 · **Closed:** 170
 
 ## decision (40)
 
@@ -223,7 +223,7 @@
 | [TD-510](../tracker/todo/TD-510.md) | Deployment-config view lacks the mail reply-to of diff §4.7: Settings has no reply-to field yet | T-0230 | implementer |
 | [TD-533](../tracker/todo/TD-533.md) | CEL client runtime has no evaluation step budget (cel-js exposes no step hook; server is the hard gate) | T-0341 | implementer |
 
-## later (170)
+## later (171)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -393,6 +393,7 @@
 | [TD-594](../tracker/todo/TD-594.md) | Automatic weather on the daily diary: fetched, timestamped reference only (source and time), never replaces calibrated ambient readings; new outbound data flow needs a decision | E-04-04 | planner |
 | [TD-597](../tracker/todo/TD-597.md) | Mark template test sends in the delivery ledger so stats can exclude them | T-0227 | implementer |
 | [TD-598](../tracker/todo/TD-598.md) | RFI call-out e-mail templates must register as required=True | T-0227 | implementer |
+| [TD-600](../tracker/todo/TD-600.md) | audit: contract test that every mutating route authenticates through get_principal, so impersonated writes always reach the ledger with impersonated_by_user_id (fold into T-0278's route classification) | T-0279 | implementer |
 | [TD-602](../tracker/todo/TD-602.md) | Impersonation guardrail: classify the broadcast routes (POST /notifications/broadcasts forbid; preview, reads and the public unsubscribe allow) | T-0278 | implementer |
 | [TD-603](../tracker/todo/TD-603.md) | Broadcast opt-out: let a user opt back in (profile setting) and show the state | T-0228 | implementer |
 | [TD-605](../tracker/todo/TD-605.md) | Broadcast list: filter by readable projects and page in SQL | T-0228 | implementer |

@@ -11,10 +11,11 @@ Pure functions with no database access, so verification can also run over an exp
   ``body`` holds the version ``v`` and every immutable field of the entry: ``tenant_id``,
   ``project_id``, ``chain_key``, ``seq``, ``prev_hash``, ``created_at`` (UTC, microseconds,
   ISO 8601), ``created_by``, ``source`` and ``payload``; from ``v`` = 2 (T-0043, ADR 0010)
-  also ``device_id``. Each entry stores the version it was hashed with (``hash_version``),
-  so entries written before ``v`` = 2 still verify. The mutable mixin columns
-  (``updated_*``, ``deleted_at``, ``revision``, ``custom_fields``) are not hashed; the
-  database refuses to change them anyway.
+  also ``device_id``; ``v`` = 3 (T-0279, ADR 0015) also ``impersonated_by_user_id``, the
+  ``system_admin`` who acted as ``created_by``. Each entry stores the version it was hashed
+  with (``hash_version``), so entries written with an older ``v`` still verify. The mutable
+  mixin columns (``updated_*``, ``deleted_at``, ``revision``, ``custom_fields``) are not
+  hashed; the database refuses to change them anyway.
 * **Chain:** entry ``n`` stores ``prev_hash`` = ``content_hash`` of entry ``n - 1``. Entry 1
   links to ``GENESIS_HASH``. ``seq`` runs 1, 2, 3, ... without gaps.
 """
@@ -31,7 +32,9 @@ from typing import Any, Final, Protocol
 
 # The version new entries are hashed with; every version in HASH_VERSIONS still verifies.
 HASH_VERSION: Final = 2
-HASH_VERSIONS: Final = frozenset({1, 2})
+# The version of entries written while a ``system_admin`` impersonates (T-0279, ADR 0015).
+IMPERSONATION_HASH_VERSION: Final = 3
+HASH_VERSIONS: Final = frozenset({1, 2, 3})
 HASH_DOMAIN: Final = b"kerp-audit-ledger\n"
 GENESIS_HASH: Final = "0" * 64
 
@@ -61,6 +64,8 @@ class LedgerRecord(Protocol):
     def payload(self) -> dict[str, Any]: ...
     @property
     def device_id(self) -> uuid.UUID | None: ...
+    @property
+    def impersonated_by_user_id(self) -> uuid.UUID | None: ...
     @property
     def hash_version(self) -> int: ...
     @property
@@ -112,7 +117,8 @@ def compute_content_hash(entry: LedgerRecord) -> str:
     """SHA-256 (hex) over the canonical body of ``entry``, in its own ``hash_version``.
 
     ``v`` = 1 hashes the fields of T-0006; ``v`` = 2 adds ``device_id`` (``null`` for an
-    entry not written through a device). Raises ``ValueError`` for an unknown version.
+    entry not written through a device); ``v`` = 3 adds ``impersonated_by_user_id``. Raises
+    ``ValueError`` for an unknown version, and for a field the entry's version cannot cover.
     """
     version = entry.hash_version
     if isinstance(version, bool) or version not in HASH_VERSIONS:
@@ -133,6 +139,10 @@ def compute_content_hash(entry: LedgerRecord) -> str:
         body["device_id"] = _str_or_none(entry.device_id)
     elif entry.device_id is not None:
         raise ValueError("a v1 ledger entry cannot carry a device_id")
+    if version >= 3:
+        body["impersonated_by_user_id"] = _str_or_none(entry.impersonated_by_user_id)
+    elif entry.impersonated_by_user_id is not None:
+        raise ValueError(f"a v{version} ledger entry cannot carry an impersonated_by_user_id")
     return hashlib.sha256(HASH_DOMAIN + canonical_json(body)).hexdigest()
 
 

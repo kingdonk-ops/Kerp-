@@ -141,6 +141,7 @@ export function auditEntry(extra: Partial<AuditEntry> = {}): AuditEntry {
     created_at: "2026-11-21T07:00:00Z",
     actor_id: ACTOR,
     device_id: DEVICE_ID,
+    impersonated_by_user_id: null,
     source: "api",
     payload: { event: "inspection_signed", sod_warning: true },
     prev_hash: "a".repeat(64),

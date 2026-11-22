@@ -29,6 +29,7 @@ from sqlalchemy.orm import Session
 from app.core.audit.hashing import (
     GENESIS_HASH,
     HASH_VERSION,
+    IMPERSONATION_HASH_VERSION,
     ChainReport,
     canonical_json,
     compute_content_hash,
@@ -36,7 +37,7 @@ from app.core.audit.hashing import (
 )
 from app.core.audit.models import TENANT_SCOPE, AuditEntry, scope_of
 from app.core.db import RECORD_SOURCES, utcnow
-from app.core.tenancy.context import TenancyContext, current_device_id
+from app.core.tenancy.context import TenancyContext, current_device_id, current_impersonator_id
 from app.core.tenancy.rls import session_tenancy
 
 MAX_CHAIN_KEY = 200
@@ -115,6 +116,12 @@ def append(
     ``device_id`` is the enrolled field device the change came through (T-0043); unset, it
     is the request's device (``current_device_id``, set at authentication), else ``NULL``.
     A job replaying a device's queued work passes the device explicitly.
+
+    While a ``system_admin`` impersonates (T-0279, ADR 0015 §6), the entry also names the
+    admin in ``impersonated_by_user_id`` and is hashed as v3. The admin comes only from the
+    request context (``current_impersonator_id``, set from the verified principal); there is
+    deliberately no argument for it. ``created_by`` stays the acting (target) user. Outside
+    impersonation entries are v2 without it.
     """
     context = _context(session)
     if not isinstance(payload, dict):
@@ -124,6 +131,8 @@ def append(
     if not chain_key or len(chain_key) > MAX_CHAIN_KEY:
         raise ValueError(f"chain_key must be 1-{MAX_CHAIN_KEY} characters")
     stored = json.loads(canonical_json(payload))  # validated, detached copy
+
+    impersonator = current_impersonator_id.get()
 
     _lock_chain(session, context, chain_key)
     tail = session.scalars(
@@ -142,7 +151,8 @@ def append(
         source=source,
         payload=stored,
         device_id=device_id or current_device_id.get(),
-        hash_version=HASH_VERSION,
+        impersonated_by_user_id=impersonator,
+        hash_version=HASH_VERSION if impersonator is None else IMPERSONATION_HASH_VERSION,
     )
     entry.content_hash = compute_content_hash(entry)
     session.add(entry)
@@ -187,6 +197,7 @@ class EntryFilter:
 
     actor_id: uuid.UUID | None = None
     device_id: uuid.UUID | None = None
+    impersonated_by_user_id: uuid.UUID | None = None
     chain_key_prefix: str | None = None
     event: str | None = None
     flag: str | None = None
@@ -222,6 +233,8 @@ def list_entries(
         query = query.where(AuditEntry.created_by == filters.actor_id)
     if filters.device_id is not None:
         query = query.where(AuditEntry.device_id == filters.device_id)
+    if filters.impersonated_by_user_id is not None:
+        query = query.where(AuditEntry.impersonated_by_user_id == filters.impersonated_by_user_id)
     if filters.chain_key_prefix:
         prefix = filters.chain_key_prefix
         query = query.where(AuditEntry.chain_key.startswith(prefix, autoescape=True))
