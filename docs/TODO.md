@@ -365,7 +365,7 @@
 | [TD-527](../tracker/todo/TD-527.md) | Published upload files can be orphaned (object kept with no live owner row, or row pointing at a deleted object) | T-0346 | planner |
 | [TD-528](../tracker/todo/TD-528.md) | Two concurrent adds of the same user to a team return 500 (unique violation) instead of the already-a-member answer | — | planner |
 | [TD-534](../tracker/todo/TD-534.md) | API shutdown raises when Redis is unreachable: SaqBroker.close() (SAQ RedisQueue.disconnect) connects to close its pub/sub | T-0342 | implementer |
-| [TD-537](../tracker/todo/TD-537.md) | review gate counts dismissed reviews: a dismissed KERP-REVIEW APPROVED still satisfies scripts/review_gate.py | — | planner |
+| [TD-560](../tracker/todo/TD-560.md) | review gate counts dismissed reviews: a dismissed KERP-REVIEW APPROVED still satisfies scripts/review_gate.py | — | planner |
 
 ## risk (34)
 
