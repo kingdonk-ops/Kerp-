@@ -36,10 +36,12 @@ log).
    `aws sns set-topic-attributes --topic-arn <arn> --attribute-name SignatureVersion --attribute-value 2`
    (console: topic → *Edit* → *Signature version: SHA256*).
 2. Create an SES **configuration set** (e.g. `kerp-mail`) with an **event destination** of
-   type SNS → that topic, for the event types *Bounce* and *Complaint* (*Delivery* is optional
-   and ignored). Set `KERP_MAIL_SES_CONFIGURATION_SET=kerp-mail`.
-   (Alternatively: the identity's *Feedback notifications* for bounces and complaints → the
-   topic. Either way SES publishes to the one topic.)
+   type SNS → that topic, for the event types *Bounce*, *Complaint* and *Delivery* (the
+   delivery ledger marks a send `delivered` from it, T-0226; without it sends stay `sent` and
+   the delivery rate in `GET /api/v1/mail/stats` is 0). Set
+   `KERP_MAIL_SES_CONFIGURATION_SET=kerp-mail`.
+   (Alternatively: the identity's *Feedback notifications* for bounces, complaints and
+   deliveries → the topic. Either way SES publishes to the one topic.)
 3. Set `KERP_MAIL_SNS_TOPIC_ARN` to the topic ARN and deploy. The API now accepts SNS
    messages of that topic only.
 4. Add an **HTTPS subscription** to the topic with the endpoint
@@ -57,7 +59,9 @@ log).
    request for a synthetic test user with that address). Both addresses must appear on the
    suppression list (`GET /api/v1/mail/suppressions`, System admin) and the sends must show
    `bounced` / `complained` in `GET /api/v1/mail/sends`. Remove them afterwards
-   (`DELETE /api/v1/mail/suppressions/{id}`).
+   (`DELETE /api/v1/mail/suppressions/{id}`). Send once to `success@simulator.amazonses.com`
+   too: that send must show `delivered`
+   (`GET /api/v1/mail/sends?address=success@simulator.amazonses.com`).
 
 ## 4. Credentials
 

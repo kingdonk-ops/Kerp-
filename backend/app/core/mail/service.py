@@ -10,8 +10,12 @@
   hands it to the transport, and records ``sent`` with the provider message id, ``failed``
   for a permanent error or the last attempt, or raises ``RetryMail`` for a transient error so
   the queue tries again with back-off.
-* ``record_ses_event`` (SNS endpoint) turns a hard bounce or a complaint into a suppression
-  and marks the send-log row ``bounced`` / ``complained``.
+* ``record_ses_event`` (SNS endpoint) marks the send-log row ``delivered`` on a delivery,
+  and turns a hard bounce or a complaint into a suppression and marks the row ``bounced`` /
+  ``complained``. Status changes from notifications only move forward (``STATUS_RANK``), so a
+  repeated or late notification changes nothing (T-0226).
+* ``list_sends`` / ``send_stats``: the searchable delivery ledger and its counts (T-0226,
+  diff §4.7, ADR 0020).
 """
 
 from __future__ import annotations
@@ -19,11 +23,11 @@ from __future__ import annotations
 import logging
 import uuid
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
-from datetime import datetime
+from dataclasses import dataclass, replace
+from datetime import UTC, datetime
 from typing import Any, Final
 
-from sqlalchemy import event, select
+from sqlalchemy import Select, event, func, select
 from sqlalchemy.orm import Session, SessionTransaction
 
 from app.core.audit import service as audit
@@ -64,8 +68,15 @@ def send_mail(
     to: str,
     context: Mapping[str, object],
     locale: str | None = None,
+    *,
+    recipient_user_id: uuid.UUID | None = None,
+    broadcast_id: uuid.UUID | None = None,
 ) -> uuid.UUID:
     """Queue ``template_key`` to ``to``; the send happens in the worker after the commit.
+
+    ``recipient_user_id`` (the user the address belongs to, when the caller knows one) and
+    ``broadcast_id`` (T-0228) only go into the delivery ledger; the address itself is kept
+    hashed and masked, never in clear.
 
     Raises ``TemplateError`` (unknown template, context that does not fit) or
     ``InvalidAddressError`` before anything is written. Returns the send-log id.
@@ -90,6 +101,8 @@ def send_mail(
             status="queued",
             attempts=0,
             request_id=request_id,
+            recipient_user_id=recipient_user_id,
+            broadcast_id=broadcast_id,
             created_by=tenancy.user_id,
             updated_by=tenancy.user_id,
             source="system",
@@ -309,7 +322,7 @@ def _dev_origin(settings: Settings) -> str:
     return DEV_WEB_ORIGIN
 
 
-# --- bounces and complaints (SNS endpoint, bound to the deployment tenant) -----------------
+# --- deliveries, bounces and complaints (SNS endpoint, bound to the deployment tenant) -----
 
 
 def suppress(
@@ -342,13 +355,28 @@ def suppress(
     return row
 
 
-def _mark(session: Session, provider_message_id: str | None, status: str) -> None:
+# How far a send has got. A notification moves a row forward only, so applying the same
+# notification twice, or a delivery after the bounce or complaint of the same message, changes
+# nothing, whatever order SNS delivers them in. ``failed`` and ``suppressed`` rows never had a
+# provider message id and are never touched.
+STATUS_RANK: Final = {"sent": 1, "delivered": 2, "bounced": 3, "complained": 4}
+
+
+def _mark(session: Session, provider_message_id: str | None, status: str) -> int:
+    """Move every row SES accepted as ``provider_message_id`` to ``status`` if that is
+    forward; return how many rows changed."""
     if not provider_message_id:
-        return
+        return 0
+    changed = 0
     for row in session.scalars(
         select(MailSend).where(MailSend.provider_message_id == provider_message_id)
     ):
+        current = STATUS_RANK.get(row.status)
+        if current is None or current >= STATUS_RANK[status]:
+            continue
         row.status, row.status_at = status, utcnow()
+        changed += 1
+    return changed
 
 
 def _recipients(items: object) -> list[str]:
@@ -367,14 +395,19 @@ def _recipients(items: object) -> list[str]:
 def record_ses_event(session: Session, event_data: Mapping[str, Any]) -> int:
     """Apply one SES notification (the ``Message`` of a verified SNS notification).
 
-    A **permanent** bounce or a complaint suppresses each recipient it names and marks the
-    send ``bounced`` / ``complained``; a transient (soft) bounce and every other event are
-    only logged. Returns how many addresses were suppressed.
+    A delivery marks the send ``delivered``. A **permanent** bounce or a complaint suppresses
+    each recipient it names and marks the send ``bounced`` / ``complained``; a transient
+    (soft) bounce and every other event are only logged. Status changes only move forward
+    (``STATUS_RANK``). Returns how many addresses were suppressed.
     """
     kind = event_data.get("notificationType") or event_data.get("eventType")
     mail = event_data.get("mail")
     message_id = mail.get("messageId") if isinstance(mail, dict) else None
     message_id = message_id if isinstance(message_id, str) else None
+    if kind == "Delivery":
+        changed = _mark(session, message_id, "delivered")
+        logger.info("SES delivery: %d send(s) marked delivered", changed)
+        return 0
     if kind == "Bounce":
         bounce = event_data.get("bounce")
         bounce = bounce if isinstance(bounce, dict) else {}
@@ -404,13 +437,109 @@ def record_ses_event(session: Session, event_data: Mapping[str, Any]) -> int:
 # --- System admin reads and the audited removal ---------------------------------------------
 
 
+@dataclass(frozen=True, slots=True)
+class SendFilter:
+    """Filters of the delivery ledger (T-0226). ``created_from`` is inclusive, ``created_to``
+    exclusive; ``recipient_hash`` is the SHA-256 of the address the admin typed (hashed by
+    the router, the address itself is never kept)."""
+
+    template_key: str | None = None
+    status: str | None = None
+    created_from: datetime | None = None
+    created_to: datetime | None = None
+    broadcast_id: uuid.UUID | None = None
+    recipient_hash: str | None = None
+
+
+def _filtered[*Ts](query: Select[*Ts], filters: SendFilter) -> Select[*Ts]:
+    if filters.template_key is not None:
+        query = query.where(MailSend.template_key == filters.template_key)
+    if filters.status is not None:
+        query = query.where(MailSend.status == filters.status)
+    if filters.created_from is not None:
+        query = query.where(MailSend.created_at >= filters.created_from.astimezone(UTC))
+    if filters.created_to is not None:
+        query = query.where(MailSend.created_at < filters.created_to.astimezone(UTC))
+    if filters.broadcast_id is not None:
+        query = query.where(MailSend.broadcast_id == filters.broadcast_id)
+    if filters.recipient_hash is not None:
+        query = query.where(MailSend.recipient_hash == filters.recipient_hash)
+    return query
+
+
 def list_sends(
-    session: Session, *, status: str | None = None, limit: int = 50, offset: int = 0
+    session: Session,
+    filters: SendFilter | None = None,
+    *,
+    status: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
 ) -> Sequence[MailSend]:
+    """The delivery ledger, newest first (``status`` is shorthand for a status-only filter)."""
+    filters = filters or SendFilter(status=status)
     query = select(MailSend).order_by(MailSend.created_at.desc(), MailSend.id)
-    if status is not None:
-        query = query.where(MailSend.status == status)
+    query = _filtered(query, filters)
     return session.scalars(query.limit(min(limit, MAX_LIST)).offset(offset)).all()
+
+
+# Statuses a send reaches only after SES accepted it, and those that mean it arrived (a
+# complaint comes from a recipient who received the mail).
+ACCEPTED_STATUSES: Final = frozenset(STATUS_RANK)
+ARRIVED_STATUSES: Final = frozenset({"delivered", "complained"})
+
+
+@dataclass(frozen=True, slots=True)
+class SendCounts:
+    """Counts of the delivery ledger by current status (T-0226).
+
+    ``sent``: accepted by SES (now ``sent``, ``delivered``, ``bounced`` or ``complained``).
+    ``delivered``: SES reported the delivery (now ``delivered`` or ``complained``).
+    ``bounced`` / ``complained`` / ``failed`` / ``suppressed`` / ``queued``: rows in that status.
+    ``delivery_rate``: ``delivered / sent``, ``None`` when nothing was sent.
+    """
+
+    total: int = 0
+    queued: int = 0
+    sent: int = 0
+    delivered: int = 0
+    bounced: int = 0
+    complained: int = 0
+    failed: int = 0
+    suppressed: int = 0
+
+    @property
+    def delivery_rate(self) -> float | None:
+        return round(self.delivered / self.sent, 4) if self.sent else None
+
+    def add(self, status: str, count: int) -> SendCounts:
+        updates = {"total": self.total + count}
+        if status in ACCEPTED_STATUSES:
+            updates["sent"] = self.sent + count
+        if status in ARRIVED_STATUSES:
+            updates["delivered"] = self.delivered + count
+        if status in ("queued", "bounced", "complained", "failed", "suppressed"):
+            updates[status] = getattr(self, status) + count
+        return replace(self, **updates)
+
+
+@dataclass(frozen=True, slots=True)
+class SendStats:
+    totals: SendCounts
+    by_template: dict[str, SendCounts]
+
+
+def send_stats(session: Session, filters: SendFilter | None = None) -> SendStats:
+    """Counts of the sends ``filters`` selects (created in the period, of the template), in
+    total and per template key. Counts only: no row leaves the database."""
+    query = select(MailSend.template_key, MailSend.status, func.count()).group_by(
+        MailSend.template_key, MailSend.status
+    )
+    totals = SendCounts()
+    by_template: dict[str, SendCounts] = {}
+    for template_key, status, count in session.execute(_filtered(query, filters or SendFilter())):
+        totals = totals.add(status, count)
+        by_template[template_key] = by_template.get(template_key, SendCounts()).add(status, count)
+    return SendStats(totals=totals, by_template=dict(sorted(by_template.items())))
 
 
 def list_suppressions(

@@ -636,6 +636,7 @@ def test_approval_e_mails_the_requester_after_the_commit(api: Api, outbox: Outbo
         "queued",
         "e***@example.test",
     )
+    assert row.recipient_user_id == api.users[EXT]  # the delivery ledger (T-0226)
     transport = FakeTransport()
     assert _deliver(api.db, mail, transport) == "sent"
     [message] = transport.sent

@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 408 · **Closed:** 167
+**Open:** 411 · **Closed:** 167
 
 ## decision (40)
 
@@ -50,7 +50,7 @@
 | [TD-564](../tracker/todo/TD-564.md) | On-site label printing (QR / asset tags, quarantine labels): PDF label sheet, vendor print service on Android, or Web Bluetooth? Needs the printer model and device platform | T-0155, E-03-03, E-03-07, T-0141, T-0255 | planner |
 | [TD-592](../tracker/todo/TD-592.md) | May a scanned paper signature ever count as the client (PER-15) co-sign? (paper-signed pages are plain evidence until decided) | T-0291, E-05-05, T-0158 | planner |
 
-## spec-gap (93)
+## spec-gap (94)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -142,6 +142,7 @@
 | [TD-571](../tracker/todo/TD-571.md) | Earned value wording: INSPECTED_PASSED/LOCKED_FOR_TURNOVER are ITR states, not ITP-line states; cross-reference the PER-03 sign-off default for steps without an ITP line (PR #179 review) | E-06-04, E-04-12 | reviewer |
 | [TD-572](../tracker/todo/TD-572.md) | Diff §4.11 AI: drop stale 'platform key only if TD-545 changes'; state default conversation retention, the RLS-protected conversation store, and the budget-cap day boundary time zone (PR #179 review) | E-05-08 | reviewer |
 | [TD-573](../tracker/todo/TD-573.md) | Quality §5 no_show row should cite frozen notice_valid_at_outcome; reschedule reset should also clear notice_delivery_reason (PR #179 review) | T-0350, T-0333, T-0335 | reviewer |
+| [TD-575](../tracker/todo/TD-575.md) | T-0226 asks to add a nullable project_id to mail_send_log, which already has one (BaseRecordMixin, the RLS scope) | T-0226 | implementer |
 | [TD-587](../tracker/todo/TD-587.md) | Notification rules and per-notification delivery log (carried over from TD-549): rule model, transactional vs optional kinds, skipped reasons, Outbox card, issued vs amended, never late | T-0019, T-0335, T-0228, T-0350 | planner |
 | [TD-588](../tracker/todo/TD-588.md) | Shared numbering service for documents, ITPs, transmittals and dossiers: which task builds it before T-0108, T-0312 and T-0185 consume it | T-0108, E-05-01, T-0312, T-0185 | planner |
 | [TD-590](../tracker/todo/TD-590.md) | Bolted joint breakout reset: a breakout event resets the joint's integrity status and reopens ITP lines and test-pack checks through run_checks; earlier sign-offs kept as superseded | E-06b-01, E-03-03 | planner |
@@ -220,7 +221,7 @@
 | [TD-510](../tracker/todo/TD-510.md) | Deployment-config view lacks the mail reply-to of diff §4.7: Settings has no reply-to field yet | T-0230 | implementer |
 | [TD-533](../tracker/todo/TD-533.md) | CEL client runtime has no evaluation step budget (cel-js exposes no step hook; server is the hard gate) | T-0341 | implementer |
 
-## later (160)
+## later (161)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -378,6 +379,7 @@
 | [TD-566](../tracker/todo/TD-566.md) | Inline read-only Gantt preview of an XER held in document control, from the server-side parse; display only, never an import path | E-04-01, E-04-12 | planner |
 | [TD-568](../tracker/todo/TD-568.md) | Adopt core tenant_level_context in the remaining tenant-level session guards | T-0349 | implementer |
 | [TD-569](../tracker/todo/TD-569.md) | Use core sha256_hex for the remaining inline SHA-256 hex digests (lockout subject, mail address, admin e-mail) | T-0349 | implementer |
+| [TD-576](../tracker/todo/TD-576.md) | Invite e-mails carry no recipient_user_id in the delivery ledger when the invitee already has an account | T-0226 | implementer |
 | [TD-582](../tracker/todo/TD-582.md) | Startup safety: also refuse a runtime role with no grants on app tables (0039 skipped), not only one with too much access (PR #181 review) | T-0342 | reviewer |
 | [TD-583](../tracker/todo/TD-583.md) | first-run.md: replace 'downgrade to 0038 and upgrade again' with a re-runnable grant command once migrations past 0039 exist (PR #181 review) | T-0343 | reviewer |
 | [TD-585](../tracker/todo/TD-585.md) | CEL runtime sets sys.setrecursionlimit inside evaluate on the request path; set it once at startup (PR #181 review) | T-0341 | reviewer |
@@ -408,7 +410,7 @@
 | [TD-560](../tracker/todo/TD-560.md) | review gate counts dismissed reviews: a dismissed KERP-REVIEW APPROVED still satisfies scripts/review_gate.py | — | planner |
 | [TD-595](../tracker/todo/TD-595.md) | Projects screen: the 'Visible in lobby' checkbox renders as a large empty square with no visible check mark or checkbox styling (desktop, /backbone/projects) | T-0026, T-0046 | planner |
 
-## risk (35)
+## risk (36)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -446,6 +448,7 @@
 | [TD-462](../tracker/todo/TD-462.md) | Internal contexts that bind is_system_admin=True for a narrow read (jobs scheduler deployment_scopes, teams reconcile, onboarding, the invite token lookup) now also see every project-scoped record of the tenant under ADR 0016 | T-0274 | implementer |
 | [TD-497](../tracker/todo/TD-497.md) | Quarantine re-check: a second verify job can still overlap one whose worker thread is mid-check after a queue-monitor abort (failed/ABORTED while the to_thread verify_upload runs on) or a queue-monitor retry of the replaced failed job; the later job finds the shared quarantine object gone and rejects a clean file as missing_object, the other leaves an orphan content object (fail-safe, nothing published unscanned) | T-0221 | implementer |
 | [TD-520](../tracker/todo/TD-520.md) | Review gate accepts a 7-character patch-id prefix (MARKER_RE [0-9a-f]{7,40} plus prefix matching) | — | planner |
+| [TD-574](../tracker/todo/TD-574.md) | Mail history exact-address lookup puts the address in the GET query string: load-balancer/proxy access logs (e.g. ALB) would record it | T-0226 | implementer |
 | [TD-584](../tracker/todo/TD-584.md) | Refresh grace: a failed commit after the token is consumed leaves the client unable to refresh; log replays inside the 30 s grace window (PR #181 review) | T-0345 | reviewer |
 
 ## Closed

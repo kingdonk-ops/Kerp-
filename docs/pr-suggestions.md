@@ -3,7 +3,221 @@
 > **Generated — do not hand-edit.** Rebuild with `python scripts/pr_suggestions.py rebuild`.
 > A running digest of everything agents surfaced on merged PRs — review notes, must-fix items, suggestions, nits, follow-ups and ideas — so nothing is lost after a squash-merge. Formal follow-ups also live as `TD-xxx` in `tracker/todo/` and on [TODO.md](TODO.md); this file is the readable skim. Each item links back to its PR or review for full context.
 
-_Repo `kingdonk-ops/Kerp-`, base `dev` · 176 merged PRs · 175 with surfaced notes._
+_Repo `kingdonk-ops/Kerp-`, base `dev` · 182 merged PRs · 181 with surfaced notes._
+
+---
+
+## PR #186 — Plan: user decisions TD-538/TD-549 + product intake 2026-11-22 (3) (AI change cards, numbering, joint breakout, competency, paper pages)
+task `T-0351` · merged 2026-11-22 · by `kingdonk-ops` · [PR](https://github.com/kingdonk-ops/Kerp-/pull/186)
+
+**TODOs raised**
+
+- TD-587: spec-gap. The notification rule model and delivery log, carried over from TD-549.
+- TD-588: spec-gap. Which task builds the shared numbering service.
+- TD-589: later. Check the title-block number on uploaded documents (warning only).
+- TD-590: spec-gap. Reset a bolted joint's integrity status on breakout.
+- TD-591: spec-gap. Competency check at sign-off.
+- TD-592: spec-gap. Upload of paper-signed pages.
+- TD-593: spec-gap. Client-supplied material arriving late for its work pack.
+- TD-594: later. Weather reference on the daily diary; the new outbound data flow needs a decision.
+- TD-595: bug. The "Visible in lobby" checkbox renders as an empty 48 dp square (`size-touch` on a native checkbox).
+- Resolved: TD-538, TD-549
+
+**Review by `kingdonk-ops` — KERP-REVIEW: CHANGES_REQUESTED patch-id=f8d388367393a001490a5968f140ce34deeccfe8** · [full review](https://github.com/kingdonk-ops/Kerp-/pull/186#pullrequestreview-6010784356)
+
+- _Must fix_
+  1. **`docs/spec/modules/quality-and-inspection.md:430-438` (and `tracker/todo/TD-592.md:13-17`): a paper scan "standing for" the client co-signature contradicts user decision R1a / TD-219.**
+     - **What is wrong.** By default (`inspection.require_e_signature` is off), the client signature would be a scan with "the signer's name and party as stated by the uploader". TD-219 (user, 2026-11-13) and §Client co-sign (`:255`) say the client co-signs **with their own KERP account (PER-15)** in one of three modes. Even mode iii (wet signature on the tablet) requires naming the PER-15 account and that client's own online confirmation. "Reviewed like a provisional wet signature" does not say who confirms it, against which account, or whether `CLIENT_SIGNATURE_PROVISIONAL` blocks approval until then. `paper_scan` is also missing from the ledger's `verification_mode` enum at `:308-309`, so the two sections disagree.
+     - **Fixed looks like one of these:**
+       - (a) When a scan is used as the client co-sign, the uploader must pick the client's PER-15 account (as in mode iii). It is stored as provisional (`verification_mode = paper_scan`), and `CLIENT_SIGNATURE_PROVISIONAL` blocks approval while it is pending. Only that PER-15's confirmation in their own account turns it into `client_confirmed`, and a rejection returns the inspection as in mode iii. Add `paper_scan` to the enum at `:308-309`, mirror the change in TD-592, and note that third-party signers follow the persona from TD-435.
+       - (b) Drop "can stand for the client co-sign" from the spec. The scan is then plain evidence only,
+
+- _Suggestions (non-blocking)_
+  - **`quality-and-inspection.md:1051` and `:1344`.** `notice_delivery_reason` still lists `skipped`. Since the TD-549 decision, opt-out is no longer a source of it for call-outs. Say what still produces `skipped` (if anything), or drop it from the enum.
+  - **`tracker/todo/TD-238.md:14`.** Still points at TD-549 for the wider delivery-log model. Add a note pointing to TD-587.
+  - **`tracker/tasks/T-0312.md:23-24`.** The new criterion "Verifier ≠ resolver" overlaps the existing one, "Verifier ≠ rectifier enforced in `service.py`…". Merge them into one criterion.
+  - **Diff §4.11 change cards.**
+    - Say whether Apply, Reject and Undo of already-staged cards stay available while AI is fail-closed (503 `AI_UNAVAILABLE` or `AI_BUDGET_REACHED`). They make no provider call, so allowing them is probably right.
+    - Say who the "requester" is for cards proposed by a scheduled or watchdog operation with no asking user.
+    - Say that Undo is refused for workflow transitions or attested sign-offs, not only for field values.
+  - **TD-595.** `DynamicForm.tsx:25` and `RegisterPage.tsx:45` use `size-touch` with `accent-brand` on native checkboxes. Include them when checking the fix. Also note that the reported "empty square" may simply be the unchecked state at 48 px with no styling.
+  - **T-0351.** The criterion "Module/README.md and docs updated" is boilerplate that does not fit a platform/CI task. Consider narrowing it to `docs/WORKFLOW.md` plus `docs/security/`.
+  KERP-REVIEW: CHANGES_REQUESTED patch-id=f8d388367393a001490a5968f140ce34deeccfe8
+  ---
+  _Generated by [Claude Code](https://claude.ai/code
+
+**Review by `kingdonk-ops` — KERP-REVIEW: APPROVED patch-id=9caff72826502ca00ae3365625f0eb98f0ccf8d3** · [full review](https://github.com/kingdonk-ops/Kerp-/pull/186#pullrequestreview-6010796031)
+
+- _Must-fix 1 (paper scan vs user decision R1a / TD-219): fixed, option (b)_
+  - **Spec.** `docs/spec/modules/quality-and-inspection.md:427-440` now makes a `wet_signed_scan` plain evidence only:
+    - it has no attestation, counts as no sign-off and never replaces a required signature;
+    - the client co-sign still needs a §Client co-sign mode with the client's own PER-15 account (TD-219);
+    - the `verification_mode` enum is unchanged.
+  - **Grep.** `paper_scan` and `require_e_signature` no longer appear anywhere in `docs/` or `tracker/`. No text lets a scan stand for or count as a signature, except the open question in TD-592.
+  - **TD-592.** It is now `kind: decision` and asks the user plainly whether a scan may ever count as the client co-sign. If yes, the proposal follows mode iii, with a PER-15 account, a provisional state that blocks approval, and confirmation in the client's own account. The planner default until decided is "no", which is consistent with R1a.
+
+- _Round 1 suggestions: all taken and correct_
+  - **`skipped` (`quality-and-inspection.md:1049-1051`).** Now defined as a non-opt-out reason, for example a notification-rule condition (TD-587). It is never a recipient's opt-out, which is consistent with the TD-549 decision.
+  - **TD-238.** Has a note pointing to TD-587.
+  - **T-0312.** The two criteria are merged into one, with no loss: the role list, self-verify, self-close and `allow_self_approval` are all kept.
+  - **Diff §4.11 change cards.**
+    - Undo is limited to field values. Transitions and attested sign-offs use the owning workflow's reverse or void path.
+    - A watchdog or scheduled card names the operation as the requester, and a person must still Apply it.
+    - Apply, Reject, Undo and edit stay available while AI is fail-closed, and only new proposals fail closed. This is consistent with TD-545 and the human-confirmation rule.
+  - **TD-595.** `DynamicForm.tsx` and `RegisterPage.tsx` are now listed, and the note about the unchecked state is added.
+  - **T-0351.** The docs criterion is narrowed to `docs/WORKFLOW.md` plus `docs/security/`. The CI change is still additive only.
+
+- _Must fix_
+  None.
+
+- _Suggestions (non-blocking)_
+  - None new.
+  KERP-REVIEW: APPROVED patch-id=9caff72826502ca00ae3365625f0eb98f0ccf8d3
+  ---
+  _Generated by [Claude Code](https://claude.ai/code)_
+
+---
+
+## PR #185 — Tracker: TD-582..TD-586 from PR #181 review suggestions
+task `T-0342` · merged 2026-11-22 · by `kingdonk-ops` · [PR](https://github.com/kingdonk-ops/Kerp-/pull/185)
+
+**TODOs raised**
+
+- TD-582, TD-583, TD-584, TD-585, TD-586
+
+**Review by `kingdonk-ops` — KERP-REVIEW: APPROVED patch-id=e68ed6f81229528316178f81b874b402a5ec9517** · [full review](https://github.com/kingdonk-ops/Kerp-/pull/185#pullrequestreview-6010710103)
+
+- _Must fix_
+  None.
+
+- _Suggestions (non-blocking)_
+  - TD-582 mentions only one way 0039 gets skipped: the role did not exist yet. The review also named a second: `KERP_RUNTIME_DB_ROLE` at migrate time named a different role from the one the app connects as. Consider adding it to the body.
+  - TD-586 could cite `backend/app/main.py:149` directly instead of "native-app CORS configuration".
+  KERP-REVIEW: APPROVED patch-id=e68ed6f81229528316178f81b874b402a5ec9517
+  ---
+  _Generated by [Claude Code](https://claude.ai/code)_
+
+---
+
+## PR #181 — T-0341..T-0349: Codebase audit hardening (CEL limits, DB roles, auth, reliability, races, performance, dedup)
+task `T-0341` · merged 2026-11-22 · by `kingdonk-ops` · [PR](https://github.com/kingdonk-ops/Kerp-/pull/181)
+
+**TODOs raised**
+
+- TD-517, TD-518, TD-519, TD-520, TD-522, TD-523, TD-524, TD-526, TD-527, TD-528, TD-529, TD-530, TD-531 — audit findings not fixed here
+- TD-533 — deferred: no client-side CEL step budget
+- TD-534, TD-535, TD-539 — from T-0342/T-0343
+- TD-538 — decision: confirm magic-link 20/h and SSO 60/h per-client limits
+- TD-560 — bug: review gate counts dismissed reviews
+- TD-568, TD-569 — later: adopt the new core helpers in the remaining copies
+- Resolved: TD-056, TD-059, TD-124, TD-289, TD-290, TD-301, TD-323, TD-336, TD-387, TD-521, TD-525
+
+**Review by `kingdonk-ops` — KERP-REVIEW: APPROVED patch-id=7b3e7604876d3f9d32a35ed556a3c7a80ba2b6fe** · [full review](https://github.com/kingdonk-ops/Kerp-/pull/181#pullrequestreview-6010220432)
+
+- _Must fix_
+  None.
+
+- _Suggestions (non-blocking)_
+  - `backend/app/core/startup_safety.py:38`: `database_role_problems` catches a role that has too much access but not one that has none. If `0039` was skipped (the role did not exist at migrate time, or `KERP_RUNTIME_DB_ROLE` named a different role), the pre-flight passes and the app fails on its first query with "permission denied". Consider adding a check such as `has_table_privilege(current_user, 'users', 'SELECT')` (a `later` TODO is fine).
+  - `docs/deploy/first-run.md:37`: the recovery advice "downgrade to `0038` and upgrade again" becomes a multi-revision, possibly destructive downgrade once `0040+` exist. A re-runnable grant entry point (for example `python -m app.core.startup_safety --grant`, or a documented psql snippet that runs `grant_sql`) would be safer. Worth a `later` TODO.
+  - T-0345 refresh grace: when the commit fails after the token was consumed, the client never gets the new pair, so the session lives on but this client cannot refresh any more. That matches the AC's plain 401, but the task's "failed commit leaves the token unconsumed" is met only by the reading in Notes, and no TODO records it. Also consider logging a within-grace retry (user, session, no token), because a replay inside 30 s of the legitimate rotation is no longer treated as theft.
+  - `backend/app/core/cel/runtime.py:240`: `sys.setrecursionlimit` is changed lazily inside `evaluate`, which mutates process-wide state on a request path. Setting it once at import or startup would be clearer. Behaviour is the same.
+  - `X-Next-Offset` is not in the native-app CORS `expose_headers`. That is fine while
+
+---
+
+## PR #180 — Tracker: TD-570..TD-573 from PR #179 review suggestions
+task `T-0335` · merged 2026-11-22 · by `kingdonk-ops` · [PR](https://github.com/kingdonk-ops/Kerp-/pull/180)
+
+**TODOs raised**
+
+- TD-570, TD-571, TD-572, TD-573
+
+**Review by `kingdonk-ops` — KERP-REVIEW: CHANGES_REQUESTED patch-id=81e440258e7fa7e450f151ef1c1e8e90f30e1748** · [full review](https://github.com/kingdonk-ops/Kerp-/pull/180#pullrequestreview-6010158459)
+
+- _Must fix_
+  1. **`tracker/todo/TD-573.md:7`: wrong task link.** `tasks: [T-0335]` is the wrong owner. T-0335 is the notifications task, and T-0350 was split out of it (PR #177 review) to own `notice_delivery`, `notice_delivery_reason` and `notice_valid_at_outcome`. T-0350 also owns the reschedule reset: "a reschedule resets the party to `pending`" and "a reschedule clears it with the outcome" (T-0350 acceptance criteria 2 and 5). The no_show and witness rows belong to T-0333 and T-0334. **Fixed:** `tasks: [T-0350, T-0333]`, optionally keeping T-0335. Re-render the boards.
+  2. **`tracker/todo/TD-570.md:7`: wrong link, and overlap with TD-567.** `tasks: [E-04-02]` is only the look-ahead board epic. The snapshot columns are T-0104's migration, because T-0104 is the P6 `.xer` import that writes `oe_p6_activity_version`. The schedule facts themselves are already the subject of TD-567, and the #179 review asked for the columns to go into TD-567's open list. As raised, TD-570 overlaps TD-567 and does not mention it. **Fixed:** either
+     - (a) add `T-0104` and `T-0125` to `tasks`, and add a body line "Companion to TD-567 (facts/CEL names); this item covers the data-model columns and the §5.6 example only", or
+     - (b) drop TD-570 and add both points to TD-567's `Open:` list.
+
+- _Suggestions (non-blocking)_
+  - TD-570 to TD-573 have empty bodies. Precedent exists (TD-324 to TD-329), but one line per TODO with the spec file and section or line would help whoever resolves them:
+    - `p6-import-and-rsw-matching.md` §4 line 94 and §5.6
+    - `commercial-and-claims.md`, EV section
+    - `KERP-CONSOLIDATION-AND-DIFF.md` §4.11
+    - `quality-and-inspection.md` §5, `no_show` row around line 1126
+  - TD-571 could also list TD-563, so the EV decision and its wording fix travel together.
+  KERP-REVIEW: CHANGES_REQUESTED patch-id=81e440258e7fa7e450f151ef1c1e8e90f30e1748
+  ---
+  _Generated by [Claude Code](https://claude.ai/code)_
+
+**Review by `kingdonk-ops` — KERP-REVIEW: APPROVED patch-id=dfae960a27ad8549b6cbae76750ec39ab6f8b403** · [full review](https://github.com/kingdonk-ops/Kerp-/pull/180#pullrequestreview-6010172607)
+
+- _Must fix_
+  None.
+
+- _Suggestions (non-blocking)_
+  None.
+  KERP-REVIEW: APPROVED patch-id=dfae960a27ad8549b6cbae76750ec39ab6f8b403
+  ---
+  _Generated by [Claude Code](https://claude.ai/code)_
+
+---
+
+## PR #182 — TD-426: ADR 0015 accepted — full system admin impersonation; unblock T-0277..T-0280
+task `T-0277` · merged 2026-11-22 · by `kingdonk-ops` · [PR](https://github.com/kingdonk-ops/Kerp-/pull/182)
+
+**TODOs raised**
+
+- none
+
+**Review by `kingdonk-ops` — KERP-REVIEW: APPROVED patch-id=6690aae127885ce7769e887d15b911be7a09e23d** · [full review](https://github.com/kingdonk-ops/Kerp-/pull/182#pullrequestreview-6010177650)
+
+- _Must fix_
+  None.
+
+- _Suggestions (non-blocking)_
+  - `docs/decisions/0015-system-admin-impersonation.md:25-27`: the last sentence of Context item 1, "so support has no need to write as the target", is reasoning left over from the proposal and now reads against the accepted decision. Consider rewording it or adding "(the reason the planner defaulted to (c))".
+  - `docs/DEVELOPMENT-PLAN.md:338-339`: the 2026-11-21 log entry still says "blocked by TD-426 … ADR 0015 proposed". That is fine as history. A short "(superseded 2026-11-22, below)" would stop readers from misreading it.
+  - `docs/spec/KERP-EDGE-SCREENS-AND-SPEC-UPDATE.md:572-573`: this summary of the forbid list leaves out memberships, invites, teams, settings and `/admin/*`. It does point to diff §4.2, which has the full list.
+  KERP-REVIEW: APPROVED patch-id=6690aae127885ce7769e887d15b911be7a09e23d
+  ---
+  _Generated by [Claude Code](https://claude.ai/code)_
+
+---
+
+## PR #178 — T-0225: Frontend: Admin → System → Audit log (filters, verify chain, verify all) and legal-hold toggle on the project admin page
+task `T-0225` · merged 2026-11-22 · by `kingdonk-ops` · [PR](https://github.com/kingdonk-ops/Kerp-/pull/178)
+
+**TODOs raised**
+
+- TD-562 — later: the backend returns hold reason / set-by / set-at only in the PUT response, so the page shows on/off only.
+
+**Review by `kingdonk-ops` — KERP-REVIEW: CHANGES_REQUESTED patch-id=86f0e0f199fc32ff39988fd9e49cb408b2874601** · [full review](https://github.com/kingdonk-ops/Kerp-/pull/178#pullrequestreview-6009779437)
+
+- _Must fix_
+  1. `frontend/src/admin/ProjectAdminPanel.tsx:101-103`: **Delete project** is shown to everyone who can load the page, not only to PER-09 and System admins as the PR body says. I confirmed this with a probe test: a member holding only PER-04, whose members list gets 403, still sees an active "Delete project" button. Spec §6.5 says a surface a caller may not use is hidden **and** refused by the API. The existing pattern (`ProjectsPage` `administers(p)`) hides admin actions too. **Fixed looks like:** render the button only when `access.systemAdmin || access.adminProjectIds.includes(project.id)`. `useAdminAccess` is already called in this component. Add a test in `ProjectAdminPanel.test.tsx` that a member without PER-09 who is not a System admin gets no Delete button. Correct the task note, which says "offered to everyone on the page".
+  2. The PR cannot run CI as it stands. Rebase onto `origin/dev`, then re-run `python scripts/tracker.py render` and commit the boards, so that `ci-gate` (backend SQLite/PG, frontend, e2e) actually runs on the head. The boards are outside the patch-id, so this is bookkeeping, but merge needs a green `ci-gate`.
+
+- _Suggestions (non-blocking)_
+  - `SystemAuditPage.tsx` VerifyAll `refetchInterval`: when the job GET fails (403/404/500), `q.state.data` stays `undefined`, so polling continues every second until the user leaves the page. Return `false` when `q.state.status === "error"`. The polling test checks `pollsAtEnd` right after the result appears, so it would not catch polling that continues afterwards. Waiting about 1.5 s before counting would.
+  - `en.ts` `admin.audit.invalidField` looks unused.
+  - The audit filters allow `from` after `to` without a hint. The result is simply empty, so this is cosmetic.
+  KERP-REVIEW: CHANGES_REQUESTED patch-id=86f0e0f199fc32ff39988fd9e49cb408b2874601
+  ---
+  _Generated by [Claude Code](https://claude.ai/code)_
+
+**Review by `kingdonk-ops` — KERP-REVIEW: APPROVED patch-id=4c70e9d74cbc19d96604829bcb3c40948a6408cb** · [full review](https://github.com/kingdonk-ops/Kerp-/pull/178#pullrequestreview-6009828403)
+
+- _Must fix_
+  None.
+
+- _Suggestions (non-blocking)_
+  - PER-04 delete test: instead of the 200 ms sleep, wait until the recorded calls include the System-admin probe request. That makes the absence assertion settle deterministically.
+  KERP-REVIEW: APPROVED patch-id=4c70e9d74cbc19d96604829bcb3c40948a6408cb
+  ---
+  _Generated by [Claude Code](https://claude.ai/code)_
 
 ---
 

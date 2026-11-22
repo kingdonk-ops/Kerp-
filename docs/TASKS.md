@@ -3,11 +3,11 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 111/322 tasks done (34%) · **ready now:** 22 · **epics awaiting breakdown:** 49
+**Overall:** 112/322 tasks done (35%) · **ready now:** 22 · **epics awaiting breakdown:** 49
 
 | Phase | Tasks done | Progress |
 |---|---|---|
-| 0 · Platform foundations | 109/127 | `████████░░` 86% |
+| 0 · Platform foundations | 110/127 | `████████░░` 87% |
 | 1 · Asset & Quality backbone | 2/169 (+2 epics) | `░░░░░░░░░░` 1% |
 | 2 · Welding quality | 0/11 | `░░░░░░░░░░` 0% |
 | 3 · Logistics | 0/2 (+7 epics) | `░░░░░░░░░░` 0% |
@@ -123,10 +123,10 @@
 | ✅ | [T-0222](../tracker/tasks/T-0222.md) | admin: read-only audit explorer over the hash-chain ledger (filters, verify one chain, verify all as a batch job) | admin | M | T-0006, T-0043, T-0039, T-0015, T-0274 | #161 |
 | ✅ | [T-0223](../tracker/tasks/T-0223.md) | projects: per-project legal hold (flag + reason, System admin only, audited) blocking soft delete with 409 LEGAL_HOLD_ACTIVE (ADR) | projects | S | T-0012, T-0039 | #168 |
 | ✅ | [T-0086](../tracker/tasks/T-0086.md) | CI speed 4: split backend-pg into parallel shards (deterministic file split, combined coverage floor) | platform | S | T-0083 | #170 |
-| ▶ | [T-0226](../tracker/tasks/T-0226.md) | core mail: delivery ledger — delivered status from SES delivery events, recipient_user_id/project_id/broadcast_id, stats and searchable history (ADR) | platform | M | T-0058 |  |
+| ✅ | [T-0226](../tracker/tasks/T-0226.md) | core mail: delivery ledger — delivered status from SES delivery events, recipient_user_id/project_id/broadcast_id, stats and searchable history (ADR) | platform | M | T-0058 | #183 |
 | ▶ | [T-0227](../tracker/tasks/T-0227.md) | core mail: automated template overrides — per template + locale subject/text blocks with revisions, preview, test send to self, reset to shipped default | platform | M | T-0058, T-0039 |  |
 | ✅ | [T-0230](../tracker/tasks/T-0230.md) | settings: typed runtime settings registry extending T-0044 (code-declared entries, per-key storage, Redis cache + pub/sub invalidation, bounds 422, audit, no secrets) | settings | M | T-0044, T-0039, T-0006 | #167 |
-| ⬜ | [T-0228](../tracker/tasks/T-0228.md) | notifications: broadcast e-mail — server-side audience resolution (System admin tenant-wide, PER-09 own projects), batch dispatch, broadcast opt-out, per-broadcast stats | notifications | M | T-0019, T-0058, T-0226, T-0014, T-0049 |  |
+| ▶ | [T-0228](../tracker/tasks/T-0228.md) | notifications: broadcast e-mail — server-side audience resolution (System admin tenant-wide, PER-09 own projects), batch dispatch, broadcast opt-out, per-broadcast stats | notifications | M | T-0019, T-0058, T-0226, T-0014, T-0049 |  |
 | ✅ | [T-0231](../tracker/tasks/T-0231.md) | settings: client bootstrap config API GET /api/v1/settings/client (client-visible entries only) | settings | S | T-0230 | #172 |
 | ✅ | [T-0341](../tracker/tasks/T-0341.md) | CEL cost limits: nested-macro cap, evaluation step budget and nesting-depth cap (backend + frontend) | platform | M | — | #181 |
 | ✅ | [T-0342](../tracker/tasks/T-0342.md) | Production startup refuses an unsafe database role and missing Redis/JWT runtime (API and worker) | platform | S | — | #181 |
