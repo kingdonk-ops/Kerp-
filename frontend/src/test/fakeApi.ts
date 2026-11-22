@@ -14,6 +14,8 @@ export const FAKE_USER = {
 export interface Recorded {
   method: string;
   path: string;
+  /** The query string without `?` (`""` when there is none). */
+  query: string;
   auth: string | null;
   body: unknown;
 }
@@ -67,6 +69,7 @@ export function fakeBackend(handlers: Record<string, Handler> = {}) {
     const rec: Recorded = {
       method: request.method,
       path: url.pathname,
+      query: url.search.replace(/^\?/, ""),
       auth: request.headers.get("Authorization"),
       body: text ? (JSON.parse(text) as unknown) : null,
     };

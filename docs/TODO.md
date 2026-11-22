@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 366 · **Closed:** 160
+**Open:** 368 · **Closed:** 160
 
 ## decision (40)
 
@@ -50,7 +50,7 @@
 | [TD-514](../tracker/todo/TD-514.md) | How is a passed or LOCKED_FOR_TURNOVER inspection corrected? Define void-and-reissue (revision suffix, supersedes link, ledger, MDR shows latest) | — | planner |
 | [TD-538](../tracker/todo/TD-538.md) | Confirm the per-client limits on magic-link requests (20 per hour, the password-reset numbers) and Entra SSO starts (60 per hour) for crews and offices behind one shared address | T-0345 | implementer |
 
-## spec-gap (72)
+## spec-gap (73)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -125,6 +125,7 @@
 | [TD-503](../tracker/todo/TD-503.md) | T-0027 rule-set step: AC names a CEL variable and an API path that do not exist (context.qty, /api/v1/projects/{id}/rule-sets) | T-0027 | implementer |
 | [TD-505](../tracker/todo/TD-505.md) | Runtime settings registry: categories, the unit and ceiling of max_upload_size_mb, and client-visible flags are implementer readings | T-0230 | implementer |
 | [TD-515](../tracker/todo/TD-515.md) | Field registry has no multi-point measurement field: add measurement_set (list of values + unit) with CEL list statistics (mean/min/max/count) | — | planner |
+| [TD-536](../tracker/todo/TD-536.md) | Queue monitor: no API lists queued/running jobs, so the System console aborts by pasted job id; add a list (or job id on stuck quarantine rows) so abort can be picked from the screen | T-0224 | implementer |
 | [TD-539](../tracker/todo/TD-539.md) | T-0342: production KERP_REDIS_URL is a startup refusal of the API and worker, not a Settings validation error (Settings also serves alembic and the first-run CLI) | T-0342 | implementer |
 
 ## missed (8)
@@ -195,7 +196,7 @@
 | [TD-510](../tracker/todo/TD-510.md) | Deployment-config view lacks the mail reply-to of diff §4.7: Settings has no reply-to field yet | T-0230 | implementer |
 | [TD-533](../tracker/todo/TD-533.md) | CEL client runtime has no evaluation step budget (cel-js exposes no step hook; server is the hard gate) | T-0341 | implementer |
 
-## later (144)
+## later (145)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -343,6 +344,7 @@
 | [TD-531](../tracker/todo/TD-531.md) | Job rows (jobs table) are never deleted: add a retention purge for finished jobs | T-0346 | planner |
 | [TD-532](../tracker/todo/TD-532.md) | Registry entries declared by later tasks add their label to admin.settings.entries (and a new category to admin.settings.categories) in the Settings screen | T-0232 | implementer |
 | [TD-535](../tracker/todo/TD-535.md) | Startup role check: also refuse a runtime role that owns any app table (owner can drop FORCE or re-grant), once every deployment runs the owner/runtime split | T-0342 | implementer |
+| [TD-537](../tracker/todo/TD-537.md) | RegisterPage shell lacks per-row actions and server-side paging, so the System console registers (failed jobs, upload quarantine) use admin card lists; adopt the shell once it supports both (diff §6.5) | T-0224 | implementer |
 
 ## bug (18)
 
