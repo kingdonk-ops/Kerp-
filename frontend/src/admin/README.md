@@ -1,10 +1,11 @@
-# `src/admin` — Admin screens: access requests, devices (T-0051), admin grants, projects, members (T-0026), users (T-0331), runtime settings (T-0232), System console (T-0224), audit log and legal hold (T-0225)
+# `src/admin` — Admin screens: access requests, devices (T-0051), admin grants, projects, members (T-0026), users (T-0331), runtime settings (T-0232), System console (T-0224), audit log and legal hold (T-0225), Communications (T-0229)
 
 Admin-group screens of diff §6.1 on the finished backends of T-0050 (access requests),
 T-0043 (device registry), T-0039 (admin grants), T-0012 / T-0044 (projects), T-0014 (members,
-accounts), T-0052 (invites), T-0230 (settings registry) and T-0218 / T-0219 / T-0221 / T-0222 / T-0223 (System console, audit explorer, legal hold).
+accounts), T-0052 (invites), T-0230 (settings registry), T-0218 / T-0219 / T-0221 / T-0222 / T-0223 (System console, audit explorer, legal hold)
+and T-0226 / T-0227 / T-0228 (delivery ledger, template overrides, broadcast e-mail).
 Everything goes through the generated client (`api.ts`, `invites.ts`, `users.ts`, `settings.ts`,
-`system.ts`, `audit.ts`); every string through `t()` (`admin.*`, `devices.*`, `personas.*`).
+`system.ts`, `audit.ts`, `comms.ts`); every string through `t()` (`admin.*`, `devices.*`, `personas.*`, `unsubscribe.*`).
 
 ## Who sees what
 
@@ -12,8 +13,9 @@ Everything goes through the generated client (`api.ts`, `invites.ts`, `users.ts`
   `GET /me/projects`) and whether they are a **System admin**. `/auth/me` has no such flag yet,
   so the client probes `GET /admin/grants?user_id=<self>`, which answers only System admins
   (TD-393). The server still checks every call; the flags only decide what is offered.
-- Nav items `admin.users` (`/admin/users`), `admin.system` (`/admin/system/devices`) and
-  `admin.accessRequests` (`/admin/access-requests`) carry `requires: "projectAdmin"` (`src/app/nav.ts`): shown to PER-09
+- Nav items `admin.users` (`/admin/users`), `admin.system` (`/admin/system/devices`),
+  `admin.accessRequests` (`/admin/access-requests`) and `admin.communications`
+  (`/admin/communications/broadcasts`) carry `requires: "projectAdmin"` (`src/app/nav.ts`): shown to PER-09
   holders and System admins only.
 - Profile → **My devices** (`/profile/devices`) is a top-bar link for every signed-in user.
 
@@ -106,6 +108,67 @@ TD-537); actions confirm in a `Dialog` first. Fixtures: `systemFixtures.ts`.
   `202`) polls `GET /jobs/{id}` every second while queued or running (status, progress bar) and
   then shows the job's result (chains, entries, broken chains, first broken chain and seq) or
   its error. Nothing here writes to the ledger except the verifications the server records.
+
+## Communications (`/admin/communications/*`, diff §4.7, §6.5, T-0229; `comms.ts`, `commsUi.tsx`)
+
+Tabs (`COMMS_TABS`, `CommsTabs` in `ui.tsx`): **Broadcasts** for PER-09 holders and System admins;
+**Delivery** and **E-mail templates** for System admins only (hidden from everyone else; the API
+answers them 403). `useCommsGate(systemAdminOnly)` enables the queries only for a caller who may
+use the screen; anyone else gets `admin.comms.forbidden` / `forbiddenSystem` and nothing is
+called. Fixtures: `commsFixtures.ts`. The three screens and `/unsubscribe` are lazy routes
+(`lazy` in `src/app/routes.tsx`): their code is a separate chunk loaded on first visit, which keeps
+the main bundle under Vite's 500 kB warning.
+
+- **Broadcasts** (`CommsBroadcastsPage`, T-0228, TD-399): the composer. A System admin chooses
+  *All active users* (`scope: tenant`) or projects of `GET /projects`; a PER-09 gets no tenant
+  option and only its own PER-09 projects (from `/me/projects`; `GET /projects` is not called).
+  Optional audience category (`internal` / `external` / `client`) and personas (PER-01…16).
+  **Count recipients** posts the audience to `POST /notifications/broadcasts/preview` and shows
+  the count (never an address); any change to the audience withdraws the count, and **Send** is
+  enabled only with a fresh count above 0, a one-line subject (≤ 200) and a plain-text body
+  (≤ 10 000, line breaks kept). Send asks first ("goes to N people; cannot be recalled"), then
+  `POST /notifications/broadcasts` (202). Refusals are explained, never the server text: `403`
+  (`IMPERSONATION_ACTION_FORBIDDEN` while logged in as another user, else not allowed), `404`
+  (a project not the caller's), `422` (nobody in the audience; any other `422` says the broadcast
+could not be sent: TD-610 for stable codes), `429` (5 per 24 h, with the time
+  from `Retry-After`). Below: **Sent broadcasts** (`GET /notifications/broadcasts`, 50 per page),
+  each a card with status, audience (project codes), recipients, queued, skipped, created and
+  finished; **Delivery** opens `GET /notifications/broadcasts/{id}` and shows its count cards
+  (the only delivery stats a PER-09 sees, diff §4.7).
+- **Delivery** (`CommsDeliveryPage`, T-0226): count cards from `GET /mail/stats` (sent, delivery
+  rate as a percentage or "—" when nothing was sent, delivered, bounced, complaints, failed,
+  suppressed, queued) and the counts per template, for a period (local days; the "to" day is
+  included) and template applied on **Apply**. **History** (`GET /mail/sends`, 50 per page):
+  template, status, period and an exact-address lookup (checked as an address before sending;
+  hashed by the server, never shown back; it travels in the query string, TD-574). Each send is
+  a card with the masked recipient only (never the hash), status, attempts, error code, queued
+  and last-change times, and whether it came from a broadcast.
+- **E-mail templates** (`CommsTemplatesPage`, T-0227, diff §4.7 'Editor details'): a
+  **mail-health banner** when the deployment cannot send, from `GET /settings/deployment-config`
+  (`mailProblems`: the `log` transport delivers nothing; no sender address). It never shows the
+  configuration's values. Sender verification and bounce wiring have no signal yet (TD-609).
+  The templates of `GET /mail/templates` are listed grouped by audience (internal staff, client,
+  witness / external party, deployment-wide), marked *Required* and *Reworded*. **Edit** opens
+  the editor for one template and language: subject, opening and closing text and (templates
+  with a link only) the button label, prefilled with the current override or the shipped text.
+  The declared placeholders sit beside the editor as buttons that insert `{name}` at the cursor
+  of the field edited last. The client refuses what it can check (empty subject or button
+  label, empty texts of a required template, lengths 200 / 2000 / 2000 / 80); the server's
+  `422` is shown per field from its `loc` (empty, too long, line break, HTML, link, placeholder),
+  never its text. `action_label` is sent as `null`, never `""`, when empty or the template has
+  no link. **Save** (`PUT`, a new revision; `409` reloads the texts and says so), **Preview**
+  (`POST .../preview` with the draft: subject, plain text, and the HTML **only inside an
+  `<iframe sandbox="">`**: no scripts, no same-origin, never in the page itself), **Send a test
+  to me** (`POST .../test-send`, the caller's own address; `429` with the retry time), **Reset to
+  default** (asks first; `DELETE`, revisions kept) and **Revisions** (`GET .../revisions`, newest
+  first, the one in use marked; **Load** copies a revision into the editor).
+- **Unsubscribe** (`src/pages/UnsubscribePage.tsx`, `/unsubscribe#<token>`, TD-601): public,
+  outside the auth guard. The token is read from the fragment once, kept in memory and removed
+  from the address bar. Nothing is posted on load (link scanners prefetch): **Unsubscribe**
+  posts `{token}` in the body to `POST /notifications/broadcasts/unsubscribe` (never in a URL),
+  and the page shows the same neutral confirmation for every answer the server gives (it gives
+  `200` for every token); a missing or malformed token says the link is incomplete; a server
+  failure offers a retry.
 
 ## Projects (`ProjectsPage`, diff §4.1, T-0040, T-0044)
 

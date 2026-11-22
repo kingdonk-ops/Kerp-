@@ -23,6 +23,7 @@ import { LoginPage } from "../pages/LoginPage";
 import { NavGroupPage } from "../pages/NavGroupPage";
 import { NotFoundPage } from "../pages/NotFoundPage";
 import { SsoReturnPage } from "../pages/SsoReturnPage";
+import { UNSUBSCRIBE_PATH } from "../pages/unsubscribePath";
 import { Layout, MY_DEVICES_PATH } from "./Layout";
 import { LOBBY_PATH, NAV_GROUPS } from "./nav";
 
@@ -33,6 +34,11 @@ export const routes: RouteObject[] = [
   { path: INVITE_PATH, element: <InvitePage /> },
   { path: FORGOT_PASSWORD_PATH, element: <PasswordEmailPage /> },
   { path: RESET_PASSWORD_PATH, element: <ResetPasswordPage /> },
+  // Broadcast opt-out link of the e-mails (T-0229, TD-601): no sign-in; its own chunk.
+  {
+    path: UNSUBSCRIBE_PATH,
+    lazy: async () => ({ Component: (await import("../pages/UnsubscribePage")).UnsubscribePage }),
+  },
   {
     element: <RequireAuth />,
     children: [
@@ -55,6 +61,19 @@ export const routes: RouteObject[] = [
           { path: "admin/system/grants", element: <SystemGrantsPage /> },
           { path: "admin/system/settings", element: <SystemSettingsPage /> },
           { path: "admin/system/audit", element: <SystemAuditPage /> },
+          // Admin → Communications (T-0229): own chunks, loaded on first visit.
+          {
+            path: "admin/communications/broadcasts",
+            lazy: async () => ({ Component: (await import("../admin/CommsBroadcastsPage")).CommsBroadcastsPage }),
+          },
+          {
+            path: "admin/communications/delivery",
+            lazy: async () => ({ Component: (await import("../admin/CommsDeliveryPage")).CommsDeliveryPage }),
+          },
+          {
+            path: "admin/communications/templates",
+            lazy: async () => ({ Component: (await import("../admin/CommsTemplatesPage")).CommsTemplatesPage }),
+          },
           { path: "admin/projects/:projectId/members", element: <MembersPage /> },
           { path: "backbone/projects", element: <ProjectsPage /> },
           { path: MY_DEVICES_PATH.slice(1), element: <MyDevicesPage /> },

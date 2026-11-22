@@ -77,6 +77,14 @@ export const NAV_ITEMS = [
   // (`SYSTEM_TABS`, src/admin/ui.tsx); Devices is open to PER-09 too, so the item lands there.
   { group: "admin", id: "system", path: "/admin/system/devices", requires: "projectAdmin" },
   { group: "admin", id: "accessRequests", path: "/admin/access-requests", requires: "projectAdmin" },
+  // Communications = broadcasts (PER-09 for its own projects, System admins), delivery ledger and
+  // e-mail templates (System admins) as tabs (`COMMS_TABS`, src/admin/ui.tsx; T-0229).
+  {
+    group: "admin",
+    id: "communications",
+    path: "/admin/communications/broadcasts",
+    requires: "projectAdmin",
+  },
 ] as const satisfies readonly {
   group: NavGroupId;
   id: string;

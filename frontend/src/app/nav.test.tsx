@@ -21,7 +21,7 @@ describe("navigation items (diff §6.1)", () => {
       documents: ["documents", "transmittals", "cdrl", "drawings"],
       defenseClaims: ["tqs", "variations", "nodEot", "claims"],
       controlsInsights: ["p6Schedule", "reporting", "moneyMirror"],
-      admin: ["users", "personas", "system", "accessRequests"],
+      admin: ["users", "personas", "system", "accessRequests", "communications"],
     });
     for (const entry of NAV_ITEMS) {
       expect(i18n.exists(`nav.items.${entry.id}`), entry.id).toBe(true);
@@ -50,7 +50,7 @@ describe("navigation items (diff §6.1)", () => {
     expect(links[0]).toHaveAttribute("href", "/execution/inspections");
   });
 
-  it("registers only the built screens: Projects for everyone, Admin users, system and access requests for project admins", () => {
+  it("registers only the built screens: Projects for everyone, Admin users, system, access requests and communications for project admins", () => {
     expect(NAV_GROUP_IDS.flatMap((g) => registeredNavItems(g)).map((i) => i.path)).toEqual([
       "/backbone/projects",
     ]);
@@ -62,6 +62,7 @@ describe("navigation items (diff §6.1)", () => {
       "/admin/users",
       "/admin/system/devices",
       "/admin/access-requests",
+      "/admin/communications/broadcasts",
     ]);
   });
 });

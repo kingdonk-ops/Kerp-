@@ -67,7 +67,7 @@ function MainNav() {
     >
       <ul className="flex flex-wrap gap-touch-gap md:flex-col">
         {NAV_GROUPS.map((group) => (
-          <li key={group.id} className="shrink-0">
+          <li key={group.id} className="max-w-full shrink-0">
             <NavLink
               to={group.path}
               end={group.path === "/"}

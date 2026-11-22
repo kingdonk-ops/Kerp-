@@ -127,7 +127,7 @@ queue. Counts (`queued_count`, `skipped_count`) and `finished_at` are set at the
 
 **Template `notifications.broadcast`** (`deployment_wide`, not required, overridable like any
 template, T-0227): subject `{subject}`, intro `{message}` (multi-line plain text, escaped), the
-action link `<KERP_WEB_ORIGIN>/unsubscribe#<token>` (SPA page: TD-601) and the headers
+action link `<KERP_WEB_ORIGIN>/unsubscribe#<token>` (SPA page `frontend/src/pages/UnsubscribePage.tsx`, T-0229) and the headers
 `List-Unsubscribe: <<KERP_WEB_ORIGIN>/api/v1/notifications/broadcasts/unsubscribe/one-click?token=<token>>`
 and `List-Unsubscribe-Post: List-Unsubscribe=One-Click` (RFC 8058).
 

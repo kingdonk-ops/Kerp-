@@ -3,7 +3,55 @@
 > **Generated — do not hand-edit.** Rebuild with `python scripts/pr_suggestions.py rebuild`.
 > A running digest of everything agents surfaced on merged PRs — review notes, must-fix items, suggestions, nits, follow-ups and ideas — so nothing is lost after a squash-merge. Formal follow-ups also live as `TD-xxx` in `tracker/todo/` and on [TODO.md](TODO.md); this file is the readable skim. Each item links back to its PR or review for full context.
 
-_Repo `kingdonk-ops/Kerp-`, base `dev` · 187 merged PRs · 186 with surfaced notes._
+_Repo `kingdonk-ops/Kerp-`, base `dev` · 188 merged PRs · 187 with surfaced notes._
+
+---
+
+## PR #189 — T-0279: audit: dual-identity ledger entries during impersonation — impersonated_by_user_id column, ledger hash v3, attribution in the audit explorer (ADR 0015)
+task `T-0279` · merged 2026-11-22 · by `kingdonk-ops` · [PR](https://github.com/kingdonk-ops/Kerp-/pull/189)
+
+**TODOs raised**
+
+- TD-600 (later): T-0278's route-classification contract test should also assert that every mutating route goes through `get_principal`
+
+**Review by `kingdonk-ops` — KERP-REVIEW: CHANGES_REQUESTED patch-id=b440023aaeed5615802ad787d18d94e3bd00c7c3** · [full review](https://github.com/kingdonk-ops/Kerp-/pull/189#pullrequestreview-6013243019)
+
+- _Must fix_
+  1. `backend/tests/test_audit_ledger_impersonation.py:363-368` (`test_the_downgrade_keeps_v1_and_v2_entries`) fails on PostgreSQL with `assert [] == [(1, 1), (2, 2)]`. It reads `audit_ledger` through `db.engine.connect()` as `kerp_app` with no tenancy bound, so RLS hides every row. I reproduced it locally with KERP_DATABASE_URL=kerp_app and KERP_TEST_OWNER_URL=kerp, which is the `backend-pg` layout. The test runs there because `needs_tamper_role` is satisfied in CI, so `backend-pg` (and `backend-pg-roles`) will go red. Fix: read inside `db.unit_of_work(CTX_T1)`, or as the owner. I checked that `db.unit_of_work(CTX_T1)` makes the test pass on PostgreSQL. All the other PG tests I ran pass: impersonation ledger, device ledger, `test_audit_ledger_pg`, `test_migrations` and `test_audit_explorer` (92 passed). That includes the downgrade being refused while a v3 entry exists.
+
+- _Suggestions (non-blocking)_
+  - `test_entries_written_before_the_migration_still_verify_after_it`: after the refused downgrade, assert that the v3 row and the column are still there and the revision is still 0043. On SQLite, alembic's batch mode is not transactional DDL, so a failed copy can leave `_alembic_tmp_audit_ledger` behind and the next downgrade attempt fails. That only matters on development databases, but one line in the README would cover it.
+  - `pytest.raises((SQLAlchemyError, ValueError))` in the same test is broader than it needs to be. `IntegrityError` alone (plus `ProgrammingError`/`OperationalError` if SQLite needs them) would pin the reason.
+  - `test_audit_explorer.py` has two hunks that only reformat unrelated tests (around lines 514 and 525). They do no harm, but they are noise in the diff.
+  - TD-600 is appropriate. Also worth noting there: ledger entries that SAQ jobs write for a job enqueued while impersonating will be v2 without the admin. The job row only carries the requester (the target). Today the impersonation guardrail probably refuses most of the routes that enqueue jobs, but option (a) says "every module entry written then".
+
+**Review by `kingdonk-ops` — KERP-REVIEW: CHANGES_REQUESTED patch-id=65b6c7b9152368a161b62b2c9e5aad34e9ee7047** · [full review](https://github.com/kingdonk-ops/Kerp-/pull/189#pullrequestreview-6013355060)
+
+- _Must fix_
+  1. **CI `backend-pg (1)` is red because of this PR.** The failing test is `tests/test_rls_bypass.py::test_migration_0035_widens_only_project_isolation_policy_and_downgrades` (backend/tests/test_rls_bypass.py:634-639). It upgrades only to `0035` and then calls `audit.append(...)`. `append` now runs an ORM `SELECT` on `AuditEntry`, and the model includes `impersonated_by_user_id` (backend/app/core/audit/models.py). That column does not exist until 0043, so the test raises `UndefinedColumn audit_ledger.impersonated_by_user_id`. I reproduced it locally: it fails on this head and passes on `origin/dev` code with the same DB.
+     **Fixed looks like:** the test passes on PostgreSQL with its assertions unchanged. Seed the B-project ledger row in a way that fits revision 0035, e.g. a raw `INSERT` as the other pinned-revision ledger tests do, rather than through the current ORM model. Alternatively, make `append`'s chain-tail query select only the columns it needs. If you change `append`, add a test for it. Also check that no other test pinned to a pre-0043 revision calls `audit.append` or `chain_entries`. CI shows only this one failure.
+
+- _Suggestions (non-blocking)_
+  - None new.
+  CI on `85999ef`:
+  - Red: `backend-pg (1)` (must-fix 1) and `review-gate` (no marker yet).
+  - Green: `backend-pg (2-4)`, frontend, tracker, image, perf, CodeQL.
+  - Still running at review time: `backend` and `backend-pg-roles`.
+  KERP-REVIEW: CHANGES_REQUESTED patch-id=65b6c7b9152368a161b62b2c9e5aad34e9ee7047
+  ---
+  _Generated by [Claude Code](https://claude.ai/code)_
+
+**Review by `kingdonk-ops` — KERP-REVIEW: APPROVED patch-id=914e307213961ef661179cfe5a46725945744e1d** · [full review](https://github.com/kingdonk-ops/Kerp-/pull/189#pullrequestreview-6013865333)
+
+- _Must fix_
+  None.
+
+- _Suggestions (non-blocking)_
+  - `backend/tests/test_rls_bypass.py:627`: the comment still says the impersonator column comes from ``0043``. After the renumber it should say ``0044``.
+  - TD-607 has an empty body. One line with the fix idea (e.g. prefix the template/test DB names with a per-run token taken from an env var or the pid of the xdist controller) would help whoever picks it up.
+  KERP-REVIEW: APPROVED patch-id=914e307213961ef661179cfe5a46725945744e1d
+  ---
+  _Generated by [Claude Code](https://claude.ai/code)_
 
 ---
 
