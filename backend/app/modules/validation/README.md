@@ -25,11 +25,11 @@ from app.modules.validation.service import run_checks
 result = run_checks(
     {"record": {...}, "fields": {...}, "actor": {...}, "now": {"$timestamp": "..."}},
     "p6.import.commit",
-    session=session,                 # bound to the caller's tenant/project
+    session=session,  # bound to the caller's tenant/project
     subject=f"p6_import:{import_id}",
 )
 if result.blocked:
-    raise TransitionBlocked(result.reason)   # e.g. "Torque wrench TW-12: calibration expired"
+    raise TransitionBlocked(result.reason)  # e.g. "Torque wrench TW-12: calibration expired"
 ```
 
 - The context is KERP CEL JSON (`app/core/cel/README.md`). `params` is reserved: each rule
@@ -159,7 +159,11 @@ confirmation (spec-gap TD-139).
 ### Versions and audit (ADR 0004 §3)
 
 Each rule has a `version` (1 on add, +1 on every edit, enable/disable, delete, reset or
-unlock) and each set a `version` (+1 on every change to one of its rules). Every change is
+unlock) and each set a `version` (+1 on every change to one of its rules). Every change that
+raises a set's version (edit, enable/disable, delete, reset, accepted upgrade, unlock approval,
+system seed upgrade) first locks the set's row (`SELECT … FOR UPDATE`, like `projects._locked`)
+and re-reads it, so concurrent edits are serialised and get consecutive versions (T-0347).
+Every change is
 appended to the set's audit chain `validation.rule_set:<set id>` (T-0006) with the full rule
 snapshot (`params` as canonical JSON text, because the ledger refuses floats). Saving
 identical values writes nothing. Deleting is a soft delete that keeps the `rule_key`; a
@@ -224,7 +228,11 @@ approval records the ADR reference on the rule (`unlock_adr_reference`). Request
 rejection or cancellation and the unlock itself are each a ledger entry. A rule changed after
 the request cannot be unlocked by it. A rule has at most one pending request: a partial unique
 index (`rule_id` where `status = 'pending'`, migration `0020`, T-0216) backs the service's
-check, so a concurrent duplicate is the same `RuleStoreError` (409), never a second row. Unlocking the tenant default does not touch project
+check, so a concurrent duplicate is the same `RuleStoreError` (409), never a second row.
+Approve, reject and cancel close the request with a guarded `UPDATE … WHERE status =
+'pending'` (as override decisions do, T-0347): when a concurrent decision committed first the
+row count is 0 and the later one is a `RuleStoreError` (409) with nothing applied and nothing
+audited, so a request is never both approved (rule unlocked) and rejected. Unlocking the tenant default does not touch project
 copies; a project picks the unlocked default up by resetting the rule. Resetting never
 loosens beyond the default, so it is allowed on locked rules, with one exception on the
 tenant layer: a reset (one rule or the whole set) that would **delete** a live locked rule

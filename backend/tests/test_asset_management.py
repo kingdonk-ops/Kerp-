@@ -472,6 +472,25 @@ def test_display_code_follows_the_template_through_a_move(tree: Tree) -> None:
     assert asset.display_code == "101"
 
 
+def test_clearing_the_last_template_restores_every_display_code(tree: Tree) -> None:
+    """T-0347 (audit item 10): with no template left, every node shows its own code again."""
+    site, asset, rsw = tree.remediation()
+    service.update_level_def(
+        tree.s, tree.levels["rsw"], LevelDefUpdate(display_code_template="{asset} / {rsw} [{line}]")
+    )
+    moved = tree.add("rsw", "205.1", tree.add("asset", "205", site))
+    assert (rsw.display_code, moved.display_code) == ("101 / 101.1 []", "205 / 205.1 []")
+    service.update_level_def(tree.s, tree.levels["rsw"], LevelDefUpdate(display_code_template=None))
+    assert service.get_node(tree.s, rsw.id).display_code == "101.1"
+    assert service.get_node(tree.s, moved.id).display_code == "205.1"
+    assert (site.display_code, asset.display_code) == (site.code, "101")
+    tree.s.expire_all()  # the stored codes, not only the session's objects
+    assert service.get_node(tree.s, rsw.id).display_code == "101.1"
+    # No template anywhere: a move rewrites no display code (each is the node's own code).
+    service.move_node(tree.s, moved.id, asset.id)
+    assert service.get_node(tree.s, moved.id).display_code == "205.1"
+
+
 # --- "visible" is not "mine" ------------------------------------------------------------------
 
 
