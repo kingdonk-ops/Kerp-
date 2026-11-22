@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 401 · **Closed:** 165
+**Open:** 408 · **Closed:** 167
 
 ## decision (40)
 
@@ -47,10 +47,10 @@
 | [TD-484](../tracker/todo/TD-484.md) | RFI notification e-mail: may it carry the date/time/location, the RFI PDF attachment and an .ics invite, and go to client distribution addresses without a KERP account? | T-0335 | planner |
 | [TD-486](../tracker/todo/TD-486.md) | RFI witness check: may an unmet hold-point (H) witness requirement be overridden per record (ADR 0004 Amendment A), or is it non-overridable? | T-0333 | planner |
 | [TD-514](../tracker/todo/TD-514.md) | How is a passed or LOCKED_FOR_TURNOVER inspection corrected? Define void-and-reissue (revision suffix, supersedes link, ledger, MDR shows latest) | — | planner |
-| [TD-538](../tracker/todo/TD-538.md) | Confirm the per-client limits on magic-link requests (20 per hour, the password-reset numbers) and Entra SSO starts (60 per hour) for crews and offices behind one shared address | T-0345 | implementer |
 | [TD-564](../tracker/todo/TD-564.md) | On-site label printing (QR / asset tags, quarantine labels): PDF label sheet, vendor print service on Android, or Web Bluetooth? Needs the printer model and device platform | T-0155, E-03-03, E-03-07, T-0141, T-0255 | planner |
+| [TD-592](../tracker/todo/TD-592.md) | May a scanned paper signature ever count as the client (PER-15) co-sign? (paper-signed pages are plain evidence until decided) | T-0291, E-05-05, T-0158 | planner |
 
-## spec-gap (89)
+## spec-gap (93)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -129,7 +129,6 @@
 | [TD-539](../tracker/todo/TD-539.md) | T-0342: production KERP_REDIS_URL is a startup refusal of the API and worker, not a Settings validation error (Settings also serves alembic and the first-run CLI) | T-0342 | implementer |
 | [TD-546](../tracker/todo/TD-546.md) | Multi-signer completion policy (all / any / quorum) with per-signer state (sent, viewed, signed, declined, expired, delivery_failed) and a derived aggregate | E-06-07, T-0291, E-05-05, E-07-02 | planner |
 | [TD-547](../tracker/todo/TD-547.md) | Results awaited: tests witnessed on site whose result arrives later (pull-off, lab) — place the waiting state on the ITR, not the RFI slot | T-0333, T-0111, T-0336 | planner |
-| [TD-549](../tracker/todo/TD-549.md) | Notification rules (trigger, recipients by role, delay, channel, template, conditions), per-notification delivery log with skipped reasons and an Outbox card, issued vs amended triggers, never-late reminders | T-0019, T-0335, T-0228 | planner |
 | [TD-550](../tracker/todo/TD-550.md) | Offline client behaviour: connection pill with queued count, photo states, Not syncing state, sign-out clearing, restore-while-offline backup slot, no visible rollback on reconnect, responsive panes | T-0127, T-0149, T-0165, T-0157 | planner |
 | [TD-551](../tracker/todo/TD-551.md) | ITR capture speed: big result buttons with number keys, filter tabs with live counts, section progress, canned comments, clone last, speed mode over unanswered items | T-0165 | planner |
 | [TD-552](../tracker/todo/TD-552.md) | Grant ceilings as tests (PER-09 cannot grant tenant grants, etc.) and an enforced fence: external accounts can never hold staff personas | T-0014, T-0026, T-0296, T-0073 | planner |
@@ -143,6 +142,11 @@
 | [TD-571](../tracker/todo/TD-571.md) | Earned value wording: INSPECTED_PASSED/LOCKED_FOR_TURNOVER are ITR states, not ITP-line states; cross-reference the PER-03 sign-off default for steps without an ITP line (PR #179 review) | E-06-04, E-04-12 | reviewer |
 | [TD-572](../tracker/todo/TD-572.md) | Diff §4.11 AI: drop stale 'platform key only if TD-545 changes'; state default conversation retention, the RLS-protected conversation store, and the budget-cap day boundary time zone (PR #179 review) | E-05-08 | reviewer |
 | [TD-573](../tracker/todo/TD-573.md) | Quality §5 no_show row should cite frozen notice_valid_at_outcome; reschedule reset should also clear notice_delivery_reason (PR #179 review) | T-0350, T-0333, T-0335 | reviewer |
+| [TD-587](../tracker/todo/TD-587.md) | Notification rules and per-notification delivery log (carried over from TD-549): rule model, transactional vs optional kinds, skipped reasons, Outbox card, issued vs amended, never late | T-0019, T-0335, T-0228, T-0350 | planner |
+| [TD-588](../tracker/todo/TD-588.md) | Shared numbering service for documents, ITPs, transmittals and dossiers: which task builds it before T-0108, T-0312 and T-0185 consume it | T-0108, E-05-01, T-0312, T-0185 | planner |
+| [TD-590](../tracker/todo/TD-590.md) | Bolted joint breakout reset: a breakout event resets the joint's integrity status and reopens ITP lines and test-pack checks through run_checks; earlier sign-offs kept as superseded | E-06b-01, E-03-03 | planner |
+| [TD-591](../tracker/todo/TD-591.md) | Competency at sign-off: read-only rule-set fact 'signer holds a valid credential of type X at signing time', snapshotted in the attestation | T-0118, T-0289, T-0291 | planner |
+| [TD-593](../tracker/todo/TD-593.md) | Client-supplied material late for its work pack: warning readiness conflict when expected delivery is after the installing pack's planned start (supplied_by flag on material lines) | E-03-03, E-03-02, E-04-02, E-06b-02, T-0266 | planner |
 
 ## missed (12)
 
@@ -216,7 +220,7 @@
 | [TD-510](../tracker/todo/TD-510.md) | Deployment-config view lacks the mail reply-to of diff §4.7: Settings has no reply-to field yet | T-0230 | implementer |
 | [TD-533](../tracker/todo/TD-533.md) | CEL client runtime has no evaluation step budget (cel-js exposes no step hook; server is the hard gate) | T-0341 | implementer |
 
-## later (158)
+## later (160)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -360,7 +364,7 @@
 | [TD-526](../tracker/todo/TD-526.md) | Uploads orphan sweep runs one query per file; batch it | T-0346 | planner |
 | [TD-529](../tracker/todo/TD-529.md) | Two list endpoints have no paging (unbounded list responses) | T-0348 | planner |
 | [TD-530](../tracker/todo/TD-530.md) | Database pool size and overflow cannot be configured (create_engine accepts pool_size/max_overflow but settings do not expose them) | T-0348 | planner |
-| [TD-531](../tracker/todo/TD-531.md) | Job rows (jobs table) are never deleted: add a retention purge for finished jobs | T-0346 | planner |
+| [TD-531](../tracker/todo/TD-531.md) | Job rows (jobs table) are never deleted: add a retention purge for finished jobs | T-0346, T-0351 | planner |
 | [TD-532](../tracker/todo/TD-532.md) | Registry entries declared by later tasks add their label to admin.settings.entries (and a new category to admin.settings.categories) in the Settings screen | T-0232 | implementer |
 | [TD-535](../tracker/todo/TD-535.md) | Startup role check: also refuse a runtime role that owns any app table (owner can drop FORCE or re-grant), once every deployment runs the owner/runtime split | T-0342 | implementer |
 | [TD-537](../tracker/todo/TD-537.md) | RegisterPage shell lacks per-row actions and server-side paging, so the System console registers (failed jobs, upload quarantine) use admin card lists; adopt the shell once it supports both (diff §6.5) | T-0224 | implementer |
@@ -378,8 +382,10 @@
 | [TD-583](../tracker/todo/TD-583.md) | first-run.md: replace 'downgrade to 0038 and upgrade again' with a re-runnable grant command once migrations past 0039 exist (PR #181 review) | T-0343 | reviewer |
 | [TD-585](../tracker/todo/TD-585.md) | CEL runtime sets sys.setrecursionlimit inside evaluate on the request path; set it once at startup (PR #181 review) | T-0341 | reviewer |
 | [TD-586](../tracker/todo/TD-586.md) | Expose X-Next-Offset in the native-app CORS expose_headers before a native client pages the drift report (PR #181 review) | T-0348 | reviewer |
+| [TD-589](../tracker/todo/TD-589.md) | Title-block number check: the worker reads the document number from an uploaded PDF (text layer, then OCR) and warns, never blocks, when it differs from the registered number | E-05-01, E-05-09 | planner |
+| [TD-594](../tracker/todo/TD-594.md) | Automatic weather on the daily diary: fetched, timestamped reference only (source and time), never replaces calibrated ambient readings; new outbound data flow needs a decision | E-04-04 | planner |
 
-## bug (17)
+## bug (18)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -400,6 +406,7 @@
 | [TD-528](../tracker/todo/TD-528.md) | Two concurrent adds of the same user to a team return 500 (unique violation) instead of the already-a-member answer | — | planner |
 | [TD-534](../tracker/todo/TD-534.md) | API shutdown raises when Redis is unreachable: SaqBroker.close() (SAQ RedisQueue.disconnect) connects to close its pub/sub | T-0342 | implementer |
 | [TD-560](../tracker/todo/TD-560.md) | review gate counts dismissed reviews: a dismissed KERP-REVIEW APPROVED still satisfies scripts/review_gate.py | — | planner |
+| [TD-595](../tracker/todo/TD-595.md) | Projects screen: the 'Visible in lobby' checkbox renders as a large empty square with no visible check mark or checkbox styling (desktop, /backbone/projects) | T-0026, T-0046 | planner |
 
 ## risk (35)
 
@@ -608,5 +615,7 @@
 | ✅ | [TD-516](../tracker/todo/TD-516.md) | Client bootstrap caching: 'ETag / no-store per the auth rules' has no auth rule to follow; default Cache-Control no-store + strong ETag over the values + If-None-Match -> 304 (T-0231); confirm, and that T-0248 clients revalidate with If-None-Match | User, 2026-11-21: default accepted. GET /api/v1/settings/client answers Cache-Control: no-store with a strong ETag over the values; If-None-Match -> 304. T-0248 clients store the values themselves and revalidate with If-None-Match. |
 | ✅ | [TD-521](../tracker/todo/TD-521.md) | Login redirect drops the query string and hash: RequireAuth stores only location.pathname as state.from | Fixed in T-0344: RequireAuth stores pathname + search + hash; LoginPage returnPath() keeps the /login loop guard (also for /login?… and /login#…) and accepts only in-app paths; tests in frontend/src/auth/sessionIsolation.test.tsx. |
 | ✅ | [TD-525](../tracker/todo/TD-525.md) | Some Redis errors surface as 500 instead of 503 (raw redis ConnectionError/TimeoutError outside RevocationUnavailableError) | T-0349: redis.ConnectionError and redis.TimeoutError that reach the app are 503 {detail: 'Service temporarily unavailable'} via one app-wide handler (redis_unavailable_handler), logged as a warning without the driver message; other Redis errors (bugs) stay 500. Request paths already wrap Redis (revocation store -> RevocationUnavailableError, settings cache swallows RedisError, queue monitor catches); the handler is the safety net for any that escape. Errors in post-response/background work (job dispatch, mail payloads) never reach a request and are unaffected. Tests: tests/test_service_unavailable.py. |
+| ✅ | [TD-538](../tracker/todo/TD-538.md) | Confirm the per-client limits on magic-link requests (20 per hour, the password-reset numbers) and Entra SSO starts (60 per hour) for crews and offices behind one shared address | User decision 2026-11-22: confirmed as is. Per-client limits stay: magic-link requests 20 per hour (the password-reset numbers) and Entra SSO starts 60 per hour, keyed by tenant + client address; no allow-list (diff §4.2) |
 | ✅ | [TD-545](../tracker/todo/TD-545.md) | AI provider, region and credentials (data use allowed by the user 2026-11-21): confirm one provider per deployment, Australian region, company-owned key in the secret store, fail closed | User decision 2026-11-22: planner defaults accepted — one AI provider per deployment, Australian region, company-owned (tenant) key in the deployment secret store, fail closed when anything is missing (diff §4.11) |
+| ✅ | [TD-549](../tracker/todo/TD-549.md) | Notification rules (trigger, recipients by role, delay, channel, template, conditions), per-notification delivery log with skipped reasons and an Outbox card, issued vs amended triggers, never-late reminders | User decision 2026-11-22: call-outs ignore e-mail opt-out. Contractual call-out / inspection-request notices are transactional; an opt-out never suppresses them and is not a skipped reason for them; opt-out applies to optional notifications only. Missing address or bounce still recorded per party. The rest of this spec-gap (rule model, delivery log, Outbox card, issued vs amended, never late) continues in TD-587 |
 | ✅ | [TD-561](../tracker/todo/TD-561.md) | Grant ceiling questions: second approver when PER-09 assigns a hold-authority persona it does not hold? May external accounts hold PER-14 (Field Worker)? | User decision 2026-11-22: planner defaults accepted — no second approver when PER-09 assigns a hold-authority persona it does not hold; external subcontractor crews may hold PER-14 Field Worker (diff §4.1, §4.9) |

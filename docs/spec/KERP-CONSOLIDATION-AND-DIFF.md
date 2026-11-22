@@ -467,6 +467,13 @@ Wins over any earlier text on tenant selection, tenant administrators and projec
   client. Accepted consequence: anyone who knows a Field Worker's e-mail can delay that
   worker's link; the worker can still sign in by password where they have one, or unlock
   offline with the PIN within the grace (offline grace, above).
+  **Per-client limits (user, 2026-11-22; TD-538 resolved; T-0345).** On top of the per-mailbox
+  lockout, magic-link requests are limited per client (tenant + client address) with the
+  password-reset numbers: 20 requests back to back, then a lock doubling from 30 seconds to
+  15 minutes, over a 1-hour window. Entra SSO starts (§4.5) are limited per client to 60 back to
+  back with the same escalation, checked before a state entry is stored. Both answer 429 with
+  `Retry-After`. Confirmed as built: a crew or office behind one shared address shares one
+  budget, and there is no allow-list of site or office addresses.
 
 - **Support impersonation (user paste "T-0076", 2026-11-21; user decision 2026-11-22, TD-426
   option (a) full impersonation; ADR 0015 accepted; T-0277–T-0280).** A `system_admin` may
@@ -783,7 +790,10 @@ visibility).
   `batch` queue, one `send_mail` per recipient (send-log rows carry the `broadcast_id`),
   suppression respected, deactivated users excluded, rate-limited, audited. Broadcast mails
   carry `List-Unsubscribe` (one-click) and an opt-out that applies to broadcasts only;
-  transactional mail is never opted out.
+  transactional mail is never opted out. Contractual call-out and inspection-request notices
+  (RFI, quality-and-inspection.md §inspection_requests §9) are transactional: an opt-out never
+  suppresses them and is never a `skipped` delivery reason for them; opt-out applies to optional
+  notifications only (user, 2026-11-22; TD-549 resolved; rule model and delivery log TD-587).
 
 **Runtime settings registry** (T-0230–T-0232) extends §4.4 (T-0044). A code-declared registry
 (key, category, type `int | float | bool | string | enum | int_list`, bounds, default,
@@ -981,7 +991,7 @@ come later (Phase 6, T-0303–T-0305, epic E-06-05). Rules:
 - **E-mail carries a link and the project code/name only** (§4.6); numbers stay in the app and
   in the statement CSV download.
 
-### 4.11 AI assistance: data use, assurance record, project assistant (user decisions 2026-11-21 and 2026-11-22; product intake 2026-11-21 and 2026-11-22)
+### 4.11 AI assistance: data use, assurance record, project assistant, change cards (user decisions 2026-11-21 and 2026-11-22; product intake 2026-11-21 and 2026-11-22)
 
 - **Data use** (user decision 2026-11-21): client and site data of a project may be sent to an
   external AI provider for KERP's AI features (assistant, ITP drafting and watchdog, ingestion
@@ -1053,6 +1063,42 @@ come later (Phase 6, T-0303–T-0305, epic E-06-05). Rules:
 - **Drawer** (product intake 2026-11-22, planner default; user to confirm). The assistant opens
   as an in-app drawer on the current record ("Ask about this NCR"), with that record as the
   starting context; it never leaves the screen the user is on.
+- **Change cards** (product intake 2026-11-22 (3), planner default; user to confirm; E-05-08).
+  A named operation that proposes a mutation stages it as a **change card**, never as a write:
+  target record (kind, id, the record version it was drafted against), a field-level diff
+  (old → new per field), a one-line rationale, the requester (the user who asked) and the
+  assurance record id. The model's confidence is shown only as a label (for example "low /
+  medium / high"); it is never a gate, a filter or a default for applying.
+  - **Apply** runs the owning module's normal service path for that change, as the person who
+    clicks Apply: the same RBAC, site scope, SoD and `run_checks(context, rule_set)` as a manual
+    save by that person, with `source="ai"` and the card id in the audit entry. The AI never has
+    more rights than the person applying; a refusal is shown exactly as for a manual save.
+  - **Edit before apply** is allowed: the person changes values on the card, and the applied
+    values are the edited ones (the assurance record's decision becomes
+    `edited_and_confirmed`).
+  - **Stale target:** if the record version changed since the card was drafted, Apply is
+    refused (409) and the card shows the current values; the person may edit the card against
+    them or reject it.
+  - **Undo** restores the previous values through the same service path only while the record
+    version is still the one Apply produced (optimistic check). After any later change Undo is
+    refused and the user is told to fix the record manually; nothing is merged automatically.
+    Undo covers field values only: a card whose apply made a workflow transition or an attested
+    sign-off cannot be undone (the owning workflow's own reverse or void path applies).
+  - **Audit:** the audit ledger records both the requester and the approver (the person who
+    applied, rejected or undid) on the card's state change and on the mutation itself. For a
+    card proposed by a scheduled or watchdog operation (no asking user) the requester is that
+    named operation; a person must still Apply it.
+  - **While AI is unavailable** (503 `AI_UNAVAILABLE`, 429 `AI_BUDGET_REACHED`): Apply, Reject,
+    Undo and editing of cards already staged stay available, because they make no provider
+    call; only new proposals fail closed.
+  - **Changes list** per project: every card with state `waiting | applied | rejected | undone
+    | expired`, filters (module, requester, record kind, state, age) and batch review so a QA
+    lead can open, apply or reject drafts one by one or in a batch. Batch apply applies each
+    card separately (one service call and one `run_checks` per card); a refused card stays
+    `waiting` with its reason, the others still apply.
+  - **Expiry:** a `waiting` card expires after `ai_change_card_expiry_days` (runtime registry,
+    §4.7; default 14, bounds 1–90) and can no longer be applied; a daily `batch` job marks it
+    `expired`. Expired and rejected cards stay listed with their assurance record.
 
 ---
 

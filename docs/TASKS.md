@@ -3,11 +3,11 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/tasks/*.md` — do not edit by hand.
 > ⬜ todo · ▶ ready to start · 🟦 in progress · 🟪 in review · ✅ done · 🟥 blocked · 🧩 epic awaiting breakdown · ⚫ dropped
 
-**Overall:** 111/321 tasks done (35%) · **ready now:** 21 · **epics awaiting breakdown:** 49
+**Overall:** 111/322 tasks done (34%) · **ready now:** 22 · **epics awaiting breakdown:** 49
 
 | Phase | Tasks done | Progress |
 |---|---|---|
-| 0 · Platform foundations | 109/126 | `████████░░` 87% |
+| 0 · Platform foundations | 109/127 | `████████░░` 86% |
 | 1 · Asset & Quality backbone | 2/169 (+2 epics) | `░░░░░░░░░░` 1% |
 | 2 · Welding quality | 0/11 | `░░░░░░░░░░` 0% |
 | 3 · Logistics | 0/2 (+7 epics) | `░░░░░░░░░░` 0% |
@@ -147,6 +147,7 @@
 | ▶ | [T-0277](../tracker/tasks/T-0277.md) | identity: system_admin impersonation token — POST /admin/users/{id}/impersonate and /auth/impersonation/exit, single-session impersonation JWT (no refresh), target RLS with is_system_admin = false, end-of-session e-mail to the target | identity | M | T-0006, T-0008, T-0010, T-0014, T-0039, T-0043, T-0058, T-0230, T-0274 |  |
 | ⬜ | [T-0278](../tracker/tasks/T-0278.md) | identity: central impersonation guardrail — 403 IMPERSONATION_ACTION_FORBIDDEN for A/S authority, signing, co-sign, inspection submit/approve, hold release, overrides and credential/device/grant mutations; route-classification contract test | identity | M | T-0277, T-0010 |  |
 | ⬜ | [T-0279](../tracker/tasks/T-0279.md) | audit: dual-identity ledger entries during impersonation — impersonated_by_user_id column, ledger hash v3, attribution in the audit explorer (ADR 0015) | audit | S | T-0006, T-0043, T-0277 |  |
+| ▶ | [T-0351](../tracker/tasks/T-0351.md) | CI: CycloneDX SBOM job (hardening only) + docs/security controls self-assessment and records-retention-by-data-class table | platform | S | T-0086 |  |
 
 ## Phase 1 — Asset & Quality backbone
 

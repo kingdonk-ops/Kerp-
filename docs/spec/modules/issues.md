@@ -169,7 +169,11 @@ writes the ledger. Step fields required by the template are checked by the same 
 - **Close.** Verification closes the punch (`verified` → `closed` in the same action; planner
   default, `verified` is kept as a state for templates whose rule set requires a separate close).
 - **Verifier ≠ resolver:** the user who marked it rectified can never verify it, whatever
-  `allow_self_approval` says (enforced in `service.py`, not the router).
+  `allow_self_approval` says (enforced in `service.py`, not the router). "Marked it rectified"
+  means the user of the latest `open → rectified` transition (the rectification being
+  verified). Where a template's rule set keeps `verified` and a separate close, that user can
+  also never perform the close (product intake 2026-11-22 (3), planner default; user to
+  confirm). `allow_self_approval` (TD-070, T-0140) never loosens this rule.
 
 ### 4.2 NCR
 `containment → disposition → root_cause → corrective_action → effectiveness → closed`.

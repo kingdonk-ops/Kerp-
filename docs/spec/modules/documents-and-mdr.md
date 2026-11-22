@@ -16,6 +16,39 @@ Covers MOD-11. Merged from legacy `documents` (+ folded VFS) with the 3D-CAD cul
   `portal`/`signing`); per-folder **versioning toggle** (fork a `file_versions` revision ON,
   overwrite in place OFF).
 
+## Numbering schemes (product intake 2026-11-22 (3), planner default; user to confirm; TD-588)
+
+Extends what is already specified, it does not replace it: per-template numbering patterns from
+client packs (ADR 0003 §4 item 5, T-0108) and the RFI pattern with a row-locked counter
+(quality-and-inspection.md §inspection_requests §8, which stays module-owned).
+
+- **One numbering service** allocates the numbers of documents, ITPs, transmittals and dossiers
+  (and of the other registers that already say "project numbering pattern": issues, scope
+  changes, substitutions, work plans, scaffolds). Which task builds it is TD-588.
+- **Scheme** per project and record kind (seeded from the client pack, editable by PER-09 or the
+  document controller persona; audited): a pattern of whitelisted tokens such as `{project}`,
+  `{discipline}`, `{doc_type}`, `{area}`, `{originator}`, `{seq:N}` (zero-padded to at least N
+  digits, growing past it), parsed with a placeholder whitelist, never `str.format`. Each code
+  token (`{discipline}`, `{doc_type}`, `{area}`, `{originator}` …) has an **allowed code list**
+  for the scheme; a value outside the list is refused (422) when the number is allocated.
+  Unknown tokens are refused when the scheme is saved.
+- **Validity and counter scope:** exactly one `{seq:N}`. The counter is one per scheme
+  (default) or one per combination of chosen code tokens (for example per `{discipline}`), and
+  every token in the counter scope must appear in the pattern, so two counters can never print
+  the same string (same rule as RFI §8, `NUMBER_PATTERN_INVALID`). A unique index on `(project_id, record kind, number)` is the last
+  line of defence.
+- **Allocation** under a row lock on the counter row in the transaction that registers or
+  issues the record (RFI §8 mechanism: `UPDATE … SET last_value = last_value + 1 RETURNING`).
+  A start value lets a project continue a client's existing sequence.
+- **Never reused:** an allocated number is never reused, also when the draft or record that got
+  it is voided or cancelled; the voided record keeps its number and stays in the register.
+- **Revision and status are never part of the number.** The revision (A, B … 0, 1 …) and the
+  CDE status or suitability code are separate fields shown next to the number; a new revision
+  keeps the number.
+- The number is a stored string: changing the scheme, the project code or a code list later never
+  renumbers existing records. A scheme can be changed at any time but only affects new numbers;
+  tightening a code list never invalidates numbers already allocated.
+
 ## Drawing viewer & markups (3D CAD culled)
 Standard **PDF/drawing plan viewer** + vector **markup** overlays (`markups`). No WebGL
 IFC/BIM renderer, no native `.dwg` parser, no 3D takeoff. A **pluggable background parser
