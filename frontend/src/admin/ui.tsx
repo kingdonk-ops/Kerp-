@@ -21,6 +21,7 @@ export const SYSTEM_TABS = [
   { to: "/admin/system/queues", label: "admin.system.queuesTab", systemAdminOnly: true },
   { to: "/admin/system/uploads", label: "admin.system.uploadsTab", systemAdminOnly: true },
   { to: "/admin/system/settings", label: "admin.system.settingsTab", systemAdminOnly: true },
+  { to: "/admin/system/audit", label: "admin.system.auditTab", systemAdminOnly: true },
   { to: "/admin/system/grants", label: "admin.system.grantsTab", systemAdminOnly: true },
   { to: "/admin/system/devices", label: "admin.system.devicesTab", systemAdminOnly: false },
 ] as const;
