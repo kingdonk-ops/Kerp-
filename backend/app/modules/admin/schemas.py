@@ -340,6 +340,9 @@ class AuditEntryRead(BaseModel):
     created_at: datetime
     actor_id: uuid.UUID | None = Field(validation_alias="created_by")
     device_id: uuid.UUID | None
+    # The ``system_admin`` who acted as ``actor_id`` through impersonation (T-0279, ADR 0015
+    # §6; hash v3), else ``null``.
+    impersonated_by_user_id: uuid.UUID | None
     source: str
     payload: dict[str, Any]
     prev_hash: str

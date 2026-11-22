@@ -40,6 +40,11 @@ class AuditEntry(Base, BaseRecordMixin):
     through, else ``NULL``. ``hash_version`` is the content-hash format of the entry: rows
     written before migration ``0016`` keep ``1`` (no ``device_id``), new rows get
     ``HASH_VERSION`` (2), which hashes ``device_id`` too.
+
+    ``impersonated_by_user_id`` (T-0279, ADR 0015 §6) is the ``system_admin`` who acted as
+    ``created_by`` (the target) through an impersonation token, else ``NULL``. Only entries
+    written while impersonating carry it; they are hashed with ``IMPERSONATION_HASH_VERSION``
+    (3), which covers it. Not a foreign key, like ``device_id``.
     """
 
     __tablename__ = TABLE
@@ -57,6 +62,9 @@ class AuditEntry(Base, BaseRecordMixin):
             name="hash_version",
         ),
         CheckConstraint("hash_version >= 2 OR device_id IS NULL", name="v1_no_device"),
+        CheckConstraint(
+            "hash_version >= 3 OR impersonated_by_user_id IS NULL", name="pre_v3_no_impersonator"
+        ),
     )
 
     scope_id: Mapped[uuid.UUID] = mapped_column(GUID(), nullable=False)
@@ -66,6 +74,7 @@ class AuditEntry(Base, BaseRecordMixin):
     content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     payload: Mapped[dict[str, Any]] = mapped_column(JSONType(), nullable=False)
     device_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), nullable=True)
+    impersonated_by_user_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), nullable=True)
     hash_version: Mapped[int] = mapped_column(
         SmallInteger, nullable=False, default=HASH_VERSION, server_default="1"
     )

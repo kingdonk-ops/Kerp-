@@ -2823,6 +2823,8 @@ export interface components {
             actor_id: string | null;
             /** Device Id */
             device_id: string | null;
+            /** Impersonated By User Id */
+            impersonated_by_user_id: string | null;
             /** Source */
             source: string;
             /** Payload */
@@ -10228,6 +10230,7 @@ export interface operations {
             query?: {
                 actor_id?: string | null;
                 device_id?: string | null;
+                impersonated_by_user_id?: string | null;
                 chain_key_prefix?: string | null;
                 event?: string | null;
                 flag?: string | null;

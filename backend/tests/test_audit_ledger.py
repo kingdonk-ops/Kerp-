@@ -428,6 +428,7 @@ class _Fields:
     content_hash: str = ""
     deleted_at: datetime | None = None
     device_id: uuid.UUID | None = None
+    impersonated_by_user_id: uuid.UUID | None = None
     hash_version: int = 1
 
 

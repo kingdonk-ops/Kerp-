@@ -49,11 +49,13 @@ from that binding, never from arguments.
 - **Hash:** SHA-256, lower-case hex.
   `content_hash = sha256(b"kerp-audit-ledger\n" + canonical_json(body))`, where `body` is
   `{"v": 1, tenant_id, project_id, chain_key, seq, prev_hash, created_at, created_by,
-  source, payload}` for v1 and the same plus `device_id` with `"v": 2` for v2 (below). UUIDs
+  source, payload}` for v1, the same plus `device_id` with `"v": 2` for v2, and the v2 body
+  plus `impersonated_by_user_id` with `"v": 3` for v3 (both below). UUIDs
   are strings, `created_at` is UTC ISO 8601 with microseconds
   (`2026-11-10T08:30:00.123456+00:00`). The mutable mixin columns are not hashed.
   `tests/test_audit_ledger.py::test_content_hash_known_answer` pins v1 and
-  `tests/test_audit_ledger_device.py::test_v2_content_hash_known_answer` pins v2; changing the
+  `tests/test_audit_ledger_device.py::test_v2_content_hash_known_answer` pins v2 and
+  `tests/test_audit_ledger_impersonation.py::test_v3_content_hash_known_answer` v3; changing the
   format needs a new `v` and must keep verifying old entries.
 - **Canonical JSON:** sorted keys, `","`/`":"` separators, UTF-8 (`ensure_ascii=False`). The
   payload must be an object of `str`, `int`, `bool`, `null`, lists and objects. **Floats and
@@ -124,6 +126,37 @@ Nothing in a request body can set it. Workers and scripts get `NULL` unless they
 The `0016` downgrade drops both columns, after which v2 entries no longer verify: development
 databases only.
 
+## Impersonation and hash v3 (T-0279, ADR 0015 §6)
+
+While a `system_admin` impersonates a user (T-0277, decision TD-426 option (a)), ordinary
+mutations are written under the target's name: `created_by` (and the module's own
+`created_by` / `updated_by`) is the target. The ledger entry is the only record of the admin.
+Migration `0044` added (additive, core table, ADR 0015):
+
+| Column | Meaning |
+|---|---|
+| `impersonated_by_user_id` | UUID or `NULL`: the `system_admin` who acted as `created_by` through an impersonation token. Not a foreign key |
+
+Entries written while impersonating get `hash_version = 3` (`IMPERSONATION_HASH_VERSION`): the
+v2 body plus `"impersonated_by_user_id"`, so the admin cannot be removed, swapped or the entry
+re-labelled as v2 without breaking the hash. Every other entry is written exactly as before
+(v2, the column `NULL`); v1 and v2 entries keep verifying and a chain may mix all three. CHECKs:
+`hash_version IN (1, 2, 3)` and `hash_version >= 3 OR impersonated_by_user_id IS NULL`.
+
+`append` has **no argument** for the impersonator. It reads `current_impersonator_id`
+(`app/core/tenancy/context.py`), which `get_principal` (`app/core/auth/deps.py`) sets per
+request from the verified, re-checked impersonation principal (`imp` claim, T-0277), next to
+`current_device_id`; nothing in a request body or a caller can set it. Workers and scripts
+write no impersonator. An entry written under an impersonation token with an explicit
+`actor_id` (the exit's `impersonation.ended`, actor = the admin) names the admin in both.
+
+The audit explorer (T-0222) returns `impersonated_by_user_id` on every item and filters on it
+(`EntryFilter.impersonated_by_user_id`).
+
+The `0044` downgrade (development databases only) restores `hash_version IN (1, 2)` and drops
+the column; it **fails while any v3 entry exists**, so a downgrade can never strip the admin
+from an entry silently. Production rolls the code back, not the schema.
+
 ## Append-only enforcement
 
 | Layer | Where | Stops |
@@ -133,6 +166,7 @@ databases only.
 | `BEFORE UPDATE OR DELETE` row trigger + `BEFORE TRUNCATE` statement trigger | migration `0002` (`guard.py`) | everyone except a superuser with `session_replication_role = replica`, or the owner after disabling the trigger |
 | CHECKs `deleted_at IS NULL`, `revision = 1`, `custom_fields = '{}'`, `scope_id` matches `project_id` | migration `0002` (`models.py`) | soft-deleted, revised or re-scoped rows, even from a superuser with triggers off (both dialects) |
 | CHECKs `hash_version IN (1, 2)`, `hash_version >= 2 OR device_id IS NULL` | migration `0016` (`models.py`) | unknown hash versions, a v1 row claiming a device |
+| CHECKs `hash_version IN (1, 2, 3)`, `hash_version >= 3 OR impersonated_by_user_id IS NULL` | migration `0044` (`models.py`) | a v1/v2 row claiming an impersonator |
 
 **Why both REVOKE and triggers.** In CI the runtime role `kerp_app` also runs the migrations,
 so it owns the table (TD-056). An owner's privileges can be revoked, and the REVOKE does apply
@@ -166,6 +200,11 @@ fails with `IntegrityError` rather than forking
 - `tests/test_audit_ledger_device.py`: SQLite and PostgreSQL. The v2 known-answer hash, v1
   unchanged, mixed v1/v2 chains, explicit and request device ids on `append`, a tampered
   `device_id`, the version CHECKs, and v1 rows written at `0015` still verifying after `0016`.
+- `tests/test_audit_ledger_impersonation.py`: SQLite and PostgreSQL. The v3 known-answer hash,
+  v1/v2 unchanged, mixed v1/v2/v3 chains, the impersonator from the request context only (no
+  `append` argument), tampering with it, the CHECKs, v1/v2 rows written at `0043` verifying
+  after `0044`, and the downgrade refusing while a v3 entry exists. The end-to-end option (a)
+  case (a node created over the API while impersonating) is in `tests/test_impersonation.py`.
 - `tests/test_audit_ledger_pg.py`: PostgreSQL only, as `kerp_app` (skipped elsewhere, TD-052).
   It covers REVOKE (`UPDATE`/`DELETE`/`TRUNCATE` denied, `INSERT`/`SELECT` kept), the triggers
   against a re-granted owner, `ledger_guard_problems`, RLS project scoping (project B's append

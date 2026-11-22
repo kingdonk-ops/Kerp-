@@ -6038,6 +6038,23 @@
             }
           },
           {
+            "name": "impersonated_by_user_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Impersonated By User Id"
+            }
+          },
+          {
             "name": "chain_key_prefix",
             "in": "query",
             "required": false,
@@ -9706,6 +9723,18 @@
             ],
             "title": "Device Id"
           },
+          "impersonated_by_user_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Impersonated By User Id"
+          },
           "source": {
             "type": "string",
             "title": "Source"
@@ -9737,6 +9766,7 @@
           "created_at",
           "actor_id",
           "device_id",
+          "impersonated_by_user_id",
           "source",
           "payload",
           "prev_hash",

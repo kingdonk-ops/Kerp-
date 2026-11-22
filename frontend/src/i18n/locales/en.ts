@@ -553,6 +553,8 @@ export const en = {
       time: "Time",
       source: "Source",
       tenantLevel: "Tenant level",
+      /** An entry written while a System admin impersonated the actor (T-0279, ADR 0015 §6). */
+      impersonatedBy: "{{target}} (impersonated by {{admin}})",
       noEvent: "(no event)",
       details: "Hashes and payload",
       contentHash: "Content hash",

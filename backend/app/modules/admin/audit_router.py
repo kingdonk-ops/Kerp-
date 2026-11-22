@@ -43,6 +43,7 @@ def list_audit_entries(
     session: DbSession,
     actor_id: uuid.UUID | None = None,
     device_id: uuid.UUID | None = None,
+    impersonated_by_user_id: uuid.UUID | None = None,
     chain_key_prefix: Annotated[str | None, Query(max_length=MAX_CHAIN_KEY)] = None,
     event: Annotated[str | None, Query(min_length=1, max_length=100)] = None,
     flag: Annotated[str | None, Query(pattern=f"^{FLAG_PATTERN.pattern}$")] = None,
@@ -54,6 +55,7 @@ def list_audit_entries(
     filters = explorer.EntryFilter(
         actor_id=actor_id,
         device_id=device_id,
+        impersonated_by_user_id=impersonated_by_user_id,
         chain_key_prefix=chain_key_prefix,
         event=event,
         flag=flag,

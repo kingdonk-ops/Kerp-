@@ -23,7 +23,8 @@ import sqlalchemy as sa
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from app.core.audit.service import chain_entries
+from app.core.audit.models import AuditEntry
+from app.core.audit.service import chain_entries, verify_chain
 from app.core.auth import impersonation
 from app.core.auth.access import CREATE_PROJECTS, SYSTEM_ADMIN, Persona
 from app.core.auth.deps import CurrentPrincipal
@@ -42,6 +43,8 @@ from app.core.tenancy.context import TenancyContext
 from app.core.tenancy.rls import RLS_EXEMPT, rls_tables, table_policy
 from app.modules.admin import service as admin
 from app.modules.admin.setting_defs import IMPERSONATION_MAX_MINUTES
+from app.modules.asset_management.schemas import LevelDefCreate
+from app.modules.asset_management.service import create_level_def
 from app.modules.projects import service as projects
 from app.modules.projects.schemas import ProjectCreate
 from app.modules.saved_views.models import SavedView
@@ -541,6 +544,53 @@ def test_records_written_while_impersonating_are_attributed_to_the_target(api: A
         view = s.get_one(SavedView, uuid.UUID(view_id))
         assert (view.created_by, view.updated_by) == (api.users[BOB], api.users[BOB])
         assert api.users[ALICE] not in (view.created_by, view.updated_by)
+
+
+def _node_entry(api: Api, headers: dict[str, str], level_id: str, code: str) -> AuditEntry:
+    """Create a node over the API and return its module ledger entry (asset hierarchy)."""
+    url = f"/api/v1/asset-management/projects/{api.home}/nodes"
+    created = api.client.post(url, json={"level_def_id": level_id, "code": code}, headers=headers)
+    assert created.status_code == 201, created.text
+    key = f"asset_node:{created.json()['id']}"
+    with api.db.unit_of_work(TenancyContext(tenant_id=T1, project_id=api.home)) as s:
+        [entry] = chain_entries(s, key)
+        assert verify_chain(s, key).ok
+        s.expunge(entry)
+        return entry
+
+
+def test_a_mutation_while_impersonating_names_both_identities_in_its_ledger_entry(
+    api: Api,
+) -> None:
+    # Option (a) (TD-426, ADR 0015 §6): an allowed mutation is attributed to the target, and
+    # its module ledger entry carries the admin as ``impersonated_by_user_id`` at hash v3.
+    with api.db.unit_of_work(
+        TenancyContext(tenant_id=T1, project_id=api.home, is_system_admin=True)
+    ) as s:
+        level = create_level_def(
+            s,
+            LevelDefCreate(key="site", depth=0, label_key="level.site", roles={"work_anchor"}),
+            actor_id=None,
+        )
+        level_id = str(level.id)
+    alice, bob = api.users[ALICE], api.users[BOB]
+    as_bob = bearer(api.impersonate(BOB)["access_token"])
+    impersonated = _node_entry(api, as_bob, level_id, "S1")
+    assert (impersonated.created_by, impersonated.impersonated_by_user_id) == (bob, alice)
+    assert impersonated.hash_version == 3
+    # The same mutation by the target itself: v2, no impersonator.
+    own = _node_entry(api, api.headers(BOB), level_id, "S2")
+    assert (own.created_by, own.impersonated_by_user_id, own.hash_version) == (bob, None, 2)
+    # The start is the admin's own request (v2, no impersonator); the exit is made under the
+    # impersonation token with the admin as actor, so it names the admin in both (v3).
+    assert api.client.post(EXIT, headers=as_bob).status_code == 204
+    with api.db.unit_of_work(ROOT) as s:
+        started, ended = chain_entries(s, CHAIN)
+        assert (started.created_by, started.impersonated_by_user_id) == (alice, None)
+        assert started.hash_version == 2
+        assert (ended.created_by, ended.impersonated_by_user_id) == (alice, alice)
+        assert ended.hash_version == 3
+        assert verify_chain(s, CHAIN).ok
 
 
 def test_a_create_projects_holder_is_impersonated_without_the_grant(api: Api) -> None:

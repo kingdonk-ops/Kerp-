@@ -75,6 +75,13 @@ class TenancyContext:
 # session's device binding, never from the request alone. The audit ledger records it.
 current_device_id: ContextVar[uuid.UUID | None] = ContextVar("current_device_id", default=None)
 
+# The ``system_admin`` acting as the request's user through an impersonation token (T-0277,
+# ADR 0015): set at authentication from the verified, re-checked principal only, never from the
+# request body or a caller's argument. The audit ledger records it (hash v3, T-0279).
+current_impersonator_id: ContextVar[uuid.UUID | None] = ContextVar(
+    "current_impersonator_id", default=None
+)
+
 
 def get_tenancy_context(
     request: Request,
