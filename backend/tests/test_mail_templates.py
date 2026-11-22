@@ -720,7 +720,7 @@ def test_overrides_stay_in_the_callers_tenant(admin: Admin) -> None:
 
 def _migration() -> ModuleType:
     versions = Path(__file__).resolve().parents[1] / "migrations" / "versions"
-    spec = importlib.util.spec_from_file_location("m0041", next(versions.glob("0041_*.py")))
+    spec = importlib.util.spec_from_file_location("m0042", next(versions.glob("0042_*.py")))
     assert spec is not None
     assert spec.loader is not None
     migration = importlib.util.module_from_spec(spec)
@@ -728,15 +728,15 @@ def _migration() -> ModuleType:
     return migration
 
 
-def test_migration_0041_creates_and_drops_the_table(tmp_path: Path) -> None:
+def test_migration_0042_creates_and_drops_the_table(tmp_path: Path) -> None:
     from sqlalchemy import inspect
 
     migration = _migration()
-    assert (migration.revision, migration.down_revision) == ("0041", "0040")
+    assert (migration.revision, migration.down_revision) == ("0042", "0041")
     url = database_url(tmp_path)
     cfg = Config(str(ALEMBIC_INI))
     cfg.attributes.update(url=url, configure_logger=False)
-    command.upgrade(cfg, "0041")
+    command.upgrade(cfg, "0042")
     database = Database(url)
     try:
         names = set(inspect(database.engine).get_table_names())
@@ -744,7 +744,7 @@ def test_migration_0041_creates_and_drops_the_table(tmp_path: Path) -> None:
         columns = {c["name"] for c in inspect(database.engine).get_columns(OVERRIDE_TABLE)}
         assert columns == {c.name for c in MailTemplateOverride.__table__.columns}
         database.dispose()
-        command.downgrade(cfg, "0040")
+        command.downgrade(cfg, "0041")
         database = Database(url)
         assert OVERRIDE_TABLE not in set(inspect(database.engine).get_table_names())
     finally:

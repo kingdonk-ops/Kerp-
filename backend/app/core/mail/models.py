@@ -1,6 +1,6 @@
 """The send log and the suppression list (T-0058, diff §4.6; migration ``0024``), the send
 log extended into the delivery ledger (T-0226, diff §4.7, ADR 0020; migration ``0040``), and
-the template overrides (T-0227, diff §4.7, ADR 0021; migration ``0041``).
+the template overrides (T-0227, diff §4.7, ADR 0021; migration ``0042``).
 
 Both use ``BaseRecordMixin`` and the standard tenant RLS policies (``project_id`` is the
 sending session's project, ``NULL`` for tenant-level sends: the auth e-mails). Neither ever

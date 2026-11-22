@@ -13,8 +13,8 @@ the default privileges of ``0039`` (ADR 0019); nothing to grant here.
 The downgrade drops the table (every override and its revisions are lost; sends use the
 shipped texts again).
 
-Revision ID: 0041
-Revises: 0040
+Revision ID: 0042
+Revises: 0041
 Create Date: 2026-11-22
 """
 
@@ -25,8 +25,8 @@ from alembic import op
 
 from app.core.db import GUID, JSONType
 
-revision: str = "0041"
-down_revision: str | None = "0040"
+revision: str = "0042"
+down_revision: str | None = "0041"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

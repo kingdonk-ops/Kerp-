@@ -14,7 +14,7 @@ production, always asynchronous, i18n templates, a send log that is also the del
 | `i18n.py`, `locales/*.json` | `t(key, locale, **params)` over flat JSON catalogs; `en-AU` is the base |
 | `transport.py` | `MailTransport` protocol: `SesTransport`, `FakeTransport`, `LogTransport`; `check_mail_config`, `transport_from_settings` |
 | `sns.py` | SNS message verification for the SES delivery/bounce/complaint endpoint |
-| `models.py` | `mail_send_log`, `mail_suppression` (`BaseRecordMixin`, standard RLS; migration `0024`; the ledger columns: `0040`), `mail_template_override` (`0041`) |
+| `models.py` | `mail_send_log`, `mail_suppression` (`BaseRecordMixin`, standard RLS; migration `0024`; the ledger columns: `0040`), `mail_template_override` (`0042`) |
 | `router.py`, `schemas.py` | `/api/v1/mail`: admin reads (history, stats), suppression removal, template overrides, the public SNS endpoint |
 
 ## Sending
@@ -208,4 +208,4 @@ admin API) and `tests/test_mail_ledger.py` (T-0226: migration `0040`, signed `De
 notifications, forward-only status changes, project sends, stats and history filters) and
 `tests/test_mail_templates.py` (T-0227: every template with and without an override, the
 override checks, revisions and reset, the next send, locale chain, preview, test send and its
-rate limit, the API, migration `0041`). All run on SQLite and PostgreSQL.
+rate limit, the API, migration `0042`). All run on SQLite and PostgreSQL.

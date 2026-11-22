@@ -3,7 +3,7 @@
 - **Status:** accepted (2026-11-22; records the new core table diff §4.7 *Automated
   templates* needs)
 - **Date:** 2026-11-22
-- **Affects:** T-0227 (this change, migration `0041_mail_template_override.py`), T-0229 (the
+- **Affects:** T-0227 (this change, migration `0042_mail_template_override.py`), T-0229 (the
   Communications UI that edits them); `app/core/mail` (T-0058); diff §4.6 *Templates*, §4.7
   *Automated templates* and *Editor details*; TD-400 (text blocks, not raw HTML). Builds on
   ADR 0019 (owner/runtime roles) and ADR 0016 (system_admin global visibility).
