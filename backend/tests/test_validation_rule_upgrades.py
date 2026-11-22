@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from sqlalchemy import func, select
+from sqlalchemy import event, func, select
 
 from app.core.audit.service import chain_entries, verify_chain
 from app.core.db import Database
@@ -41,9 +41,11 @@ from app.modules.validation.service import (
 from app.modules.validation.upgrades import (
     MAX_SAMPLE_CONTEXT_BYTES,
     MAX_SAMPLE_DEPTH,
+    DriftPage,
     SampleContextError,
     accept_update,
     drift_report,
+    drift_report_page,
     pending_updates,
     try_rule,
 )
@@ -485,6 +487,78 @@ def test_the_drift_report_needs_a_tenant_level_session(
         pytest.raises(RuleStoreError, match="tenant-level session"),
     ):
         drift_report(s)
+
+
+def _drift_world(db: Database, count: int, prefix: str = "D") -> list[uuid.UUID]:
+    """``count`` projects copied from the seeded tenant, each with one disabled rule."""
+    project_ids = [new_project(db, f"SYN-{prefix}{n}") for n in range(count)]
+    for project_id in project_ids:
+        set_id = set_of(db, in_project(project_id), "project")
+        with db.unit_of_work(in_project(project_id)) as s:
+            set_rule_enabled(s, set_id, "photo", False)
+    return sorted(project_ids, key=str)
+
+
+def _drift_selects(db: Database, ctx: TenancyContext, **page: Any) -> tuple[int, DriftPage]:
+    statements: list[str] = []
+
+    def record(_conn: Any, _cursor: Any, statement: str, *_args: Any) -> None:
+        if statement.lstrip().upper().startswith("SELECT") and "set_config" not in statement:
+            statements.append(statement)
+
+    with db.unit_of_work(ctx) as s:
+        s.connection()  # the transaction (and its tenancy binding) is not counted
+        event.listen(db.engine, "before_cursor_execute", record)
+        try:
+            found = drift_report_page(s, **page)
+        finally:
+            event.remove(db.engine, "before_cursor_execute", record)
+    return len(statements), found
+
+
+def test_the_drift_report_query_count_does_not_grow_with_the_projects(
+    db: Database, project: tuple[uuid.UUID, uuid.UUID, uuid.UUID]
+) -> None:
+    """Audit 2026-11-21 item 19 (T-0348, TD-289): a fixed number of queries per report."""
+    del project  # seeds the tenant; its own project has no drift
+    few = _drift_world(db, 2)
+    many = few + _drift_world(db, 6, prefix="E")
+    with db.unit_of_work(CTX) as s:
+        own = create_rule_set(s, key="tenant.only", kind="check", layer="tenant")
+        save_rule(s, own.id, spec("only"))
+    small = TenancyContext(tenant_id=T1, user_id=QD, allowed_project_ids=frozenset(few))
+    large = TenancyContext(tenant_id=T1, user_id=QD, allowed_project_ids=frozenset(many))
+    small_count, small_page = _drift_selects(db, small)
+    large_count, large_page = _drift_selects(db, large)
+    assert [e.project_id for e in small_page.entries] == few
+    assert [e.project_id for e in large_page.entries] == sorted(many, key=str)
+    assert small_count == large_count <= 4
+
+
+def test_the_drift_report_pages_by_whole_projects(
+    db: Database, project: tuple[uuid.UUID, uuid.UUID, uuid.UUID]
+) -> None:
+    project_id, set_id, _ = project
+    with db.unit_of_work(in_project(project_id)) as s:
+        save_rule(s, set_id, spec("mine"))  # two entries for this project
+    project_ids = sorted([*_drift_world(db, 6), project_id], key=str)
+    readable = TenancyContext(tenant_id=T1, user_id=QD, allowed_project_ids=frozenset(project_ids))
+    with db.unit_of_work(readable) as s:
+        whole = drift_report(s)
+        pages: list[DriftPage] = []
+        offset: int | None = 0
+        while offset is not None:
+            pages.append(drift_report_page(s, limit=3, offset=offset))
+            offset = pages[-1].next_offset
+        beyond = drift_report_page(s, limit=3, offset=99)
+    assert [p.next_offset for p in pages] == [3, 6, None]
+    assert [e for p in pages for e in p.entries] == whole
+    assert [len({e.project_id for e in p.entries}) for p in pages] == [3, 3, 1]
+    assert {e.project_id for e in whole} == set(project_ids)
+    assert (beyond.entries, beyond.next_offset) == ([], None)
+    with db.unit_of_work(readable) as s:  # an exact last page has no next page
+        assert drift_report_page(s, limit=7).next_offset is None
+        assert drift_report_page(s, limit=6).next_offset == 6
 
 
 # --- "Try it" (ADR 0004 §6) ---------------------------------------------------------------------

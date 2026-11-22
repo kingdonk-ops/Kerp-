@@ -13,7 +13,7 @@ Built fresh; Inspection-ERP's `Finding(key, severity, message)` shape was a refe
 | `defaults.py` | system default seed files `app/modules/<m>/rules/defaults/*.yaml`: `load_defaults()` |
 | `service.py` | rule store (`create_rule_set`, `save_rule`, `set_rule_enabled`, `delete_rule`, `reset_rule`, `reset_rule_set`), layers (`sync_system_layer`, `sync_system_defaults`, `seed_tenant`, `seed_project`, `copy_module_defaults`), unlock (`request_unlock`, `approve_unlock`, `reject_unlock`), `resolve_rule_set`, `run_checks` |
 | `overrides.py` | per-record override of a blocked check (`request_override`, `approve_override`, `reject_override`, `list_overrides`, `get_override`; binding hash and voiding used by `run_checks`) — T-0035 |
-| `upgrades.py` | default-upgrade offers (`pending_updates`, `accept_update`), the tenant drift report (`drift_report`), "Try it" (`try_rule`) — T-0036 |
+| `upgrades.py` | default-upgrade offers (`pending_updates`, `accept_update`), the tenant drift report (`drift_report`, `drift_report_page`), "Try it" (`try_rule`) — T-0036 |
 | `schemas.py` | `RuleSpec` (input), `CheckResult` / `CheckFinding` (output), the Rules API shapes |
 | `router.py` | Rules settings API (ADR 0004 §7), see below |
 
@@ -277,6 +277,15 @@ not accepted) and `default_removed` (a copied rule whose default the tenant remo
 covers the projects the session can read (RLS: the caller's portfolio projects,
 `allowed_project_ids`), never others.
 
+`drift_report_page(session, limit=None, offset=0)` returns one page (`DriftPage`: `entries`,
+`next_offset`, `None` on the last page) of whole projects in project id order, so a project is
+never split across pages; `drift_report` is every page at once. A page costs four queries
+however many projects and sets it covers (the page's project ids, its project sets, the tenant
+default sets, and one `IN (...)` query for the rules of both; T-0348, TD-289).
+`GET /drift-report` takes optional `limit` (projects per page, default 100, at most 500) and
+`offset` (default 0) and still answers a plain `DriftEntryRead` list; when more projects follow,
+the `X-Next-Offset` header holds the `offset` of the next page.
+
 ## "Try it" (ADR 0004 §6, T-0036)
 
 `try_rule(session, set_id, rule_key, context, draft=None)` evaluates the stored rule (enabled
@@ -309,7 +318,7 @@ and returns a `TryResult`; it writes **nothing** (no finding, version or ledger 
 | `GET .../rule-sets/{set}/updates` | the upgrade offer (`RuleSetUpdatesRead`), tenant and project sets |
 | `POST .../rule-sets/{set}/updates/{key}/accept` | accept one rule of it |
 | `POST .../rule-sets/{set}/rules/{key}/try` | "Try it" (`TryRuleInput`: `context`, optional draft `rule`) |
-| `GET /drift-report` | the tenant drift report (`DriftEntryRead`) |
+| `GET /drift-report` | the tenant drift report (`DriftEntryRead`), paged by project (`limit`, `offset`, `X-Next-Offset`) |
 
 | Layer | `check` sets | other kinds |
 |---|---|---|

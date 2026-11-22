@@ -187,7 +187,10 @@ rows with `tests/db_support.seed_tenants` (synthetic ids only).
 - **Core connections:** `bind_connection(conn, ctx)` inside the transaction.
 - `bind_tenancy(session, ctx)` stores the context on `session.info`. An `after_begin` hook
   applies it with `set_config(..., true)` (`SET LOCAL`) at the start of every transaction.
-  `install_pool_reset` also clears every setting (`rls.SETTINGS`) when a connection returns to the pool.
+  `install_pool_reset` also clears every setting (`rls.SETTINGS`) when a connection returns to the pool:
+  one `SELECT set_config(name, '', false), …` (`rls.POOL_RESET_SQL`) and one commit (T-0348), so
+  a return costs three round trips (the driver's `BEGIN`, the statement, `COMMIT`), not nine. The
+  policies read the empty value as unset (`NULLIF(..., '')`), as after a `RESET`.
 - **One scope per session.** `bind_tenancy` raises if asked to switch a session that holds
   loaded objects or pending changes to a *different* context, because `session.get` would
   hand out identity-map objects of the old scope without SQL. Commit and `expunge_all()`

@@ -26,12 +26,12 @@ every referenced column the catalogue no longer has as missing instead of failin
 from __future__ import annotations
 
 import uuid
-from collections.abc import Callable, Collection
+from collections.abc import Callable, Collection, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Final
 
 from pydantic import ValidationError
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.core.tenancy.rls import session_tenancy
@@ -59,6 +59,7 @@ __all__ = [
     "list_views",
     "load_config",
     "present",
+    "present_many",
     "register_catalogue",
     "update_view",
     "view_team_ids",
@@ -176,19 +177,31 @@ def get_view(session: Session, viewer: Viewer, view_id: uuid.UUID) -> SavedView:
     return view
 
 
-def _register_views(session: Session, register_key: str) -> list[SavedView]:
+def _register_views(
+    session: Session, register_key: str, viewer: Viewer | None = None
+) -> list[SavedView]:
+    """The register's views in the bound project, by name; with ``viewer``, without the
+    private views of others (filtered in SQL, T-0348)."""
     query = (
         select(SavedView)
         .where(SavedView.project_id == _project_id(session))
         .where(SavedView.register_key == register_key)
         .order_by(SavedView.name, SavedView.created_at)
     )
+    if viewer is not None:
+        query = query.where(
+            or_(SavedView.visibility != "private", SavedView.owner_user_id == viewer.user_id)
+        )
     return list(session.scalars(query))
 
 
 def list_views(session: Session, viewer: Viewer, register_key: str) -> list[SavedView]:
-    """The register's views ``viewer`` may see in the bound project, by name."""
-    views = _register_views(session, register_key)
+    """The register's views ``viewer`` may see in the bound project, by name.
+
+    Two queries however many views there are: the views (others' private ones never leave
+    the database) and the team links of the team views among them.
+    """
+    views = _register_views(session, register_key, viewer)
     named = view_team_ids(session, [v.id for v in views if v.visibility == "team"])
     return [v for v in views if can_see(viewer, v, named.get(v.id, frozenset()))]
 
@@ -222,17 +235,38 @@ def load_config(view: SavedView) -> ViewConfig:
 
 def present(session: Session, view: SavedView) -> SavedViewRead:
     """The view as the register loads it, with missing columns flagged (spec §3)."""
+    return present_many(session, [view])[0]
+
+
+def present_many(session: Session, views: Sequence[SavedView]) -> list[SavedViewRead]:
+    """``present`` for a list, in order (T-0348, TD-387): each register's column catalogue is
+    built once, and the team views' links and the project's linked teams are read with one
+    query each, however many views there are."""
+    catalogues: dict[str, frozenset[str] | None] = {}
+    team_views = [v.id for v in views if v.visibility == "team"]
+    named = view_team_ids(session, team_views)
+    linked: dict[uuid.UUID, frozenset[uuid.UUID]] = {}
+    found: list[SavedViewRead] = []
+    for view in views:
+        assert view.project_id is not None
+        if view.register_key not in catalogues:
+            catalogues[view.register_key] = known_columns(session, view.register_key)
+        team_ids: list[uuid.UUID] = []
+        if named.get(view.id):  # only teams still linked to the project
+            if view.project_id not in linked:
+                linked[view.project_id] = teams.project_team_ids(session, view.project_id)
+            team_ids = sorted(named[view.id] & linked[view.project_id], key=str)
+        found.append(_read(view, catalogues[view.register_key], team_ids))
+    return found
+
+
+def _read(
+    view: SavedView, known: frozenset[str] | None, team_ids: list[uuid.UUID]
+) -> SavedViewRead:
     config = load_config(view)
-    known = known_columns(session, view.register_key)
     missing = [] if known is None else [c for c in config.referenced_columns() if c not in known]
     columns = [ResolvedColumn(**c.model_dump(), missing=c.id in missing) for c in config.columns]
     assert view.project_id is not None
-    team_ids: list[uuid.UUID] = []
-    if view.visibility == "team":
-        named = view_team_ids(session, [view.id])[view.id]
-        if named:  # only teams still linked to the project
-            linked = named & teams.project_team_ids(session, view.project_id)
-            team_ids = sorted(linked, key=str)
     return SavedViewRead(
         id=view.id,
         project_id=view.project_id,
