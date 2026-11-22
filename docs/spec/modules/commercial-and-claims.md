@@ -30,3 +30,15 @@ commitment & claim transactions and exports them; money figures are read-only mi
 Claim percentages are gated by field progress ([`../modules/asset-and-tagging.md`] RSW earned
 qty) and QA/QC hold sign-offs ([`quality-and-inspection.md`](quality-and-inspection.md)); an
 incomplete hydrotest blocks its testing milestone.
+
+## Earned value counts verified completion (product intake 2026-11-22, planner default; user to confirm)
+- Earned value (EV, for CPI = EV / AC and SPI = EV / PV, master spec MOD-03) credits a scope's
+  budget only for **verified** progress: a progress step earns once the ITP line(s) that verify
+  it are `INSPECTED_PASSED` or `LOCKED_FOR_TURNOVER` (facts from `inspections.service`), never on
+  self-reported percent complete alone. Self-reported progress is still captured and shown
+  beside it as "reported", so the gap is visible.
+- A **planned vs verified-complete** view per area or work package (planned, reported, verified,
+  with the difference) feeds the progress and EVM screens (E-04-03, E-06-04) and the planner
+  statistics (planner-and-work-plans.md §9.1).
+- Which ITP lines verify which progress steps, and partial credit, are open in TD-563. Money stays a read-only mirror: KERP computes indices from mirrored budget and
+  cost, it never authors amounts.

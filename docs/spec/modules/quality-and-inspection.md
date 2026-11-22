@@ -1087,11 +1087,11 @@ table keeps every earlier time.
 | add / edit / remove slot (`draft`) | creators | request is `draft`; at most `max_slots` | — |
 | `draft → requested` (**issue**, request-level: all draft slots at once) | creators | every slot has type, future `scheduled_start`, ≥ 1 linked record in `PENDING` or `RE_INSPECT` (else 409 `INSPECTION_NOT_REQUESTABLE`), party rows; `run_checks(context, "inspection_request.issue")` passes | RFI no. allocated on first issue (§8); notice computed (§6); linked records → `INSPECTION_REQUESTED` (§5); call-out notifications (§9); PDF rendered (§10) |
 | `requested → confirmed` | named witness or PER-15 of the client party; PER-06/PER-07 recording on behalf (`confirmation_ref` required) | before an outcome | requester notified |
-| `requested \| confirmed \| no_show \| failed → requested` (**reschedule**) | creators; PER-15 of the client party (cause `client` set automatically) | new `scheduled_start` in the future; `reason` (non-blank) and `cause_party` required | `reschedule_count` + 1; old and new times in the event; confirmation, attendance and `reminder_sent_at` cleared; notice recomputed from now (§6); delay entry (§7); notifications; PDF re-rendered |
+| `requested \| confirmed \| no_show \| failed → requested` (**reschedule**) | creators; PER-15 of the client party (cause `client` set automatically) | new `scheduled_start` in the future; `reason` (non-blank) and `cause_party` required | `reschedule_count` + 1; old and new times in the event; confirmation, attendance and `reminder_sent_at` cleared; every party's `notice_delivery` reset to `pending` and `notice_valid_at_outcome` cleared with the outcome (§6, §9); notice recomputed from now (§6); delay entry (§7); notifications; PDF re-rendered |
 | **waive a party** (no slot transition) | PER-15 of that party (any point); PER-06 for a `W` point only, with `waiver_ref` (the party's written waiver) | slot `requested`/`confirmed`; the party is an external H/W party | that party's `attendance = waived` (`attendance_by_user_id`; `waiver_ref` on the party row and in the event); when every external H/W party is now `waived` the slot moves to `waived` in the same action |
 | `requested \| confirmed → witnessed` | PER-06, PER-07 (site scope) | **no external H/W party `pending`**; every one `attended` or `waived`, at least one `attended` | witness requirement satisfied (§5) |
 | `requested \| confirmed → waived` | automatic, by the last **waive a party** action | every external H/W party `waived` | witness requirement satisfied |
-| `requested \| confirmed → no_show` | PER-06, PER-07 | `outcome_occurred_at` ≥ `scheduled_start` + `inspection_request.no_show_grace_minutes` (default 30); **no external H/W party `pending`**; ≥ 1 `absent` | satisfied only if every absent party's point is `W` and that party had valid notice (§6; §5); delay entry (§7) |
+| `requested \| confirmed → no_show` | PER-06, PER-07 | `outcome_occurred_at` ≥ `scheduled_start` + `inspection_request.no_show_grace_minutes` (default 30); **no external H/W party `pending`**; ≥ 1 `absent` | satisfied only if every absent party's point is `W` and that party had valid notice, frozen per party in `notice_valid_at_outcome` when this outcome is recorded (§6; §5); delay entry (§7) |
 | `requested \| confirmed → failed` | PER-06, PER-07 | `outcome_reason_code` required (§7): the call-out could not be held for a reason other than the witness's absence (work not ready, access, weather, permit, instrument) | not satisfied; delay entry (§7) |
 | `draft \| requested \| confirmed → cancelled` | requester, PER-06 | reason required unless `draft` | linked records revert (§5); notifications; PDF re-rendered; a draft request whose slots are all cancelled may be soft-deleted instead (no number was used) |
 
@@ -1135,9 +1135,9 @@ party**. It looks at the most recently issued slot that links **the record itsel
 later, so a slot that links only the line counts for the ITR, **provided the slot's anchors cover
 the ITR's anchor** (the ITR's node or Item is a slot anchor or lies in the subtree of one);
 otherwise that slot does not count for the ITR. Per party, the requirement is met when its
-attendance is `attended` or `waived`, or `absent` on a `W` point with valid notice (§6, as frozen at the outcome); it is unmet
+attendance is `attended` or `waived`, or `absent` on a `W` point with valid notice (§6; the party's frozen `notice_valid_at_outcome`); it is unmet
 when no slot was issued, its attendance is still `pending`, the party was absent on an `H`
-point or without valid notice (short notice or `notice_delivery = failed`), or the slot `failed`. Precedence: `failed` makes every party unmet;
+point or without valid notice (`notice_valid_at_outcome = false`: short notice or `notice_delivery = failed` at the outcome), or the slot `failed`. Precedence: `failed` makes every party unmet;
 otherwise the party's attendance decides, and `pending` = unmet. `construction_control` adds two locked
 system-default `check` rules (ADR 0004 §5) to `inspection.submit` (§Review and return),
 evaluated from the ITP line's external points: `WITNESS_REQUIREMENT_HOLD` fails only for unmet
