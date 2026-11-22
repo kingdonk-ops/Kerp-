@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 424 · **Closed:** 170
+**Open:** 425 · **Closed:** 170
 
 ## decision (40)
 
@@ -223,7 +223,7 @@
 | [TD-510](../tracker/todo/TD-510.md) | Deployment-config view lacks the mail reply-to of diff §4.7: Settings has no reply-to field yet | T-0230 | implementer |
 | [TD-533](../tracker/todo/TD-533.md) | CEL client runtime has no evaluation step budget (cel-js exposes no step hook; server is the hard gate) | T-0341 | implementer |
 
-## later (171)
+## later (172)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -398,6 +398,7 @@
 | [TD-603](../tracker/todo/TD-603.md) | Broadcast opt-out: let a user opt back in (profile setting) and show the state | T-0228 | implementer |
 | [TD-605](../tracker/todo/TD-605.md) | Broadcast list: filter by readable projects and page in SQL | T-0228 | implementer |
 | [TD-606](../tracker/todo/TD-606.md) | Pin pydantic (or normalise the export) so the generated OpenAPI Decimal pattern does not drift | T-0228 | implementer |
+| [TD-607](../tracker/todo/TD-607.md) | Test PG databases are named by xdist worker only (pg_databases.py): parallel sessions on one cluster drop each other's databases — add a per-run prefix | T-0279 | coordinator |
 
 ## bug (18)
 
