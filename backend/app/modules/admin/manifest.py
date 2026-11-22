@@ -6,10 +6,11 @@ from app.core.module_loader.manifest import ModuleManifest
 # The member list names the team of every team-derived grant through the teams service (T-0013).
 # The System console's queue monitor reads and acts through the jobs service (T-0218), its
 # upload quarantine monitor (T-0221), object-store totals and health probes (T-0219)
-# through the uploads service.
+# through the uploads service. Impersonation (T-0277) reads its maximum length from the
+# settings registry (``impersonation_max_minutes``, declared in ``setting_defs.py``).
 MANIFEST = ModuleManifest(
     name="admin",
     version="0.1.0",
-    depends_on=("projects", "teams", "jobs", "uploads"),
+    depends_on=("projects", "teams", "jobs", "uploads", "settings"),
     toggleable=False,
 )

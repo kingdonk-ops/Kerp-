@@ -3,7 +3,7 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 411 · **Closed:** 168
+**Open:** 416 · **Closed:** 168
 
 ## decision (39)
 
@@ -221,7 +221,7 @@
 | [TD-510](../tracker/todo/TD-510.md) | Deployment-config view lacks the mail reply-to of diff §4.7: Settings has no reply-to field yet | T-0230 | implementer |
 | [TD-533](../tracker/todo/TD-533.md) | CEL client runtime has no evaluation step budget (cel-js exposes no step hook; server is the hard gate) | T-0341 | implementer |
 
-## later (161)
+## later (165)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -380,6 +380,10 @@
 | [TD-568](../tracker/todo/TD-568.md) | Adopt core tenant_level_context in the remaining tenant-level session guards | T-0349 | implementer |
 | [TD-569](../tracker/todo/TD-569.md) | Use core sha256_hex for the remaining inline SHA-256 hex digests (lockout subject, mail address, admin e-mail) | T-0349 | implementer |
 | [TD-576](../tracker/todo/TD-576.md) | Invite e-mails carry no recipient_user_id in the delivery ledger when the invitee already has an account | T-0226 | implementer |
+| [TD-577](../tracker/todo/TD-577.md) | Impersonation notice: pass recipient_user_id to send_mail once T-0226 (mail delivery ledger) is merged | T-0277 | implementer |
+| [TD-578](../tracker/todo/TD-578.md) | Login telemetry, presence and the session index must skip impersonation principals (ADR 0015 §7) | T-0243 | implementer |
+| [TD-579](../tracker/todo/TD-579.md) | Impersonation UI: keep the token in memory only, never store the last-used project or offline data, and decide what Logout does while impersonating | T-0280 | implementer |
+| [TD-580](../tracker/todo/TD-580.md) | Sync download and other device-bound field endpoints must refuse impersonation tokens | T-0147 | implementer |
 | [TD-582](../tracker/todo/TD-582.md) | Startup safety: also refuse a runtime role with no grants on app tables (0039 skipped), not only one with too much access (PR #181 review) | T-0342 | reviewer |
 | [TD-583](../tracker/todo/TD-583.md) | first-run.md: replace 'downgrade to 0038 and upgrade again' with a re-runnable grant command once migrations past 0039 exist (PR #181 review) | T-0343 | reviewer |
 | [TD-585](../tracker/todo/TD-585.md) | CEL runtime sets sys.setrecursionlimit inside evaluate on the request path; set it once at startup (PR #181 review) | T-0341 | reviewer |
@@ -410,7 +414,7 @@
 | [TD-560](../tracker/todo/TD-560.md) | review gate counts dismissed reviews: a dismissed KERP-REVIEW APPROVED still satisfies scripts/review_gate.py | — | planner |
 | [TD-595](../tracker/todo/TD-595.md) | Projects screen: the 'Visible in lobby' checkbox renders as a large empty square with no visible check mark or checkbox styling (desktop, /backbone/projects) | T-0026, T-0046 | planner |
 
-## risk (36)
+## risk (37)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -449,6 +453,7 @@
 | [TD-497](../tracker/todo/TD-497.md) | Quarantine re-check: a second verify job can still overlap one whose worker thread is mid-check after a queue-monitor abort (failed/ABORTED while the to_thread verify_upload runs on) or a queue-monitor retry of the replaced failed job; the later job finds the shared quarantine object gone and rejects a clean file as missing_object, the other leaves an orphan content object (fail-safe, nothing published unscanned) | T-0221 | implementer |
 | [TD-520](../tracker/todo/TD-520.md) | Review gate accepts a 7-character patch-id prefix (MARKER_RE [0-9a-f]{7,40} plus prefix matching) | — | planner |
 | [TD-574](../tracker/todo/TD-574.md) | Mail history exact-address lookup puts the address in the GET query string: load-balancer/proxy access logs (e.g. ALB) would record it | T-0226 | implementer |
+| [TD-581](../tracker/todo/TD-581.md) | Migration 0039 collides with T-0226's 0039 (parallel branches): the second to merge must renumber and re-chain | T-0277 | implementer |
 | [TD-584](../tracker/todo/TD-584.md) | Refresh grace: a failed commit after the token is consumed leaves the client unable to refresh; log replays inside the 30 s grace window (PR #181 review) | T-0345 | reviewer |
 
 ## Closed

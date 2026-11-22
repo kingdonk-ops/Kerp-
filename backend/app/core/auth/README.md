@@ -13,7 +13,8 @@ rewritten (HS256 → RS256/EdDSA + JWKS + `jti` revocation in Redis).
 | `password_policy.py`, `data/common_passwords.txt` | The one password policy (T-0077): `check_password` (minimum length, NFKC, bundled blocklist + patterns + context words, optional breach lookup), codes `PASSWORD_TOO_SHORT` / `PASSWORD_TOO_LONG` / `PASSWORD_TOO_COMMON` (*Passwords*) |
 | `password_reset.py`, `password_reset_router.py` | Self-service password reset by e-mail (T-0077): `PasswordResetService` (neutral request, post-response issue, single-use hashed token, confirm), endpoints `/auth/password-reset/{request,confirm}` (*Self-service password reset*) |
 | `keys.py` | Ed25519 / RSA signing key, retired verification keys, RFC 7638 `kid`, JWKS document |
-| `tokens.py` | `TokenService`: issue/verify access (15 min) and refresh tokens |
+| `tokens.py` | `TokenService`: issue/verify access (15 min), refresh and impersonation tokens (T-0277) |
+| `impersonation.py` | System admin impersonation (T-0277, ADR 0015): `start`, `end` (exactly once: ledger `impersonation.ended` + the target's notice e-mail), `end_refused` (lazy end at the first refused use), `sweep` (batch cron), the `auth.impersonation_ended` mail template (*Impersonation*) |
 | `revocation.py` | `RevocationStore`: Redis (prod) / in-memory (dev, tests) — `jti` + session blacklist, one-time refresh tokens; the app-wide `503` handlers for a store outage and a raw Redis outage (T-0349) |
 | `runtime.py` | `AuthRuntime` (keys + tokens + store) built from settings, cached on `app.state.auth`: lazily outside production; in production at startup, so a missing or invalid signing key (or a missing `KERP_REDIS_URL`) refuses the start (T-0342, `app/core/startup_safety.py`) |
 | `bearer.py` | `get_bearer`: verifies the `Authorization: Bearer` token once per request (no DB) |
@@ -26,7 +27,7 @@ rewritten (HS256 → RS256/EdDSA + JWKS + `jti` revocation in Redis).
 | `magic_link.py` | Magic links for Field Workers only (T-0057): `magic_link_eligible` (PER-14 via `load_grants`, plus registered providers), the eligibility extension point (`register_magic_link_eligibility`), `MagicLinkJob` (the post-response half of a request), refusal reason `magic_link_not_field_worker` |
 | `post_auth.py` | The post-authentication hook (T-0052): what a sign-in does with an `invite_token`. Empty by default; the module owning invites registers it (*Post-authentication hook*) |
 | `lockout.py` | `ProgressiveLockout` + policies, Redis-backed (T-0009); offline failures counted with `extra` (T-0038) |
-| `models.py` | `auth_user` table (tenant-level rows, RLS) — migration `0003`, internal staff flag + Entra link in `0013` (T-0049, ADR 0009); `auth_project_membership` (T-0010) — migration `0006`, persona CHECK widened for PER-16 in `0012` (T-0076), membership-based RLS in `0015` (T-0014), grant sources (`source_type`, `source_id`) in `0025` (T-0073, ADR 0008); `oe_identity_device` (T-0043) — migration `0016`, `wipe_secret_hash` in `0018` (T-0080), `pin_hash` + `pin_set_at` in `0019` (T-0038) |
+| `models.py` | `auth_user` table (tenant-level rows, RLS) — migration `0003`, internal staff flag + Entra link in `0013` (T-0049, ADR 0009); `auth_project_membership` (T-0010) — migration `0006`, persona CHECK widened for PER-16 in `0012` (T-0076), membership-based RLS in `0015` (T-0014), grant sources (`source_type`, `source_id`) in `0025` (T-0073, ADR 0008); `oe_identity_device` (T-0043) — migration `0016`, `wipe_secret_hash` in `0018` (T-0080), `pin_hash` + `pin_set_at` in `0019` (T-0038); `auth_impersonation_session` (T-0277) — migration `0039` |
 | `memberships.py` | The membership store's write side for **individual** (`direct`) rows (`project_grants`, `set_user_grants`, `revoke_project`; revoke = soft delete, re-grant revives) and the member list with sources (`project_member_grants`), used by the admin module (T-0014) and the projects module (creator PER-09, revoke on delete; T-0039) |
 | `team_grants.py` | Team-derived grants (T-0073, ADR 0008): `sync_team_link_grants`, `revoke_team_link_grants`, `team_link_grants` for the teams module, and the startup check (below) |
 | `access.py` | Persona matrix, capability tiers, SoD, scope resolution, `ProjectAccess` (`has`, `can_release_hold`) (T-0010); admin-grant lookup seam, `is_system_admin` binding, `CallerIsSystemAdmin`, `sod_warning` (T-0014); `system_admin` capabilities on every project, `system_admin_holders` (T-0275); `CallerAdminGrants` (the caller's own `system_admin` / `create_projects`, cached with the scope; T-0039) |
@@ -42,7 +43,8 @@ rewritten (HS256 → RS256/EdDSA + JWKS + `jti` revocation in Redis).
 | `GET /.well-known/jwks.json` | none | `{"keys": [...]}` public JWKs (active + retired), `Cache-Control: public, max-age=300` |
 | `POST /api/v1/auth/login` | none | `{email, password, invite_token?}` → `TokenResponse` (`no-store`) + refresh cookie (native app: token in the body); a `tenant_id` field is `422`; `429` when locked |
 | `POST /api/v1/auth/refresh` | refresh cookie + Origin (native app: `{refresh_token}` body) | new `TokenResponse` + cookie (rotation); `401 {code: PIN_REQUIRED}` for a session of a device with a PIN idle `KERP_PIN_IDLE_MINUTES` or longer (token not spent); `401` for ended sessions; a spent token: plain `401`, within 30 s of its use the session lives on, later the whole session is revoked (T-0345, *Tokens*); `403` cross-origin |
-| `POST /api/v1/auth/logout` | bearer | `204`; revokes the token and its whole login session; clears the refresh cookie |
+| `POST /api/v1/auth/logout` | bearer | `204`; revokes the token and its whole login session; clears the refresh cookie. With an impersonation token: ends the impersonation only (as `/impersonation/exit`); the cookie stays |
+| `POST /api/v1/auth/impersonation/exit` | impersonation token | `204`; revokes the impersonation token's `jti` and `sid`, ledgers `impersonation.ended` (`exit`) and queues the target's notice; `403 {code: NOT_IMPERSONATING}` for any other token (*Impersonation*) |
 | `GET /api/v1/auth/me` | bearer | `{id, tenant_id, email, display_name, is_internal}` (`is_internal` read-only, below) |
 | `GET /api/v1/auth/config` | none | `{password: {available: true}, sso: {provider: "entra", preferred: true, start_url} \| null}` (*Entra ID SSO*) |
 | `GET /api/v1/auth/sso/entra/start` | none | `?device_id&app_challenge` → `302` to the tenant's authorize endpoint + pre-auth cookie; `404` without SSO; `429` + `Retry-After` past the per-client limit (T-0345). An `invite_token` in the query is ignored (never in a URL) |
@@ -716,14 +718,18 @@ sign-in's own writes are committed before the hook runs) and the response carrie
 ## Tokens
 
 Claims: `iss`, `aud`, `sub` (user), `tid` (tenant), `sid` (login session), `jti`, `type`
-(`access`|`refresh`), `iat`, `nbf`, `exp`; `did` (the session's bound device, when known:
-T-0038) is optional. `auth_time` (the session's sign-in moment, fractional like `iat`) and
+(`access`|`refresh`|`impersonation`), `iat`, `nbf`, `exp`; `did` (the session's bound device,
+when known: T-0038) is optional; access tokens also carry `sxp`, the login session's end
+(T-0277). `auth_time` (the session's sign-in moment, fractional like `iat`) and
 `amr` (its sign-in method: `pwd`, `magic_link` or `sso`, with `pin` appended once the session
 has been renewed by PIN unlock) are set at every sign-in and copied unchanged by every
 rotation and unlock (T-0345); they are optional on verify, so tokens issued before T-0345
-keep working and simply never count as a fresh sign-in. Header: `kid` (RFC 7638 thumbprint), `alg`
-(`EdDSA` or `RS256`, from the key), `typ` (`at+jwt` for access tokens). Verification looks
+keep working and simply never count as a fresh sign-in. Impersonation tokens carry neither
+(an impersonation is never a fresh sign-in). Header: `kid` (RFC 7638 thumbprint), `alg`
+(`EdDSA` or `RS256`, from the key), `typ` (`at+jwt` for access tokens, `imp+jwt` for
+impersonation tokens). Verification looks
 the key up by `kid` and accepts only that key's algorithm (no `none`, no HS/RS confusion).
+An `imp+jwt` header is accepted only for the `impersonation` type and the other way round.
 
 - **Access**: 15 minutes (`KERP_ACCESS_TOKEN_MINUTES`, capped at 15).
 - **Refresh**: `KERP_REFRESH_TOKEN_HOURS` (default 12, TD-121), counted from sign-in.
@@ -785,6 +791,58 @@ configuration rules (it has no `A`); a `system_admin` is never site-filtered (`s
 is `None`). `project_access` stays pure: callers load the project under the session scope
 (`projects.service.bind_project`, `get_project`), so an unknown, deleted or other-tenant
 project is 404 before any 403.
+
+## Impersonation (T-0277, ADR 0015 option (a), diff §4.2 *Support impersonation*)
+
+A `system_admin` starts a time-boxed session as a non-admin user with `POST
+/api/v1/admin/users/{id}/impersonate` `{reason}` (admin module, `impersonation_router.py`;
+refusals: nested `403 IMPERSONATION_ACTION_FORBIDDEN`, non-admin `403`, oneself `422
+CANNOT_IMPERSONATE_SELF`, unknown `404`, deactivated `422 USER_DEACTIVATED`, a System admin
+`403 CANNOT_IMPERSONATE_SYSTEM_ADMIN`; `reason` 1-500 characters). Targets holding
+`create_projects` (§8) and PER-15 Client Representatives (§9, read-only) may be impersonated.
+
+- **Token.** `type: impersonation`, header `typ: imp+jwt`, the T-0008 key set: `sub` = the
+  target, `tid` = the admin's tenant, its own `sid` (= the `auth_impersonation_session` row id)
+  and `jti`, `imp` = the admin, `imp_sid` = the admin's login session. `exp` = now +
+  min(`impersonation_max_minutes` (registry, admin module, default 30, 5-60), the admin
+  session's end (`sxp` of the admin's access token)). No refresh token: `/auth/refresh`
+  verifies `type: refresh` only. No `did`: never bound to a device, `resolve_request_device`
+  is skipped (no device lookup, no `last_seen_at`), PIN unlock has no refresh token to work
+  with. The SPA keeps it in memory only.
+- **Every request** (`bearer.py`): refused (`401`) when its `jti` or `sid` is revoked, the
+  admin's `imp_sid` is revoked (admin logout, force sign-out, device revoke) or it expired.
+  `access.resolve_request_scope` re-checks, in the unit of work that loads the grants, that
+  the admin still holds `system_admin` and is active (bound to the admin, then rebound to the
+  target), and builds the **target's** scope: `app.current_user_id` = target, its
+  allowed/member/admin projects, its site filter, `app.is_system_admin` **false**. It stores an
+  `ImpersonationScope` on `request.state`; without it `get_current_user` refuses the token.
+- **Principal.** `user` / `user_id` are the target (so `created_by` / `updated_by` are the
+  target: option (a) attribution); `impersonator_user_id` is the admin;
+  `impersonation_read_only` is true when the target holds PER-15 on any project (computed per
+  request from the memberships loaded with the grants; enforced by the guardrail, T-0278).
+  `CallerAdminGrants` is empty while impersonating: the target's `create_projects` is not
+  usable (project creation answers `403`).
+- **End, exactly once** (`impersonation.end`: `UPDATE auth_impersonation_session SET ended_at
+  ... WHERE ended_at IS NULL`; only the matching caller writes): `exit` (`POST
+  /auth/impersonation/exit` or logout with the impersonation token; revokes `jti` and `sid`
+  for the token's remaining lifetime), `expired` (the first refused use after `exp`, or the
+  batch cron `impersonation_sweep`, every 5 minutes), `revoked` (the first refused use after
+  the admin's session was revoked, the admin lost `system_admin` or was deactivated; or the
+  sweep). The admin's own access token and refresh cookie are never touched, so the SPA
+  resumes the admin's session.
+- **Ledger** (tenant chain `admin-impersonation:<tenant>`): `impersonation.started` (session
+  id, admin, target, reason, client IP, user agent, `started_at`, `expires_at`, admin device)
+  and `impersonation.ended` (`reason: exit | expired | revoked`). Never the token.
+- **Target notice** (§10): the ending path queues one `auth.impersonation_ended` e-mail to the
+  target through `send_mail` in its own SAVEPOINT (sent after the commit on the interactive
+  queue): the admin's display name, start and end time (UTC) and that the actions were
+  recorded under the target's name and audited as impersonated. Never the reason, the token
+  or a link. A refused or failed send changes nothing else.
+- **No side effects on the target** (§7): no device touch, no `auth_user` write, no session
+  binding. Login telemetry and the session index (T-0243) and the last-used project (T-0042)
+  must skip impersonation principals (TD-578; the SPA side TD-579).
+- Not here: the central route guardrail (T-0278), `impersonated_by_user_id` on ledger entries
+  (hash v3, T-0279), the UI (T-0280).
 
 ## Personas, tiers and scope (T-0010)
 

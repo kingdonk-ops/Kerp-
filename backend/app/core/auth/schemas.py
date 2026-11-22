@@ -196,6 +196,54 @@ class TokenResponse(BaseModel):
     )
 
 
+ImpersonationRefusalCode = Literal[
+    "NOT_IMPERSONATING",
+    "IMPERSONATION_ACTION_FORBIDDEN",
+    "CANNOT_IMPERSONATE_SYSTEM_ADMIN",
+    "CANNOT_IMPERSONATE_SELF",
+    "USER_DEACTIVATED",
+]
+
+
+class ImpersonationRefusal(BaseModel):
+    """A refused impersonation request (T-0277, ADR 0015): ``403``
+    `IMPERSONATION_ACTION_FORBIDDEN` (the caller is itself impersonating),
+    `CANNOT_IMPERSONATE_SYSTEM_ADMIN`, `NOT_IMPERSONATING` (exit without an impersonation
+    token); ``422`` `CANNOT_IMPERSONATE_SELF`, `USER_DEACTIVATED`."""
+
+    detail: str
+    code: ImpersonationRefusalCode
+
+
+class ImpersonationStartRequest(BaseModel):
+    """Why the System admin impersonates the user: kept in the audit ledger, never e-mailed."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    reason: Annotated[str, Field(min_length=1, max_length=500)]
+
+    @field_validator("reason")
+    @classmethod
+    def _not_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("reason must not be blank")
+        return value.strip()
+
+
+class ImpersonationStarted(BaseModel):
+    """The impersonation token: send it as `Authorization: Bearer` while acting as the user.
+    Keep it in memory only (never storage, never offline). There is no refresh token: at
+    `expires_at`, or after `POST /api/v1/auth/impersonation/exit`, resume the own session."""
+
+    access_token: str
+    token_type: Literal["bearer"] = "bearer"
+    impersonation_session_id: uuid.UUID
+    expires_in: int = Field(description="Seconds until the impersonation ends by itself")
+    expires_at: datetime
+    target_user_id: uuid.UUID
+    target_display_name: str
+
+
 class MeResponse(BaseModel):
     id: uuid.UUID
     tenant_id: uuid.UUID

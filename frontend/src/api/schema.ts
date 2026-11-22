@@ -177,8 +177,33 @@ export interface paths {
         /**
          * Logout
          * @description Revoke this access token and every token of its login session; clear the cookie.
+         *
+         *     With an impersonation token it ends the impersonation only, like
+         *     `/impersonation/exit`: the refresh cookie is the admin's own session and stays.
          */
         post: operations["logout_api_v1_auth_logout_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/impersonation/exit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Exit Impersonation
+         * @description End the caller's impersonation (T-0277, ADR 0015 §3): its token and session are revoked
+         *     at once and the target is told by e-mail. The admin's own access token and refresh cookie
+         *     were never touched, so the SPA resumes the admin's session. Expiry needs no call.
+         */
+        post: operations["exit_impersonation_api_v1_auth_impersonation_exit_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2231,6 +2256,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/users/{user_id}/impersonate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Impersonate
+         * @description Act as `user_id` for a short, audited session (ADR 0015). The answer carries the
+         *     impersonation token; the caller's own access token and refresh cookie stay as they are.
+         *     The session ends at `expires_at`, on `POST /api/v1/auth/impersonation/exit`, when the
+         *     caller's own session ends or the caller loses `system_admin`; the user is then told by
+         *     e-mail.
+         */
+        post: operations["impersonate_api_v1_admin_users__user_id__impersonate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/access-requests": {
         parameters: {
             query?: never;
@@ -3292,6 +3341,68 @@ export interface components {
              * @description Configuration warnings, absent when there are none. `sso_acct_claim_missing`: an Entra ID SSO sign-in was refused in the last 24 h because the ID token had no `acct` claim (enable the optional claims `email`, `acct`, `xms_edov`)
              */
             warnings?: string[] | null;
+        };
+        /**
+         * ImpersonationRefusal
+         * @description A refused impersonation request (T-0277, ADR 0015): ``403``
+         *     `IMPERSONATION_ACTION_FORBIDDEN` (the caller is itself impersonating),
+         *     `CANNOT_IMPERSONATE_SYSTEM_ADMIN`, `NOT_IMPERSONATING` (exit without an impersonation
+         *     token); ``422`` `CANNOT_IMPERSONATE_SELF`, `USER_DEACTIVATED`.
+         */
+        ImpersonationRefusal: {
+            /** Detail */
+            detail: string;
+            /**
+             * Code
+             * @enum {string}
+             */
+            code: "NOT_IMPERSONATING" | "IMPERSONATION_ACTION_FORBIDDEN" | "CANNOT_IMPERSONATE_SYSTEM_ADMIN" | "CANNOT_IMPERSONATE_SELF" | "USER_DEACTIVATED";
+        };
+        /**
+         * ImpersonationStartRequest
+         * @description Why the System admin impersonates the user: kept in the audit ledger, never e-mailed.
+         */
+        ImpersonationStartRequest: {
+            /** Reason */
+            reason: string;
+        };
+        /**
+         * ImpersonationStarted
+         * @description The impersonation token: send it as `Authorization: Bearer` while acting as the user.
+         *     Keep it in memory only (never storage, never offline). There is no refresh token: at
+         *     `expires_at`, or after `POST /api/v1/auth/impersonation/exit`, resume the own session.
+         */
+        ImpersonationStarted: {
+            /** Access Token */
+            access_token: string;
+            /**
+             * Token Type
+             * @default bearer
+             * @constant
+             */
+            token_type: "bearer";
+            /**
+             * Impersonation Session Id
+             * Format: uuid
+             */
+            impersonation_session_id: string;
+            /**
+             * Expires In
+             * @description Seconds until the impersonation ends by itself
+             */
+            expires_in: number;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /**
+             * Target User Id
+             * Format: uuid
+             */
+            target_user_id: string;
+            /** Target Display Name */
+            target_display_name: string;
         };
         /**
          * InviteAcceptWithPassword
@@ -6132,6 +6243,33 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    exit_impersonation_api_v1_auth_impersonation_exit_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `code: NOT_IMPERSONATING`: the bearer is not an impersonation token */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImpersonationRefusal"];
+                };
             };
         };
     };
@@ -10696,6 +10834,57 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    impersonate_api_v1_admin_users__user_id__impersonate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImpersonationStartRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImpersonationStarted"];
+                };
+            };
+            /** @description Not a System admin (plain `detail`, no `code`); `IMPERSONATION_ACTION_FORBIDDEN`: the caller is impersonating; `CANNOT_IMPERSONATE_SYSTEM_ADMIN`: the target holds `system_admin` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImpersonationRefusal"];
+                };
+            };
+            /** @description No such user */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `CANNOT_IMPERSONATE_SELF`, `USER_DEACTIVATED`; or a validation error (blank or too long `reason`) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImpersonationRefusal"];
                 };
             };
         };

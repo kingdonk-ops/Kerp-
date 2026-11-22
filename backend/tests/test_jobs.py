@@ -929,11 +929,17 @@ def test_worker_builds_one_saq_worker_per_queue_with_its_concurrency(db: Databas
         ("t:batch", 1),
     ]
     # Both run job rows; the batch worker also runs the stuck-job sweep cron (T-0214), the
-    # hourly jobs (T-0215) and the queued-mail expiry (T-0346), the interactive one the
-    # outbound e-mail sends (T-0058).
+    # hourly jobs (T-0215), the queued-mail expiry (T-0346) and the impersonation sweep
+    # (T-0277), the interactive one the outbound e-mail sends (T-0058).
     assert [set(w.functions) for w in workers] == [
         {"kerp_run_job", "kerp_send_mail"},
-        {"kerp_run_job", "sweep_cron", "hourly_project_jobs", "expire_mail_cron"},
+        {
+            "kerp_run_job",
+            "sweep_cron",
+            "hourly_project_jobs",
+            "expire_mail_cron",
+            "impersonation_sweep",
+        },
     ]
     ctx: WorkerContext = {"worker": workers[0]}
     assert workers[0].startup is not None

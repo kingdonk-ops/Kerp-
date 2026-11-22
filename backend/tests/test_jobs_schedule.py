@@ -160,8 +160,14 @@ def test_the_batch_worker_runs_the_sweep_every_five_minutes(db: Database) -> Non
             (scheduler.sweep_cron, scheduler.SWEEP_CRON, scheduler.CRON_TIMEOUT_S),
             (scheduler.hourly_project_jobs, scheduler.HOURLY_CRON, scheduler.CRON_TIMEOUT_S),
             (scheduler.expire_mail_cron, scheduler.MAIL_EXPIRY_CRON, scheduler.CRON_TIMEOUT_S),
+            (
+                scheduler.impersonation_sweep,
+                scheduler.IMPERSONATION_CRON,
+                scheduler.CRON_TIMEOUT_S,
+            ),
         ],
     }
+    assert scheduler.IMPERSONATION_CRON == "*/5 * * * *"
     assert scheduler.SWEEP_CRON == "*/5 * * * *"
     ctx: Any = {}
     assert workers[1].startup is not None

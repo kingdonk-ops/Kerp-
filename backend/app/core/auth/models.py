@@ -242,3 +242,51 @@ class Device(Base, BaseRecordMixin):
     # PIN-gated. The failure counter is per device in the revocation store (``lockout.py``).
     pin_hash: Mapped[str | None] = mapped_column(String(PIN_HASH_LENGTH), nullable=True)
     pin_set_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+IMPERSONATION_TABLE: Final = "auth_impersonation_session"
+IMPERSONATION_OPEN_INDEX: Final = "ix_auth_impersonation_session_open"
+# Why an impersonation ended (T-0277, ADR 0015 §3): the exit endpoint (or logout with the
+# impersonation token), its expiry, or a revocation (the admin's session revoked, the admin's
+# ``system_admin`` grant removed or the admin deactivated).
+IMPERSONATION_END_REASONS: Final = ("exit", "expired", "revoked")
+
+
+class ImpersonationSession(Base, BaseRecordMixin):
+    """One impersonation session of a ``system_admin`` as another user (T-0277, ADR 0015).
+
+    ``id`` is the impersonation token's ``sid``. The row exists so an end is recorded exactly
+    once, whichever path sees it first (exit, the first refused use, the cron sweep): the
+    ``impersonation.ended`` ledger entry and the target's notice e-mail are written by the one
+    ``UPDATE ... WHERE ended_at IS NULL`` that wins. It holds no token, no reason text and no
+    client data: those (never the token) are in the ledger chain
+    ``admin-impersonation:<tenant>``. A tenant-level row under the standard policy; only
+    ``app.core.auth.impersonation`` reads or writes it.
+    """
+
+    __tablename__ = IMPERSONATION_TABLE
+    __table_args__ = (
+        CheckConstraint("project_id IS NULL", name="tenant_level"),
+        CheckConstraint(_in("end_reason", IMPERSONATION_END_REASONS), name="end_reason"),
+        CheckConstraint("(ended_at IS NULL) = (end_reason IS NULL)", name="ended"),
+        CheckConstraint("admin_user_id <> target_user_id", name="not_self"),
+        Index(
+            IMPERSONATION_OPEN_INDEX,
+            "tenant_id",
+            "expires_at",
+            postgresql_where=text("ended_at IS NULL"),
+            sqlite_where=text("ended_at IS NULL"),
+        ),
+    )
+
+    admin_user_id: Mapped[uuid.UUID] = mapped_column(
+        GUID(), ForeignKey(f"{TABLE}.id"), nullable=False
+    )
+    admin_session_id: Mapped[uuid.UUID] = mapped_column(GUID(), nullable=False)
+    target_user_id: Mapped[uuid.UUID] = mapped_column(
+        GUID(), ForeignKey(f"{TABLE}.id"), nullable=False, index=True
+    )
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    end_reason: Mapped[str | None] = mapped_column(String(16), nullable=True)

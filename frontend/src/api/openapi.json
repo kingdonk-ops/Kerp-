@@ -357,11 +357,41 @@
           "auth"
         ],
         "summary": "Logout",
-        "description": "Revoke this access token and every token of its login session; clear the cookie.",
+        "description": "Revoke this access token and every token of its login session; clear the cookie.\n\nWith an impersonation token it ends the impersonation only, like\n`/impersonation/exit`: the refresh cookie is the admin's own session and stays.",
         "operationId": "logout_api_v1_auth_logout_post",
         "responses": {
           "204": {
             "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/impersonation/exit": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Exit Impersonation",
+        "description": "End the caller's impersonation (T-0277, ADR 0015 §3): its token and session are revoked\nat once and the target is told by e-mail. The admin's own access token and refresh cookie\nwere never touched, so the SPA resumes the admin's session. Expiry needs no call.",
+        "operationId": "exit_impersonation_api_v1_auth_impersonation_exit_post",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "403": {
+            "description": "`code: NOT_IMPERSONATING`: the bearer is not an impersonation token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImpersonationRefusal"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -8119,6 +8149,79 @@
         }
       }
     },
+    "/api/v1/admin/users/{user_id}/impersonate": {
+      "post": {
+        "tags": [
+          "admin",
+          "admin"
+        ],
+        "summary": "Impersonate",
+        "description": "Act as `user_id` for a short, audited session (ADR 0015). The answer carries the\nimpersonation token; the caller's own access token and refresh cookie stay as they are.\nThe session ends at `expires_at`, on `POST /api/v1/auth/impersonation/exit`, when the\ncaller's own session ends or the caller loses `system_admin`; the user is then told by\ne-mail.",
+        "operationId": "impersonate_api_v1_admin_users__user_id__impersonate_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "User Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImpersonationStartRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImpersonationStarted"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not a System admin (plain `detail`, no `code`); `IMPERSONATION_ACTION_FORBIDDEN`: the caller is impersonating; `CANNOT_IMPERSONATE_SYSTEM_ADMIN`: the target holds `system_admin`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImpersonationRefusal"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such user"
+          },
+          "422": {
+            "description": "`CANNOT_IMPERSONATE_SELF`, `USER_DEACTIVATED`; or a validation error (blank or too long `reason`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImpersonationRefusal"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/access-requests": {
       "post": {
         "tags": [
@@ -10725,6 +10828,98 @@
           "version"
         ],
         "title": "HealthResponse"
+      },
+      "ImpersonationRefusal": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "code": {
+            "type": "string",
+            "enum": [
+              "NOT_IMPERSONATING",
+              "IMPERSONATION_ACTION_FORBIDDEN",
+              "CANNOT_IMPERSONATE_SYSTEM_ADMIN",
+              "CANNOT_IMPERSONATE_SELF",
+              "USER_DEACTIVATED"
+            ],
+            "title": "Code"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail",
+          "code"
+        ],
+        "title": "ImpersonationRefusal",
+        "description": "A refused impersonation request (T-0277, ADR 0015): ``403``\n`IMPERSONATION_ACTION_FORBIDDEN` (the caller is itself impersonating),\n`CANNOT_IMPERSONATE_SYSTEM_ADMIN`, `NOT_IMPERSONATING` (exit without an impersonation\ntoken); ``422`` `CANNOT_IMPERSONATE_SELF`, `USER_DEACTIVATED`."
+      },
+      "ImpersonationStartRequest": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "reason"
+        ],
+        "title": "ImpersonationStartRequest",
+        "description": "Why the System admin impersonates the user: kept in the audit ledger, never e-mailed."
+      },
+      "ImpersonationStarted": {
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "title": "Access Token"
+          },
+          "token_type": {
+            "type": "string",
+            "const": "bearer",
+            "title": "Token Type",
+            "default": "bearer"
+          },
+          "impersonation_session_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Impersonation Session Id"
+          },
+          "expires_in": {
+            "type": "integer",
+            "title": "Expires In",
+            "description": "Seconds until the impersonation ends by itself"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          },
+          "target_user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Target User Id"
+          },
+          "target_display_name": {
+            "type": "string",
+            "title": "Target Display Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "access_token",
+          "impersonation_session_id",
+          "expires_in",
+          "expires_at",
+          "target_user_id",
+          "target_display_name"
+        ],
+        "title": "ImpersonationStarted",
+        "description": "The impersonation token: send it as `Authorization: Bearer` while acting as the user.\nKeep it in memory only (never storage, never offline). There is no refresh token: at\n`expires_at`, or after `POST /api/v1/auth/impersonation/exit`, resume the own session."
       },
       "InviteAcceptWithPassword": {
         "properties": {

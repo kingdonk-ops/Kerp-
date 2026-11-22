@@ -150,6 +150,11 @@ own-rows clauses let it read the caller's memberships and grants without dependi
 decides (TD-152). Seeds, scripts and provisioning jobs that need every project row bind
 `TenancyContext(tenant_id, is_system_admin=True)` explicitly.
 
+An impersonation token (T-0277, ADR 0015) binds every setting above from the **target**
+(`sub`): its memberships, `app.current_user_id` = the target, and `app.is_system_admin` unset
+(false) whatever the impersonating admin holds; the target's view is a subset of the admin's
+own (`app/core/auth/README.md` *Impersonation*).
+
 ## Tenants directory (T-0079, ADR 0011)
 
 `tenants` (`models.py`, `Tenant`) is the directory every `tenant_id` references: the FK is

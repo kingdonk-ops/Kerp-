@@ -87,6 +87,10 @@ def get_tenancy_context(
     ``system_admin`` flag from the admin grants table (T-0014); nothing in the request can
     widen them. The write project is not bound yet (TD-122). Tests
     override this through ``app.dependency_overrides``.
+
+    An impersonation token (T-0277, ADR 0015) binds the *target's* scope with
+    ``is_system_admin`` false, after re-checking its admin; a refused one leaves the session
+    unbound.
     """
     claims = bearer.claims
     if claims is None:
@@ -96,6 +100,13 @@ def get_tenancy_context(
     if database is None:
         return base
     # Imported here: app.core.auth.access needs app.core.db, which imports this module.
-    from app.core.auth.access import resolve_request_scope
+    from app.core.auth.access import ImpersonationRefusedError, resolve_request_scope
 
-    return resolve_request_scope(database, base, state=request.state)
+    impersonation = claims if claims.is_impersonation else None
+    try:
+        return resolve_request_scope(
+            database, base, state=request.state, impersonation=impersonation
+        )
+    except ImpersonationRefusedError:
+        # Unbound (RLS shows nothing); ``deps.get_current_user`` answers 401 (T-0277).
+        return None

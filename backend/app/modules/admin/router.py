@@ -34,6 +34,9 @@ bound with, loaded from the grants table at authentication, never from the reque
 * Legal hold (``system_projects_router.py``, T-0223): ``PUT
   /system/projects/{p}/legal-hold``, ``system_admin`` only (403 for everyone else, PER-09
   included).
+* Impersonation (``impersonation_router.py``, T-0277, ADR 0015): ``POST
+  /users/{id}/impersonate`` ``{reason}``, ``system_admin`` only; refusals with a ``code``
+  (no nesting, no System admin targets, not oneself, not deactivated users).
 
 No endpoint takes or returns a tenant id. Tenant-level grants are not personas: they are
 never assignable through the membership endpoints.
@@ -67,6 +70,7 @@ from app.core.auth.runtime import AuthRuntime, get_auth_runtime
 from app.core.db import DbSession
 from app.modules.admin import service
 from app.modules.admin.audit_router import router as audit_router
+from app.modules.admin.impersonation_router import router as impersonation_router
 from app.modules.admin.invites_router import router as invites_router
 from app.modules.admin.schemas import (
     AdminGranted,
@@ -413,3 +417,7 @@ router.include_router(stats_router)
 # --- System console: legal hold (T-0223): ``system_projects_router.py`` ----------------------
 
 router.include_router(system_projects_router)
+
+# --- System admin impersonation (T-0277, ADR 0015): ``impersonation_router.py`` ---------------
+
+router.include_router(impersonation_router)
