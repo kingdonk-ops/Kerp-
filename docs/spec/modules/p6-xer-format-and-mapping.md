@@ -31,9 +31,9 @@ ERMHDR <TAB> 24.12 <TAB> 2026-06-04 <TAB> Project <TAB> <login> <TAB> <user name
 
 | Element | Rule |
 |---|---|
-| Header | First line, tag `ERMHDR`. Fields in order: export version, export date, export type (`Project`), login, user name, database, module, base currency. Version and export date are stored on `oe_p6_import`. Login and user name are personal data. They are **not** stored: only the fact that they were present. |
+| Header | First line, tag `ERMHDR`. Fields in order: export version, export date, export type (`Project`), login, user name, database, module, base currency. Version and export date are stored on `oe_p6_import` as `xer_version` and `xer_exported_on`. Login and user name are personal data. They are **not** stored: only the fact that they were present. |
 | Line ending | CRLF in the observed file. Accept CRLF and LF. |
-| Encoding | Windows-1252 in the observed file (`£`, `¥`, `€` currency symbols). Rule: a UTF-8 BOM, or strict UTF-8 decoding of the whole file succeeding → UTF-8. Otherwise cp1252 with replacement. Record the detected encoding and the count of replacement characters (warning if > 0). |
+| Encoding | Windows-1252 in the observed file (`£`, `¥`, `€` currency symbols). Rule: a UTF-8 BOM, or strict UTF-8 decoding of the whole stored file succeeding → UTF-8. This check is a cheap first pass over the bytes before the streaming parse, which then decodes line by line. Otherwise cp1252 with replacement. Record the detected encoding and the count of replacement characters (warning if > 0). |
 | Empty value | Empty string = `NULL`. |
 | Quotes | No CSV quoting. A literal `"` inside a value is written doubled (`""`). Evidence: an HTML memo whose DOCTYPE reads `""-//W3C//DTD HTML…` and a UDF value `Changed from ""C"" to ""G""`. The parser decodes `""` → `"`. |
 | Embedded line breaks | Multi-line values (memos, calendar data, OBS description) use `0x7F` as the line separator. The parser maps `0x7F` → `\n` in memo and description text. It keeps calendar data byte-exact (§4.4). |
@@ -44,9 +44,12 @@ ERMHDR <TAB> 24.12 <TAB> 2026-06-04 <TAB> Project <TAB> <login> <TAB> <user name
 | End marker | `%E`. A missing end marker means the file is truncated. That is an error and nothing is staged. |
 
 A file can contain **several projects** (several `PROJECT` rows, child rows tagged with
-`proj_id`). The observed file has one. When there are several, the upload preview lists them
-(`proj_short_name`, `name` of the root WBS, activity count) and the planner picks one. Only
-that project's rows are staged.
+`proj_id`). The observed file has one. When there are several, the parse stops after a
+pre-scan in status **`awaiting_project_choice`**: `summary.projects` lists each one
+(`proj_short_name`, `guid`, root WBS name, activity count). The planner picks one with
+`POST …/imports/{id}/select-project` (`source_project_guid`). Only then are that project's rows
+staged, and the import moves on to `parsed` (P6 spec §4, §10). A single-project file skips
+this step.
 
 ---
 
@@ -62,8 +65,12 @@ that project's rows are staged.
 - **Columns by name, never by position.** P6 versions add, drop and reorder columns. A missing
   *required* column (marked **R** in §4) is an error naming table + column. A missing optional
   column is `NULL`.
-- **Row width.** More values than `%F` columns → error for that row (row skipped, import
-  `failed` if the row is required). Fewer values → missing trailing values are `NULL`.
+- **Row width.** More values than `%F` columns makes the row malformed. Fewer values are fine:
+  the missing trailing values are `NULL`.
+- **Fatal tables.** `PROJECT`, `PROJWBS`, `TASK` and `TASKPRED` are fatal tables. A malformed row
+  in one of them fails the import (`failed`, nothing staged). Malformed means too many values, an
+  empty required (**R**) value, or an unparsable date or number in a required column. In every
+  other table a malformed row is dropped with a warning.
 - **Limits (configurable, tenant setting, defaults):** file ≤ 100 MB; line ≤ 4 MB (calendar and
   memo blobs are long); ≤ 500,000 rows in total. Exceeding a limit fails the parse with a clear
   message. The observed 5.5 MB file has 14,384 lines; its longest values are calendar blobs.
@@ -75,7 +82,7 @@ that project's rows are staged.
   - `TASK.wbs_id` not in `PROJWBS` → activity staged with `wbs_id = NULL`. It is shown on the
     unmatched list.
   - `TASKPRED` endpoint not in the file, or `pred_proj_id ≠ proj_id` → stored as an *external*
-    relationship (`external_pred_task_ref`). It is not linked.
+    relationship (`is_external = true`, `external_pred_task_code`). It is not linked.
   - `TASKACTV`/`UDFVALUE`/`TASKRSRC` pointing at an unknown task, code, UDF type or resource →
     row dropped with a warning.
   - `TASK.clndr_id` not in `CALENDAR` → calendar `NULL`. Days-based display falls back to the
@@ -98,7 +105,7 @@ P6 writes dates without an offset. They are wall-clock times on the activity's c
 (06:00 shift start, 17:30 finish). **Default (TD-611, user to confirm):**
 
 - Stored as `timestamp without time zone` columns suffixed `_local`. They are interpreted in the
-  project's `site_timezone` (projects spec §1.2), and never converted at import.
+  project's `site_timezone` (projects table, master spec §4.1). They are never converted at import.
 - Anything that needs an instant (calendar views, readiness checks, due-date comparisons) does
   the conversion with `site_timezone` at read time. A daylight-saving shift never moves a 06:00
   shift start.
@@ -114,8 +121,10 @@ activity's calendar hours per day (`day_hr_cnt`) on the version row. Days for di
 question: both are available, hours are the stored truth.
 
 ### 3.3 Quantities
-`TASKRSRC` quantities are resource units in the resource's unit (labour = hours). They are
-mirrored as numbers with the resource's `cost_qty_type`. Costs are never mirrored (§4.6).
+`TASKRSRC` quantities are in the resource's unit. Labour is in hours. For material resources the
+unit comes from `RSRC.unit_id` → `UMEASURE.unit_abbrev`. Quantities are mirrored as numbers with
+that unit. `RSRC.cost_qty_type` is the time basis of the price, not a unit; it is ignored like
+every other cost field. Costs are never mirrored (§4.6).
 
 ---
 
@@ -159,7 +168,7 @@ All other `PROJECT` columns (≈ 60: earned-value defaults, numbering, flags) ar
 
 | XER column | Target | Notes |
 |---|---|---|
-| `wbs_id` **R** | (file key) | Resolves `parent_wbs_id` and `TASK.wbs_id` |
+| `wbs_id` **R** | (file key) | Resolves `parent_wbs_id` and `TASK.wbs_id` within the file only |
 | `guid` | `external_id` | Persistent identity. Fallback when absent: the `short_name` path from the root. |
 | `parent_wbs_id` **R** | `parent_id`, `tree_path ltree` | The project node (`proj_node_flag = Y`) is the root. Its own parent points outside the file (to the EPS) and is ignored. |
 | `wbs_short_name` **R** | `short_name` | Not unique (29 distinct across 135 nodes): only the path is. |
@@ -167,6 +176,13 @@ All other `PROJECT` columns (≈ 60: earned-value defaults, numbering, flags) ar
 | `seq_num` | `sort_order` | Sibling order |
 | `proj_node_flag` | `is_project_node` | |
 | `status_code` | `status` | `WS_Open` / `WS_Whatif` / `WS_Closed` |
+
+`oe_p6_wbs` is a **persistent identity**, like `oe_p6_activity`. Its key is `external_id`: the
+`guid`, or when that is absent the short-name path from the root. Parse writes `oe_p6_wbs_stage`
+rows (`import_id`, `external_id`, `parent_external_id`, `short_name`, `name`, `sort_order`,
+`source_line`). Commit then upserts the identities and updates name, parent and order. Identities
+missing from the file are marked `removed_from_schedule` and never deleted. Version rows store
+`wbs_external_id`, so `wbs_moved` (P6 spec §6) compares external ids, never row ids.
 
 Observed: depth up to 7 below the project node. Activities sit at depths 3–7, and 5 summary
 nodes carry activities directly (allowed). Earned-value and cost columns are ignored.
@@ -186,8 +202,10 @@ more than one WBS node. The WBS stays a schedule mirror (P6 spec §2, ADR 0003).
 | `day_hr_cnt`, `week_hr_cnt`, `month_hr_cnt`, `year_hr_cnt` | same names | Day hours drive the days display (§3.2) |
 | `clndr_data` | `raw_data text` | Kept byte-exact. It is a nested `(0||…()(…))` structure: weekday work periods `(s|06:00|f|12:00)` plus exceptions, `0x7F` separated. **Interpreting it (working-day maths, look-ahead in working days) is later (TD-613).** |
 
-Identity of a calendar across imports: `(name, calendar_type)`. Calendars are written per import
-(snapshot) because they are small.
+Calendars have **no identity across imports**. Names repeat (76 distinct of 77), so a name is
+never a key. Rows are per import and keyed `(import_id, source_clndr_id)`. A version row references
+its import's calendar row and also copies `calendar_day_hours`, so float in days never needs a
+cross-import lookup.
 
 ### 4.5 `TASK` → `oe_p6_activity` + `oe_p6_activity_version`
 
@@ -201,7 +219,7 @@ Identity of a calendar across imports: `(name, calendar_type)`. Calendars are wr
 | `task_name` **R** | `name` (raw) | Fed to the `p6_grammar` rules (§5). Not unique: 27 names repeat. |
 | `wbs_id` **R** | `wbs_id` | via §4.3 |
 | `clndr_id` | `calendar_id`, plus `calendar_day_hours` | §3.2 |
-| `task_type` **R** | `task_type` | `TT_Task` → `task`, `TT_Rsrc` → `resource_dependent`, `TT_Mile` → `start_milestone`, `TT_FinMile` → `finish_milestone`, `TT_LOE` → `level_of_effort`, `TT_WBS` → `wbs_summary`. Observed: 2,964 / 1 / 16 / 6 / 0 / 0. |
+| `task_type` **R** | `task_type` (mapped; the value eligibility rules see, P6 spec §5.3) | `TT_Task` → `task`, `TT_Rsrc` → `resource_dependent`, `TT_Mile` → `start_milestone`, `TT_FinMile` → `finish_milestone`, `TT_LOE` → `level_of_effort`, `TT_WBS` → `wbs_summary`. Observed: 2,964 / 1 / 16 / 6 / 0 / 0. |
 | `status_code` **R** | `status` | `TK_NotStart` → `not_started`, `TK_Active` → `in_progress`, `TK_Complete` → `complete`. Mirror only: it never drives KERP state (P6 spec §6). |
 | `duration_type` | `duration_type` | Kept raw (`DT_FixedDrtn`, `DT_FixedQty`, …) |
 | `phys_complete_pct` | `physical_pct_complete` | P6's own % (mirror). KERP's earned progress is separate (E-04-03). |
@@ -256,7 +274,7 @@ on every touch without a schedule change).
 | `task_id` **R**, `pred_task_id` **R** | `succ_activity_id`, `pred_activity_id` | Resolved through `task_code` at commit |
 | `pred_type` **R** | `type` | `PR_FS`/`PR_FF`/`PR_SS`/`PR_SF` → `FS`/`FF`/`SS`/`SF`. Observed 3,456 / 212 / 130 / 11. |
 | `lag_hr_cnt` | `lag_hours` | May be **negative** (lead): 11 observed |
-| `pred_proj_id` | `is_external` | ≠ `proj_id` → external (§2) |
+| `pred_proj_id` | `is_external` | ≠ `proj_id` → external (§2); the predecessor's `task_code` then goes in `external_pred_task_code` and `pred_activity_id` stays `NULL` |
 | `aref`, `arls` | — | Computed relationship dates, recomputed by P6. Ignored. |
 | `comments` | `comments` | |
 
@@ -276,10 +294,18 @@ Relationships are per import (no identity across imports). The change report com
 - `UDFTYPE` → `oe_p6_udf_type` (`label`, `table_name`, `logical_data_type`). Only
   `table_name = TASK` is interpreted for now; `PROJWBS`/`RSRC` UDFs are counted and ignored.
 - `UDFVALUE` (`fk_id` = `task_id`) → version row `udfs jsonb` = `{"<label>": value}`, typed by
-  `logical_data_type`: `FT_TEXT` → `udf_text`, `FT_INT`/`FT_FLOAT_2_DECIMALS`/`FT_MONEY` →
-  `udf_number`, `FT_START_DATE`/`FT_END_DATE`/`FT_STATICTYPE` date → `udf_date`,
-  `FT_INDICATOR` → `udf_code_id`/text. **`FT_MONEY` UDFs are dropped**: money is never mirrored
-  from P6. Observed: labels `Comment` and `Notes`; values `New` (1,222), `Secondary` (125) and
+  `logical_data_type`:
+
+  | Logical type | Read from |
+  |---|---|
+  | `FT_TEXT` | `udf_text` |
+  | `FT_INT`, `FT_FLOAT_2_DECIMALS` | `udf_number` |
+  | `FT_START_DATE`, `FT_END_DATE` | `udf_date` |
+  | `FT_STATICTYPE` (indicator) | `udf_code_id`, stored as the indicator name |
+  | `FT_MONEY` | **dropped**: money is never mirrored from P6 |
+
+  Verify the list against the P6 data dictionary of the export version during T-0352; unknown
+  types are kept as text with a warning. Observed: labels `Comment` and `Notes`; values `New` (1,222), `Secondary` (125) and
   one `Changed from "C" to "G"`. The P6 spec §6 shows these revision notes on the change report.
 - Mapping a code or UDF to a node attribute (for example the status code → `work_window` /
   `hold_priority`) is a **mapping-profile field map** (P6 spec §5), not parser logic.
@@ -293,7 +319,7 @@ scaffolder, mechanical, civil) under a parent hierarchy.
 
 | XER | Target | Columns kept |
 |---|---|---|
-| `RSRC` | `oe_p6_resource` (identity `(project_id, short_name)`, `p6_guid`) | `rsrc_short_name` **R**, `rsrc_name`, `parent_rsrc_id` → `parent_id`, `rsrc_type` (`RT_Labor`/`RT_Equip`/`RT_Mat`), `clndr_id`, `active_flag`, `def_qty_per_hr`, `cost_qty_type` (unit). **Not kept:** `email_addr`, `employee_code`, phone numbers (personal data), `curr_id`, `ot_*`. |
+| `RSRC` | `oe_p6_resource` (identity `(project_id, short_name)`, `p6_guid`) | `rsrc_short_name` **R**, `rsrc_name`, `parent_rsrc_id` → `parent_id`, `rsrc_type` (`RT_Labor`/`RT_Equip`/`RT_Mat`), `clndr_id`, `active_flag`, `def_qty_per_hr`, `unit_id` → `UMEASURE.unit_abbrev` (`unit`). **Not kept:** `email_addr`, `employee_code`, phone numbers (personal data), `curr_id`, `ot_*`. |
 | `TASKRSRC` | `oe_p6_resource_assignment` (per import, keyed `(task_code, resource short_name)`) | `target_qty`, `remain_qty`, `act_reg_qty` + `act_ot_qty` → `actual_qty`, `target_qty_per_hr`, `remain_qty_per_hr`, `target_start/end_date`, `restart/reend_date` (`_local`), `role_id`. **Not kept:** every `*cost*`, `cost_per_qty*`, `rate_type`, `acct_id`. |
 
 An activity may have several assignments (9 observed with two). `RSRCRATE`, `CURRTYPE` and
@@ -305,9 +331,10 @@ the ERP).
 | Tables | Why |
 |---|---|
 | `CURRTYPE`, `RSRCRATE`, `FINTMPL`, `ACCOUNT`, `PROJCOST`, `COSTTYPE`, `TASKFIN`, `TRSRCFIN`, `PROJFUND`, `BUDGCHNG` | Money: never from P6 |
+| `UMEASURE` | Read only to resolve a resource's unit (§3.3) |
 | `WBSMEMO`, `TASKMEMO`, `MEMOTYPE` | HTML notebook text. Not imported now. If a later feature needs it, sanitise HTML to text, never render raw. Counted in the summary. |
 | `OBS`, `USERS`, `RSRCROLE`, `ROLES`, `ROLERATE`, `PROJPCAT`, `PCATTYPE`, `PCATVAL`, `RCATTYPE`, `RCATVAL`, `RSRCRCAT` | Organisation and personnel structures; KERP has its own (teams, ADR 0008) |
-| `TASKPROC` (activity steps), `TASKNOTE`, `ISSUHIST`, `PROJISSU`, `PROJTHRS`, `RISKTYPE`, `SHIFT`, `SHIFTPER`, `UMEASURE`, `NONWORK`, `PHASE`, `PROJEST`, `DOCUMENT`, `TASKDOC` | Not needed by the Phase 1 mapping; recoverable from the original |
+| `TASKPROC` (activity steps), `TASKNOTE`, `ISSUHIST`, `PROJISSU`, `PROJTHRS`, `RISKTYPE`, `SHIFT`, `SHIFTPER`, `NONWORK`, `PHASE`, `PROJEST`, `DOCUMENT`, `TASKDOC` | Not needed by the Phase 1 mapping; recoverable from the original |
 
 ---
 
@@ -321,10 +348,11 @@ This section refines P6 spec §5.1 with the measured corpus. The grammar itself 
 | Shape of `task_name` | Count | Example (synthetic) |
 |---|---|---|
 | `<asset> / <type> / <code>` with code `9`, `9.9`, `9-9`, `9.9-9`, optional ` Online`/` Shut` | **2,867** | `CV-12 / SCA Erect / 512.1-16` |
-| code list with spaced dashes | 48 | `CV-12 / WFE / 902 - 903 - 904` |
+| …of which two codes of equal length joined by a bare dash | 14 | `CV-12 / SCA Dism / 914-915` |
+| code list or range with spaced dashes | 48 | `CV-12 / WFE / 902 - 903 - 904`, `728 - 732` |
 | code plus a qualifier word | 27 | `CV-12 / B / 305 OHP`, `305 - Access`, `305-North`, `305 Props` |
-| unspaced chain of three or more numbers | 10 | `CV-12 / P / 410-2-3` |
-| three segments, no code | 8 | `CV-12 / Custom / Painters` |
+| bare-dash run of three or more codes | 10 | `CV-12 / SCA Erect / 804-805-806` (all 10 observed are full codes) |
+| three segments, no code | 8 | `CV-12 / Prov Sums / Painters` |
 | no ` / ` at all | 27 | `Contract award` (22 milestones, 4 tasks, 1 resource-dependent) |
 
 The shipped default regex in P6 spec §5.1 matches 2,867 of 2,960 three-segment names
@@ -341,32 +369,78 @@ Other findings:
   SCA Dism 361, W 249, CP 189, SR 119, BN 119, G 64, GR/HDNR1/HDNR2 21 each, Custom 18,
   HDBN 17, C 14, Prov Sums 9.
 
-### 5.2 Shipped default `p6_grammar` rules (default pending TD-612)
+### 5.2 Shipped default `p6_grammar` rules (user decisions 2026-11-23, TD-612)
 
-Tried in `sort_order`. The first match wins. RE2 named groups:
+The rules are tried in `sort_order` and the first match wins. They use RE2 named groups. One
+qualifier fragment is shared by all three rules: it accepts letters after a space or a dash. A
+project may narrow it to a word list through a rule parameter. A qualifier never touches the
+digits of the code.
 
-1. **Single code** (P6 spec §5.1), extended with an optional `qualifier` group. The qualifier
-   vocabulary is a rule parameter (default `OHP`, `Access`, `Props`, `North`,
-   `Water Diversion`). It is stored on the link as `qualifier`; the node is the same node as
-   without it.
+```
+QUALIFIER = (?:(?: - |-| )(?P<qualifier>[A-Za-z][A-Za-z .]*?))?
+```
+
+1. **Single code** (P6 spec §5.1) with an optional `qualifier`.
    ```
-   ^(?P<asset>.+?) / (?P<activity_type>[^/]+?) / (?P<anchor_code>\d+(?:\.\d+)?)(?:-(?P<suffix>\d+))?(?: (?P<window>Online|Shut))?(?:\s*-?\s*(?P<qualifier>OHP|Access|Props|North|Water Diversion))?$
+   ^(?P<asset>.+?) / (?P<activity_type>[^/]+?) / (?P<anchor_code>\d+(?:\.\d+)?)(?:-(?P<suffix>\d+))?(?: (?P<window>Online|Shut))?QUALIFIER$
    ```
-2. **Code list.** RE2 cannot capture repeats, so the whole list is one group. The mapper splits
-   it on the rule parameter `list_separator` (default `" - "`). Each element becomes its own
-   work-anchor node and its own `oe_p6_anchor_link` with `relationship_type = shared` and
-   `allocation_pct = NULL`. **Listed codes only: a list is never expanded as a range**
-   (`728 - 732` links 728 and 732, not 729–731).
+   - A suffix shorter than the code stays a suffix (TD-076): `900-16` and `913.1-16` are their own
+     work-anchor nodes.
+   - A suffix as long as the code names a **second code**: `914-915` is RSWs 914 and 915.
+2. **Spaced list or range.** RE2 cannot capture repeats, so the whole run is one group
+   (`anchor_list`). The mapper splits it on the rule parameter `list_separator` (default `" - "`).
+   - **Two whole numbers joined by the separator are a range** (user, 2026-11-23): `728 - 732` is
+     728, 729, 730, 731 and 732.
+   - A range is capped by `max_range` (default 50). A longer or backwards pair is taken as listed.
+   - Decimals are always listed: `410.2 - 410.5` is two codes.
    ```
-   ^(?P<asset>.+?) / (?P<activity_type>[^/]+?) / (?P<anchor_list>\d+(?:\.\d+)?(?: - \d+(?:\.\d+)?)+)(?: (?P<window>Online|Shut))?(?:\s*-?\s*(?P<qualifier>OHP|Access|Props))?$
+   ^(?P<asset>.+?) / (?P<activity_type>[^/]+?) / (?P<anchor_list>\d+(?:\.\d+)?(?: - \d+(?:\.\d+)?)+)(?: (?P<window>Online|Shut))?QUALIFIER$
    ```
-3. Everything else (unspaced chains, no code, no separators) → **Unmatched-Row Linking Screen**
+3. **Bare-dash run of three or more codes** (`anchor_chain`, user, 2026-11-23).
+   - Every later part as long as the first → full codes: `804-805-806` is 804, 805 and 806, and
+     `909-910-911-914` is 909, 910, 911 and 914.
+   - Later parts shorter than the first → numbered items of the first: `410-2-3` is 410, 410.2 and
+     410.3.
+   - Gaps are never filled. A 410.1 that another contractor did, or that was found not to be
+     needed, is simply not named.
+   - Any other shape (a later part longer than the first, a decimal first part) falls through to
+     manual linking.
+   ```
+   ^(?P<asset>.+?) / (?P<activity_type>[^/]+?) / (?P<anchor_chain>\d+(?:-\d+){2,})(?: (?P<window>Online|Shut))?QUALIFIER$
+   ```
+4. Everything else (no code, no separators, unclear runs) → **Unmatched-Row Linking Screen**
    (T-0105). Never guessed.
 
-With these defaults the observed corpus would map ≈ 2,940 activities by rule and leave
-≈ 45 for manual linking (27 unsegmented, mostly milestones that are ineligible anyway; 10
-chains; 8 without a code). The exact figures are a fixture assertion on the synthetic corpus,
-not on the client file.
+**Several codes in one activity.** Each code becomes its own work-anchor node and its own
+`oe_p6_anchor_link`, with `relationship_type = shared` and `allocation_pct = NULL`.
+
+**Qualifiers** (`OHP`, `Access`, `Props`, `North`, `Water Diversion`) are notes (user,
+2026-11-23).
+- They are stored on the link as `qualifier` and resolve to the same node as the code without
+  them.
+- They usually mark part of an RSW done separately: waiting on safe access, a scaffold, or
+  equipment being shut down.
+- Several activities on one RSW, one per part or visit, are normal: the link is many-to-many.
+
+**Provisional sums named without a code** (`Prov Sums / Painters`) never reach the activity-type
+eligibility rule, because nothing parsed. A shipped `p6_eligibility` rule therefore also takes
+`name` containing `Prov Sums` / `Prov.Sums` out of scope.
+
+**Breakdown levels from the WBS** (user, 2026-11-23: "custom for each project"). The mapping
+profile may map a WBS depth to a breakdown level, for example WBS level 3 → Site and level 4 →
+Area (1 = the first level under the project node). The value is the WBS name or code, and
+missing nodes are created like the asset ones. This mapping only places new nodes: the WBS is
+still never the asset tree (§4.3). Other projects may need none, or other depths.
+
+Measured on the observed corpus with these defaults (rules only):
+
+| Outcome | Activities |
+|---|---|
+| Mapped by rule | 2,923 |
+| Out of scope (milestones, provisional sums, custom) | 59 |
+| Left for manual linking (general activities such as mobilisation and demobilisation) | 5 |
+
+The exact figures are fixture assertions on the synthetic corpus, not on the client file.
 
 ---
 
@@ -377,15 +451,19 @@ else points to them yet:
 
 - `oe_p6_activity_version` rows with `external_activity_id` (= `task_code`) and
   `activity_id = NULL` until commit;
-- `oe_p6_wbs` snapshot rows, `oe_p6_calendar`, `oe_p6_code_type`/`_value`, `oe_p6_udf_type`,
+- `oe_p6_wbs_stage` rows (§4.3), per-import `oe_p6_calendar` rows (§4.4), `oe_p6_code_type`/`_value`, `oe_p6_udf_type`,
   `oe_p6_resource` candidates and `oe_p6_resource_assignment`, `oe_p6_relationship`;
 - the grammar result per version row (`parsed jsonb`: matched rule id and groups, or
   `unmatched` with the reason).
 
-Commit (P6 spec §6) creates or updates `oe_p6_activity` identities, sets `activity_id` and
-`current_version_id`, and ensures placeholders and links. Discard marks the import `discarded`.
-A discarded import's staging rows are purged after 30 days. They are the only P6 rows ever
-deleted, because nothing ever referenced them.
+Commit (P6 spec §6) creates or updates the `oe_p6_activity` and `oe_p6_wbs` identities, sets
+`activity_id` and `current_version_id`, and ensures placeholders and links. Setting
+`activity_id` is the only write a version row ever receives after parse. Version rows are
+otherwise immutable.
+
+Discard marks the import `discarded`. Its staged rows are kept, unreferenced, for audit. No P6
+row is ever hard-deleted: BaseRecordMixin forbids it, and KERP has no hard purge of project data
+(TD-401, ADR 0018). Any future retention purge belongs to that work and must consult legal hold.
 
 The Primavera XML parser (T-0105) maps `<Project>`, `<WBS>`, `<Activity>`, `<Relationship>`,
 `<Calendar>`, `<ActivityCodeType>`/`<ActivityCode>`/`<ActivityCodeAssignment>`,
@@ -401,9 +479,9 @@ hand-edited files, plus the small generated files committed for readability. It 
 
 | Fixture | Content |
 |---|---|
-| `small_rev_a.xer` | ≈ 60 activities across a 5-level WBS. Every §5.1 name shape at least once, all four `task_type`s seen, 3 constraints, all four relationship types, one negative lag, an activity with two resource assignments, two code types, a doubled-quote UDF value, cp1252 characters (`£`, `°`, `€`), `0x7F` calendar blobs, a `1899-12-30` sentinel, a CRLF line ending, two currencies and a rate row (must be ignored). |
+| `small_rev_a.xer` | ≈ 60 activities across a 5-level WBS. Every §5.1 name shape at least once (including `728 - 732`, `804-805-806`, `410-2-3`, `914-915`, `900-16`), all six mapped `task_type`s, 3 constraints, all four relationship types, one negative lag, an activity with two resource assignments, two code types, a doubled-quote UDF value, cp1252 characters (`£`, `°`, `€`), `0x7F` calendar blobs, a `1899-12-30` sentinel, a CRLF line ending, two currencies and a rate row (must be ignored). |
 | `small_rev_b.xer` | Revision of rev A for P6 spec §11 test 3: changed dates, a rename that changes the parsed code, a WBS move, a removed activity, a new activity, a renumber (same `guid`, new `task_code`), a changed UDF note, a new copied-project `guid`. |
-| `multi_project.xer` | Two `PROJECT`s; the preview lists both, only the chosen one is staged. |
+| `multi_project.xer` | Two `PROJECT`s; the pre-scan lists both (`awaiting_project_choice`), only the chosen one is staged. |
 | `broken/*.xer` | Missing `%E`; row wider than `%F`; missing required column; duplicate `task_code`; dangling `wbs_id`, `pred_task_id`, code id; UTF-8 with BOM. |
 | `scale.xer` (generated in CI, not committed) | ≈ 3,000 activities, 3,800 relationships, 3,000 assignments, 80 calendars, ≈ 6 MB: the observed scale. |
 
@@ -422,24 +500,33 @@ Parser (pure unit tests, no DB):
 - X3. `""` decodes to `"`. `0x7F` in memo text becomes `\n`. Calendar `raw_data` is byte-exact.
 - X4. `1899-12-30 00:00` → `NULL`. Dates stay wall-clock (no offset applied). Hours are
   `Decimal`, not float.
-- X5. Each `broken/*.xer` fails or warns exactly as §2 says, with the table, line and i18n code.
+- X5. Each `broken/*.xer` fails or warns exactly as §2 says (fatal tables fail the import, other
+  tables drop the row), with the table, line and i18n code.
 - X6. Columns are matched by name: rev A with `TASK` columns reordered and an unknown extra
   column parses identically.
 - X7. Unknown table → counted, ignored. Cost columns, `RSRCRATE`, `CURRTYPE`, `FT_MONEY` UDFs,
   P6 user names and resource e-mails/phones are absent from every staged row.
 
 Staging and mapping (DB):
-- X8. `multi_project.xer` stages only the chosen project.
-- X9. Grammar defaults: every §5.1 shape lands as specified; `902 - 903 - 904` → three links
-  `shared`; `728 - 732` → two links (no range); `305 OHP` → node `305`, `qualifier = OHP`;
-  chain and no-code rows → unmatched.
+- X8. `multi_project.xer` stops in `awaiting_project_choice` with both projects in the summary;
+  after `select-project` only the chosen project is staged. A single-project file never stops.
+- X9. Grammar defaults: every §5.1 shape lands as specified.
+  - `902 - 903 - 904` → three `shared` links; `728 - 732` → five links (728–732).
+  - `804-805-806` → three links; `410-2-3` → 410, 410.2, 410.3 (no 410.1).
+  - `914-915` → two links; `900-16` → one node `900-16`.
+  - `305 OHP` → node `305` with `qualifier = OHP`.
+  - `Prov Sums / Painters` → out of scope; a no-code row → unmatched.
+- X9a. With WBS-level mappings 3 → Site and 4 → Area, new assets are created under the Site and
+  Area named by their WBS; without them, behaviour is unchanged.
 - X10. The same code under two assets → two distinct work-anchor nodes.
 - X11. Critical definition `from_schedule` with `CT_TotFloat`, threshold 0 → `on_critical_path`
   for exactly the fixture activities with total float ≤ 0. A project override wins.
 - X12. `content_hash` is unchanged when only `update_date` differs, and changes when a date,
   code, UDF or assignment quantity changes.
-- X13. `scale.xer` parses and stages within the NFR budget: **≤ 30 s and ≤ 512 MB RSS on the CI
-  worker** (budget recorded for T-0146).
+- X13. `scale.xer` parses and stages within the NFR budget: **≤ 30 s and ≤ 512 MB RSS**. The
+  check runs in a dedicated `perf` CI job (pytest marker `perf`) on a fixed runner size, not in
+  the main suite, so shared-runner noise cannot fail unrelated PRs. The budget is recorded for
+  T-0146.
 
 ---
 
@@ -448,5 +535,7 @@ Staging and mapping (DB):
 | Item | Default in this file | TODO |
 |---|---|---|
 | Wall-clock dates in `site_timezone`, hours as stored truth with calendar day-hours, critical definition `from_schedule`, resources and quantities mirrored without cost, P6 user names not stored | §3, §4.5.2, §4.6 | TD-611 |
-| Multi-code names (list = several nodes, never a range), qualifier words, unspaced chains to manual linking | §5.2 | TD-612 |
+| ~~Multi-code names, ranges, qualifiers, bare-dash runs~~: decided by the user 2026-11-23 | §5.2 | TD-612 (resolved) |
+| ~~Breakdown levels from the WBS~~: per project, decided by the user 2026-11-23 | §5.2 | — |
+| Share an activity's hours over the days inside a work plan window | later | TD-614 |
 | Interpreting calendar work patterns and exceptions | later | TD-613 |
