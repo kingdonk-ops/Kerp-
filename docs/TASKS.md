@@ -159,7 +159,7 @@
 | ▶ | [T-0136](../tracker/tasks/T-0136.md) | Terminology layer: per-locale, plural-aware terminology packs (project → client pack → default) + frontend t() resolver | asset_management | M | T-0101, T-0024 |  |
 | ▶ | [T-0102](../tracker/tasks/T-0102.md) | Dynamic field registry: oe_asset_field_def (JSONSchema registry) + custom_fields JSONB (EAV deleted), GIN jsonb_path_ops + functional B-tree | asset_management | M | T-0101, T-0110 |  |
 | ⬜ | [T-0103](../tracker/tasks/T-0103.md) | Items oe_asset_item: typed inspectable items + work_anchor_id + reserved CML stub fields (no calc engine) | asset_management | M | T-0102 |  |
-| ⬜ | [T-0104](../tracker/tasks/T-0104.md) | P6 .xer import: SAQ parser → staging → hierarchy mapping via p6_grammar / p6_eligibility rules, unique (project_id, external_activity_id) | asset_management | M | T-0101, T-0015, T-0034, T-0352 |  |
+| ⬜ | [T-0104](../tracker/tasks/T-0104.md) | P6 import mapping and commit: consumes T-0352 staging → hierarchy mapping via p6_grammar / p6_eligibility rules, placeholders, change-impact diff, commit; unique (project_id, external_activity_id) | asset_management | M | T-0101, T-0015, T-0034, T-0352 |  |
 | ▶ | [T-0352](../tracker/tasks/T-0352.md) | P6 XER parser + staging tables: stdlib streaming tokeniser, encoding pre-pass, fatal tables, multi-project pre-scan, column mapping to oe_p6_* staging, synthetic fixture generator | asset_management | M | T-0015, T-0101 |  |
 | ⬜ | [T-0105](../tracker/tasks/T-0105.md) | P6 Primavera XML variant + Unmatched-Row Linking Screen (backend) | asset_management | S | T-0104 |  |
 | ⬜ | [T-0106](../tracker/tasks/T-0106.md) | P6 export: progress actuals keyed on Activity ID (non-destructive re-import) | asset_management | M | T-0104 |  |

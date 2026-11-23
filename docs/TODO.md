@@ -49,7 +49,7 @@
 | [TD-514](../tracker/todo/TD-514.md) | How is a passed or LOCKED_FOR_TURNOVER inspection corrected? Define void-and-reissue (revision suffix, supersedes link, ledger, MDR shows latest) | — | planner |
 | [TD-564](../tracker/todo/TD-564.md) | On-site label printing (QR / asset tags, quarantine labels): PDF label sheet, vendor print service on Android, or Web Bluetooth? Needs the printer model and device platform | T-0155, E-03-03, E-03-07, T-0141, T-0255 | planner |
 | [TD-596](../tracker/todo/TD-596.md) | Confirm T-0227 template-editor defaults: required set, empty blocks, audience of existing templates | T-0227 | implementer |
-| [TD-611](../tracker/todo/TD-611.md) | P6 XER mapping defaults to confirm: wall-clock dates in site_timezone, hours as stored truth with calendar day-hours, critical definition from_schedule, resources and quantities mirrored without cost, P6 user names not stored | T-0104 | planner |
+| [TD-611](../tracker/todo/TD-611.md) | P6 XER mapping defaults to confirm: wall-clock dates in site_timezone, hours as stored truth with calendar day-hours, critical definition from_schedule, resources and quantities mirrored without cost, P6 user names not stored | T-0352, T-0104 | planner |
 
 ## spec-gap (93)
 
@@ -401,7 +401,7 @@
 | [TD-607](../tracker/todo/TD-607.md) | Test PG databases are named by xdist worker only (pg_databases.py): parallel sessions on one cluster drop each other's databases — add a per-run prefix | T-0279 | coordinator |
 | [TD-608](../tracker/todo/TD-608.md) | e2e: a per-run broadcaster in the seed, so local re-runs of the Communications journey never meet the 5-broadcasts-per-24h limit of the shared System admin | T-0229 | implementer |
 | [TD-610](../tracker/todo/TD-610.md) | Machine-readable 422 codes for mail template overrides and broadcast refusals, so the Communications UI stops matching English reason text | T-0229 | implementer |
-| [TD-613](../tracker/todo/TD-613.md) | Interpret P6 calendar data (work periods per weekday, exceptions, inheritance) for working-day maths and look-ahead in working days | T-0104 | planner |
+| [TD-613](../tracker/todo/TD-613.md) | Interpret P6 calendar data (work periods per weekday, exceptions, inheritance) for working-day maths and look-ahead in working days | T-0352, T-0104 | planner |
 | [TD-614](../tracker/todo/TD-614.md) | Work packs from P6 activities: share an activity's hours (and quantities) over the days that fall inside the work plan's window instead of carrying its full P6 hours | E-04-12 | planner |
 
 ## bug (18)

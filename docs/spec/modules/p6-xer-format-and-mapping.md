@@ -7,7 +7,7 @@ contract, which tables and columns are interpreted, how each lands in the `oe_p6
 and what the synthetic fixtures must contain. Primavera XML (T-0105) must produce the same
 staging shape (§6), so this file is also the contract for that parser.
 
-Precedence: module detail (3). Built by T-0104 (parser and staging, mapping) and T-0105 (XML).
+Precedence: module detail (3). Built by T-0352 (import lifecycle up to `parsed`, parser and staging), T-0104 (mapping, preview diff and commit) and T-0105 (XML).
 
 **Evidence.** A real client construction schedule (P6 export version 24.12, 5.5 MB, one
 project) was re-profiled column by column on 2026-11-23. **It is client data. It is never
@@ -79,7 +79,7 @@ this step.
 - **Traceability.** Every staged row carries `source_line` (1-based line of its `%R`).
 - **Referential checks** (after tokenising; each failure is a *warning* and the row is kept
   unless stated otherwise):
-  - `TASK.wbs_id` not in `PROJWBS` → activity staged with `wbs_id = NULL`. It is shown on the
+  - `TASK.wbs_id` not in `PROJWBS` → activity staged with `wbs_external_id = NULL`. It is shown on the
     unmatched list.
   - `TASKPRED` endpoint not in the file, or `pred_proj_id ≠ proj_id` → stored as an *external*
     relationship (`is_external = true`, `external_pred_task_code`). It is not linked.
@@ -193,7 +193,7 @@ more than one WBS node. The WBS stays a schedule mirror (P6 spec §2, ADR 0003).
 
 | XER column | Target | Notes |
 |---|---|---|
-| `clndr_id` **R** | (file key) | |
+| `clndr_id` **R** | `source_clndr_id` | With `import_id`, the row key (no identity across imports) |
 | `clndr_name` **R** | `name` | Not unique (76 distinct of 77) |
 | `clndr_type` | `calendar_type` | `CA_Base` / `CA_Project` / `CA_Rsrc` |
 | `proj_id` | — | Project calendars carry it; global ones do not |
@@ -217,7 +217,7 @@ cross-import lookup.
 | `task_code` **R** | `oe_p6_activity.external_activity_id` | **Identity** (P6 spec §6). Unique in the observed file (2,987 of 2,987). Prefixes seen: `C…` (activities), `MS…` (milestones). |
 | `guid` | `oe_p6_activity.p6_guid` | Renumber detection (P6 spec §6) |
 | `task_name` **R** | `name` (raw) | Fed to the `p6_grammar` rules (§5). Not unique: 27 names repeat. |
-| `wbs_id` **R** | `wbs_id` | via §4.3 |
+| `wbs_id` **R** | `wbs_external_id` | Resolved through §4.3 (the WBS `guid`, else its short-name path); never a row id |
 | `clndr_id` | `calendar_id`, plus `calendar_day_hours` | §3.2 |
 | `task_type` **R** | `task_type` (mapped; the value eligibility rules see, P6 spec §5.3) | `TT_Task` → `task`, `TT_Rsrc` → `resource_dependent`, `TT_Mile` → `start_milestone`, `TT_FinMile` → `finish_milestone`, `TT_LOE` → `level_of_effort`, `TT_WBS` → `wbs_summary`. Observed: 2,964 / 1 / 16 / 6 / 0 / 0. |
 | `status_code` **R** | `status` | `TK_NotStart` → `not_started`, `TK_Active` → `in_progress`, `TK_Complete` → `complete`. Mirror only: it never drives KERP state (P6 spec §6). |
@@ -405,6 +405,9 @@ QUALIFIER = (?:(?: - |-| )(?P<qualifier>[A-Za-z][A-Za-z .]*?))?
      needed, is simply not named.
    - Any other shape (a later part longer than the first, a decimal first part) falls through to
      manual linking.
+   - Deliberate asymmetry (user, 2026-11-23): a bare two-part `410-2` stays one node `410-2`
+     (TD-076 suffix), while the same item inside a run of three or more, `410-2-3`, is `410.2`. A
+     project that numbers items with dashes everywhere can change the rule-1 suffix parameter.
    ```
    ^(?P<asset>.+?) / (?P<activity_type>[^/]+?) / (?P<anchor_chain>\d+(?:-\d+){2,})(?: (?P<window>Online|Shut))?QUALIFIER$
    ```
@@ -436,9 +439,9 @@ Measured on the observed corpus with these defaults (rules only):
 
 | Outcome | Activities |
 |---|---|
-| Mapped by rule | 2,923 |
-| Out of scope (milestones, provisional sums, custom) | 59 |
-| Left for manual linking (general activities such as mobilisation and demobilisation) | 5 |
+| Parsed by a grammar and in scope | 2,923 |
+| Out of scope by an eligibility rule, whether or not the name parsed (milestones, provisional sums incl. those without a code, `Custom`) | 59 |
+| Not parsed and in scope → manual linking (general activities such as mobilisation and demobilisation) | 5 |
 
 The exact figures are fixture assertions on the synthetic corpus, not on the client file.
 

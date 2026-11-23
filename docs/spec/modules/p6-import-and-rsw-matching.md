@@ -1,6 +1,6 @@
 # Module detail — P6 import, RSW register, matching & field-checkout merge
 
-Covers the Primavera P6 import wizard (Phase 1: T-0104, T-0105, T-0106, T-0125, T-0129), the
+Covers the Primavera P6 import wizard (Phase 1: T-0352, T-0104, T-0105, T-0106, T-0125, T-0129), the
 expected-RSW register built from it, the RSW document ↔ P6 matching and reconciliation engine
 (Phase 5 epic), and the **merge rule between a P6 re-import and work checked out to a tablet**
 (Phase 1 sync core: T-0126, T-0133; decision in ADR 0005).
@@ -95,7 +95,7 @@ Module: `asset_management` owns the mirror and links (other modules call its `se
 | `oe_p6_import` | One uploaded file and its lifecycle | `file_id`, `sha256`, `xer_version`, `xer_exported_on`, `source_project_short_name`, `source_project_guid`, `data_date_local`, `status` (`uploaded → [awaiting_project_choice →] parsed → previewed → committed` / `failed` / `discarded`), `mapping_profile_revision_id`, `summary jsonb`, `committed_by/at` |
 | `oe_p6_wbs` | **Persistent identity** of a WBS node (ltree); staged per import in `oe_p6_wbs_stage` (XER spec §4.3) | `external_id` (wbs guid, else short-name path), `short_name`, `name`, `parent_id`, `tree_path ltree`, `removed_from_schedule` |
 | `oe_p6_activity` | **Persistent identity** of an activity | unique `(project_id, external_activity_id)` = `task_code`; `p6_guid`; `current_version_id`; `schedule_state` (`active` / `removed_from_schedule` / `cancelled`) |
-| `oe_p6_activity_version` | Immutable snapshot per import (`activity_id` is set once, at commit) | `activity_id`, `import_id`, `wbs_external_id`, `calendar_id`, `name`, `task_type` (mapped), `status`, planned/target/early/late/actual dates, `codes jsonb`, `udfs jsonb`, `content_hash`, `source_line` |
+| `oe_p6_activity_version` | Immutable snapshot per import (`activity_id` is set once, at commit) | `activity_id`, `external_activity_id` (`task_code`), `import_id`, `wbs_external_id`, `calendar_id`, `calendar_day_hours`, `name`, `task_type` (mapped), `status`, planned/target/early/late/actual dates, `codes jsonb`, `udfs jsonb`, `content_hash`, `source_line` |
 | `oe_p6_relationship` | Predecessor/successor per import | `import_id`, `pred_activity_id`, `succ_activity_id`, `type` (FS/FF/SS/SF), `lag_hours` |
 | `oe_p6_anchor_link` | **Many-to-many** activity ↔ work-anchor node (and optional asset node) | `activity_id`, `node_id`, `relationship_type` (`primary`, `supporting`, `shared`, `parent`, `schedule`, `area`), `allocation_pct` (nullable), `work_window` (nullable, e.g. `Online`/`Shut`, TD-076), `qualifier` (nullable note from the name, e.g. `OHP`, `Access`; XER spec §5.2), `match_method` (`name_grammar`, `manual`, `matching_engine`), `match_score`, `status` (`proposed → confirmed → approved` / `rejected`), `verified_by/at`; unique `(activity_id, node_id, relationship_type)` |
 | `oe_p6_change` | One row per detected change in an import | `import_id`, `activity_id`, `change_type` (§6), `field`, `old jsonb`, `new jsonb`, `impact jsonb` (affected nodes, checked-out jobs), `decision` |
