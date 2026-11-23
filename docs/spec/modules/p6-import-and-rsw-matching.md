@@ -13,6 +13,10 @@ code may assume the level is called RSW.
 Precedence: module detail (3). Where this file and the consolidation diff disagree, raise a
 `spec-gap` TODO.
 
+**File format, parser contract and column-by-column mapping:**
+[p6-xer-format-and-mapping.md](p6-xer-format-and-mapping.md) (re-profiled 2026-11-23). It also
+holds the measured name-grammar corpus and the synthetic fixture specification.
+
 ---
 
 ## 1. Principles (binding)
@@ -47,10 +51,10 @@ copies of its shape.** Findings that drive this spec:
 | Activities | 2,987 (2,964 task, 22 milestones, 1 resource-dependent) | Milestones never generate RSW placeholders (eligibility, §5). |
 | WBS nodes | 135, depth up to 7 (project → phase → region → site → shutdown/online window) | WBS kept as its own tree; not forced onto the asset tree. |
 | Relationships | 3,809 (FS 3,456 · FF 212 · SS 130 · SF 11) | Stored for schedule reconciliation; not used to build the hierarchy. |
-| Activity name grammar | 2,960 of 2,987 follow `<asset> / <activity type> / <RSW code>` | **The RSW and asset are encoded in the activity name**, not in codes/UDFs. Name parsing is the primary mapping (§5). |
-| Distinct assets / asset+RSW pairs | 66 / 620 | One RSW has **many** activities (one per activity type) → RSW↔activity is many-to-many. |
+| Activity name grammar | 2,960 of 2,987 have the three segments `<asset> / <activity type> / <RSW code>`; the §5.1 regex matches 2,867 of them, the rest are code lists, qualifiers or chains (XER spec §5.1) | **The RSW and asset are encoded in the activity name**, not in codes/UDFs. Name parsing is the primary mapping (§5). |
+| Distinct assets / asset+RSW pairs | 66 / 620 | One RSW has **many** activities (one per activity type) → RSW↔activity is many-to-many. RSW codes repeat under different assets (108 of 297 codes), so a work-anchor node is keyed by asset + code, never code alone. |
 | Activity-type tokens | `WFE, SCA Erect, SCA Dism, B, P, W, CP, SR, BN, G, GR, C, HDNR1, HDNR2, HDBN, Custom, Prov Sums` | Map to the `activity` level / item type via the client pack. |
-| Token spelling variants | `SCA Dism` / `SCA-Dism`, `Prov Sums` / `Prov.Sums` | Project-scoped **alias dictionary** (§5.2). |
+| Token spelling variants | `SCA Dism` / `SCA-Dism`, `SCA Erect` / `SCA-Erect`, `Prov Sums` / `Prov.Sums` | Project-scoped **alias dictionary** (§5.2). |
 | RSW code variants | `305`, `410.2`, `512 Online` / `512 Shut`, `512-21`, `512.1-16` (synthetic examples of the observed shapes) | Grammar captures base code, sub-code, work window and suffix; default meaning per TD-076 (§5.1). |
 | Activity codes | 2 types (`<site> Status`) with values Shutdown, Online Works, On-Hold Priority 1/2 | Mapped to a node attribute (`work_window`, `hold_priority`). |
 | UDFs | `Comment`, `Notes` (values `New`, `Secondary`, `Changed from "C" to "G"`) | Planners record revision deltas in UDFs; surface them on the change report. |
@@ -97,8 +101,11 @@ Module: `asset_management` owns the mirror and links (other modules call its `se
 | `oe_p6_change` | One row per detected change in an import | `import_id`, `activity_id`, `change_type` (§6), `field`, `old jsonb`, `new jsonb`, `impact jsonb` (affected nodes, checked-out jobs), `decision` |
 
 Resource rates and costs in `RSRCRATE`/`TASKRSRC` are **not** imported (money is a read-only
-mirror from the ERP, not from P6). Resource quantities may be kept in the snapshot for later
-reconciliation.
+mirror from the ERP, not from P6). Resources and assignment quantities are mirrored without
+cost (`oe_p6_resource`, `oe_p6_resource_assignment`), together with calendars, code and UDF
+types (`oe_p6_calendar`, `oe_p6_code_type`/`_value`, `oe_p6_udf_type`). Every column of
+`oe_p6_activity_version` (dates, hours, float, `driving_path`, codes, UDFs) and of these tables
+is listed in [p6-xer-format-and-mapping.md](p6-xer-format-and-mapping.md) §4 (TD-570, TD-611).
 
 ---
 
@@ -163,8 +170,9 @@ exist before any PDF arrives.
 - `asset_management.service` exposes read-only, P6-owned facts of the committed import for an
   anchor's linked activities (§4, §7): `total_float_hours` (from the XER's total float),
   `on_critical_path` and `critical_basis`. "Critical" follows the project's own definition, a
-  project setting `p6.critical_definition` = `total_float_le` (threshold hours, default 0) or
-  `longest_path` (the XER's longest-path flag where the schedule carries it). Several linked
+  project setting `p6.critical_definition` = `from_schedule` (default: the XER's own
+  `critical_path_type` and threshold, XER spec §4.5.2, TD-611), `total_float_le` (threshold
+  hours) or `longest_path` (the XER's `driving_path_flag`). Several linked
   activities: the minimum float and `on_critical_path` if any is critical.
 - Rule sets of other modules may read these facts as CEL context variables (for example raise the
   priority of an open NCR or an unsigned hold point whose anchor is on a critical-path
