@@ -3,9 +3,9 @@
 > **Generated** by `python scripts/tracker.py render` from `tracker/todo/*.md` — do not edit by hand.
 > Add: `python scripts/tracker.py new-todo --kind <kind> --title "..." --task T-xxxx --source <agent>`
 
-**Open:** 427 · **Closed:** 171
+**Open:** 429 · **Closed:** 173
 
-## decision (40)
+## decision (41)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -49,8 +49,9 @@
 | [TD-514](../tracker/todo/TD-514.md) | How is a passed or LOCKED_FOR_TURNOVER inspection corrected? Define void-and-reissue (revision suffix, supersedes link, ledger, MDR shows latest) | — | planner |
 | [TD-564](../tracker/todo/TD-564.md) | On-site label printing (QR / asset tags, quarantine labels): PDF label sheet, vendor print service on Android, or Web Bluetooth? Needs the printer model and device platform | T-0155, E-03-03, E-03-07, T-0141, T-0255 | planner |
 | [TD-596](../tracker/todo/TD-596.md) | Confirm T-0227 template-editor defaults: required set, empty blocks, audience of existing templates | T-0227 | implementer |
+| [TD-611](../tracker/todo/TD-611.md) | P6 XER mapping defaults to confirm: wall-clock dates in site_timezone, hours as stored truth with calendar day-hours, critical definition from_schedule, resources and quantities mirrored without cost, P6 user names not stored | T-0352, T-0104 | planner |
 
-## spec-gap (94)
+## spec-gap (93)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -138,7 +139,6 @@
 | [TD-559](../tracker/todo/TD-559.md) | MDR breakdown open points: how client acceptance of a review revision is recorded, revision scheme, Rev 0 without review, B-LTA augmentation schedule | E-05-05 | planner |
 | [TD-563](../tracker/todo/TD-563.md) | Earned value counts only verified completion: which ITP lines verify which progress steps, partial credit, reversal on re-inspection; planned vs verified-complete view | E-06-04, E-04-03, E-04-06, E-04-12 | planner |
 | [TD-567](../tracker/todo/TD-567.md) | Schedule facts in rule sets: total float and on-critical-path per anchor from the last committed P6 import (project critical definition), CEL variable names and units | T-0125, T-0104, E-04-02 | planner |
-| [TD-570](../tracker/todo/TD-570.md) | P6 schedule facts: add total_float_hours and driving_path_flag snapshot columns to oe_p6_activity_version, and list late_finish or change the §5.6 example (PR #179 review) | T-0104, T-0125, E-04-02 | reviewer |
 | [TD-571](../tracker/todo/TD-571.md) | Earned value wording: INSPECTED_PASSED/LOCKED_FOR_TURNOVER are ITR states, not ITP-line states; cross-reference the PER-03 sign-off default for steps without an ITP line (PR #179 review) | E-06-04, E-04-12 | reviewer |
 | [TD-572](../tracker/todo/TD-572.md) | Diff §4.11 AI: drop stale 'platform key only if TD-545 changes'; state default conversation retention, the RLS-protected conversation store, and the budget-cap day boundary time zone (PR #179 review) | E-05-08 | reviewer |
 | [TD-573](../tracker/todo/TD-573.md) | Quality §5 no_show row should cite frozen notice_valid_at_outcome; reschedule reset should also clear notice_delivery_reason (PR #179 review) | T-0350, T-0333, T-0335 | reviewer |
@@ -223,7 +223,7 @@
 | [TD-510](../tracker/todo/TD-510.md) | Deployment-config view lacks the mail reply-to of diff §4.7: Settings has no reply-to field yet | T-0230 | implementer |
 | [TD-533](../tracker/todo/TD-533.md) | CEL client runtime has no evaluation step budget (cel-js exposes no step hook; server is the hard gate) | T-0341 | implementer |
 
-## later (174)
+## later (176)
 
 | ID | Title | Related tasks | Raised by |
 |---|---|---|---|
@@ -401,6 +401,8 @@
 | [TD-607](../tracker/todo/TD-607.md) | Test PG databases are named by xdist worker only (pg_databases.py): parallel sessions on one cluster drop each other's databases — add a per-run prefix | T-0279 | coordinator |
 | [TD-608](../tracker/todo/TD-608.md) | e2e: a per-run broadcaster in the seed, so local re-runs of the Communications journey never meet the 5-broadcasts-per-24h limit of the shared System admin | T-0229 | implementer |
 | [TD-610](../tracker/todo/TD-610.md) | Machine-readable 422 codes for mail template overrides and broadcast refusals, so the Communications UI stops matching English reason text | T-0229 | implementer |
+| [TD-613](../tracker/todo/TD-613.md) | Interpret P6 calendar data (work periods per weekday, exceptions, inheritance) for working-day maths and look-ahead in working days | T-0352, T-0104 | planner |
+| [TD-614](../tracker/todo/TD-614.md) | Work packs from P6 activities: share an activity's hours (and quantities) over the days that fall inside the work plan's window instead of carrying its full P6 hours | E-04-12 | planner |
 
 ## bug (18)
 
@@ -638,7 +640,9 @@
 | ✅ | [TD-545](../tracker/todo/TD-545.md) | AI provider, region and credentials (data use allowed by the user 2026-11-21): confirm one provider per deployment, Australian region, company-owned key in the secret store, fail closed | User decision 2026-11-22: planner defaults accepted — one AI provider per deployment, Australian region, company-owned (tenant) key in the deployment secret store, fail closed when anything is missing (diff §4.11) |
 | ✅ | [TD-549](../tracker/todo/TD-549.md) | Notification rules (trigger, recipients by role, delay, channel, template, conditions), per-notification delivery log with skipped reasons and an Outbox card, issued vs amended triggers, never-late reminders | User decision 2026-11-22: call-outs ignore e-mail opt-out. Contractual call-out / inspection-request notices are transactional; an opt-out never suppresses them and is not a skipped reason for them; opt-out applies to optional notifications only. Missing address or bounce still recorded per party. The rest of this spec-gap (rule model, delivery log, Outbox card, issued vs amended, never late) continues in TD-587 |
 | ✅ | [TD-561](../tracker/todo/TD-561.md) | Grant ceiling questions: second approver when PER-09 assigns a hold-authority persona it does not hold? May external accounts hold PER-14 (Field Worker)? | User decision 2026-11-22: planner defaults accepted — no second approver when PER-09 assigns a hold-authority persona it does not hold; external subcontractor crews may hold PER-14 Field Worker (diff §4.1, §4.9) |
+| ✅ | [TD-570](../tracker/todo/TD-570.md) | P6 schedule facts: add total_float_hours and driving_path_flag snapshot columns to oe_p6_activity_version, and list late_finish or change the §5.6 example (PR #179 review) | Planner, 2026-11-23: docs/spec/modules/p6-xer-format-and-mapping.md 4.5.2 lists total_float_hours, free_float_hours, driving_path and late_start/late_finish_local on oe_p6_activity_version; p6 spec 5.6 critical definition gains from_schedule (TD-611) |
 | ✅ | [TD-577](../tracker/todo/TD-577.md) | Impersonation notice: pass recipient_user_id to send_mail once T-0226 (mail delivery ledger) is merged | Done in T-0277 (PR #184) after T-0226 merged: the notice passes recipient_user_id=target.id. |
 | ✅ | [TD-581](../tracker/todo/TD-581.md) | Migration 0040 collides with T-0226's 0040 (parallel branches): the second to merge must renumber and re-chain | Resolved in T-0277 (PR #184): renumbered to 0041_impersonation_session (Revises 0040_mail_delivery_ledger) after #183 merged. |
 | ✅ | [TD-592](../tracker/todo/TD-592.md) | May a scanned paper signature ever count as the client (PER-15) co-sign? (paper-signed pages are plain evidence until decided) | User, 2026-11-22: yes. A scanned paper signature may count as the client (PER-15) co-sign on the terms of mode iii: the uploader names the client's PER-15 account; it is provisional (verification_mode = provisional_scan) and blocks approval (CLIENT_SIGNATURE_PROVISIONAL) until that client confirms in their own account; a rejection returns the inspection. Spec: quality-and-inspection.md §Client co-sign mode iv and §Signing attestation 'Paper-signed pages'. |
 | ✅ | [TD-601](../tracker/todo/TD-601.md) | SPA page /unsubscribe#<token> for the broadcast opt-out link (T-0228 e-mails link to it) | Resolved in T-0229: public SPA route /unsubscribe (frontend/src/pages/UnsubscribePage.tsx) reads the token from the fragment once, clears it from the URL, posts {token} in the body to /api/v1/notifications/broadcasts/unsubscribe only on the Unsubscribe button (never on load) and shows one neutral confirmation; component, a11y and e2e tests. |
+| ✅ | [TD-612](../tracker/todo/TD-612.md) | P6 activity names with several work-anchor codes or qualifier words: code lists (902 - 903 - 904), possible ranges (728 - 732), unspaced chains (410-2-3) and qualifiers (OHP, Access, Props, North) | User, 2026-11-23: 728 - 732 is the range 728-732 (spaced lists name each code); bare-dash runs: equal-length parts are full codes (804-805-806), shorter parts are items of the first (410-2-3 -> 410, 410.2, 410.3), gaps never filled; OHP/Access/Props are notes on the link (parts waiting on access, scaffold or shutdown), same RSW; breakdown levels from WBS depths, per project. Spec: p6-xer-format-and-mapping.md 5.2. |

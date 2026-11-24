@@ -1,6 +1,6 @@
 # Module detail — P6 import, RSW register, matching & field-checkout merge
 
-Covers the Primavera P6 import wizard (Phase 1: T-0104, T-0105, T-0106, T-0125, T-0129), the
+Covers the Primavera P6 import wizard (Phase 1: T-0352, T-0104, T-0105, T-0106, T-0125, T-0129), the
 expected-RSW register built from it, the RSW document ↔ P6 matching and reconciliation engine
 (Phase 5 epic), and the **merge rule between a P6 re-import and work checked out to a tablet**
 (Phase 1 sync core: T-0126, T-0133; decision in ADR 0005).
@@ -12,6 +12,10 @@ code may assume the level is called RSW.
 
 Precedence: module detail (3). Where this file and the consolidation diff disagree, raise a
 `spec-gap` TODO.
+
+**File format, parser contract and column-by-column mapping:**
+[p6-xer-format-and-mapping.md](p6-xer-format-and-mapping.md) (re-profiled 2026-11-23). It also
+holds the measured name-grammar corpus and the synthetic fixture specification.
 
 ---
 
@@ -47,10 +51,10 @@ copies of its shape.** Findings that drive this spec:
 | Activities | 2,987 (2,964 task, 22 milestones, 1 resource-dependent) | Milestones never generate RSW placeholders (eligibility, §5). |
 | WBS nodes | 135, depth up to 7 (project → phase → region → site → shutdown/online window) | WBS kept as its own tree; not forced onto the asset tree. |
 | Relationships | 3,809 (FS 3,456 · FF 212 · SS 130 · SF 11) | Stored for schedule reconciliation; not used to build the hierarchy. |
-| Activity name grammar | 2,960 of 2,987 follow `<asset> / <activity type> / <RSW code>` | **The RSW and asset are encoded in the activity name**, not in codes/UDFs. Name parsing is the primary mapping (§5). |
-| Distinct assets / asset+RSW pairs | 66 / 620 | One RSW has **many** activities (one per activity type) → RSW↔activity is many-to-many. |
+| Activity name grammar | 2,960 of 2,987 have the three segments `<asset> / <activity type> / <RSW code>`; the §5.1 regex matches 2,867 of them, the rest are code lists, qualifiers or chains (XER spec §5.1) | **The RSW and asset are encoded in the activity name**, not in codes/UDFs. Name parsing is the primary mapping (§5). |
+| Distinct assets / asset+RSW pairs | 66 / 620 | One RSW has **many** activities (one per activity type) → RSW↔activity is many-to-many. RSW codes repeat under different assets (108 of 297 codes), so a work-anchor node is keyed by asset + code, never code alone. |
 | Activity-type tokens | `WFE, SCA Erect, SCA Dism, B, P, W, CP, SR, BN, G, GR, C, HDNR1, HDNR2, HDBN, Custom, Prov Sums` | Map to the `activity` level / item type via the client pack. |
-| Token spelling variants | `SCA Dism` / `SCA-Dism`, `Prov Sums` / `Prov.Sums` | Project-scoped **alias dictionary** (§5.2). |
+| Token spelling variants | `SCA Dism` / `SCA-Dism`, `SCA Erect` / `SCA-Erect`, `Prov Sums` / `Prov.Sums` | Project-scoped **alias dictionary** (§5.2). |
 | RSW code variants | `305`, `410.2`, `512 Online` / `512 Shut`, `512-21`, `512.1-16` (synthetic examples of the observed shapes) | Grammar captures base code, sub-code, work window and suffix; default meaning per TD-076 (§5.1). |
 | Activity codes | 2 types (`<site> Status`) with values Shutdown, Online Works, On-Hold Priority 1/2 | Mapped to a node attribute (`work_window`, `hold_priority`). |
 | UDFs | `Comment`, `Notes` (values `New`, `Secondary`, `Changed from "C" to "G"`) | Planners record revision deltas in UDFs; surface them on the change report. |
@@ -88,17 +92,20 @@ Module: `asset_management` owns the mirror and links (other modules call its `se
 
 | Table | Purpose | Key columns |
 |---|---|---|
-| `oe_p6_import` | One uploaded file and its lifecycle | `file_id`, `sha256`, `xer_version`, `source_project_short_name`, `data_date`, `status` (`uploaded → parsed → previewed → committed` / `failed` / `discarded`), `mapping_profile_revision_id`, `summary jsonb`, `committed_by/at` |
-| `oe_p6_wbs` | WBS mirror (ltree) | `external_id` (wbs guid), `short_name`, `name`, `parent_id`, `tree_path ltree`, `removed_from_schedule` |
+| `oe_p6_import` | One uploaded file and its lifecycle | `file_id`, `sha256`, `xer_version`, `xer_exported_on`, `source_project_short_name`, `source_project_guid`, `data_date_local`, `status` (`uploaded → [awaiting_project_choice →] parsed → previewed → committed` / `failed` / `discarded`), `mapping_profile_revision_id`, `summary jsonb`, `committed_by/at` |
+| `oe_p6_wbs` | **Persistent identity** of a WBS node (ltree); staged per import in `oe_p6_wbs_stage` (XER spec §4.3) | `external_id` (wbs guid, else short-name path), `short_name`, `name`, `parent_id`, `tree_path ltree`, `removed_from_schedule` |
 | `oe_p6_activity` | **Persistent identity** of an activity | unique `(project_id, external_activity_id)` = `task_code`; `p6_guid`; `current_version_id`; `schedule_state` (`active` / `removed_from_schedule` / `cancelled`) |
-| `oe_p6_activity_version` | Immutable snapshot per import | `activity_id`, `import_id`, `wbs_id`, `name`, `task_type`, `status_code`, planned/target/early/late/actual dates, `codes jsonb`, `udfs jsonb`, `content_hash`, `source_line` |
+| `oe_p6_activity_version` | Immutable snapshot per import (`activity_id` is set once, at commit) | `activity_id`, `external_activity_id` (`task_code`), `import_id`, `wbs_external_id`, `calendar_id`, `calendar_day_hours`, `name`, `task_type` (mapped), `status`, planned/target/early/late/actual dates, `codes jsonb`, `udfs jsonb`, `content_hash`, `source_line` |
 | `oe_p6_relationship` | Predecessor/successor per import | `import_id`, `pred_activity_id`, `succ_activity_id`, `type` (FS/FF/SS/SF), `lag_hours` |
-| `oe_p6_anchor_link` | **Many-to-many** activity ↔ work-anchor node (and optional asset node) | `activity_id`, `node_id`, `relationship_type` (`primary`, `supporting`, `shared`, `parent`, `schedule`, `area`), `allocation_pct` (nullable), `work_window` (nullable, e.g. `Online`/`Shut`, TD-076), `match_method` (`name_grammar`, `manual`, `matching_engine`), `match_score`, `status` (`proposed → confirmed → approved` / `rejected`), `verified_by/at`; unique `(activity_id, node_id, relationship_type)` |
+| `oe_p6_anchor_link` | **Many-to-many** activity ↔ work-anchor node (and optional asset node) | `activity_id`, `node_id`, `relationship_type` (`primary`, `supporting`, `shared`, `parent`, `schedule`, `area`), `allocation_pct` (nullable), `work_window` (nullable, e.g. `Online`/`Shut`, TD-076), `qualifier` (nullable note from the name, e.g. `OHP`, `Access`; XER spec §5.2), `match_method` (`name_grammar`, `manual`, `matching_engine`), `match_score`, `status` (`proposed → confirmed → approved` / `rejected`), `verified_by/at`; unique `(activity_id, node_id, relationship_type)` |
 | `oe_p6_change` | One row per detected change in an import | `import_id`, `activity_id`, `change_type` (§6), `field`, `old jsonb`, `new jsonb`, `impact jsonb` (affected nodes, checked-out jobs), `decision` |
 
 Resource rates and costs in `RSRCRATE`/`TASKRSRC` are **not** imported (money is a read-only
-mirror from the ERP, not from P6). Resource quantities may be kept in the snapshot for later
-reconciliation.
+mirror from the ERP, not from P6). Resources and assignment quantities are mirrored without
+cost (`oe_p6_resource`, `oe_p6_resource_assignment`), together with calendars, code and UDF
+types (`oe_p6_calendar`, `oe_p6_code_type`/`_value`, `oe_p6_udf_type`). Every column of
+`oe_p6_activity_version` (dates, hours, float, `driving_path`, codes, UDFs) and of these tables
+is listed in [p6-xer-format-and-mapping.md](p6-xer-format-and-mapping.md) §4 (TD-570, TD-611).
 
 ---
 
@@ -126,6 +133,10 @@ One or more `p6_grammar` rules with named groups, tried in `sort_order`:
   suffix is part of the node code); a **window** (`Online` / `Shut`) is the **same work-anchor
   node in two work windows** (`512 Online` and `512 Shut` → node `512`, one `oe_p6_anchor_link`
   per activity, `work_window` recorded on the link). A project may change either default.
+- Several codes in one name (spaced lists and ranges such as `728 - 732`, bare-dash runs such as
+  `804-805-806` or `410-2-3`), trailing notes (`OHP`, `Access`) and the WBS-level placement of new
+  nodes follow the shipped rules and user decisions in
+  [p6-xer-format-and-mapping.md](p6-xer-format-and-mapping.md) §5.2 (TD-612).
 - No pattern matches → activity goes to the **Unmatched-Row Linking Screen** (T-0105), never
   dropped, never guessed.
 - Other sources the profile may use instead of the name: an activity-code type, a UDF, or the WBS
@@ -138,8 +149,10 @@ One or more `p6_grammar` rules with named groups, tried in `sort_order`:
   `TK1002 / TK 1002 → TK-1002`. Aliases never resolve across projects.
 
 ### 5.3 Eligibility (which activities expect an RSW) — `p6_eligibility` rules
-CEL rules in the rule store, e.g. `task_type == "TT_Mile" → no_placeholder`,
-`activity_type in ["Prov Sums","Custom"] → no_placeholder`, everything that parsed →
+CEL rules in the rule store, e.g. `task_type in ["start_milestone", "finish_milestone"] →
+no_placeholder` (`task_type` is the mapped value, XER spec §4.5.1),
+`activity_type in ["Prov Sums","Custom"] → no_placeholder`, `name` containing `Prov Sums` →
+no_placeholder, everything that parsed →
 placeholder. Ineligible activities are still mirrored and visible; they just do not create
 expected RSWs.
 
@@ -163,8 +176,9 @@ exist before any PDF arrives.
 - `asset_management.service` exposes read-only, P6-owned facts of the committed import for an
   anchor's linked activities (§4, §7): `total_float_hours` (from the XER's total float),
   `on_critical_path` and `critical_basis`. "Critical" follows the project's own definition, a
-  project setting `p6.critical_definition` = `total_float_le` (threshold hours, default 0) or
-  `longest_path` (the XER's longest-path flag where the schedule carries it). Several linked
+  project setting `p6.critical_definition` = `from_schedule` (default: the XER's own
+  `critical_path_type` and threshold, XER spec §4.5.2, TD-611), `total_float_le` (threshold
+  hours) or `longest_path` (the XER's `driving_path_flag`). Several linked
   activities: the minimum float and `on_critical_path` if any is critical.
 - Rule sets of other modules may read these facts as CEL context variables (for example raise the
   priority of an open NCR or an unsigned hold point whose anchor is on a critical-path
@@ -188,7 +202,7 @@ activity, it is a **renumber** (proposed, planner confirms).
 | `new` | unknown `task_code` and `guid` | mirror + placeholder if eligible |
 | `name_changed` | name differs | new version; if the parsed asset/RSW differs → link becomes `proposed`, flagged for review; approved links are never moved automatically |
 | `dates_changed` | any planned/target date differs | new version; schedule association updated; inspection due dates **not** changed |
-| `wbs_moved` | `wbs_id` differs | hierarchy reconciliation finding |
+| `wbs_moved` | `wbs_external_id` differs (never a row id) | hierarchy reconciliation finding |
 | `status_changed` | P6 status differs | mirror only — P6 status never drives inspection or RSW state |
 | `codes_or_udfs_changed` | code/UDF values differ | mirror; UDF "Changed from …" notes shown on the report |
 | `removed` | activity absent from the file | `schedule_state = removed_from_schedule`; linked anchors flagged *orphaned*; **no delete** |
@@ -328,6 +342,7 @@ values; nothing overwrites the original.
 | Endpoint | Purpose |
 |---|---|
 | `POST /projects/{id}/p6/imports` | upload XER/XML → `oe_p6_import` (`uploaded`), enqueue parse |
+| `POST /projects/{id}/p6/imports/{import_id}/select-project` | multi-project file: choose `source_project_guid` while `awaiting_project_choice`; staging starts |
 | `GET /projects/{id}/p6/imports/{import_id}` | status, summary, parse errors |
 | `GET /projects/{id}/p6/imports/{import_id}/changes` | change-impact report incl. checked-out records |
 | `GET /projects/{id}/p6/imports/{import_id}/unmatched` | rows the grammar could not map |
@@ -350,7 +365,7 @@ P6 import:
 3. Revised XER: changed dates, renamed activity, moved WBS, removed activity, new activity,
    renumbered activity (same guid) → each produces the right `oe_p6_change` and action.
 4. Removed activity: node and inspections kept, flagged orphaned, nothing deleted.
-5. Milestone and `Prov Sums` activities create no placeholders.
+5. Start milestones, finish milestones and `Prov Sums` activities (by activity type and by name) create no placeholders.
 6. Unparseable names land on the unmatched screen; manual link preserves existing ties.
 7. Aliases (`SCA-Dism`) resolve; an alias from project A never resolves in project B.
 8. Approved link is not moved by a re-import that changes the parsed RSW; a proposal is raised.
@@ -381,6 +396,14 @@ Decided 2026-11-10:
 - Office edits to field-owned values of a checked-out record are blocked, not queued (ADR 0005).
 - Grammar and eligibility rules are `p6_grammar` / `p6_eligibility` kinds in the rule store
   (TD-079, §5).
+
+Decided 2026-11-23 (user, TD-612; detail in XER spec §5.2):
+- `728 - 732` is the range 728–732; spaced lists name each code.
+- Bare-dash runs: equal-length parts are full codes (`804-805-806`); shorter parts are items of the
+  first (`410-2-3` → 410, 410.2, 410.3); gaps are never filled.
+- `OHP`, `Access`, `Props` and the like are notes on the link (parts waiting on access, scaffold or
+  shutdown); the RSW is the same.
+- Breakdown levels may be taken from WBS depths, configured per project.
 
 Open:
 - Rule-set names for import commit / link approval and link placement when `schedule_link` and
