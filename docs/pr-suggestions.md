@@ -3,7 +3,144 @@
 > **Generated — do not hand-edit.** Rebuild with `python scripts/pr_suggestions.py rebuild`.
 > A running digest of everything agents surfaced on merged PRs — review notes, must-fix items, suggestions, nits, follow-ups and ideas — so nothing is lost after a squash-merge. Formal follow-ups also live as `TD-xxx` in `tracker/todo/` and on [TODO.md](TODO.md); this file is the readable skim. Each item links back to its PR or review for full context.
 
-_Repo `kingdonk-ops/Kerp-`, base `dev` · 188 merged PRs · 187 with surfaced notes._
+_Repo `kingdonk-ops/Kerp-`, base `dev` · 190 merged PRs · 189 with surfaced notes._
+
+---
+
+## PR #192 — T-0104: P6 XER file format, parser contract and column mapping (spec)
+task `T-0104` · merged 2026-11-24 · by `kingdonk-ops` · [PR](https://github.com/kingdonk-ops/Kerp-/pull/192)
+
+**TODOs raised**
+
+- TD-611 — XER mapping defaults to confirm
+- TD-612 — resolved by user decision 2026-11-23
+- TD-613 — interpret P6 calendar data (later)
+- TD-614 — share activity hours over a work-plan window (later)
+
+**Review by `kingdonk-ops` — KERP-REVIEW: CHANGES_REQUESTED patch-id=38824bd3d2032f2118a41586e1a0a1a9eda63c50** · [full review](https://github.com/kingdonk-ops/Kerp-/pull/192#pullrequestreview-6018116438)
+
+- _Must fix_
+  1. **The 30-day purge of discarded staging rows** (§6) contradicts "never hard-deleted" (BaseRecordMixin) and the no-hard-purge rule (diff §756, ADR 0018). Fix: soft-delete the rows or keep them with `status = discarded`.
+  2. **`task_type` is mapped to KERP values, but the P6 spec §5.3 eligibility example still tests `TT_Mile`** and misses `TT_FinMile`. Six finish milestones would then get placeholders. Fix: align the example with the mapped values, or keep the raw code in its own field. Test 5 should cover both milestone types.
+  3. **Column names differ between the two files:**
+     - `data_date` / `xer_version` vs `data_date_local`
+     - `status_code` vs `status`
+     - `qualifier` is missing from `oe_p6_anchor_link`
+     Fix: one set of names.
+  4. **Identity across imports:**
+     - Calendar identity `(name, type)` is not unique: names repeat.
+     - WBS rows are per-import snapshots, but `wbs_moved` compares `wbs_id`, so every activity would show as moved.
+     Fix: say whether WBS and calendar rows are persistent or snapshots, compare the WBS by its external id, and give calendars an identity that survives duplicate names.
+  5. **Choosing a project from a multi-project file** has no status step and no endpoint. Fix: specify the flow, or raise a spec-gap TODO.
+  6. **"Required row" is undefined**, but test X5 expects exact behaviour. Fix: name the tables whose malformed rows fail the import.
+  7. **T-0104 is knowingly oversized** and is neither split nor tracked. Fix: split it, or raise a TODO and add it to `blocked_by`.
+
+- _Suggestions (non-blocking)_
+  - `cost_qty_type` is a price time basis, not a unit; the unit comes from `unit_id`/UMEASURE.
+  - Restate the UDF logical-type list.
+  - "projects spec §1.2" is a dangling reference; `site_timezone` is in master spec §504.
+  - `external_pred_task_ref` and `is_external` name the same thing; pick one.
+  - Grammar rule 2 should read the same qualifier parameter as rule 1, and should require a space or dash before the qualifier.
+  - The fixture wording mentions four `task_type`s; there are six.
+  - Add §6 to T-0105's spec list.
+  - Note that setting `activity_id` at commit is the one allowed write to an "immutable" version row.
+  - UTF-8 detection needs a pre-pass before the streaming parse; say so.
+  - The X13 performance budget belongs in a dedicated job.
+
+**Review by `kingdonk-ops` — KERP-REVIEW: CHANGES_REQUESTED patch-id=047158a251952f311664a8cccee26a053eca6eda** · [full review](https://github.com/kingdonk-ops/Kerp-/pull/192#pullrequestreview-6021906688)
+
+- _Must fix_
+  1. **The `TASK` mapping still uses the old WBS column name.** In `p6-xer-format-and-mapping.md`, the row at ~:220 still maps `wbs_id` → `wbs_id`, and §2 (~:82) still says `wbs_id = NULL`. §4.3 and P6 spec §4 now say `wbs_external_id`. Fix: map the target to `wbs_external_id` (resolved through §4.3: guid, else short-name path) in both places.
+  2. **No task clearly owns the import lifecycle.**
+     - T-0352 has to deliver X8 and depends on T-0015. That needs the `oe_p6_import` table and its status flow, the upload endpoint and the SAQ batch parse job, but none of them is in T-0352's acceptance criteria.
+     - T-0104 still claims the SAQ parse.
+     Fix:
+     - List all three in T-0352's acceptance criteria.
+     - Reword T-0104's title, goal and criteria to mapping, placeholders and diff/commit, consuming T-0352's staging.
+     - Re-render the boards.
+
+- _Suggestions (non-blocking)_
+  - Under TD-076 a bare `410-2` is node `410-2`, but inside `410-2-3` the same item becomes `410.2`. Note that this asymmetry is deliberate.
+  - Add `source_clndr_id` as the target of `clndr_id` in the §4.4 calendar table.
+  - List `external_activity_id` and `calendar_day_hours` among the version-row key columns in P6 spec §4.
+  - Add T-0352 to the task links of TD-611 and TD-613. TD-613's body still credits the work to T-0104.
+  - T-0352 sits at the top of an M: watch its size, and consider giving the `perf` job its own task.
+  - In the §5.2 outcome table, separate rows that didn't parse from rows that parsed but are out of scope.
+
+**Review by `kingdonk-ops` — KERP-REVIEW: APPROVED patch-id=6f0ccd6a80bbbe77e0ea6332aa9263e14a3ea390** · [full review](https://github.com/kingdonk-ops/Kerp-/pull/192#pullrequestreview-6022130187)
+
+- _Must fix_
+  None.
+
+- _Suggestion (non-blocking, for follow-up)_
+  Two lines in XER spec §6 still describe the model from before the split:
+  - Parse is said to write the grammar result (`parsed jsonb`).
+  - The version-row immutability sentence only allows `activity_id` to be written.
+  Grammar mapping now belongs to T-0104, after `parsed`. The T-0104 implementer can settle this, or it can be a small follow-up.
+
+**Comment by `kingdonk-ops`** · [link](https://github.com/kingdonk-ops/Kerp-/pull/192#issuecomment-7094457687)
+
+`review-gate` is red only because this PR has no independent `KERP-REVIEW: APPROVED patch-id=…` marker yet. That is expected for a new PR (CLAUDE.md §3 step 4) and is not a defect in the diff. It clears once `kerp-reviewer` reviews this docs/tracker change and posts its verdict. The tracker gates (`validate`, `render --check`, `pytest scripts/tests`) pass locally.
+
+---
+_Generated by [Claude Code](https://claude.ai/code)_
+
+---
+
+## PR #191 — T-0229: Frontend: Admin → Communications — broadcast composer, delivery stats and history, automated template editor
+task `T-0229` · merged 2026-11-22 · by `kingdonk-ops` · [PR](https://github.com/kingdonk-ops/Kerp-/pull/191)
+
+**TODOs raised**
+
+- TD-601: resolved (the unsubscribe page)
+- TD-608 (later): the e2e test sends as the shared first-run System admin, so a reused local database can hit the 5-per-24 h limit. Fix: seed a per-run PER-09 sender.
+- TD-610 (later): machine-readable 422 codes, so the UI can stop matching the server's English refusal text
+- TD-609 (missed, backend): a status-only probe for sender verification and bounce wiring, for the mail-health banner
+
+Size: about 3,050 lines, about 1,100 of them tests. This is over the M guideline, mostly because TD-601 and the a11y and e2e tests were added to the scope.
+
+**Review by `kingdonk-ops` — KERP-REVIEW: CHANGES_REQUESTED patch-id=e2c1a65111d445dd21ecfae902e482723be71657** · [full review](https://github.com/kingdonk-ops/Kerp-/pull/191#pullrequestreview-6013996755)
+
+- _Must fix_
+  1. **The PER-09 project filter is untested.** In `frontend/src/admin/CommsBroadcastsPage.tsx:55` I replaced `.filter((p) => p.personas.includes("PER-09"))` with `.filter(() => true)`, and the whole `CommsBroadcastsPage.test.tsx` still passed (13/13).
+     - Why: the test at `CommsBroadcastsPage.test.tsx:98` checks that `SYN-002` is absent, but `SYN-002` exists only in the `GET /projects` fixture, which a PER-09 never calls. So the assertion holds no matter what the filter does. Client-side restriction to own PER-09 projects is an explicit acceptance criterion.
+     - Fixed looks like: render the PER-09 with a second `/me/projects` entry where the user is a member without PER-09 (for example `personas: ["PER-01"]`). Assert that this project's checkbox is not offered and that it never appears in the `project_ids` of the preview or send call. The test must fail with the filter removed.
+  2. **This PR pushes the main bundle over Vite's 500 kB warning, with no TODO.** On `origin/dev` the main chunk is 487.47 kB (no warning). On this head it is 525.79 kB and Vite prints the chunk-size warning. The PR body presents the warning as if it already existed. CLAUDE.md §5 says anything found but not done needs a TODO in the same PR.
+     - Fixed looks like either of these:
+       - (a) Lazy-load the three Communications routes (route `lazy` or `React.lazy`) so the main chunk goes back under 500 kB.
+       - (b) Raise a TODO with `python scripts/tracker.py new-todo --kind later --task T-0229 --source implementer` ("route-level code splitting: main chunk 525.79 kB > 500 kB since T-0229"), add it to th
+
+- _Suggestions (non-blocking)_
+  - `comms.ts:269` (`refusalReason`): the mapping depends on the English text in `backend/app/core/mail/templates.py` (`override_problems`). Consider a `later` TODO for the backend to return a machine-readable `code` per field in the 422. Until then, a unit test that lists each current backend reason string would make any drift visible.
+  - `CommsBroadcastsPage.tsx`, `SendOutcome` for `invalid`: every 422 is shown as "no recipients", but a 422 can also come from schema validation. A generic "could not send" fallback would be more accurate.
+  - `UnsubscribePage.test.tsx`: also assert that `router.state.location.pathname` is still `/unsubscribe` after the hash is cleared.
+  - Re-size T-0229 (or note the size overrun) so the board reflects the real effort.
+  KERP-REVIEW: CHANGES_REQUESTED patch-id=e2c1a65111d445dd21ecfae902e482723be71657
+  ---
+  _Generated by [Claude Code](https://claude.ai/code)_
+
+**Review by `kingdonk-ops` — KERP-REVIEW: CHANGES_REQUESTED patch-id=492a1a8869a133a728d187281fb774c55b1d540f** · [full review](https://github.com/kingdonk-ops/Kerp-/pull/191#pullrequestreview-6014132420)
+
+- _Must fix_
+  1. `frontend/src/pages/UnsubscribePage.test.tsx:16`: the round-1 fix made this test flaky. With the eager route, `navigate({ hash: "" }, { replace: true })` used to finish before the heading appeared. With the `lazy` route, the router finishes that navigation a tick later. So `expect(router.state.location.hash).toBe("")`, read synchronously after `findByRole("heading")`, can still see `#syntheticOptOutToken_…`. I reproduced it under CPU load in 2 of about 20 runs (`AssertionError: expected '#syntheticOptOutToken_0123456789-abcd…' to be ''` at :16). The eager `routes.tsx` from `84e70cd` passed 0 failures in 24 runs under the same load. A flaky test landing on `dev` would turn other PRs' `ci-gate` red. **Fixed** = wait for the router, e.g. `await waitFor(() => { expect(router.state.location.hash).toBe(""); });`, importing `waitFor`. I tried exactly this locally: 24 of 24 runs passed under the same load.
+
+- _Suggestions (non-blocking)_
+  - The 500 kB warning is per chunk, and the eager total (main + api) is already about 499 kB. Watch for the next eager admin screen; lazy routes are now the pattern to follow.
+  - `routes.tsx:38` hard-codes `"/unsubscribe"` so the page module stays out of the main chunk. A one-line comment pointing to `UNSUBSCRIBE_PATH`, or moving the constant to a tiny module, would keep the two from drifting.
+  KERP-REVIEW: CHANGES_REQUESTED patch-id=492a1a8869a133a728d187281fb774c55b1d540f
+  ---
+  _Generated by [Claude Code](https://claude.ai/code)_
+
+**Review by `kingdonk-ops` — KERP-REVIEW: APPROVED patch-id=e7b2335936466c166449bc037b4b7367a501bbb2** · [full review](https://github.com/kingdonk-ops/Kerp-/pull/191#pullrequestreview-6014228352)
+
+- _Must fix_
+  None.
+
+- _Suggestions (non-blocking)_
+  - `UnsubscribePage.test.tsx:20` `expect(UNSUBSCRIBE_PATH).toBe("/unsubscribe")` asserts a constant. It is acceptable as a guard on the e-mail link contract. A backend/frontend contract test on the link format would be stronger (`later`).
+  KERP-REVIEW: APPROVED patch-id=e7b2335936466c166449bc037b4b7367a501bbb2
+  ---
+  _Generated by [Claude Code](https://claude.ai/code)_
 
 ---
 
